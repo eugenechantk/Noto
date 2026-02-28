@@ -24,20 +24,20 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		5DF5FAFE2F0EC372008EDC76 /* PersonalNotetaking.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PersonalNotetaking.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		5DF5FB0E2F0EC373008EDC76 /* PersonalNotetakingTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PersonalNotetakingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		5DF5FB182F0EC373008EDC76 /* PersonalNotetakingUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PersonalNotetakingUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5DF5FAFE2F0EC372008EDC76 /* Noto.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Noto.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5DF5FB182F0EC373008EDC76 /* NotoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		5DF5FB002F0EC372008EDC76 /* PersonalNotetaking */ = {
+		5DF5FB002F0EC372008EDC76 /* Noto */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = PersonalNotetaking;
+			path = Noto;
 			sourceTree = "<group>";
 		};
-		5DF5FB112F0EC373008EDC76 /* PersonalNotetakingTests */ = {
+		5DF5FB112F0EC373008EDC76 /* NotoTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = PersonalNotetakingTests;
+			path = NotoTests;
 			sourceTree = "<group>";
 		};
 		5DF5FB1B2F0EC373008EDC76 /* PersonalNotetakingUITests */ = {
@@ -75,8 +75,8 @@
 		5DF5FAF52F0EC372008EDC76 = {
 			isa = PBXGroup;
 			children = (
-				5DF5FB002F0EC372008EDC76 /* PersonalNotetaking */,
-				5DF5FB112F0EC373008EDC76 /* PersonalNotetakingTests */,
+				5DF5FB002F0EC372008EDC76 /* Noto */,
+				5DF5FB112F0EC373008EDC76 /* NotoTests */,
 				5DF5FB1B2F0EC373008EDC76 /* PersonalNotetakingUITests */,
 				5DF5FAFF2F0EC372008EDC76 /* Products */,
 			);
@@ -85,9 +85,9 @@
 		5DF5FAFF2F0EC372008EDC76 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				5DF5FAFE2F0EC372008EDC76 /* PersonalNotetaking.app */,
-				5DF5FB0E2F0EC373008EDC76 /* PersonalNotetakingTests.xctest */,
-				5DF5FB182F0EC373008EDC76 /* PersonalNotetakingUITests.xctest */,
+				5DF5FAFE2F0EC372008EDC76 /* Noto.app */,
+				5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */,
+				5DF5FB182F0EC373008EDC76 /* NotoUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,9 +95,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		5DF5FAFD2F0EC372008EDC76 /* PersonalNotetaking */ = {
+		5DF5FAFD2F0EC372008EDC76 /* Noto */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 5DF5FB222F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "PersonalNotetaking" */;
+			buildConfigurationList = 5DF5FB222F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "Noto" */;
 			buildPhases = (
 				5DF5FAFA2F0EC372008EDC76 /* Sources */,
 				5DF5FAFB2F0EC372008EDC76 /* Frameworks */,
@@ -108,18 +108,18 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				5DF5FB002F0EC372008EDC76 /* PersonalNotetaking */,
+				5DF5FB002F0EC372008EDC76 /* Noto */,
 			);
-			name = PersonalNotetaking;
+			name = Noto;
 			packageProductDependencies = (
 			);
 			productName = PersonalNotetaking;
-			productReference = 5DF5FAFE2F0EC372008EDC76 /* PersonalNotetaking.app */;
+			productReference = 5DF5FAFE2F0EC372008EDC76 /* Noto.app */;
 			productType = "com.apple.product-type.application";
 		};
-		5DF5FB0D2F0EC373008EDC76 /* PersonalNotetakingTests */ = {
+		5DF5FB0D2F0EC373008EDC76 /* NotoTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 5DF5FB252F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "PersonalNotetakingTests" */;
+			buildConfigurationList = 5DF5FB252F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "NotoTests" */;
 			buildPhases = (
 				5DF5FB0A2F0EC373008EDC76 /* Sources */,
 				5DF5FB0B2F0EC373008EDC76 /* Frameworks */,
@@ -131,18 +131,18 @@
 				5DF5FB102F0EC373008EDC76 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				5DF5FB112F0EC373008EDC76 /* PersonalNotetakingTests */,
+				5DF5FB112F0EC373008EDC76 /* NotoTests */,
 			);
-			name = PersonalNotetakingTests;
+			name = NotoTests;
 			packageProductDependencies = (
 			);
 			productName = PersonalNotetakingTests;
-			productReference = 5DF5FB0E2F0EC373008EDC76 /* PersonalNotetakingTests.xctest */;
+			productReference = 5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		5DF5FB172F0EC373008EDC76 /* PersonalNotetakingUITests */ = {
+		5DF5FB172F0EC373008EDC76 /* NotoUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 5DF5FB282F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "PersonalNotetakingUITests" */;
+			buildConfigurationList = 5DF5FB282F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "NotoUITests" */;
 			buildPhases = (
 				5DF5FB142F0EC373008EDC76 /* Sources */,
 				5DF5FB152F0EC373008EDC76 /* Frameworks */,
@@ -156,11 +156,11 @@
 			fileSystemSynchronizedGroups = (
 				5DF5FB1B2F0EC373008EDC76 /* PersonalNotetakingUITests */,
 			);
-			name = PersonalNotetakingUITests;
+			name = NotoUITests;
 			packageProductDependencies = (
 			);
 			productName = PersonalNotetakingUITests;
-			productReference = 5DF5FB182F0EC373008EDC76 /* PersonalNotetakingUITests.xctest */;
+			productReference = 5DF5FB182F0EC373008EDC76 /* NotoUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -200,9 +200,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				5DF5FAFD2F0EC372008EDC76 /* PersonalNotetaking */,
-				5DF5FB0D2F0EC373008EDC76 /* PersonalNotetakingTests */,
-				5DF5FB172F0EC373008EDC76 /* PersonalNotetakingUITests */,
+				5DF5FAFD2F0EC372008EDC76 /* Noto */,
+				5DF5FB0D2F0EC373008EDC76 /* NotoTests */,
+				5DF5FB172F0EC373008EDC76 /* NotoUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -258,12 +258,12 @@
 /* Begin PBXTargetDependency section */
 		5DF5FB102F0EC373008EDC76 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 5DF5FAFD2F0EC372008EDC76 /* PersonalNotetaking */;
+			target = 5DF5FAFD2F0EC372008EDC76 /* Noto */;
 			targetProxy = 5DF5FB0F2F0EC373008EDC76 /* PBXContainerItemProxy */;
 		};
 		5DF5FB1A2F0EC373008EDC76 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 5DF5FAFD2F0EC372008EDC76 /* PersonalNotetaking */;
+			target = 5DF5FAFD2F0EC372008EDC76 /* Noto */;
 			targetProxy = 5DF5FB192F0EC373008EDC76 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -567,7 +567,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		5DF5FB222F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "PersonalNotetaking" */ = {
+		5DF5FB222F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "Noto" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5DF5FB232F0EC373008EDC76 /* Debug */,
@@ -576,7 +576,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		5DF5FB252F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "PersonalNotetakingTests" */ = {
+		5DF5FB252F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "NotoTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5DF5FB262F0EC373008EDC76 /* Debug */,
@@ -585,7 +585,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		5DF5FB282F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "PersonalNotetakingUITests" */ = {
+		5DF5FB282F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "NotoUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5DF5FB292F0EC373008EDC76 /* Debug */,
