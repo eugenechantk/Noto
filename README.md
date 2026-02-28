@@ -66,7 +66,7 @@ This search should work offline as well.
 
 This also serves as the backbone for AI chat, which requires some grounding from the blocks I wrote.
 
-### Today notes / Inbox
+### Today notes / Inbox / An easy way to dump ideas
 
 ### Templates & auto-fill
 
