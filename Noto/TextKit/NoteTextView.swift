@@ -7,15 +7,19 @@
 //
 
 import UIKit
+import os.log
+
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NoteTextView")
 
 protocol NoteTextViewDelegate: AnyObject {
     func noteTextViewDidBeginEditing(_ noteTextView: NoteTextView)
     func noteTextViewDidEndEditing(_ noteTextView: NoteTextView)
     func noteTextViewDidChange(_ noteTextView: NoteTextView)
+    func noteTextView(_ noteTextView: NoteTextView, moveLineAt sourceIndex: Int, toLineAt destinationIndex: Int)
 }
 
 /// Custom `UITextView` subclass for showing & editing a given note.
-final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate {
+final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, UIGestureRecognizerDelegate {
 
     private var noteTextStorage: NoteTextStorage {
         return textStorage as! NoteTextStorage
@@ -47,12 +51,25 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate {
         resetTypingAttributes()
         setUpInputAccessoryBar()
         registerForKeyboardNotifications()
+        setUpReorderGesture()
     }
 
     private func setUpInputAccessoryBar() {
         let toolbar = UIToolbar()
         toolbar.sizeToFit()
 
+        let indentButton = UIBarButtonItem(
+            image: UIImage(systemName: "increase.indent"),
+            style: .plain,
+            target: self,
+            action: #selector(indentCurrentLine)
+        )
+        let outdentButton = UIBarButtonItem(
+            image: UIImage(systemName: "decrease.indent"),
+            style: .plain,
+            target: self,
+            action: #selector(outdentCurrentLine)
+        )
         let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
         let doneButton = UIBarButtonItem(
             image: UIImage(systemName: "keyboard.chevron.compact.down"),
@@ -60,7 +77,7 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate {
             target: self,
             action: #selector(dismissKeyboardTapped)
         )
-        toolbar.items = [flexSpace, doneButton]
+        toolbar.items = [indentButton, outdentButton, flexSpace, doneButton]
         self.inputAccessoryView = toolbar
     }
 
@@ -315,6 +332,350 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate {
         if let oldScrollIndicatorInsets = oldScrollIndicatorInsets {
             verticalScrollIndicatorInsets = oldScrollIndicatorInsets
         }
+    }
+
+    // MARK: - Indent / Outdent
+
+    override var keyCommands: [UIKeyCommand]? {
+        [
+            UIKeyCommand(input: "\t", modifierFlags: [], action: #selector(indentCurrentLine)),
+            UIKeyCommand(input: "\t", modifierFlags: .shift, action: #selector(outdentCurrentLine))
+        ]
+    }
+
+    @objc private func indentCurrentLine() {
+        noteTextStorage.indentLine(at: selectedRange.location)
+        noteTextViewDelegate?.noteTextViewDidChange(self)
+    }
+
+    @objc private func outdentCurrentLine() {
+        noteTextStorage.outdentLine(at: selectedRange.location)
+        noteTextViewDelegate?.noteTextViewDidChange(self)
+    }
+
+    // MARK: - Long-Press Drag Reorder
+
+    private struct DragState {
+        let sourceLineIndex: Int
+        let sourceLineRange: NSRange
+        let snapshotView: UIView
+        let snapshotOffsetY: CGFloat
+        let insertionIndicator: UIView
+        var currentTargetIndex: Int
+    }
+
+    private var dragState: DragState?
+    private var reorderGesture: UILongPressGestureRecognizer?
+    private var autoScrollTimer: CADisplayLink?
+    private var autoScrollSpeed: CGFloat = 0
+
+    private func setUpReorderGesture() {
+        let gesture = UILongPressGestureRecognizer(target: self, action: #selector(handleReorderGesture(_:)))
+        gesture.minimumPressDuration = 0.3
+        gesture.delegate = self
+        addGestureRecognizer(gesture)
+        reorderGesture = gesture
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+        return false
+    }
+
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === reorderGesture else {
+            return super.gestureRecognizerShouldBegin(gestureRecognizer)
+        }
+        // Only start if the touch is on a valid line
+        let point = gestureRecognizer.location(in: self)
+        return lineIndex(at: point) != nil
+    }
+
+    @objc private func handleReorderGesture(_ gesture: UILongPressGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            reorderBegan(gesture)
+        case .changed:
+            reorderChanged(gesture)
+        case .ended:
+            reorderEnded(gesture)
+        case .cancelled, .failed:
+            reorderCancelled()
+        default:
+            break
+        }
+    }
+
+    // MARK: Reorder — .began
+
+    private func reorderBegan(_ gesture: UILongPressGestureRecognizer) {
+        let point = gesture.location(in: self)
+        guard let lineIdx = lineIndex(at: point) else { return }
+        guard let lineRange = rangeForLine(lineIdx) else { return }
+        let lineRect = rectForLine(lineIdx)
+
+        // Dismiss keyboard and disable editing during drag
+        resignFirstResponder()
+        isEditable = false
+
+        // Snapshot of the line
+        let snapshot = createLineSnapshot(for: lineRect)
+        snapshot.center = CGPoint(x: lineRect.midX, y: lineRect.midY)
+        addSubview(snapshot)
+
+        let offsetY = point.y - lineRect.midY
+
+        // Insertion indicator
+        let indicator = UIView()
+        indicator.backgroundColor = tintColor
+        indicator.frame = CGRect(x: textContainerInset.left, y: lineRect.minY, width: bounds.width - textContainerInset.left - textContainerInset.right, height: 2)
+        indicator.layer.cornerRadius = 1
+        addSubview(indicator)
+
+        // Dim source line
+        dimLine(at: lineIdx, alpha: 0.15)
+
+        // Haptic
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+
+        dragState = DragState(
+            sourceLineIndex: lineIdx,
+            sourceLineRange: lineRange,
+            snapshotView: snapshot,
+            snapshotOffsetY: offsetY,
+            insertionIndicator: indicator,
+            currentTargetIndex: lineIdx
+        )
+    }
+
+    // MARK: Reorder — .changed
+
+    private func reorderChanged(_ gesture: UILongPressGestureRecognizer) {
+        guard var state = dragState else { return }
+        let point = gesture.location(in: self)
+
+        // Move snapshot to follow touch
+        state.snapshotView.center.y = point.y - state.snapshotOffsetY
+
+        // Compute target insertion index
+        let totalLines = lineCount()
+        var targetIndex = state.sourceLineIndex
+        for i in 0..<totalLines {
+            let lineRect = rectForLine(i)
+            if point.y < lineRect.midY {
+                targetIndex = i
+                break
+            }
+            targetIndex = i + 1
+        }
+        targetIndex = max(0, min(targetIndex, totalLines))
+
+        // Reposition insertion indicator
+        let indicatorY: CGFloat
+        if targetIndex < totalLines {
+            indicatorY = rectForLine(targetIndex).minY - 1
+        } else {
+            indicatorY = rectForLine(totalLines - 1).maxY - 1
+        }
+        state.insertionIndicator.frame.origin.y = indicatorY
+
+        // Haptic on target change
+        if targetIndex != state.currentTargetIndex {
+            let light = UIImpactFeedbackGenerator(style: .light)
+            light.impactOccurred()
+            state.currentTargetIndex = targetIndex
+        }
+
+        dragState = state
+
+        // Auto-scroll near edges
+        handleAutoScroll(touchY: point.y)
+    }
+
+    // MARK: Reorder — .ended
+
+    private func reorderEnded(_ gesture: UILongPressGestureRecognizer) {
+        guard let state = dragState else { return }
+        let source = state.sourceLineIndex
+        let destination = state.currentTargetIndex
+
+        cleanUpDrag()
+
+        // Notify delegate if position actually changed
+        // destination == source or destination == source + 1 means no-op
+        if destination != source && destination != source + 1 {
+            noteTextViewDelegate?.noteTextView(self, moveLineAt: source, toLineAt: destination)
+        }
+    }
+
+    // MARK: Reorder — .cancelled
+
+    private func reorderCancelled() {
+        cleanUpDrag()
+    }
+
+    // MARK: Reorder — cleanup
+
+    private func cleanUpDrag() {
+        guard let state = dragState else { return }
+
+        state.snapshotView.removeFromSuperview()
+        state.insertionIndicator.removeFromSuperview()
+
+        // Restore source line opacity
+        restoreLineDim(at: state.sourceLineIndex)
+
+        dragState = nil
+        isEditable = true
+
+        stopAutoScroll()
+    }
+
+    // MARK: Reorder — line geometry helpers
+
+    private func lineIndex(at point: CGPoint) -> Int? {
+        let adjustedPoint = CGPoint(
+            x: point.x - textContainerInset.left,
+            y: point.y - textContainerInset.top
+        )
+        let charIndex = layoutManager.characterIndex(
+            for: adjustedPoint,
+            in: textContainer,
+            fractionOfDistanceBetweenInsertionPoints: nil
+        )
+        guard charIndex < textStorage.length else { return nil }
+
+        let text = textStorage.string
+        var lineIdx = 0
+        var searchStart = text.startIndex
+        while searchStart < text.endIndex {
+            let lineEnd = text[searchStart...].firstIndex(of: "\n") ?? text.endIndex
+            let nsLoc = text.distance(from: text.startIndex, to: searchStart)
+            let nsEnd = text.distance(from: text.startIndex, to: lineEnd)
+            if charIndex >= nsLoc && charIndex <= nsEnd {
+                return lineIdx
+            }
+            if lineEnd < text.endIndex {
+                searchStart = text.index(after: lineEnd)
+            } else {
+                break
+            }
+            lineIdx += 1
+        }
+        return lineIdx
+    }
+
+    private func lineCount() -> Int {
+        let text = textStorage.string
+        if text.isEmpty { return 1 }
+        return text.components(separatedBy: "\n").count
+    }
+
+    private func rangeForLine(_ index: Int) -> NSRange? {
+        let text = textStorage.string
+        let lines = text.components(separatedBy: "\n")
+        guard index >= 0 && index < lines.count else { return nil }
+
+        var location = 0
+        for i in 0..<index {
+            location += lines[i].count + 1 // +1 for newline
+        }
+        let length = lines[index].count
+        return NSRange(location: location, length: length)
+    }
+
+    private func rectForLine(_ index: Int) -> CGRect {
+        guard let range = rangeForLine(index) else { return .zero }
+        // Use at least length 1 so empty lines still have a rect
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: NSRange(location: range.location, length: max(range.length, 1)),
+            actualCharacterRange: nil
+        )
+        var lineRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+        lineRect.origin.x += textContainerInset.left
+        lineRect.origin.y += textContainerInset.top
+        lineRect.size.width = bounds.width - textContainerInset.left - textContainerInset.right
+        return lineRect
+    }
+
+    private func createLineSnapshot(for rect: CGRect) -> UIView {
+        let snapshot = UIView(frame: rect)
+        snapshot.backgroundColor = .systemBackground
+
+        // Render the line region into an image
+        let renderer = UIGraphicsImageRenderer(bounds: rect)
+        let image = renderer.image { ctx in
+            self.layer.render(in: ctx.cgContext)
+        }
+        let imageView = UIImageView(image: image)
+        imageView.frame = snapshot.bounds
+        snapshot.addSubview(imageView)
+
+        // Shadow and slight scale
+        snapshot.layer.shadowColor = UIColor.black.cgColor
+        snapshot.layer.shadowOpacity = 0.25
+        snapshot.layer.shadowRadius = 8
+        snapshot.layer.shadowOffset = CGSize(width: 0, height: 2)
+        snapshot.transform = CGAffineTransform(scaleX: 1.03, y: 1.03)
+        snapshot.alpha = 0.9
+
+        return snapshot
+    }
+
+    // MARK: Reorder — visual feedback helpers
+
+    private func dimLine(at lineIndex: Int, alpha: CGFloat) {
+        guard let range = rangeForLine(lineIndex) else { return }
+        textStorage.addAttribute(.foregroundColor, value: UIColor.label.withAlphaComponent(alpha), range: range)
+    }
+
+    private func restoreLineDim(at lineIndex: Int) {
+        guard let range = rangeForLine(lineIndex) else { return }
+        textStorage.addAttribute(.foregroundColor, value: UIColor.label, range: range)
+    }
+
+    // MARK: Reorder — auto-scroll
+
+    private func handleAutoScroll(touchY: CGFloat) {
+        let visibleTop = contentOffset.y
+        let visibleBottom = contentOffset.y + bounds.height - contentInset.bottom
+        let edgeMargin: CGFloat = 50
+
+        if touchY < visibleTop + edgeMargin {
+            autoScrollSpeed = -4.0
+            startAutoScroll()
+        } else if touchY > visibleBottom - edgeMargin {
+            autoScrollSpeed = 4.0
+            startAutoScroll()
+        } else {
+            stopAutoScroll()
+        }
+    }
+
+    private func startAutoScroll() {
+        guard autoScrollTimer == nil else { return }
+        let link = CADisplayLink(target: self, selector: #selector(autoScrollTick))
+        link.add(to: .main, forMode: .common)
+        autoScrollTimer = link
+    }
+
+    private func stopAutoScroll() {
+        autoScrollTimer?.invalidate()
+        autoScrollTimer = nil
+        autoScrollSpeed = 0
+    }
+
+    @objc private func autoScrollTick() {
+        guard dragState != nil else {
+            stopAutoScroll()
+            return
+        }
+        let maxY = max(contentSize.height - bounds.height + contentInset.bottom, 0)
+        let newY = min(max(contentOffset.y + autoScrollSpeed, 0), maxY)
+        contentOffset.y = newY
     }
 
     // MARK: - Helpers

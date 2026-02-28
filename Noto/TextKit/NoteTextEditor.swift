@@ -13,6 +13,7 @@ struct NoteTextEditor: UIViewRepresentable {
     @Binding var text: String
     var onBeginEditing: (() -> Void)?
     var onEndEditing: (() -> Void)?
+    var onReorderLine: ((_ source: Int, _ destination: Int) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -88,6 +89,10 @@ struct NoteTextEditor: UIViewRepresentable {
 
         func noteTextViewDidChange(_ noteTextView: NoteTextView) {
             syncText()
+        }
+
+        func noteTextView(_ noteTextView: NoteTextView, moveLineAt sourceIndex: Int, toLineAt destinationIndex: Int) {
+            parent.onReorderLine?(sourceIndex, destinationIndex)
         }
 
         private func syncText() {
