@@ -1,6 +1,6 @@
 //
 //  SearchIndex.swift
-//  PersonalNotetaking
+//  Noto
 //
 //  Full-text search index for keyword search.
 //

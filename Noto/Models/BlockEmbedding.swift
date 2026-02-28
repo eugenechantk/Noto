@@ -1,6 +1,6 @@
 //
 //  BlockEmbedding.swift
-//  PersonalNotetaking
+//  Noto
 //
 //  Stores vector embeddings for semantic search.
 //

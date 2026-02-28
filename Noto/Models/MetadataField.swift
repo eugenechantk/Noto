@@ -1,6 +1,6 @@
 //
 //  MetadataField.swift
-//  PersonalNotetaking
+//  Noto
 //
 //  Custom metadata fields attached to blocks.
 //

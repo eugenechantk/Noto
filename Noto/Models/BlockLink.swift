@@ -1,6 +1,6 @@
 //
 //  BlockLink.swift
-//  PersonalNotetaking
+//  Noto
 //
 //  Tracks bidirectional references between blocks.
 //

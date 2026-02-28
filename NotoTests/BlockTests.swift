@@ -1,6 +1,6 @@
 //
 //  BlockTests.swift
-//  PersonalNotetakingTests
+//  NotoTests
 //
 //  Unit tests for Block and BlockLink data models.
 //
@@ -8,7 +8,7 @@
 import Testing
 import Foundation
 import SwiftData
-@testable import PersonalNotetaking
+@testable import Noto
 
 // MARK: - Test Container Helper
 

@@ -1,6 +1,6 @@
 //
 //  Tag.swift
-//  PersonalNotetaking
+//  Noto
 //
 //  Tag and BlockTag models for categorization.
 //

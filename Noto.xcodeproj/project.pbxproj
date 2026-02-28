@@ -12,14 +12,14 @@
 			containerPortal = 5DF5FAF62F0EC372008EDC76 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 5DF5FAFD2F0EC372008EDC76;
-			remoteInfo = PersonalNotetaking;
+			remoteInfo = Noto;
 		};
 		5DF5FB192F0EC373008EDC76 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5DF5FAF62F0EC372008EDC76 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 5DF5FAFD2F0EC372008EDC76;
-			remoteInfo = PersonalNotetaking;
+			remoteInfo = Noto;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -40,9 +40,9 @@
 			path = NotoTests;
 			sourceTree = "<group>";
 		};
-		5DF5FB1B2F0EC373008EDC76 /* PersonalNotetakingUITests */ = {
+		5DF5FB1B2F0EC373008EDC76 /* NotoUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = PersonalNotetakingUITests;
+			path = NotoUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -77,7 +77,7 @@
 			children = (
 				5DF5FB002F0EC372008EDC76 /* Noto */,
 				5DF5FB112F0EC373008EDC76 /* NotoTests */,
-				5DF5FB1B2F0EC373008EDC76 /* PersonalNotetakingUITests */,
+				5DF5FB1B2F0EC373008EDC76 /* NotoUITests */,
 				5DF5FAFF2F0EC372008EDC76 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -113,7 +113,7 @@
 			name = Noto;
 			packageProductDependencies = (
 			);
-			productName = PersonalNotetaking;
+			productName = Noto;
 			productReference = 5DF5FAFE2F0EC372008EDC76 /* Noto.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -136,7 +136,7 @@
 			name = NotoTests;
 			packageProductDependencies = (
 			);
-			productName = PersonalNotetakingTests;
+			productName = NotoTests;
 			productReference = 5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
@@ -154,12 +154,12 @@
 				5DF5FB1A2F0EC373008EDC76 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				5DF5FB1B2F0EC373008EDC76 /* PersonalNotetakingUITests */,
+				5DF5FB1B2F0EC373008EDC76 /* NotoUITests */,
 			);
 			name = NotoUITests;
 			packageProductDependencies = (
 			);
-			productName = PersonalNotetakingUITests;
+			productName = NotoUITests;
 			productReference = 5DF5FB182F0EC373008EDC76 /* NotoUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
@@ -390,7 +390,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = PersonalNotetaking/PersonalNotetaking.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Noto/Noto.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 39GJBP8V5A;
@@ -430,7 +430,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = PersonalNotetaking/PersonalNotetaking.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Noto/Noto.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 39GJBP8V5A;
@@ -476,14 +476,14 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.PersonalNotetakingTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.NotoTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PersonalNotetaking.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PersonalNotetaking";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Noto.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Noto";
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
 			name = Debug;
@@ -499,14 +499,14 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.PersonalNotetakingTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.NotoTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PersonalNotetaking.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PersonalNotetaking";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Noto.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Noto";
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
 			name = Release;
@@ -521,14 +521,14 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.PersonalNotetakingUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.NotoUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = PersonalNotetaking;
+				TEST_TARGET_NAME = Noto;
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
 			name = Debug;
@@ -543,14 +543,14 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.PersonalNotetakingUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.NotoUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = PersonalNotetaking;
+				TEST_TARGET_NAME = Noto;
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
 			name = Release;

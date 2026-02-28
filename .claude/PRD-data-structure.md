@@ -355,18 +355,18 @@ This test UI validates the data layer before investing in the final UI/UX.
 
 | File | Action | Description |
 |------|--------|-------------|
-| `PersonalNotetaking/Models/Block.swift` | Create | Core Block model with SwiftData |
-| `PersonalNotetaking/Models/BlockLink.swift` | Create | Bidirectional linking model |
-| `PersonalNotetaking/Models/Tag.swift` | Create | Tag and BlockTag models |
-| `PersonalNotetaking/Models/MetadataField.swift` | Create | Custom metadata fields for blocks |
-| `PersonalNotetaking/Models/BlockEmbedding.swift` | Create | Embedding storage for semantic search |
-| `PersonalNotetaking/Models/SearchIndex.swift` | Create | Full-text search index |
-| `PersonalNotetaking/Item.swift` | Delete | Replace with new Block model |
-| `PersonalNotetaking/PersonalNotetakingApp.swift` | Modify | Update ModelContainer schema |
-| `PersonalNotetaking/Views/TestOutlineView.swift` | Create | Minimal test UI for outline tree |
-| `PersonalNotetaking/Views/BlockRowView.swift` | Create | Single block row component |
-| `PersonalNotetaking/ContentView.swift` | Modify | Replace with TestOutlineView |
-| `PersonalNotetakingTests/BlockTests.swift` | Create | Unit tests for Block and BlockLink |
+| `Noto/Models/Block.swift` | Create | Core Block model with SwiftData |
+| `Noto/Models/BlockLink.swift` | Create | Bidirectional linking model |
+| `Noto/Models/Tag.swift` | Create | Tag and BlockTag models |
+| `Noto/Models/MetadataField.swift` | Create | Custom metadata fields for blocks |
+| `Noto/Models/BlockEmbedding.swift` | Create | Embedding storage for semantic search |
+| `Noto/Models/SearchIndex.swift` | Create | Full-text search index |
+| `Noto/Item.swift` | Delete | Replace with new Block model |
+| `Noto/NotoApp.swift` | Modify | Update ModelContainer schema |
+| `Noto/Views/TestOutlineView.swift` | Create | Minimal test UI for outline tree |
+| `Noto/Views/BlockRowView.swift` | Create | Single block row component |
+| `Noto/ContentView.swift` | Modify | Replace with TestOutlineView |
+| `NotoTests/BlockTests.swift` | Create | Unit tests for Block and BlockLink |
 
 ---
 

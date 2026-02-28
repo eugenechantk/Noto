@@ -1,6 +1,6 @@
 //
 //  Block.swift
-//  PersonalNotetaking
+//  Noto
 //
 //  Core entity for outline-based note-taking.
 //
@@ -174,5 +174,40 @@ final class Block {
             return 1.0
         }
         return lastSortOrder + 1.0
+    }
+
+    // MARK: - Node View Flattening
+
+    /// Entry in a flattened block tree for display in NodeView.
+    struct FlatEntry {
+        let block: Block
+        let indentLevel: Int
+    }
+
+    /// Flatten this block's descendants for display in NodeView.
+    /// - Parameter expanded: If true, include ALL descendants. If false, include only children and grandchildren.
+    /// - Returns: Array of `FlatEntry` with correct indent levels.
+    func flattenedDescendants(expanded: Bool) -> [FlatEntry] {
+        var result: [FlatEntry] = []
+        for child in sortedChildren {
+            result.append(FlatEntry(block: child, indentLevel: 0))
+            if expanded {
+                appendAllDescendants(of: child, rootDepth: self.depth, to: &result)
+            } else {
+                for grandchild in child.sortedChildren {
+                    let indent = grandchild.depth - self.depth - 1
+                    result.append(FlatEntry(block: grandchild, indentLevel: indent))
+                }
+            }
+        }
+        return result
+    }
+
+    private func appendAllDescendants(of parent: Block, rootDepth: Int, to result: inout [FlatEntry]) {
+        for child in parent.sortedChildren {
+            let indentLevel = child.depth - rootDepth - 1
+            result.append(FlatEntry(block: child, indentLevel: indentLevel))
+            appendAllDescendants(of: child, rootDepth: rootDepth, to: &result)
+        }
     }
 }
