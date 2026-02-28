@@ -1,6 +1,6 @@
 //
-//  PersonalNotetakingApp.swift
-//  PersonalNotetaking
+//  NotoApp.swift
+//  Noto
 //
 //  Created by Eugene Chan on 1/8/26.
 //
@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct PersonalNotetakingApp: App {
+struct NotoApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Block.self,

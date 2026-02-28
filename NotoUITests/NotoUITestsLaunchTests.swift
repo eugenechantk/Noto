@@ -1,13 +1,13 @@
 //
-//  PersonalNotetakingUITestsLaunchTests.swift
-//  PersonalNotetakingUITests
+//  NotoUITestsLaunchTests.swift
+//  NotoUITests
 //
 //  Created by Eugene Chan on 1/8/26.
 //
 
 import XCTest
 
-final class PersonalNotetakingUITestsLaunchTests: XCTestCase {
+final class NotoUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

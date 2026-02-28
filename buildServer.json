@@ -12,8 +12,8 @@
 	"argv": [
 		"/opt/homebrew/bin/xcode-build-server"
 	],
-	"workspace": "/Users/eugenechan/dev/personal/PersonalNotetaking/PersonalNotetaking.xcodeproj/project.xcworkspace",
-	"build_root": "/Users/eugenechan/Library/Developer/Xcode/DerivedData/PersonalNotetaking-gaigpflfgdyqgmguyaljmvrjujtw",
-	"scheme": "PersonalNotetaking",
+	"workspace": "/Users/eugenechan/dev/personal/Noto/Noto.xcodeproj/project.xcworkspace",
+	"build_root": "/Users/eugenechan/Library/Developer/Xcode/DerivedData/Noto-avkhatqcdtvymufbhyrxtlkrfeqb",
+	"scheme": "Noto",
 	"kind": "xcode"
 }

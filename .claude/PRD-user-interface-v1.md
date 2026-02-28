@@ -110,6 +110,46 @@ The app is a universal Apple app. Both platforms share the same SwiftUI views wi
 
 ---
 
+## Required Tests
+
+Unit tests validating the UI operations against the data layer. Tests operate directly on `ModelContext` and `Block` model, simulating the actions the views perform.
+
+### Block Creation Tests
+- `testCreateFirstRootBlock` — Creating a block when no blocks exist inserts a root block with `parent = nil`, `depth = 0`, empty content, and `sortOrder = 1.0`
+- `testCreateBlockAfterExisting` — Pressing Return after an existing block creates a new sibling below it with `sortOrder` between the current block and the next sibling (or +1 if last)
+- `testCreateBlockBetweenSiblings` — New block inserted between two siblings gets `sortOrder` as the midpoint of its neighbors
+- `testCreateChildInNodeView` — Creating a child in node view sets `parentId = currentNode.id` and `depth = currentNode.depth + 1`
+
+### Block Deletion Tests
+- `testDeleteEmptyBlock` — Deleting an empty block removes it from the model context
+- `testDeleteBlockCascadesToChildren` — Deleting a block with children also deletes all descendants
+- `testDeleteNonEmptyBlockIgnored` — The delete-on-backspace operation is a no-op when the block has content
+
+### Block Editing Tests
+- `testEditBlockContent` — Updating a block's `content` persists correctly
+- `testEditBlockUpdatesTimestamp` — Updating content sets `updatedAt` to a newer date
+
+### Reorder Tests
+- `testReorderMovesBlockDown` — Moving a block from index 0 to index 2 recalculates all sortOrders sequentially
+- `testReorderMovesBlockUp` — Moving a block from index 2 to index 0 recalculates all sortOrders sequentially
+- `testReorderPreservesContent` — Block content is unchanged after reorder
+
+### Reorganize (Indent / Outdent) Tests
+- `testIndentMakesChildOfPreviousSibling` — Indenting a block sets its `parent` to the previous sibling and increments `depth`
+- `testIndentFirstSiblingFails` — Indenting the first sibling (no previous sibling) returns `false` and makes no changes
+- `testOutdentMakesSiblingOfParent` — Outdenting a block sets its `parent` to the grandparent (or `nil`) and decrements `depth`
+- `testOutdentRootBlockFails` — Outdenting a root block returns `false` and makes no changes
+- `testIndentUpdatesDescendantDepths` — Indenting a block with children increments depth for all descendants
+
+### Node View Flattening Tests
+- `testFlattenCollapsedShowsChildrenAndGrandchildren` — In collapsed mode, the flattened list includes direct children (indent 0) and grandchildren (indent 1), but not great-grandchildren
+- `testFlattenExpandedShowsAllDescendants` — In expanded mode, all descendants appear with correct indent levels
+- `testFlattenIndentLevelFormula` — Each block's indent level equals `block.depth - currentNode.depth - 1`
+- `testFlattenDirectChildrenHaveIndentZero` — Direct children always have indent level 0 (no bullet)
+- `testFlattenPreservesSortOrder` — Blocks within the same parent appear in `sortOrder` ascending order
+
+---
+
 ## Not in scope for v1 UI
 
 These features exist in the data model but will not have UI in v1:
