@@ -12,7 +12,13 @@ import SwiftData
 struct PersonalNotetakingApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Block.self,
+            BlockLink.self,
+            Tag.self,
+            BlockTag.self,
+            MetadataField.self,
+            BlockEmbedding.self,
+            SearchIndex.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
