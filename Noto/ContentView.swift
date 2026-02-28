@@ -10,47 +10,95 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Block.updatedAt, order: .reverse)
+    @Query(sort: \Block.sortOrder)
     private var allBlocks: [Block]
 
-    private var rootBlock: Block? {
-        allBlocks.first { $0.parent == nil && !$0.isArchived }
+    private var rootBlocks: [Block] {
+        allBlocks.filter { $0.parent == nil && !$0.isArchived }
     }
 
     @State private var editableContent: String = ""
     @State private var hasLoaded = false
 
+    @State private var showDebug = false
+    @State private var isSyncing = false
+
     var body: some View {
-        NoteTextEditor(text: $editableContent)
-            .ignoresSafeArea(.keyboard)
-            .onAppear {
-                loadContent()
+        ZStack(alignment: .bottom) {
+            NoteTextEditor(text: $editableContent)
+                .ignoresSafeArea(.keyboard)
+                .onAppear {
+                    loadContent()
+                }
+                .onChange(of: editableContent) {
+                    syncContent()
+                }
+
+            if showDebug {
+                DebugPanelView(blocks: rootBlocks)
+                    .transition(.move(edge: .bottom))
             }
-            .onChange(of: editableContent) {
-                syncContent()
+        }
+        .safeAreaInset(edge: .top) {
+            HStack {
+                Spacer()
+                Button {
+                    withAnimation { showDebug.toggle() }
+                } label: {
+                    Image(systemName: showDebug ? "ladybug.fill" : "ladybug")
+                        .font(.caption)
+                        .padding(8)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .padding(.trailing, 12)
             }
+            .frame(height: 32)
+        }
     }
 
     private func loadContent() {
         guard !hasLoaded else { return }
         hasLoaded = true
 
-        if let block = rootBlock {
-            editableContent = block.content
-        } else {
-            // Create the single root block
+        let blocks = rootBlocks
+        if blocks.isEmpty {
             let block = Block(content: "", sortOrder: 1.0)
             modelContext.insert(block)
+        } else {
+            editableContent = blocks.map(\.content).joined(separator: "\n")
         }
     }
 
     private func syncContent() {
-        guard hasLoaded else { return }
+        guard hasLoaded, !isSyncing else { return }
+        isSyncing = true
+        defer { isSyncing = false }
 
-        if let block = rootBlock {
-            if block.content != editableContent {
-                block.content = editableContent
-                block.updatedAt = Date()
+        let lines = editableContent.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var blocks = rootBlocks
+
+        // Update existing blocks
+        for i in 0..<min(lines.count, blocks.count) {
+            if blocks[i].content != lines[i] {
+                blocks[i].content = lines[i]
+                blocks[i].updatedAt = Date()
+            }
+        }
+
+        // Create new blocks for extra lines
+        if lines.count > blocks.count {
+            for i in blocks.count..<lines.count {
+                let sortOrder = (blocks.last?.sortOrder ?? 0) + Double(i - blocks.count + 1)
+                let block = Block(content: lines[i], sortOrder: sortOrder)
+                modelContext.insert(block)
+                blocks.append(block)
+            }
+        }
+
+        // Delete excess blocks
+        if blocks.count > lines.count {
+            for i in stride(from: blocks.count - 1, through: lines.count, by: -1) {
+                modelContext.delete(blocks[i])
             }
         }
     }
