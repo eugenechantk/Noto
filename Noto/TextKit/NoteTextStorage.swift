@@ -712,6 +712,18 @@ fileprivate final class ListsFormatter: Formatter {
         // Fixes caret position.
         let itemNewline = NSMakeRange(change.lineRange.location - 1 + caretOffset, 1)
         storage.setAttribute(.caret, value: true, range: itemNewline)
+
+        // Restore bodyStyle on the caret character (setAttribute wipes all attributes)
+        // and on the preceding newline, so the paragraph after the list gets
+        // normal body spacing instead of the list's tight spacing.
+        for (key, value) in bodyStyle {
+            storage.addAttribute(key, value: value, range: itemNewline)
+        }
+        let newlineIndex = change.lineRange.location - 1
+        if newlineIndex >= 0 && newlineIndex != itemNewline.location {
+            storage.setAttributes(bodyStyle, range: NSMakeRange(newlineIndex, 1))
+        }
+
         return formattedText(caretAtLine: itemNewline.location)
     }
 

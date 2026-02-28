@@ -39,12 +39,37 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate {
         self.spellCheckingType = .no
         self.autocorrectionType = .no
         self.autocapitalizationType = .sentences
-        self.dataDetectorTypes = [.link, .phoneNumber]
         self.font = noteTextStorage.bodyFont
         self.textColor = .label
+        self.isEditable = true
         self.isSelectable = true
 
         resetTypingAttributes()
+        setUpInputAccessoryBar()
+        registerForKeyboardNotifications()
+    }
+
+    private func setUpInputAccessoryBar() {
+        let toolbar = UIToolbar()
+        toolbar.sizeToFit()
+
+        let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        let doneButton = UIBarButtonItem(
+            image: UIImage(systemName: "keyboard.chevron.compact.down"),
+            style: .plain,
+            target: self,
+            action: #selector(dismissKeyboardTapped)
+        )
+        toolbar.items = [flexSpace, doneButton]
+        self.inputAccessoryView = toolbar
+    }
+
+    @objc private func dismissKeyboardTapped() {
+        resignFirstResponder()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func resetTypingAttributes() {
@@ -65,69 +90,6 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate {
 
     weak var noteTextViewDelegate: NoteTextViewDelegate?
 
-    // MARK: - User Interaction
-
-    private var initialTouchY: CGFloat = 0
-
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        super.touchesBegan(touches, with: event)
-        initialTouchY = touches.first!.location(in: self).y
-    }
-
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        let touch = touches.first!
-        let swipeDistance = abs(touch.location(in: self).y - initialTouchY)
-        if  swipeDistance <= 10 {
-            if !didTapNoteView(touch) {
-                super.touchesEnded(touches, with: event)
-            }
-        }
-    }
-
-    @objc private func didTapNoteView(_ touch: UITouch) -> Bool {
-        var location = touch.location(in: self)
-        location.x -= self.textContainerInset.left;
-        location.y -= self.textContainerInset.top;
-
-        var unitInsertionPoint: CGFloat = 0
-        let charIndex = self.layoutManager.characterIndex(
-            for: location,
-            in: self.textContainer,
-            fractionOfDistanceBetweenInsertionPoints: &unitInsertionPoint
-        )
-        assert(unitInsertionPoint >= 0.0 && unitInsertionPoint <= 1.0)
-
-        if !detectTappableText(at: charIndex, with: unitInsertionPoint) {
-            startEditing(at: charIndex, with: unitInsertionPoint)
-            return true
-        } else {
-            return false
-        }
-    }
-
-    private func detectTappableText(at charIndex: Int,
-                                    with unitInsertionPoint: CGFloat) -> Bool {
-        guard charIndex < self.textStorage.length else {
-            return false
-        }
-
-        let noteText = self.attributedText!
-        let tappableAttribs: [NSAttributedString.Key] = [.link, .list]
-        for attrib in tappableAttribs {
-            var attribRange = NSRange(location: 0, length: 0)
-            let attribValue = noteText.attribute(attrib, at: charIndex,
-                                                 effectiveRange: &attribRange)
-            guard let _ = attribValue else {
-                continue
-            }
-            guard !(charIndex == attribRange.max - 1 && unitInsertionPoint == 1.0) else {
-                continue
-            }
-            return true
-        }
-        return false
-    }
-
     // MARK: - Fixes Copy & Paste Bug
 
     func textPasteConfigurationSupporting(
@@ -146,24 +108,6 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate {
 
     func textViewDidEndEditing(_ noteView: UITextView) {
         noteTextViewDelegate?.noteTextViewDidEndEditing(self)
-    }
-
-    private func startEditing(at charIndex: Int, with unitInsertionPoint: CGFloat) {
-        var charIndex = charIndex
-        if character(at: charIndex) != "\n" {
-            charIndex += Int(unitInsertionPoint.rounded())
-        }
-        selectedRange = NSRange(location: charIndex, length: 0)
-
-        isEditable = true
-        becomeFirstResponder()
-        resetTypingAttributes()
-    }
-
-    func endEditing() {
-        endEditing(false)
-        isEditable = false
-        resignFirstResponder()
     }
 
     func textViewDidChange(_ noteView: UITextView) {
@@ -275,6 +219,50 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate {
         }
     }
 
+    // Gate all automatic scrolling. Only allow scroll when:
+    // 1. The user is physically dragging/scrolling, OR
+    // 2. The caret is actually below the visible area
+    private var isUserScrolling = false
+
+    override func setContentOffset(_ contentOffset: CGPoint, animated: Bool) {
+        if isUserScrolling || isDecelerating {
+            super.setContentOffset(contentOffset, animated: animated)
+            return
+        }
+
+        // Check if the caret is currently visible
+        guard let selectedTextRange = selectedTextRange else {
+            super.setContentOffset(contentOffset, animated: animated)
+            return
+        }
+        let caret = caretRect(for: selectedTextRange.start)
+        let visibleHeight = bounds.height - contentInset.bottom
+        let visibleBottom = self.contentOffset.y + visibleHeight
+
+        // Only scroll if the caret is below the visible area
+        if caret.maxY > visibleBottom {
+            // Scroll just enough to bring the caret to the bottom
+            let targetY = caret.maxY - visibleHeight + 20
+            let clampedY = max(min(targetY, contentSize.height - visibleHeight), 0)
+            super.setContentOffset(CGPoint(x: self.contentOffset.x, y: clampedY), animated: animated)
+        }
+        // Otherwise: don't scroll at all
+    }
+
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        isUserScrolling = true
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate {
+            isUserScrolling = false
+        }
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        isUserScrolling = false
+    }
+
     private func textRange(from range: NSRange) -> UITextRange? {
         guard let start = position(from: beginningOfDocument, offset: range.location) else {
             return nil
@@ -283,6 +271,50 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate {
             return nil
         }
         return textRange(from: start, to: end)
+    }
+
+    // MARK: - Keyboard Management
+
+    private var oldContentInset: UIEdgeInsets?
+    private var oldScrollIndicatorInsets: UIEdgeInsets?
+
+    private func registerForKeyboardNotifications() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillShow(notification:)),
+            name: UIResponder.keyboardWillShowNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide(notification:)),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+    }
+
+    @objc private func keyboardWillShow(notification: NSNotification) {
+        guard let info = notification.userInfo,
+              let keyboardFrame = (info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
+        else { return }
+
+        let keyboardHeight = keyboardFrame.height
+        let contentInsets = UIEdgeInsets(top: 0, left: 0, bottom: keyboardHeight, right: 0)
+
+        oldContentInset = contentInset
+        oldScrollIndicatorInsets = verticalScrollIndicatorInsets
+
+        contentInset = contentInsets
+        verticalScrollIndicatorInsets = contentInsets
+    }
+
+    @objc private func keyboardWillHide(notification: NSNotification) {
+        if let oldContentInset = oldContentInset {
+            contentInset = oldContentInset
+        }
+        if let oldScrollIndicatorInsets = oldScrollIndicatorInsets {
+            verticalScrollIndicatorInsets = oldScrollIndicatorInsets
+        }
     }
 
     // MARK: - Helpers

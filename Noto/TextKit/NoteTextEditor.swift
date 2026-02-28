@@ -18,7 +18,7 @@ struct NoteTextEditor: UIViewRepresentable {
         Coordinator(self)
     }
 
-    func makeUIView(context: Context) -> UIView {
+    func makeUIView(context: Context) -> NoteTextView {
         let coordinator = context.coordinator
 
         // Build TextKit 1 stack: NoteTextStorage → NSLayoutManager → NSTextContainer → NoteTextView
@@ -38,6 +38,7 @@ struct NoteTextEditor: UIViewRepresentable {
         noteTextView.isScrollEnabled = true
         noteTextView.backgroundColor = .clear
         noteTextView.textContainerInset = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        noteTextView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
 
         // Load initial content
         noteTextView.loadNote(text)
@@ -48,10 +49,10 @@ struct NoteTextEditor: UIViewRepresentable {
         return noteTextView
     }
 
-    func updateUIView(_ uiView: UIView, context: Context) {
+    func updateUIView(_ uiView: NoteTextView, context: Context) {
         let coordinator = context.coordinator
-        guard let noteTextView = coordinator.noteTextView,
-              let textStorage = coordinator.textStorage else { return }
+        guard let textStorage = coordinator.textStorage else { return }
+        let noteTextView = uiView
 
         // Only reload if the binding changed externally (not from user editing)
         if !coordinator.isEditing {
