@@ -6,6 +6,9 @@
 //  Covers: double-tap navigation, nested drill-down, back button, content
 //  preservation across navigation, and editing round-trips.
 //
+//  NOTE: The home screen always contains a "Today's Notes" root block (line 0).
+//  All helpers account for this auto-created block.
+//
 
 import XCTest
 
@@ -33,11 +36,27 @@ final class NavigationUITests: XCTestCase {
         app.textViews["noteTextView"]
     }
 
+    /// Type lines into the text view. Positions cursor after any existing content
+    /// (e.g. the auto-created "Today's Notes" block) before typing.
     private func typeLines(_ lines: [String]) {
         let tv = textView
         XCTAssertTrue(tv.waitForExistence(timeout: 5), "Text view should exist")
-        tv.tap()
-        Thread.sleep(forTimeInterval: 0.3)
+
+        let existingText = tv.value as? String ?? ""
+        if !existingText.isEmpty {
+            // Tap below existing text to place cursor at end of content.
+            let lineCount = existingText.components(separatedBy: "\n").count
+            let belowContentY = 8 + 24 * CGFloat(lineCount) + 12
+            let base = tv.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+            let belowContent = base.withOffset(CGVector(dx: 80, dy: belowContentY))
+            belowContent.tap()
+            Thread.sleep(forTimeInterval: 0.3)
+            tv.typeText("\n")
+        } else {
+            tv.tap()
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+
         let fullText = lines.joined(separator: "\n")
         tv.typeText(fullText)
         Thread.sleep(forTimeInterval: 0.3)
@@ -53,6 +72,12 @@ final class NavigationUITests: XCTestCase {
             dismiss.tap()
             Thread.sleep(forTimeInterval: 0.3)
         }
+    }
+
+    /// Double-tap a user-content line. Adjusts index to account for
+    /// "Today's Notes" being line 0 on the home screen.
+    private func doubleTapUserLine(_ userLineIndex: Int) {
+        doubleTapLine(userLineIndex + 1)
     }
 
     private func doubleTapLine(_ lineIndex: Int) {
@@ -83,7 +108,7 @@ final class NavigationUITests: XCTestCase {
         typeLines(["Topic A"])
         dismissKeyboard()
 
-        doubleTapLine(0)
+        doubleTapUserLine(0)
 
         let heading = app.staticTexts["Topic A"]
         XCTAssertTrue(heading.waitForExistence(timeout: 3),
@@ -97,7 +122,7 @@ final class NavigationUITests: XCTestCase {
         dismissKeyboard()
 
         // Navigate to Topic A
-        doubleTapLine(0)
+        doubleTapUserLine(0)
         Thread.sleep(forTimeInterval: 0.5)
 
         // Create child in node view
@@ -126,7 +151,7 @@ final class NavigationUITests: XCTestCase {
         typeLines(["Topic A"])
         dismissKeyboard()
 
-        doubleTapLine(0)
+        doubleTapUserLine(0)
 
         let heading = app.staticTexts["Topic A"]
         XCTAssertTrue(heading.waitForExistence(timeout: 3))
@@ -144,7 +169,7 @@ final class NavigationUITests: XCTestCase {
         typeLines(["Topic A"])
         dismissKeyboard()
 
-        doubleTapLine(0)
+        doubleTapUserLine(0)
         Thread.sleep(forTimeInterval: 0.5)
 
         tapBackButton()
@@ -166,7 +191,7 @@ final class NavigationUITests: XCTestCase {
         dismissKeyboard()
 
         // Navigate into Alpha
-        doubleTapLine(0)
+        doubleTapUserLine(0)
         Thread.sleep(forTimeInterval: 0.5)
 
         // Come back
@@ -185,7 +210,7 @@ final class NavigationUITests: XCTestCase {
         dismissKeyboard()
 
         // Navigate to Parent node view
-        doubleTapLine(0)
+        doubleTapUserLine(0)
         Thread.sleep(forTimeInterval: 0.5)
 
         // Create a child
@@ -203,7 +228,7 @@ final class NavigationUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.5)
 
         // Re-navigate to Parent
-        doubleTapLine(0)
+        doubleTapUserLine(0)
         Thread.sleep(forTimeInterval: 0.5)
 
         // The child should still be there
@@ -219,7 +244,7 @@ final class NavigationUITests: XCTestCase {
         dismissKeyboard()
 
         // Navigate to Node A
-        doubleTapLine(0)
+        doubleTapUserLine(0)
         Thread.sleep(forTimeInterval: 0.5)
 
         // Create child in Node A

@@ -207,7 +207,7 @@ final class Block: Hashable {
     }
 
     /// Flatten this block's descendants for display in NodeView.
-    /// - Parameter expanded: If true, include ALL descendants. If false, include only children and grandchildren.
+    /// - Parameter expanded: If true, include ALL descendants. If false, include only direct children.
     /// - Returns: Array of `FlatEntry` with correct indent levels.
     func flattenedDescendants(expanded: Bool) -> [FlatEntry] {
         var result: [FlatEntry] = []
@@ -215,11 +215,6 @@ final class Block: Hashable {
             result.append(FlatEntry(block: child, indentLevel: 0))
             if expanded {
                 appendAllDescendants(of: child, rootDepth: self.depth, to: &result)
-            } else {
-                for grandchild in child.sortedChildren {
-                    let indent = grandchild.depth - self.depth - 1
-                    result.append(FlatEntry(block: grandchild, indentLevel: indent))
-                }
             }
         }
         return result

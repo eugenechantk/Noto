@@ -31,23 +31,38 @@ final class ReorderUITests: XCTestCase {
         app.textViews["noteTextView"]
     }
 
-    /// Type multiple lines into the editor. After calling, cursor is on the last line.
+    /// Type multiple lines into the editor. Positions cursor after any existing content
+    /// (e.g. the auto-created "Today's Notes" block) before typing.
+    /// After calling, cursor is on the last line.
     private func typeLines(_ lines: [String]) {
         let tv = textView
         XCTAssertTrue(tv.waitForExistence(timeout: 5), "Text view should exist")
-        tv.tap()
-        // Small delay for keyboard to appear
-        Thread.sleep(forTimeInterval: 0.3)
+
+        let existingText = tv.value as? String ?? ""
+        if !existingText.isEmpty {
+            // Tap below existing text to place cursor at end of content.
+            let lineCount = existingText.components(separatedBy: "\n").count
+            let belowContentY = 8 + 24 * CGFloat(lineCount) + 12
+            let base = tv.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+            let belowContent = base.withOffset(CGVector(dx: 80, dy: belowContentY))
+            belowContent.tap()
+            Thread.sleep(forTimeInterval: 0.3)
+            tv.typeText("\n")
+        } else {
+            tv.tap()
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+
         let fullText = lines.joined(separator: "\n")
         tv.typeText(fullText)
         // Wait for text processing to settle
         Thread.sleep(forTimeInterval: 0.3)
     }
 
-    /// Returns the current text content split into lines.
+    /// Returns user-typed lines, excluding the auto-created "Today's Notes" root block.
     private func currentLines() -> [String] {
         let value = textView.value as? String ?? ""
-        return value.components(separatedBy: "\n")
+        return value.components(separatedBy: "\n").filter { $0 != "Today's Notes" }
     }
 
     /// Tap on a specific line to position the cursor there.

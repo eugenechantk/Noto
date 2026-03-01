@@ -23,6 +23,7 @@ struct NodeView: View {
     @State private var hasLoaded = false
     @State private var isSyncing = false
     @State private var searchText: String = ""
+    @State private var ancestors: [Block] = []
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -59,10 +60,13 @@ struct NodeView: View {
             // Bottom toolbar: Today button + search bar
             bottomToolbar
         }
-        .background(backgroundColor)
+        .background {
+            backgroundColor.ignoresSafeArea()
+        }
         .navigationBarHidden(true)
         .onAppear {
             triggerAutoBuilding()
+            buildAncestorPath()
             loadContent()
         }
         .onChange(of: editableContent) {
@@ -85,8 +89,8 @@ struct NodeView: View {
 
             Spacer()
 
-            // Breadcrumb
-            ScrollableBreadcrumb(navigationPath: navigationPath, currentNode: node)
+            // Breadcrumb (full hierarchy path derived from parent chain)
+            ScrollableBreadcrumb(ancestors: ancestors, currentNode: node, navigationPath: $navigationPath)
 
             Spacer()
 
@@ -122,17 +126,10 @@ struct NodeView: View {
     private func navigateToToday() {
         let dayBlock = TodayNotesService.ensureToday(context: modelContext)
 
-        // Check if already on today's day block
+        // No-op if already on today's day block
         if dayBlock.id == node.id { return }
 
-        // Build the full navigation path
-        var path: [Block] = []
-        var current: Block? = dayBlock
-        while let block = current {
-            path.insert(block, at: 0)
-            current = block.parent
-        }
-        navigationPath = path
+        navigationPath.append(dayBlock)
     }
 
     // MARK: - Auto-Building
@@ -320,6 +317,21 @@ struct NodeView: View {
         isSyncing = true
         buildEditableContent()
         isSyncing = false
+    }
+
+    // MARK: - Ancestor Path
+
+    /// Walk the parent chain to build the full hierarchy path for the breadcrumb.
+    /// Called after triggerAutoBuilding() to ensure all parents are resolved.
+    private func buildAncestorPath() {
+        var path: [Block] = []
+        var current: Block? = node
+        while let block = current {
+            path.insert(block, at: 0)
+            current = block.parent
+        }
+        ancestors = path
+        logger.debug("[buildAncestorPath] \(path.map { $0.content }.joined(separator: " → "))")
     }
 
     // MARK: - Navigation

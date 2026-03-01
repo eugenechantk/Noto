@@ -64,6 +64,18 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
         let toolbar = UIToolbar()
         toolbar.sizeToFit()
 
+        // Match the app's background color (dark gray in dark mode, white in light mode)
+        let toolbarBackground = UIColor { traitCollection in
+            traitCollection.userInterfaceStyle == .dark
+                ? UIColor(red: 0.07, green: 0.07, blue: 0.07, alpha: 1.0)
+                : .white
+        }
+        let appearance = UIToolbarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = toolbarBackground
+        toolbar.standardAppearance = appearance
+        toolbar.scrollEdgeAppearance = appearance
+
         let indentButton = UIBarButtonItem(
             image: UIImage(systemName: "increase.indent"),
             style: .plain,

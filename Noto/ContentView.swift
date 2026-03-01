@@ -67,7 +67,9 @@ struct ContentView: View {
                     bottomToolbar
                 }
             }
-            .background(backgroundColor)
+            .background {
+                backgroundColor.ignoresSafeArea()
+            }
             .navigationDestination(for: Block.self) { block in
                 NodeView(node: block, navigationPath: $navigationPath)
             }
@@ -157,14 +159,7 @@ struct ContentView: View {
 
     private func navigateToToday() {
         let dayBlock = TodayNotesService.ensureToday(context: modelContext)
-        // Build the full navigation path: Today's Notes root → Year → Month → Week → Day
-        var path: [Block] = []
-        var current: Block? = dayBlock
-        while let block = current {
-            path.insert(block, at: 0)
-            current = block.parent
-        }
-        navigationPath = path
+        navigationPath.append(dayBlock)
     }
 
     // MARK: - Double-Tap Navigation
