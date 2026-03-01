@@ -64,13 +64,20 @@ struct NoteTextEditor: UIViewRepresentable {
         guard let textStorage = coordinator.textStorage else { return }
         let noteTextView = uiView
 
-        // Only reload if the binding changed externally (not from user editing)
-        if !coordinator.isEditing {
-            let currentDeformatted = textStorage.deformatted()
-            if currentDeformatted != text {
-                noteTextView.loadNote(text)
-            }
+        let currentDeformatted = textStorage.deformatted()
+        guard currentDeformatted != text else { return }
+
+        if coordinator.isEditing {
+            // During editing, only force-reload for structural changes
+            // (e.g., a line was removed due to reparenting on the home screen).
+            // This preserves cursor position for normal typing while ensuring
+            // the text view stays in sync with model-driven line removals.
+            let currentLineCount = currentDeformatted.components(separatedBy: "\n").count
+            let bindingLineCount = text.components(separatedBy: "\n").count
+            guard currentLineCount != bindingLineCount else { return }
         }
+
+        noteTextView.loadNote(text)
     }
 
     // MARK: - Coordinator
@@ -92,7 +99,17 @@ struct NoteTextEditor: UIViewRepresentable {
 
         func noteTextViewDidEndEditing(_ noteTextView: NoteTextView) {
             isEditing = false
-            syncText()
+
+            // If the binding was changed programmatically during editing
+            // (e.g., reparenting removed a line), reload from the binding
+            // instead of pushing stale UITextView text back to the binding.
+            if let textStorage = textStorage {
+                let deformatted = textStorage.deformatted()
+                if parent.text != deformatted {
+                    noteTextView.loadNote(parent.text)
+                }
+            }
+
             parent.onEndEditing?()
         }
 

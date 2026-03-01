@@ -68,6 +68,20 @@ This also serves as the backbone for AI chat, which requires some grounding from
 
 ### Today notes / Inbox / An easy way to dump ideas
 
+The today notes follow the same block primitive as the whole entire app. The block structure of the today notes feature would be like:
+|-Today notes
+|--[Year e.g. 2026]
+|---[Month e.g. Jan 2026]
+|----[Week e.g. Week 1 (1/1 - 7/1)]
+|-----[Day e.g. 1/1/2026]
+
+The block data model already supports scaffolding of the year -> month -> week -> day
+But this feature needs a way to automatically add blocks when a new day/week/month/year starts
+I may also add those new day/week/month/year manually. So the auto-adding function needs to check if the new day/week/month/year is already added
+
+This automatic adding of block should become a new primitive, not just suitable for this today notes feature, but also for other features like AI editing
+Therefore, this automatic adding block primitive should have a robust interface that other features can reuse
+
 ### Templates & auto-fill
 
 ### Bidirectional linking and editing

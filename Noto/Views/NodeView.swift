@@ -16,6 +16,7 @@ struct NodeView: View {
     let node: Block
     @Binding var navigationPath: [Block]
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var editableContent: String = ""
     @State private var isExpanded: Bool = false
@@ -24,10 +25,14 @@ struct NodeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Custom Liquid Glass toolbar
+            nodeToolbar
+
             // Title area
             VStack(alignment: .leading, spacing: 4) {
                 Text(node.content)
                     .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(labelPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
@@ -47,19 +52,8 @@ struct NodeView: View {
             )
             .ignoresSafeArea(.keyboard)
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                breadcrumbView
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    dismissKeyboardAndToggle()
-                } label: {
-                    Image(systemName: isExpanded ? "list.bullet" : "list.bullet.indent")
-                }
-            }
-        }
+        .background(backgroundColor)
+        .navigationBarHidden(true)
         .onAppear {
             loadContent()
         }
@@ -71,26 +65,55 @@ struct NodeView: View {
         }
     }
 
+    // MARK: - Liquid Glass Toolbar
+
+    private var nodeToolbar: some View {
+        HStack {
+            // Back button
+            GlassToolbarButton(systemImage: "chevron.left") {
+                navigationPath.removeLast()
+            }
+            .accessibilityLabel("Back")
+
+            Spacer()
+
+            // Breadcrumb
+            breadcrumbView
+
+            Spacer()
+
+            // Expand/collapse toggle
+            GlassToolbarButton(systemImage: isExpanded ? "list.bullet" : "list.bullet.indent") {
+                dismissKeyboardAndToggle()
+            }
+            .accessibilityLabel(isExpanded ? "Collapse" : "Expand")
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+
     // MARK: - Breadcrumb
 
     private var breadcrumbView: some View {
         HStack(spacing: 4) {
             Text("Home")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(labelSecondary)
             ForEach(navigationPath, id: \.id) { block in
                 Text("/")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(labelSecondary)
                 if block.id == node.id {
                     Text(block.content.isEmpty ? "Untitled" : String(block.content.prefix(20)))
+                        .foregroundStyle(labelPrimary)
                         .lineLimit(1)
                 } else {
                     Text(block.content.isEmpty ? "Untitled" : String(block.content.prefix(20)))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(labelSecondary)
                         .lineLimit(1)
                 }
             }
         }
-        .font(.subheadline)
+        .font(.system(size: 15, weight: .medium))
+        .tracking(-0.25)
     }
 
     // MARK: - Content Management
@@ -235,7 +258,13 @@ struct NodeView: View {
         // Reconcile parents
         reconcileParents(in: blocks)
 
-        reloadContent()
+        // Rebuild content from the locally reordered array
+        isSyncing = true
+        editableContent = blocks.map { block in
+            let relativeDepth = block.depth - node.depth - 1
+            return String(repeating: "\t", count: relativeDepth) + block.content
+        }.joined(separator: "\n")
+        isSyncing = false
     }
 
     private func reconcileParents(in blocks: [Block]) {
@@ -270,6 +299,26 @@ struct NodeView: View {
         guard lineIndex >= 0, lineIndex < blocks.count else { return }
         let tappedBlock = blocks[lineIndex]
         navigationPath.append(tappedBlock)
+    }
+
+    // MARK: - Colors
+
+    private var backgroundColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.07, green: 0.07, blue: 0.07)
+            : .white
+    }
+
+    private var labelPrimary: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.9)
+            : Color(red: 0.1, green: 0.1, blue: 0.1)
+    }
+
+    private var labelSecondary: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.45)
+            : Color(red: 0.45, green: 0.45, blue: 0.45)
     }
 
     // MARK: - Expand/Collapse

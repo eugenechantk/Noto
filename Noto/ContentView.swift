@@ -14,13 +14,8 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    @Query(sort: \Block.sortOrder)
-    private var allBlocks: [Block]
-
-    /// Flat list of all blocks ordered by global sortOrder.
-    private var flattenedBlocks: [Block] {
-        allBlocks.filter { !$0.isArchived }.sorted { $0.sortOrder < $1.sortOrder }
-    }
+    @Query(filter: #Predicate<Block> { $0.parent == nil && !$0.isArchived }, sort: \Block.sortOrder)
+    private var rootBlocks: [Block]
 
     @State private var editableContent: String = ""
     @State private var hasLoaded = false
@@ -63,7 +58,7 @@ struct ContentView: View {
                     Spacer()
 
                     if showDebug {
-                        DebugPanelView(blocks: flattenedBlocks)
+                        DebugPanelView(blocks: rootBlocks)
                             .transition(.move(edge: .bottom))
                             .padding(.bottom, 8)
                     }
@@ -147,9 +142,8 @@ struct ContentView: View {
     // MARK: - Double-Tap Navigation
 
     private func handleDoubleTap(at lineIndex: Int) {
-        let blocks = flattenedBlocks
-        guard lineIndex >= 0, lineIndex < blocks.count else { return }
-        let tappedBlock = blocks[lineIndex]
+        guard lineIndex >= 0, lineIndex < rootBlocks.count else { return }
+        let tappedBlock = rootBlocks[lineIndex]
         navigationPath.append(tappedBlock)
     }
 
@@ -157,14 +151,11 @@ struct ContentView: View {
         guard !hasLoaded else { return }
         hasLoaded = true
 
-        let blocks = flattenedBlocks
-        if blocks.isEmpty {
+        if rootBlocks.isEmpty {
             let block = Block(content: "", sortOrder: 1.0)
             modelContext.insert(block)
         } else {
-            editableContent = blocks.map { block in
-                String(repeating: "\t", count: block.depth) + block.content
-            }.joined(separator: "\n")
+            editableContent = rootBlocks.map { $0.content }.joined(separator: "\n")
         }
     }
 
@@ -182,15 +173,11 @@ struct ContentView: View {
     private func syncContent() {
         guard hasLoaded, !isSyncing else { return }
         isSyncing = true
-        defer { isSyncing = false }
 
         let lines = editableContent.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let parsed = lines.map { parseLine($0) }
-        var blocks = flattenedBlocks
-
-        if parsed.contains(where: { $0.depth > 0 }) {
-            logger.debug("[syncContent] parsed depths: \(parsed.enumerated().map { "[\($0.offset)] d=\($0.element.depth) \"\($0.element.content.prefix(20))\"" }.joined(separator: ", "))")
-        }
+        var blocks = Array(rootBlocks)
+        var needsReload = false
 
         // Update existing blocks
         for i in 0..<min(parsed.count, blocks.count) {
@@ -201,16 +188,12 @@ struct ContentView: View {
                 blocks[i].updatedAt = Date()
             }
 
-            // Update depth / parent if changed
-            if blocks[i].depth != depth {
-                let newParent = findParent(for: i, depth: depth, in: blocks, parsed: parsed)
-                logger.debug("[syncContent] block[\(i)] depth \(blocks[i].depth)→\(depth), parent: \(newParent?.content.prefix(20) ?? "nil")")
-                let newSortOrder = blocks[i].sortOrder
-                blocks[i].move(to: newParent, sortOrder: newSortOrder)
-                // move() computes depth from parent; override if the parsed
-                // depth disagrees (e.g. orphan indent with no valid parent).
-                if blocks[i].depth != depth {
-                    blocks[i].depth = depth
+            // Handle indentation on home screen: reparent under previous sibling
+            if depth > 0 {
+                if let newParent = findParent(for: i, depth: depth, in: blocks, parsed: parsed) {
+                    let newSortOrder = Block.sortOrderForAppending(to: newParent.sortedChildren.filter { !$0.isArchived })
+                    blocks[i].move(to: newParent, sortOrder: newSortOrder)
+                    needsReload = true
                 }
             }
         }
@@ -220,35 +203,39 @@ struct ContentView: View {
             for i in blocks.count..<parsed.count {
                 let (depth, content) = parsed[i]
                 let sortOrder = (blocks.last?.sortOrder ?? 0) + Double(i - blocks.count + 1)
-                let newParent = findParent(for: i, depth: depth, in: blocks, parsed: parsed)
+                let newParent: Block? = depth > 0 ? findParent(for: i, depth: depth, in: blocks, parsed: parsed) : nil
                 let block = Block(content: content, parent: newParent, sortOrder: sortOrder)
-                // The Block init sets depth from parent, but we need to override for root blocks
-                if depth != block.depth {
-                    block.depth = depth
-                }
                 modelContext.insert(block)
                 blocks.append(block)
             }
         }
 
-        // Delete excess blocks
+        // Delete excess blocks — only delete blocks still at root level.
+        // Reparented blocks (parent != nil) must be preserved; they appear in
+        // the stale @Query snapshot but have already been moved to a parent.
         if blocks.count > parsed.count {
             for i in stride(from: blocks.count - 1, through: parsed.count, by: -1) {
-                modelContext.delete(blocks[i])
+                if blocks[i].parent == nil {
+                    modelContext.delete(blocks[i])
+                }
             }
         }
+
+        // Rebuild content from remaining root blocks immediately
+        // (can't rely on @Query rootBlocks which hasn't refreshed yet)
+        if needsReload {
+            let remainingRoots = blocks.filter { $0.parent == nil }
+            editableContent = remainingRoots.map { $0.content }.joined(separator: "\n")
+        }
+
+        isSyncing = false
     }
 
     /// Walk backwards to find the nearest block with depth == targetDepth - 1.
     private func findParent(for index: Int, depth: Int, in blocks: [Block], parsed: [(depth: Int, content: String)]) -> Block? {
         guard depth > 0 else { return nil }
         for j in stride(from: index - 1, through: 0, by: -1) {
-            let candidateDepth: Int
-            if j < blocks.count {
-                candidateDepth = blocks[j].depth
-            } else {
-                candidateDepth = parsed[j].depth
-            }
+            let candidateDepth = parsed[j].depth
             if candidateDepth == depth - 1 {
                 return blocks[j]
             }
@@ -261,7 +248,7 @@ struct ContentView: View {
     /// Move a block from `source` line index to `destination` insertion index.
     /// Destination uses insertion semantics: 0 = before first, count = after last.
     private func reorderBlock(from source: Int, to destination: Int) {
-        var blocks = flattenedBlocks
+        var blocks = Array(rootBlocks)
         guard source >= 0, source < blocks.count else { return }
         guard destination >= 0, destination <= blocks.count else { return }
         guard source != destination, source != destination - 1 else { return }
@@ -273,71 +260,24 @@ struct ContentView: View {
         let insertAt = destination > source ? destination - 1 : destination
         blocks.insert(movedBlock, at: insertAt)
 
-        // Adjust depth: a block can be at most 1 deeper than the block above it.
-        let blockAbove = insertAt > 0 ? blocks[insertAt - 1] : nil
-        let maxValidDepth = (blockAbove?.depth ?? -1) + 1
-        let newDepth = min(movedBlock.depth, maxValidDepth)
+        logger.debug("[reorderBlock] moving '\(movedBlock.content.prefix(20))' from \(source) to \(destination)")
 
-        if movedBlock.depth != newDepth {
-            logger.debug("[reorderBlock] adjusting depth \(movedBlock.depth)→\(newDepth)")
-        }
-
-        // Find the parent for the (possibly adjusted) depth
-        var newParent: Block? = nil
-        if newDepth > 0 {
-            for j in stride(from: insertAt - 1, through: 0, by: -1) {
-                if blocks[j].depth == newDepth - 1 {
-                    newParent = blocks[j]
-                    break
-                }
-            }
-        }
-
-        logger.debug("[reorderBlock] moving '\(movedBlock.content.prefix(20))' from \(source) to \(destination), depth \(movedBlock.depth)→\(newDepth), newParent=\(newParent?.content.prefix(20) ?? "nil")")
-
-        // Update the moved block's parent and depth via move() (also updates descendants)
-        movedBlock.move(to: newParent, sortOrder: 0)
-
-        // Assign sequential sortOrders to ALL blocks to maintain the flat order
+        // Assign sequential sortOrders to maintain the new order
         for (i, block) in blocks.enumerated() {
             block.sortOrder = Double(i + 1)
         }
 
-        // Reconcile parents for any blocks whose visual position now implies
-        // a different parent (e.g., a child that's now visually under a new parent)
-        reconcileParents(in: blocks)
-
-        reloadContent()
+        // Rebuild content from the locally reordered array
+        // (rootBlocks @Query hasn't refreshed the new sortOrder yet)
+        isSyncing = true
+        editableContent = blocks.map { $0.content }.joined(separator: "\n")
+        isSyncing = false
     }
 
-    /// Ensure each block's parent matches the flat visual order.
-    /// Walk the flat list and assign parents by looking backward for the nearest
-    /// block at depth - 1.
-    private func reconcileParents(in blocks: [Block]) {
-        for (i, block) in blocks.enumerated() {
-            let depth = block.depth
-            var correctParent: Block? = nil
-            if depth > 0 {
-                for j in stride(from: i - 1, through: 0, by: -1) {
-                    if blocks[j].depth == depth - 1 {
-                        correctParent = blocks[j]
-                        break
-                    }
-                }
-            }
-            if block.parent !== correctParent {
-                block.parent = correctParent
-                block.updatedAt = Date()
-            }
-        }
-    }
-
-    /// Regenerate `editableContent` from the current model state.
+    /// Regenerate `editableContent` from the current root blocks.
     private func reloadContent() {
         isSyncing = true
-        editableContent = flattenedBlocks.map { block in
-            String(repeating: "\t", count: block.depth) + block.content
-        }.joined(separator: "\n")
+        editableContent = rootBlocks.map { $0.content }.joined(separator: "\n")
         isSyncing = false
     }
 }

@@ -107,3 +107,4 @@ func createTestContainer() throws -> ModelContainer  // in-memory, all models re
 - **Logging**: Always use `os_log` (`Logger`) instead of `print()`. Pattern: `private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "ClassName")`
 - **SwiftLint**: `line_length` and `identifier_name` rules are disabled
 - PRD documents live in `.claude/` directory (PRD-data-structure.md, PRD-user-interface-v1.md)
+- **Testing & Simulator**: Always invoke the `/ios-dev-testing` skill instead of directly using `xcodebuild` or `xcrun simctl` CLI commands. The skill ensures simulator isolation (per-session dedicated simulator), clean builds, and proper teardown. Never run build/test commands manually — let the skill manage the full lifecycle.
