@@ -18,6 +18,11 @@ final class NoteTextStorage: NSTextStorage {
     fileprivate let backingStore = NSMutableAttributedString()
     fileprivate var backingString: NSString { return backingStore.string as NSString }
 
+    /// When true, bullet styles vary by indent depth (node view mode).
+    var nodeViewMode = false {
+        didSet { syncNodeViewMode() }
+    }
+
     // MARK: - Storage Initialization
 
     override init() {
@@ -34,6 +39,12 @@ final class NoteTextStorage: NSTextStorage {
         wordsFormatter.storage = self
         listsFormatter.storage = self
         indentFormatter.storage = self
+        indentFormatter.nodeViewMode = nodeViewMode
+    }
+
+    /// Update the indent formatter's mode when nodeViewMode changes.
+    private func syncNodeViewMode() {
+        indentFormatter.nodeViewMode = nodeViewMode
     }
 
     // MARK: - NSTextStorage Subclassing Requirements
@@ -145,8 +156,11 @@ final class NoteTextStorage: NSTextStorage {
                                           range: restoreRange)
 
                 // Re-insert bullet if it was stripped by a formatter
-                if !indentFormatter.lineHasBullet(at: restoreRange) {
-                    let bullet = indentFormatter.makeBulletPublic()
+                let needsBullet = indentFormatter.nodeViewMode
+                    ? !indentFormatter.bulletString(for: savedDepth).isEmpty
+                    : true
+                if needsBullet && !indentFormatter.lineHasBullet(at: restoreRange) {
+                    let bullet = indentFormatter.makeBulletPublic(for: savedDepth)
                     backingStore.insert(bullet, at: restoreRange.location)
                     // Re-stamp depth & style on the now-longer line
                     let updatedRange = backingStore.lineRange(for: restoreRange.location)
@@ -873,16 +887,27 @@ fileprivate final class IndentFormatter: Formatter {
 
     private static let bulletExtra: CGFloat = 16
 
+    /// When true, bullet character varies by depth and depth-0 lines have no bullet.
+    var nodeViewMode = false
+
     func paragraphStylePublic(for depth: Int) -> NSParagraphStyle {
         return paragraphStyle(for: depth)
     }
 
     private func paragraphStyle(for depth: Int) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
-        let indent = CGFloat(depth) * IndentFormatter.indentWidth
+        let indent: CGFloat
+        let hasBullet: Bool
+        if nodeViewMode {
+            // In node view, depth 0 = no indent/bullet, depth 1+ = indent with bullet
+            indent = depth > 0 ? CGFloat(depth) * IndentFormatter.indentWidth : 0
+            hasBullet = !bulletString(for: depth).isEmpty
+        } else {
+            indent = CGFloat(depth) * IndentFormatter.indentWidth
+            hasBullet = depth > 0
+        }
         style.firstLineHeadIndent = indent
-        // Wrapped text indents past the bullet character
-        style.headIndent = depth > 0 ? indent + IndentFormatter.bulletExtra : indent
+        style.headIndent = hasBullet ? indent + IndentFormatter.bulletExtra : indent
         style.paragraphSpacingBefore = 2.5
         return style
     }
@@ -909,13 +934,17 @@ fileprivate final class IndentFormatter: Formatter {
             let mutableLine = NSMutableAttributedString(attributedString: attribLine)
             // Remove leading tabs
             mutableLine.replaceCharacters(in: NSMakeRange(0, depth), with: "")
-            // Insert bullet prefix
-            let bullet = NSMutableAttributedString(
-                string: IndentFormatter.bulletPrefix,
-                attributes: storage.bodyStyle
-            )
-            bullet.addAttribute(.indentBullet, value: true, range: NSMakeRange(0, bullet.length))
-            mutableLine.insert(bullet, at: 0)
+
+            // In node view mode, depth-0 lines (first-level children) get no bullet
+            let bulletStr = bulletString(for: depth)
+            if !bulletStr.isEmpty {
+                let bullet = NSMutableAttributedString(
+                    string: bulletStr,
+                    attributes: storage.bodyStyle
+                )
+                bullet.addAttribute(.indentBullet, value: true, range: NSMakeRange(0, bullet.length))
+                mutableLine.insert(bullet, at: 0)
+            }
             // Apply depth attribute & paragraph indent
             mutableLine.addAttribute(.blockDepth, value: depth, range: mutableLine.range)
             mutableLine.addAttribute(.paragraphStyle, value: self.paragraphStyle(for: depth), range: mutableLine.range)
@@ -996,9 +1025,11 @@ fileprivate final class IndentFormatter: Formatter {
         storage.beginEditing()
         backingStore.replaceCharacters(in: dashRange, with: "")
 
-        // Insert bullet prefix
-        let bullet = makeBullet()
-        backingStore.insert(bullet, at: lineRange.location)
+        // Insert bullet prefix (depth-aware in node view mode)
+        let bullet = makeBullet(for: newDepth)
+        if bullet.length > 0 {
+            backingStore.insert(bullet, at: lineRange.location)
+        }
 
         // Apply new depth to the line
         let updatedLineRange = backingStore.lineRange(for: lineRange.location)
@@ -1025,13 +1056,25 @@ fileprivate final class IndentFormatter: Formatter {
 
     private static let bulletPrefix = "• "
 
-    func makeBulletPublic() -> NSAttributedString {
-        return makeBullet()
+    /// Returns the bullet string for the given depth in node view mode.
+    func bulletString(for depth: Int) -> String {
+        guard nodeViewMode else { return IndentFormatter.bulletPrefix }
+        switch depth {
+        case 0: return "" // first-level children: no bullet
+        case 1: return "• "
+        case 2: return "◦ "
+        default: return "– "
+        }
     }
 
-    private func makeBullet() -> NSAttributedString {
+    func makeBulletPublic(for depth: Int = -1) -> NSAttributedString {
+        return makeBullet(for: depth)
+    }
+
+    private func makeBullet(for depth: Int = -1) -> NSAttributedString {
+        let prefix = depth >= 0 ? bulletString(for: depth) : IndentFormatter.bulletPrefix
         let bullet = NSMutableAttributedString(
-            string: IndentFormatter.bulletPrefix,
+            string: prefix,
             attributes: storage.bodyStyle
         )
         bullet.addAttribute(.indentBullet, value: true, range: NSMakeRange(0, bullet.length))
@@ -1089,18 +1132,30 @@ fileprivate final class IndentFormatter: Formatter {
 
         storage.beginEditing()
 
-        // Insert bullet when transitioning from depth 0 → 1
         var lengthChange = 0
-        if currentDepth == 0 && !lineHasBullet(at: lineRange) {
-            let bullet = makeBullet()
-            backingStore.insert(bullet, at: lineRange.location)
-            lengthChange = bullet.length
+        if nodeViewMode {
+            // In node view, swap bullet based on new depth
+            let removed = stripBullet(at: lineRange.location)
+            lengthChange -= removed
+            let newBulletStr = bulletString(for: newDepth)
+            if !newBulletStr.isEmpty {
+                let bullet = makeBullet(for: newDepth)
+                backingStore.insert(bullet, at: lineRange.location)
+                lengthChange += bullet.length
+            }
+        } else {
+            // Insert bullet when transitioning from depth 0 → 1
+            if currentDepth == 0 && !lineHasBullet(at: lineRange) {
+                let bullet = makeBullet()
+                backingStore.insert(bullet, at: lineRange.location)
+                lengthChange = bullet.length
+            }
         }
 
-        let updatedLineRange = backingStore.lineRange(for: index + lengthChange)
+        let updatedLineRange = backingStore.lineRange(for: index + max(lengthChange, 0))
         backingStore.addAttribute(.blockDepth, value: newDepth, range: updatedLineRange)
         backingStore.addAttribute(.paragraphStyle, value: paragraphStyle(for: newDepth), range: updatedLineRange)
-        storage.edited(lengthChange > 0 ? .editedCharacters : .editedAttributes,
+        storage.edited(lengthChange != 0 ? .editedCharacters : .editedAttributes,
                        range: lineRange,
                        changeInLength: lengthChange)
         storage.endEditing()
@@ -1121,11 +1176,23 @@ fileprivate final class IndentFormatter: Formatter {
 
         storage.beginEditing()
 
-        // Remove bullet when transitioning from depth 1 → 0
         var lengthChange = 0
-        if newDepth == 0 {
+        if nodeViewMode {
+            // Swap bullet based on new depth
             let removed = stripBullet(at: lineRange.location)
-            lengthChange = -removed
+            lengthChange -= removed
+            let newBulletStr = bulletString(for: newDepth)
+            if !newBulletStr.isEmpty {
+                let bullet = makeBullet(for: newDepth)
+                backingStore.insert(bullet, at: lineRange.location)
+                lengthChange += bullet.length
+            }
+        } else {
+            // Remove bullet when transitioning from depth 1 → 0
+            if newDepth == 0 {
+                let removed = stripBullet(at: lineRange.location)
+                lengthChange = -removed
+            }
         }
 
         let updatedLineRange = backingStore.lineRange(for: lineRange.location)

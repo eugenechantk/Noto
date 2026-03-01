@@ -8,24 +8,63 @@ Noto is a universal Apple (iOS/macOS) outline-based note-taking app. Each note e
 
 No external dependencies — pure Apple frameworks only.
 
+## Simulator Isolation (IMPORTANT)
+
+Multiple Claude Code sessions and worktrees may run concurrently. **Each session MUST use its own dedicated simulator** to avoid conflicts.
+
+### Setup (do this once before first build/test/simulator use in a session)
+
+```bash
+# 1. Create a dedicated simulator clone (generates a unique UDID)
+SIM_UDID=$(xcrun simctl clone "iPhone 16 Pro" "Noto-$(uuidgen | head -c 8)")
+echo "Session simulator UDID: $SIM_UDID"
+
+# 2. Boot it
+xcrun simctl boot "$SIM_UDID"
+```
+
+**Store `$SIM_UDID` and use it for ALL subsequent commands in the session.** Never use `name=iPhone 16 Pro` or `booted` — always use `id=$SIM_UDID`.
+
+### Cleanup (do this when all testing/building is done)
+
+```bash
+xcrun simctl shutdown "$SIM_UDID"
+xcrun simctl delete "$SIM_UDID"
+```
+
+### Housekeeping (remove orphaned session simulators)
+
+```bash
+xcrun simctl list devices | grep "Noto-" | grep -oE '[0-9A-F-]{36}' | xargs -I{} xcrun simctl delete {}
+```
+
 ## Build & Test Commands
+
+All commands use `id=$SIM_UDID` where `$SIM_UDID` is the session's dedicated simulator (see Simulator Isolation above).
 
 ```bash
 # Build for iOS simulator
-xcodebuild -project Noto.xcodeproj -scheme Noto -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
+xcodebuild -project Noto.xcodeproj -scheme Noto -destination "id=$SIM_UDID"
 
 # Run all unit tests (Swift Testing framework)
-xcodebuild test -project Noto.xcodeproj -scheme Noto -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -only-testing:NotoTests
+xcodebuild test -project Noto.xcodeproj -scheme Noto -destination "id=$SIM_UDID" -only-testing:NotoTests
 
 # Run a specific test class
-xcodebuild test -project Noto.xcodeproj -scheme Noto -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -only-testing:NotoTests/BlockTests
+xcodebuild test -project Noto.xcodeproj -scheme Noto -destination "id=$SIM_UDID" -only-testing:NotoTests/BlockTests
 
 # Run UI tests (visible in simulator with -parallel-testing-enabled NO)
-xcodebuild test -project Noto.xcodeproj -scheme Noto -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -only-testing:NotoUITests -parallel-testing-enabled NO
+xcodebuild test -project Noto.xcodeproj -scheme Noto -destination "id=$SIM_UDID" -only-testing:NotoUITests -parallel-testing-enabled NO
 
-# View os_log output from simulator
-xcrun simctl spawn booted log stream --predicate 'subsystem == "com.noto"'
+# View os_log output from session's simulator
+xcrun simctl spawn "$SIM_UDID" log stream --predicate 'subsystem == "com.noto"'
 ```
+
+### MCP Tool Usage
+
+When using xc-build, xc-testing, xc-launch, xc-interact, or xc-ai-assist MCP tools:
+- Pass `destination: "id=$SIM_UDID"` for build/test tools
+- Pass `target: "$SIM_UDID"` (the UDID) for IDB-based tools (idb_tap, idb_describe, simulator_screenshot, etc.)
+- **Never** use `"booted"` as target — multiple simulators may be booted across sessions
 
 ## Architecture
 

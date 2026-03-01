@@ -13,6 +13,7 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \Block.sortOrder)
     private var allBlocks: [Block]
 
@@ -23,46 +24,133 @@ struct ContentView: View {
 
     @State private var editableContent: String = ""
     @State private var hasLoaded = false
-
     @State private var showDebug = false
     @State private var isSyncing = false
+    @State private var navigationPath: [Block] = []
+    @State private var searchText: String = ""
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            NoteTextEditor(
-                text: $editableContent,
-                onReorderLine: { source, destination in
-                    reorderBlock(from: source, to: destination)
-                }
-            )
-                .ignoresSafeArea(.keyboard)
-                .onAppear {
-                    loadContent()
-                }
-                .onChange(of: editableContent) {
-                    syncContent()
+        NavigationStack(path: $navigationPath) {
+            ZStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Top toolbar with liquid glass
+                    topToolbar
+
+                    // Title section
+                    titleSection
+
+                    // Main text editor
+                    NoteTextEditor(
+                        text: $editableContent,
+                        onReorderLine: { source, destination in
+                            reorderBlock(from: source, to: destination)
+                        },
+                        onDoubleTapLine: { lineIndex in
+                            handleDoubleTap(at: lineIndex)
+                        }
+                    )
+                    .ignoresSafeArea(.keyboard)
+                    .onAppear {
+                        loadContent()
+                    }
+                    .onChange(of: editableContent) {
+                        syncContent()
+                    }
                 }
 
-            if showDebug {
-                DebugPanelView(blocks: flattenedBlocks)
-                    .transition(.move(edge: .bottom))
-            }
-        }
-        .safeAreaInset(edge: .top) {
-            HStack {
-                Spacer()
-                Button {
-                    withAnimation { showDebug.toggle() }
-                } label: {
-                    Image(systemName: showDebug ? "ladybug.fill" : "ladybug")
-                        .font(.caption)
-                        .padding(8)
-                        .background(.ultraThinMaterial, in: Circle())
+                // Floating overlays
+                VStack(spacing: 0) {
+                    Spacer()
+
+                    if showDebug {
+                        DebugPanelView(blocks: flattenedBlocks)
+                            .transition(.move(edge: .bottom))
+                            .padding(.bottom, 8)
+                    }
+
+                    // Bottom search bar
+                    GlassSearchBar(text: $searchText)
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 32)
                 }
-                .padding(.trailing, 12)
             }
-            .frame(height: 32)
+            .background(backgroundColor)
+            .navigationDestination(for: Block.self) { block in
+                NodeView(node: block, navigationPath: $navigationPath)
+            }
         }
+    }
+
+    // MARK: - Liquid Glass UI
+
+    private var topToolbar: some View {
+        HStack {
+            Text("Home")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(labelSecondary)
+                .tracking(-0.25)
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                // Debug toggle
+                GlassToolbarButton(systemImage: showDebug ? "ladybug.fill" : "ladybug") {
+                    withAnimation { showDebug.toggle() }
+                }
+
+                // Sort button (from Figma design)
+                GlassToolbarButton(systemImage: "arrow.up.arrow.down") {
+                    logger.debug("Sort button tapped")
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+
+    private var titleSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Home")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(labelPrimary)
+                .tracking(0.4)
+
+            Text("Add tag here")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(labelSecondary)
+                .tracking(-0.25)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
+    }
+
+    // MARK: - Colors
+
+    private var backgroundColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.07, green: 0.07, blue: 0.07)
+            : .white
+    }
+
+    private var labelPrimary: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.9)
+            : Color(red: 0.1, green: 0.1, blue: 0.1)
+    }
+
+    private var labelSecondary: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.45)
+            : Color(red: 0.45, green: 0.45, blue: 0.45)
+    }
+
+    // MARK: - Double-Tap Navigation
+
+    private func handleDoubleTap(at lineIndex: Int) {
+        let blocks = flattenedBlocks
+        guard lineIndex >= 0, lineIndex < blocks.count else { return }
+        let tappedBlock = blocks[lineIndex]
+        navigationPath.append(tappedBlock)
     }
 
     private func loadContent() {

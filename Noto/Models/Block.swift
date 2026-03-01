@@ -9,7 +9,15 @@ import Foundation
 import SwiftData
 
 @Model
-final class Block {
+final class Block: Hashable {
+    static func == (lhs: Block, rhs: Block) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
     @Attribute(.unique) var id: UUID
     var content: String
     var createdAt: Date

@@ -1,4 +1,4 @@
-# User interface
+# User interface v1
 
 The user interface should look like a normal note taking app, similar to Apple notes. The key design principle: it should not feel like you are typing out a bullet list, even though the underlying data model is an outliner (blocks with parent-child relationships).
 
@@ -11,11 +11,13 @@ The home screen should be the root, showing all the blocks with no parent nodes 
 Block creation, editing, and deletion should feel exactly like typing in a normal note-taking app — no special buttons or gestures required.
 
 **Creating a new block:**
+
 - Pressing Return at the end of any existing block creates a new sibling block below it
 - If the screen is completely empty (no blocks at all), tapping anywhere on the empty space creates the first block and enters edit mode
 - New blocks get `sortOrder` appended at the end of their sibling list
 
 **Deleting a block:**
+
 - Backspace on an empty block deletes it and moves the cursor to the end of the previous block — just like deleting an empty line in a text editor
 - If the deleted block had children, they are also deleted (`isArchived = true`, cascading to all descendants)
 
@@ -52,6 +54,7 @@ The node view still looks the same as Apple Notes, but instead showing the text 
 **Indentation formula:** `indent level = block.depth - currentNode.depth - 1`, where indent level 0 means no bullet (first-level children), indent level 1 means first bullet level (grandchildren), indent level 2 means sub-bullets (great-grandchildren), etc. Indent roughly ~20pt per level.
 
 **Bullet styles by indent level:**
+
 - Level 1 (grandchildren): filled circle (•)
 - Level 2 (great-grandchildren): hollow circle (◦)
 - Level 3+: dash (–)
@@ -59,6 +62,7 @@ The node view still looks the same as Apple Notes, but instead showing the text 
 **Creating and deleting blocks** work the same as on the home screen — Return to create, Backspace on empty to delete. Tapping empty space below the last child also creates a new child block. New child blocks get `parentId = currentNode.id` and `depth = currentNode.depth + 1`.
 
 On top of the node view is a menu bar. Left of the menu bar is a back button that goes back to the previous layer of the stack. Right of the menu bar is an expand all toggle button:
+
 - **Collapsed (default):** Only first-level children shown as plain text, with their immediate descendants visible as described above
 - **Expanded:** All descendants of the current node are shown. First-level children remain as plain text (no bullets). All deeper descendants shown with bullets at their respective indent levels. The button text/icon toggles between "Expand All" and "Collapse"
 
@@ -68,18 +72,18 @@ In the node view, tapping on any text will still get you into edit mode, same as
 
 ## Interaction summary
 
-| Gesture | Context | Action |
-|---------|---------|--------|
-| Tap on block text | Any screen | Enter edit mode for that block |
-| Tap empty space | Empty screen | Create first block and enter edit mode |
-| Tap empty space below last block | Any screen | Create new block at end and enter edit mode |
-| Tap outside text | Edit mode | Exit edit mode, save changes |
-| Return key | Edit mode | Create new sibling block below |
-| Backspace on empty block | Edit mode | Delete block, cursor to previous |
-| Double tap on block text | Any screen | Push node view onto NavigationStack |
-| Long press on block text | Any screen | Enter reorder mode (drag to reposition) |
-| Indent button | Edit mode | Indent under previous sibling |
-| Outdent button | Edit mode | Outdent to parent's level |
+| Gesture                          | Context      | Action                                      |
+| -------------------------------- | ------------ | ------------------------------------------- |
+| Tap on block text                | Any screen   | Enter edit mode for that block              |
+| Tap empty space                  | Empty screen | Create first block and enter edit mode      |
+| Tap empty space below last block | Any screen   | Create new block at end and enter edit mode |
+| Tap outside text                 | Edit mode    | Exit edit mode, save changes                |
+| Return key                       | Edit mode    | Create new sibling block below              |
+| Backspace on empty block         | Edit mode    | Delete block, cursor to previous            |
+| Double tap on block text         | Any screen   | Push node view onto NavigationStack         |
+| Long press on block text         | Any screen   | Enter reorder mode (drag to reposition)     |
+| Indent button                    | Edit mode    | Indent under previous sibling               |
+| Outdent button                   | Edit mode    | Outdent to parent's level                   |
 
 ---
 
@@ -87,14 +91,14 @@ In the node view, tapping on any text will still get you into edit mode, same as
 
 The app is a universal Apple app. Both platforms share the same SwiftUI views with minor adaptations:
 
-| Aspect | iOS | macOS |
-|--------|-----|-------|
-| Edit mode trigger | Tap | Click |
-| Node view trigger | Double tap | Double-click |
-| Indent / Outdent | Format bar above keyboard | Tab / Shift+Tab |
-| Mention | Format bar above keyboard | Right-click context menu |
-| Reordering | Long press + drag | Long press + drag |
-| Delete | Backspace on empty block | Backspace on empty block |
+| Aspect            | iOS                       | macOS                    |
+| ----------------- | ------------------------- | ------------------------ |
+| Edit mode trigger | Tap                       | Click                    |
+| Node view trigger | Double tap                | Double-click             |
+| Indent / Outdent  | Format bar above keyboard | Tab / Shift+Tab          |
+| Mention           | Format bar above keyboard | Right-click context menu |
+| Reordering        | Long press + drag         | Long press + drag        |
+| Delete            | Backspace on empty block  | Backspace on empty block |
 
 ---
 
@@ -115,26 +119,31 @@ The app is a universal Apple app. Both platforms share the same SwiftUI views wi
 Unit tests validating the UI operations against the data layer. Tests operate directly on `ModelContext` and `Block` model, simulating the actions the views perform.
 
 ### Block Creation Tests
+
 - `testCreateFirstRootBlock` — Creating a block when no blocks exist inserts a root block with `parent = nil`, `depth = 0`, empty content, and `sortOrder = 1.0`
 - `testCreateBlockAfterExisting` — Pressing Return after an existing block creates a new sibling below it with `sortOrder` between the current block and the next sibling (or +1 if last)
 - `testCreateBlockBetweenSiblings` — New block inserted between two siblings gets `sortOrder` as the midpoint of its neighbors
 - `testCreateChildInNodeView` — Creating a child in node view sets `parentId = currentNode.id` and `depth = currentNode.depth + 1`
 
 ### Block Deletion Tests
+
 - `testDeleteEmptyBlock` — Deleting an empty block removes it from the model context
 - `testDeleteBlockCascadesToChildren` — Deleting a block with children also deletes all descendants
 - `testDeleteNonEmptyBlockIgnored` — The delete-on-backspace operation is a no-op when the block has content
 
 ### Block Editing Tests
+
 - `testEditBlockContent` — Updating a block's `content` persists correctly
 - `testEditBlockUpdatesTimestamp` — Updating content sets `updatedAt` to a newer date
 
 ### Reorder Tests
+
 - `testReorderMovesBlockDown` — Moving a block from index 0 to index 2 recalculates all sortOrders sequentially
 - `testReorderMovesBlockUp` — Moving a block from index 2 to index 0 recalculates all sortOrders sequentially
 - `testReorderPreservesContent` — Block content is unchanged after reorder
 
 ### Reorganize (Indent / Outdent) Tests
+
 - `testIndentMakesChildOfPreviousSibling` — Indenting a block sets its `parent` to the previous sibling and increments `depth`
 - `testIndentFirstSiblingFails` — Indenting the first sibling (no previous sibling) returns `false` and makes no changes
 - `testOutdentMakesSiblingOfParent` — Outdenting a block sets its `parent` to the grandparent (or `nil`) and decrements `depth`
@@ -142,6 +151,7 @@ Unit tests validating the UI operations against the data layer. Tests operate di
 - `testIndentUpdatesDescendantDepths` — Indenting a block with children increments depth for all descendants
 
 ### Node View Flattening Tests
+
 - `testFlattenCollapsedShowsChildrenAndGrandchildren` — In collapsed mode, the flattened list includes direct children (indent 0) and grandchildren (indent 1), but not great-grandchildren
 - `testFlattenExpandedShowsAllDescendants` — In expanded mode, all descendants appear with correct indent levels
 - `testFlattenIndentLevelFormula` — Each block's indent level equals `block.depth - currentNode.depth - 1`
@@ -153,6 +163,7 @@ Unit tests validating the UI operations against the data layer. Tests operate di
 ## Not in scope for v1 UI
 
 These features exist in the data model but will not have UI in v1:
+
 - Search (keyword + semantic)
 - Tags
 - Metadata fields

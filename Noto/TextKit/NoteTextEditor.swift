@@ -11,9 +11,11 @@ import UIKit
 
 struct NoteTextEditor: UIViewRepresentable {
     @Binding var text: String
+    var nodeViewMode: Bool = false
     var onBeginEditing: (() -> Void)?
     var onEndEditing: (() -> Void)?
     var onReorderLine: ((_ source: Int, _ destination: Int) -> Void)?
+    var onDoubleTapLine: ((_ lineIndex: Int) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -24,6 +26,7 @@ struct NoteTextEditor: UIViewRepresentable {
 
         // Build TextKit 1 stack: NoteTextStorage → NSLayoutManager → NSTextContainer → NoteTextView
         let textStorage = NoteTextStorage()
+        textStorage.nodeViewMode = nodeViewMode
 
         let textContainerSize = CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         let textContainer = NSTextContainer(size: textContainerSize)
@@ -41,6 +44,11 @@ struct NoteTextEditor: UIViewRepresentable {
         noteTextView.textContainerInset = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         noteTextView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         noteTextView.accessibilityIdentifier = "noteTextView"
+
+        // Enable double-tap navigation if callback is set
+        if onDoubleTapLine != nil {
+            noteTextView.enableDoubleTapNavigation = true
+        }
 
         // Load initial content
         noteTextView.loadNote(text)
@@ -96,6 +104,10 @@ struct NoteTextEditor: UIViewRepresentable {
             parent.onReorderLine?(sourceIndex, destinationIndex)
             // Force reload since isEditing blocks updateUIView
             noteTextView.loadNote(parent.text)
+        }
+
+        func noteTextView(_ noteTextView: NoteTextView, didDoubleTapLineAt lineIndex: Int) {
+            parent.onDoubleTapLine?(lineIndex)
         }
 
         private func syncText() {

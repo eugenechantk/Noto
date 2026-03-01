@@ -16,6 +16,7 @@ protocol NoteTextViewDelegate: AnyObject {
     func noteTextViewDidEndEditing(_ noteTextView: NoteTextView)
     func noteTextViewDidChange(_ noteTextView: NoteTextView)
     func noteTextView(_ noteTextView: NoteTextView, moveLineAt sourceIndex: Int, toLineAt destinationIndex: Int)
+    func noteTextView(_ noteTextView: NoteTextView, didDoubleTapLineAt lineIndex: Int)
 }
 
 /// Custom `UITextView` subclass for showing & editing a given note.
@@ -35,6 +36,11 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         setUpNoteTextView()
+    }
+
+    /// When true, a double-tap gesture is enabled for navigation.
+    var enableDoubleTapNavigation = false {
+        didSet { setUpDoubleTapGesture() }
     }
 
     private func setUpNoteTextView() {
@@ -423,6 +429,10 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
         _ gestureRecognizer: UIGestureRecognizer,
         shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
     ) -> Bool {
+        // Allow double-tap navigation to fire alongside text selection
+        if gestureRecognizer === doubleTapGesture || otherGestureRecognizer === doubleTapGesture {
+            return true
+        }
         return false
     }
 
@@ -730,6 +740,31 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
         let maxY = max(contentSize.height - bounds.height + contentInset.bottom, 0)
         let newY = min(max(contentOffset.y + autoScrollSpeed, 0), maxY)
         contentOffset.y = newY
+    }
+
+    // MARK: - Double-Tap Navigation
+
+    private var doubleTapGesture: UITapGestureRecognizer?
+
+    private func setUpDoubleTapGesture() {
+        // Remove existing gesture if any
+        if let existing = doubleTapGesture {
+            removeGestureRecognizer(existing)
+            doubleTapGesture = nil
+        }
+        guard enableDoubleTapNavigation else { return }
+
+        let gesture = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
+        gesture.numberOfTapsRequired = 2
+        gesture.delegate = self
+        addGestureRecognizer(gesture)
+        doubleTapGesture = gesture
+    }
+
+    @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+        let point = gesture.location(in: self)
+        guard let lineIdx = lineIndex(at: point) else { return }
+        noteTextViewDelegate?.noteTextView(self, didDoubleTapLineAt: lineIdx)
     }
 
     // MARK: - Helpers
