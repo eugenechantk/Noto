@@ -22,39 +22,47 @@ struct NodeView: View {
     @State private var isExpanded: Bool = false
     @State private var hasLoaded = false
     @State private var isSyncing = false
+    @State private var searchText: String = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Custom Liquid Glass toolbar
-            nodeToolbar
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                // Custom Liquid Glass toolbar
+                nodeToolbar
 
-            // Title area
-            VStack(alignment: .leading, spacing: 4) {
-                Text(node.content)
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(labelPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
+                // Title area
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(node.content)
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundStyle(labelPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
+                        .accessibilityIdentifier("nodeViewTitle")
+                }
+
+                // Content editor
+                NoteTextEditor(
+                    text: $editableContent,
+                    nodeViewMode: true,
+                    onReorderLine: { source, destination in
+                        reorderBlock(from: source, to: destination)
+                    },
+                    onDoubleTapLine: { lineIndex in
+                        handleDoubleTap(at: lineIndex)
+                    }
+                )
+                .ignoresSafeArea(.keyboard)
             }
 
-            // Content editor
-            NoteTextEditor(
-                text: $editableContent,
-                nodeViewMode: true,
-                onReorderLine: { source, destination in
-                    reorderBlock(from: source, to: destination)
-                },
-                onDoubleTapLine: { lineIndex in
-                    handleDoubleTap(at: lineIndex)
-                }
-            )
-            .ignoresSafeArea(.keyboard)
+            // Bottom toolbar: Today button + search bar
+            bottomToolbar
         }
         .background(backgroundColor)
         .navigationBarHidden(true)
         .onAppear {
+            triggerAutoBuilding()
             loadContent()
         }
         .onChange(of: editableContent) {
@@ -78,7 +86,7 @@ struct NodeView: View {
             Spacer()
 
             // Breadcrumb
-            breadcrumbView
+            ScrollableBreadcrumb(navigationPath: navigationPath, currentNode: node)
 
             Spacer()
 
@@ -92,28 +100,55 @@ struct NodeView: View {
         .padding(.top, 8)
     }
 
-    // MARK: - Breadcrumb
+    // MARK: - Bottom Toolbar
 
-    private var breadcrumbView: some View {
-        HStack(spacing: 4) {
-            Text("Home")
-                .foregroundStyle(labelSecondary)
-            ForEach(navigationPath, id: \.id) { block in
-                Text("/")
-                    .foregroundStyle(labelSecondary)
-                if block.id == node.id {
-                    Text(block.content.isEmpty ? "Untitled" : String(block.content.prefix(20)))
-                        .foregroundStyle(labelPrimary)
-                        .lineLimit(1)
-                } else {
-                    Text(block.content.isEmpty ? "Untitled" : String(block.content.prefix(20)))
-                        .foregroundStyle(labelSecondary)
-                        .lineLimit(1)
+    private var bottomToolbar: some View {
+        GlassEffectContainer {
+            HStack(spacing: 12) {
+                GlassTodayButton {
+                    navigateToToday()
                 }
+
+                GlassSearchBar(text: $searchText)
             }
         }
-        .font(.system(size: 15, weight: .medium))
-        .tracking(-0.25)
+        .padding(.horizontal, 28)
+        .padding(.bottom, 32)
+        .padding(.top, 4)
+    }
+
+    // MARK: - Today Navigation
+
+    private func navigateToToday() {
+        let dayBlock = TodayNotesService.ensureToday(context: modelContext)
+
+        // Check if already on today's day block
+        if dayBlock.id == node.id { return }
+
+        // Build the full navigation path
+        var path: [Block] = []
+        var current: Block? = dayBlock
+        while let block = current {
+            path.insert(block, at: 0)
+            current = block.parent
+        }
+        navigationPath = path
+    }
+
+    // MARK: - Auto-Building
+
+    /// Trigger auto-building when navigating to any Today's Notes descendant.
+    private func triggerAutoBuilding() {
+        // Check if this node is part of Today's Notes hierarchy
+        var current: Block? = node
+        while let block = current {
+            if block.content == "Today's Notes" && block.parent == nil {
+                // This is a Today's Notes descendant — ensure today's hierarchy is built
+                let _ = TodayNotesService.buildHierarchy(root: block, for: Date(), context: modelContext)
+                return
+            }
+            current = block.parent
+        }
     }
 
     // MARK: - Content Management
@@ -131,7 +166,6 @@ struct NodeView: View {
         }.joined(separator: "\n")
     }
 
-    /// Get the flattened list of descendant blocks in display order.
     private func flattenedBlocks() -> [Block] {
         return node.flattenedDescendants(expanded: isExpanded).map { $0.block }
     }
@@ -160,12 +194,14 @@ struct NodeView: View {
             let (relativeDepth, content) = parsed[i]
             let absoluteDepth = node.depth + 1 + relativeDepth
 
-            if blocks[i].content != content {
+            // Guard: skip content sync for blocks not editable by user
+            if blocks[i].content != content && blocks[i].isContentEditableByUser {
                 blocks[i].content = content
                 blocks[i].updatedAt = Date()
             }
 
-            if blocks[i].depth != absoluteDepth {
+            // Skip depth/parent changes for non-movable blocks
+            if blocks[i].depth != absoluteDepth && blocks[i].isMovable {
                 let newParent = findParent(for: i, relativeDepth: relativeDepth, in: blocks, parsed: parsed)
                 let newSortOrder = blocks[i].sortOrder
                 blocks[i].move(to: newParent, sortOrder: newSortOrder)
@@ -191,17 +227,16 @@ struct NodeView: View {
             }
         }
 
-        // Delete excess blocks
+        // Delete excess blocks (skip non-deletable blocks)
         if blocks.count > parsed.count {
             for i in stride(from: blocks.count - 1, through: parsed.count, by: -1) {
-                modelContext.delete(blocks[i])
+                if blocks[i].isDeletable {
+                    modelContext.delete(blocks[i])
+                }
             }
         }
     }
 
-    /// Find parent for a block at the given relative depth.
-    /// Relative depth 0 → parent is the node itself.
-    /// Relative depth N → walk backward for nearest block at relative depth N-1.
     private func findParent(for index: Int, relativeDepth: Int, in blocks: [Block], parsed: [(depth: Int, content: String)]) -> Block? {
         if relativeDepth == 0 { return node }
         for j in stride(from: index - 1, through: 0, by: -1) {
@@ -228,16 +263,20 @@ struct NodeView: View {
 
         let movedBlock = blocks[source]
 
+        // Guard: non-reorderable blocks cannot be moved
+        guard movedBlock.isReorderable else {
+            logger.debug("[reorderBlock] block '\(movedBlock.content.prefix(20))' is not reorderable")
+            return
+        }
+
         blocks.remove(at: source)
         let insertAt = destination > source ? destination - 1 : destination
         blocks.insert(movedBlock, at: insertAt)
 
-        // Adjust depth relative to the node
         let blockAbove = insertAt > 0 ? blocks[insertAt - 1] : nil
         let maxValidDepth = (blockAbove?.depth ?? node.depth) + 1
         let newDepth = min(movedBlock.depth, maxValidDepth)
 
-        // Find parent
         var newParent: Block? = node
         if newDepth > node.depth + 1 {
             for j in stride(from: insertAt - 1, through: 0, by: -1) {
@@ -250,21 +289,12 @@ struct NodeView: View {
 
         movedBlock.move(to: newParent, sortOrder: 0)
 
-        // Assign sequential sortOrders
         for (i, block) in blocks.enumerated() {
             block.sortOrder = Double(i + 1)
         }
 
-        // Reconcile parents
         reconcileParents(in: blocks)
-
-        // Rebuild content from the locally reordered array
-        isSyncing = true
-        editableContent = blocks.map { block in
-            let relativeDepth = block.depth - node.depth - 1
-            return String(repeating: "\t", count: relativeDepth) + block.content
-        }.joined(separator: "\n")
-        isSyncing = false
+        reloadContent()
     }
 
     private func reconcileParents(in blocks: [Block]) {

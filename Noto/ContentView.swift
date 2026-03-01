@@ -63,10 +63,8 @@ struct ContentView: View {
                             .padding(.bottom, 8)
                     }
 
-                    // Bottom search bar
-                    GlassSearchBar(text: $searchText)
-                        .padding(.horizontal, 28)
-                        .padding(.bottom, 32)
+                    // Bottom toolbar: Today button + search bar
+                    bottomToolbar
                 }
             }
             .background(backgroundColor)
@@ -109,6 +107,7 @@ struct ContentView: View {
                 .font(.system(size: 34, weight: .bold))
                 .foregroundStyle(labelPrimary)
                 .tracking(0.4)
+                .accessibilityIdentifier("homeTitle")
 
             Text("Add tag here")
                 .font(.system(size: 15, weight: .medium))
@@ -117,6 +116,21 @@ struct ContentView: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 10)
+    }
+
+    private var bottomToolbar: some View {
+        GlassEffectContainer {
+            HStack(spacing: 12) {
+                GlassTodayButton {
+                    navigateToToday()
+                }
+
+                GlassSearchBar(text: $searchText)
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.bottom, 32)
+        .padding(.top, 4)
     }
 
     // MARK: - Colors
@@ -139,6 +153,20 @@ struct ContentView: View {
             : Color(red: 0.45, green: 0.45, blue: 0.45)
     }
 
+    // MARK: - Today Navigation
+
+    private func navigateToToday() {
+        let dayBlock = TodayNotesService.ensureToday(context: modelContext)
+        // Build the full navigation path: Today's Notes root → Year → Month → Week → Day
+        var path: [Block] = []
+        var current: Block? = dayBlock
+        while let block = current {
+            path.insert(block, at: 0)
+            current = block.parent
+        }
+        navigationPath = path
+    }
+
     // MARK: - Double-Tap Navigation
 
     private func handleDoubleTap(at lineIndex: Int) {
@@ -150,6 +178,9 @@ struct ContentView: View {
     private func loadContent() {
         guard !hasLoaded else { return }
         hasLoaded = true
+
+        // Ensure Today's Notes root exists
+        let _ = TodayNotesService.ensureRoot(context: modelContext)
 
         if rootBlocks.isEmpty {
             let block = Block(content: "", sortOrder: 1.0)
@@ -183,13 +214,15 @@ struct ContentView: View {
         for i in 0..<min(parsed.count, blocks.count) {
             let (depth, content) = parsed[i]
 
-            if blocks[i].content != content {
+            // Guard: skip content sync for blocks not editable by user
+            if blocks[i].content != content && blocks[i].isContentEditableByUser {
                 blocks[i].content = content
                 blocks[i].updatedAt = Date()
             }
 
             // Handle indentation on home screen: reparent under previous sibling
-            if depth > 0 {
+            // Skip for non-movable blocks (e.g. auto-built Today's Notes blocks)
+            if depth > 0 && blocks[i].isMovable {
                 if let newParent = findParent(for: i, depth: depth, in: blocks, parsed: parsed) {
                     let newSortOrder = Block.sortOrderForAppending(to: newParent.sortedChildren.filter { !$0.isArchived })
                     blocks[i].move(to: newParent, sortOrder: newSortOrder)
@@ -210,12 +243,11 @@ struct ContentView: View {
             }
         }
 
-        // Delete excess blocks — only delete blocks still at root level.
-        // Reparented blocks (parent != nil) must be preserved; they appear in
-        // the stale @Query snapshot but have already been moved to a parent.
+        // Delete excess blocks — only delete root-level, deletable blocks.
+        // Reparented blocks (parent != nil) must be preserved.
         if blocks.count > parsed.count {
             for i in stride(from: blocks.count - 1, through: parsed.count, by: -1) {
-                if blocks[i].parent == nil {
+                if blocks[i].parent == nil && blocks[i].isDeletable {
                     modelContext.delete(blocks[i])
                 }
             }
@@ -246,7 +278,6 @@ struct ContentView: View {
     // MARK: - Reorder
 
     /// Move a block from `source` line index to `destination` insertion index.
-    /// Destination uses insertion semantics: 0 = before first, count = after last.
     private func reorderBlock(from source: Int, to destination: Int) {
         var blocks = Array(rootBlocks)
         guard source >= 0, source < blocks.count else { return }
@@ -255,7 +286,12 @@ struct ContentView: View {
 
         let movedBlock = blocks[source]
 
-        // Build the new flat order
+        // Guard: non-reorderable blocks cannot be moved
+        guard movedBlock.isReorderable else {
+            logger.debug("[reorderBlock] block '\(movedBlock.content.prefix(20))' is not reorderable")
+            return
+        }
+
         blocks.remove(at: source)
         let insertAt = destination > source ? destination - 1 : destination
         blocks.insert(movedBlock, at: insertAt)
