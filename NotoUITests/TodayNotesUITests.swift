@@ -6,7 +6,7 @@
 //  hierarchy building, block protection, and day block editing.
 //  Maps to spec acceptance criteria: AC-GT-*, AC-SB-*, AC-AB-*, AC-BP-*, AC-DBE-*, AC-HSI-*.
 //
-//  NOTE: NodeView uses a custom Liquid Glass toolbar with .navigationBarHidden(true).
+//  NOTE: OutlineView uses a custom Liquid Glass toolbar with .navigationBarHidden(true).
 //  Back button is a GlassToolbarButton with accessibilityLabel "Back".
 //  Breadcrumb is a ScrollableBreadcrumb in the custom toolbar, not in a system nav bar.
 //
@@ -196,9 +196,11 @@ final class TodayNotesUITests: XCTestCase {
         XCTAssertTrue(separator.waitForExistence(timeout: 5),
                        "Breadcrumb should have ' / ' separator indicating a navigation path")
 
-        // Verify "Today's Notes" appears in the breadcrumb (full hierarchy path)
-        let todayNotesLabel = app.staticTexts["Today's Notes"]
-        XCTAssertTrue(todayNotesLabel.exists,
+        // Verify "Today's Notes" appears in the breadcrumb (full hierarchy path).
+        // Non-current breadcrumb segments are Buttons, not StaticTexts.
+        let todayNotesButton = app.buttons["Today's Notes"]
+        let todayNotesText = app.staticTexts["Today's Notes"]
+        XCTAssertTrue(todayNotesButton.exists || todayNotesText.exists,
                        "Breadcrumb should contain 'Today's Notes' path segment")
     }
 

@@ -1,52 +1,66 @@
 //
-//  NodeView.swift
+//  OutlineView.swift
 //  Noto
 //
-//  Drill-down view for a single Block node, showing its content as a heading
-//  with descendants below in an indented outline.
+//  Unified outline view for both home (root) and drill-down (node) modes.
+//  When node is nil, shows root-level blocks. When node is non-nil, shows
+//  that node's descendants. The only difference is which node is focused.
 //
 
 import SwiftUI
 import SwiftData
 import os.log
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NodeView")
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "OutlineView")
 
-struct NodeView: View {
-    let node: Block
+struct OutlineView: View {
+    let node: Block?
     @Binding var navigationPath: [Block]
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+
+    @Query(sort: \Block.sortOrder) private var allBlocks: [Block]
 
     @State private var editableContent: String = ""
     @State private var isExpanded: Bool = false
     @State private var hasLoaded = false
     @State private var isSyncing = false
     @State private var searchText: String = ""
+    @State private var showDebug = false
     @State private var ancestors: [Block] = []
+
+    private var isRoot: Bool { node == nil }
+    private var baseDepth: Int { node?.depth ?? -1 }
+    private var displayTitle: String { node?.content ?? "Home" }
+
+    /// Root blocks (parent == nil, not archived), used only in root mode.
+    private var rootBlocks: [Block] {
+        allBlocks.filter { $0.parent == nil && !$0.isArchived }
+            .sorted { $0.sortOrder < $1.sortOrder }
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
                 // Custom Liquid Glass toolbar
-                nodeToolbar
+                outlineToolbar
 
                 // Title area
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(node.content)
+                    Text(displayTitle)
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(labelPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
                         .padding(.bottom, 4)
-                        .accessibilityIdentifier("nodeViewTitle")
+                        .accessibilityIdentifier(isRoot ? "homeTitle" : "nodeViewTitle")
                 }
 
                 // Content editor
                 NoteTextEditor(
                     text: $editableContent,
-                    nodeViewMode: true,
+                    nodeViewMode: !isRoot,
                     onReorderLine: { source, destination in
                         reorderBlock(from: source, to: destination)
                     },
@@ -57,16 +71,28 @@ struct NodeView: View {
                 .ignoresSafeArea(.keyboard)
             }
 
-            // Bottom toolbar: Today button + search bar
-            bottomToolbar
+            // Floating overlays
+            VStack(spacing: 0) {
+                Spacer()
+
+                if showDebug {
+                    DebugPanelView(blocks: currentBlocks())
+                        .transition(.move(edge: .bottom))
+                        .padding(.bottom, 8)
+                }
+
+                bottomToolbar
+            }
         }
         .background {
             backgroundColor.ignoresSafeArea()
         }
         .navigationBarHidden(true)
         .onAppear {
-            triggerAutoBuilding()
-            buildAncestorPath()
+            if !isRoot {
+                triggerAutoBuilding()
+                buildAncestorPath()
+            }
             loadContent()
         }
         .onChange(of: editableContent) {
@@ -77,28 +103,34 @@ struct NodeView: View {
         }
     }
 
-    // MARK: - Liquid Glass Toolbar
+    // MARK: - Toolbar
 
-    private var nodeToolbar: some View {
+    private var outlineToolbar: some View {
         HStack {
-            // Back button
-            GlassToolbarButton(systemImage: "chevron.left") {
-                navigationPath.removeLast()
+            if node != nil {
+                GlassToolbarButton(systemImage: "chevron.left") {
+                    navigationPath.removeLast()
+                }
+                .accessibilityLabel("Back")
             }
-            .accessibilityLabel("Back")
 
             Spacer()
 
-            // Breadcrumb (full hierarchy path derived from parent chain)
-            ScrollableBreadcrumb(ancestors: ancestors, currentNode: node, navigationPath: $navigationPath)
-
-            Spacer()
-
-            // Expand/collapse toggle
-            GlassToolbarButton(systemImage: isExpanded ? "list.bullet" : "list.bullet.indent") {
-                dismissKeyboardAndToggle()
+            if let node = node {
+                ScrollableBreadcrumb(ancestors: ancestors, currentNode: node, navigationPath: $navigationPath)
+                Spacer()
             }
-            .accessibilityLabel(isExpanded ? "Collapse" : "Expand")
+
+            HStack(spacing: 8) {
+                GlassToolbarButton(systemImage: showDebug ? "ladybug.fill" : "ladybug") {
+                    withAnimation { showDebug.toggle() }
+                }
+
+                GlassToolbarButton(systemImage: isExpanded ? "list.bullet" : "list.bullet.indent") {
+                    dismissKeyboardAndToggle()
+                }
+                .accessibilityLabel(isExpanded ? "Collapse" : "Expand")
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -121,50 +153,78 @@ struct NodeView: View {
         .padding(.top, 4)
     }
 
-    // MARK: - Today Navigation
+    // MARK: - Colors
 
-    private func navigateToToday() {
-        let dayBlock = TodayNotesService.ensureToday(context: modelContext)
-
-        // No-op if already on today's day block
-        if dayBlock.id == node.id { return }
-
-        navigationPath.append(dayBlock)
+    private var backgroundColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.07, green: 0.07, blue: 0.07)
+            : .white
     }
 
-    // MARK: - Auto-Building
+    private var labelPrimary: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.9)
+            : Color(red: 0.1, green: 0.1, blue: 0.1)
+    }
 
-    /// Trigger auto-building when navigating to any Today's Notes descendant.
-    private func triggerAutoBuilding() {
-        // Check if this node is part of Today's Notes hierarchy
-        var current: Block? = node
-        while let block = current {
-            if block.content == "Today's Notes" && block.parent == nil {
-                // This is a Today's Notes descendant — ensure today's hierarchy is built
-                let _ = TodayNotesService.buildHierarchy(root: block, for: Date(), context: modelContext)
-                return
+    private var labelSecondary: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.45)
+            : Color(red: 0.45, green: 0.45, blue: 0.45)
+    }
+
+    // MARK: - Data
+
+    /// Build the flat list of (block, indentLevel) entries for display.
+    private func displayEntries() -> [(block: Block, indentLevel: Int)] {
+        if let node = node {
+            return node.flattenedDescendants(expanded: isExpanded).map { ($0.block, $0.indentLevel) }
+        } else {
+            if isExpanded {
+                var result: [(Block, Int)] = []
+                func walk(_ blocks: [Block]) {
+                    for block in blocks {
+                        result.append((block, block.depth))
+                        walk(block.sortedChildren.filter { !$0.isArchived })
+                    }
+                }
+                walk(rootBlocks)
+                return result
+            } else {
+                return rootBlocks.map { ($0, 0) }
             }
-            current = block.parent
         }
     }
 
-    // MARK: - Content Management
-
-    private func loadContent() {
-        guard !hasLoaded else { return }
-        hasLoaded = true
-        buildEditableContent()
+    /// Flat list of blocks currently displayed.
+    private func currentBlocks() -> [Block] {
+        displayEntries().map { $0.block }
     }
 
     private func buildEditableContent() {
-        let entries = node.flattenedDescendants(expanded: isExpanded)
-        editableContent = entries.map { entry in
+        editableContent = displayEntries().map { entry in
             String(repeating: "\t", count: entry.indentLevel) + entry.block.content
         }.joined(separator: "\n")
     }
 
-    private func flattenedBlocks() -> [Block] {
-        return node.flattenedDescendants(expanded: isExpanded).map { $0.block }
+    private func loadContent() {
+        guard !hasLoaded else { return }
+        hasLoaded = true
+
+        if isRoot {
+            let _ = TodayNotesService.ensureRoot(context: modelContext)
+            // Snapshot rootBlocks to avoid @Query timing race — the query
+            // may not yet reflect the block inserted by ensureRoot.
+            let blocks = rootBlocks
+            if blocks.isEmpty {
+                let block = Block(content: "", sortOrder: 1.0)
+                modelContext.insert(block)
+            } else {
+                editableContent = blocks.map { $0.content }.joined(separator: "\n")
+            }
+        } else {
+            buildEditableContent()
+        }
     }
 
     private func parseLine(_ line: String) -> (depth: Int, content: String) {
@@ -184,12 +244,12 @@ struct NodeView: View {
 
         let lines = editableContent.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let parsed = lines.map { parseLine($0) }
-        var blocks = flattenedBlocks()
+        var blocks = currentBlocks()
 
         // Update existing blocks
         for i in 0..<min(parsed.count, blocks.count) {
             let (relativeDepth, content) = parsed[i]
-            let absoluteDepth = node.depth + 1 + relativeDepth
+            let absoluteDepth = baseDepth + 1 + relativeDepth
 
             // Guard: skip content sync for blocks not editable by user
             if blocks[i].content != content && blocks[i].isContentEditableByUser {
@@ -212,7 +272,7 @@ struct NodeView: View {
         if parsed.count > blocks.count {
             for i in blocks.count..<parsed.count {
                 let (relativeDepth, content) = parsed[i]
-                let absoluteDepth = node.depth + 1 + relativeDepth
+                let absoluteDepth = baseDepth + 1 + relativeDepth
                 let sortOrder = (blocks.last?.sortOrder ?? 0) + Double(i - blocks.count + 1)
                 let newParent = findParent(for: i, relativeDepth: relativeDepth, in: blocks, parsed: parsed)
                 let block = Block(content: content, parent: newParent ?? node, sortOrder: sortOrder)
@@ -239,7 +299,7 @@ struct NodeView: View {
         for j in stride(from: index - 1, through: 0, by: -1) {
             let candidateRelDepth: Int
             if j < blocks.count {
-                candidateRelDepth = blocks[j].depth - node.depth - 1
+                candidateRelDepth = blocks[j].depth - baseDepth - 1
             } else {
                 candidateRelDepth = parsed[j].depth
             }
@@ -253,7 +313,7 @@ struct NodeView: View {
     // MARK: - Reorder
 
     private func reorderBlock(from source: Int, to destination: Int) {
-        var blocks = flattenedBlocks()
+        var blocks = currentBlocks()
         guard source >= 0, source < blocks.count else { return }
         guard destination >= 0, destination <= blocks.count else { return }
         guard source != destination, source != destination - 1 else { return }
@@ -271,11 +331,11 @@ struct NodeView: View {
         blocks.insert(movedBlock, at: insertAt)
 
         let blockAbove = insertAt > 0 ? blocks[insertAt - 1] : nil
-        let maxValidDepth = (blockAbove?.depth ?? node.depth) + 1
+        let maxValidDepth = (blockAbove?.depth ?? baseDepth) + 1
         let newDepth = min(movedBlock.depth, maxValidDepth)
 
         var newParent: Block? = node
-        if newDepth > node.depth + 1 {
+        if newDepth > baseDepth + 1 {
             for j in stride(from: insertAt - 1, through: 0, by: -1) {
                 if blocks[j].depth == newDepth - 1 {
                     newParent = blocks[j]
@@ -298,7 +358,7 @@ struct NodeView: View {
         for (i, block) in blocks.enumerated() {
             let depth = block.depth
             var correctParent: Block? = node
-            if depth > node.depth + 1 {
+            if depth > baseDepth + 1 {
                 for j in stride(from: i - 1, through: 0, by: -1) {
                     if blocks[j].depth == depth - 1 {
                         correctParent = blocks[j]
@@ -319,11 +379,41 @@ struct NodeView: View {
         isSyncing = false
     }
 
+    // MARK: - Navigation
+
+    private func navigateToToday() {
+        let dayBlock = TodayNotesService.ensureToday(context: modelContext)
+        if let node = node, dayBlock.id == node.id { return }
+        navigationPath.append(dayBlock)
+    }
+
+    private func handleDoubleTap(at lineIndex: Int) {
+        let blocks = currentBlocks()
+        guard lineIndex >= 0, lineIndex < blocks.count else { return }
+        let tappedBlock = blocks[lineIndex]
+        navigationPath.append(tappedBlock)
+    }
+
+    // MARK: - Auto-Building
+
+    /// Trigger auto-building when navigating to any Today's Notes descendant.
+    private func triggerAutoBuilding() {
+        guard let node = node else { return }
+        var current: Block? = node
+        while let block = current {
+            if block.content == "Today's Notes" && block.parent == nil {
+                let _ = TodayNotesService.buildHierarchy(root: block, for: Date(), context: modelContext)
+                return
+            }
+            current = block.parent
+        }
+    }
+
     // MARK: - Ancestor Path
 
     /// Walk the parent chain to build the full hierarchy path for the breadcrumb.
-    /// Called after triggerAutoBuilding() to ensure all parents are resolved.
     private func buildAncestorPath() {
+        guard let node = node else { return }
         var path: [Block] = []
         var current: Block? = node
         while let block = current {
@@ -331,36 +421,7 @@ struct NodeView: View {
             current = block.parent
         }
         ancestors = path
-        logger.debug("[buildAncestorPath] \(path.map { $0.content }.joined(separator: " → "))")
-    }
-
-    // MARK: - Navigation
-
-    private func handleDoubleTap(at lineIndex: Int) {
-        let blocks = flattenedBlocks()
-        guard lineIndex >= 0, lineIndex < blocks.count else { return }
-        let tappedBlock = blocks[lineIndex]
-        navigationPath.append(tappedBlock)
-    }
-
-    // MARK: - Colors
-
-    private var backgroundColor: Color {
-        colorScheme == .dark
-            ? Color(red: 0.07, green: 0.07, blue: 0.07)
-            : .white
-    }
-
-    private var labelPrimary: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.9)
-            : Color(red: 0.1, green: 0.1, blue: 0.1)
-    }
-
-    private var labelSecondary: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.45)
-            : Color(red: 0.45, green: 0.45, blue: 0.45)
+        logger.debug("[buildAncestorPath] \(path.map { $0.content }.joined(separator: " \u{2192} "))")
     }
 
     // MARK: - Expand/Collapse

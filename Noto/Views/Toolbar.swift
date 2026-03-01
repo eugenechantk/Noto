@@ -3,6 +3,7 @@
 //  Noto
 //
 //  Reusable Liquid Glass UI components using the native .glassEffect() API (iOS 26+).
+//  Contains all glass-styled toolbar buttons and controls used by OutlineView.
 //
 
 import SwiftUI
@@ -50,5 +51,29 @@ struct GlassToolbarButton: View {
         .frame(height: 44)
         .padding(.horizontal, 4)
         .glassEffect(.regular.interactive(), in: .capsule)
+    }
+}
+
+// MARK: - Glass Today Button
+
+struct GlassTodayButton: View {
+    let action: () -> Void
+
+    /// SF Symbol name for the current day of the month (e.g. "1.circle" for the 1st).
+    private var todaySymbolName: String {
+        let day = Calendar.current.component(.day, from: Date())
+        return "\(day).circle"
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: todaySymbolName)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.primary)
+        }
+        .frame(height: 48)
+        .padding(.horizontal, 14)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .accessibilityIdentifier("todayButton")
     }
 }
