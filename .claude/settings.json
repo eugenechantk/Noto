@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "Railway": {
+      "disabled": true
+    },
+    "playwright": {
+      "disabled": true
+    },
+    "claude-in-chrome": {
+      "disabled": true
+    }
+  }
+}

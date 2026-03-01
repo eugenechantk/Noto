@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "xc-build": {
+      "command": "node",
+      "args": ["/Users/eugenechan/.claude/plugins/marketplaces/xclaude-plugin-marketplace/mcp-servers/xc-build/dist/index.js"],
+      "env": {
+        "XC_LOG_LEVEL": "info"
+      }
+    },
+    "xc-launch": {
+      "command": "node",
+      "args": ["/Users/eugenechan/.claude/plugins/marketplaces/xclaude-plugin-marketplace/mcp-servers/xc-launch/dist/index.js"],
+      "env": {
+        "XC_LOG_LEVEL": "info"
+      }
+    },
+    "xc-testing": {
+      "command": "node",
+      "args": ["/Users/eugenechan/.claude/plugins/marketplaces/xclaude-plugin-marketplace/mcp-servers/xc-testing/dist/index.js"],
+      "env": {
+        "XC_LOG_LEVEL": "info"
+      }
+    },
+    "xc-interact": {
+      "command": "node",
+      "args": ["/Users/eugenechan/.claude/plugins/marketplaces/xclaude-plugin-marketplace/mcp-servers/xc-interact/dist/index.js"],
+      "env": {
+        "XC_LOG_LEVEL": "info"
+      }
+    },
+    "xc-ai-assist": {
+      "command": "node",
+      "args": ["/Users/eugenechan/.claude/plugins/marketplaces/xclaude-plugin-marketplace/mcp-servers/xc-ai-assist/dist/index.js"],
+      "env": {
+        "XC_LOG_LEVEL": "info"
+      }
+    }
+  }
+}
