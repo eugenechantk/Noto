@@ -70,6 +70,22 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
             target: self,
             action: #selector(outdentCurrentLine)
         )
+        let moveUpButton = UIBarButtonItem(
+            image: UIImage(systemName: "arrow.up"),
+            style: .plain,
+            target: self,
+            action: #selector(moveCurrentLineUp)
+        )
+        moveUpButton.accessibilityIdentifier = "moveUp"
+        moveUpButton.accessibilityLabel = "Move Up"
+        let moveDownButton = UIBarButtonItem(
+            image: UIImage(systemName: "arrow.down"),
+            style: .plain,
+            target: self,
+            action: #selector(moveCurrentLineDown)
+        )
+        moveDownButton.accessibilityIdentifier = "moveDown"
+        moveDownButton.accessibilityLabel = "Move Down"
         let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
         let doneButton = UIBarButtonItem(
             image: UIImage(systemName: "keyboard.chevron.compact.down"),
@@ -77,7 +93,9 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
             target: self,
             action: #selector(dismissKeyboardTapped)
         )
-        toolbar.items = [indentButton, outdentButton, flexSpace, doneButton]
+        doneButton.accessibilityIdentifier = "dismissKeyboard"
+        doneButton.accessibilityLabel = "Dismiss Keyboard"
+        toolbar.items = [indentButton, outdentButton, moveUpButton, moveDownButton, flexSpace, doneButton]
         self.inputAccessoryView = toolbar
     }
 
@@ -339,7 +357,9 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
     override var keyCommands: [UIKeyCommand]? {
         [
             UIKeyCommand(input: "\t", modifierFlags: [], action: #selector(indentCurrentLine)),
-            UIKeyCommand(input: "\t", modifierFlags: .shift, action: #selector(outdentCurrentLine))
+            UIKeyCommand(input: "\t", modifierFlags: .shift, action: #selector(outdentCurrentLine)),
+            UIKeyCommand(input: UIKeyCommand.inputUpArrow, modifierFlags: .alternate, action: #selector(moveCurrentLineUp)),
+            UIKeyCommand(input: UIKeyCommand.inputDownArrow, modifierFlags: .alternate, action: #selector(moveCurrentLineDown))
         ]
     }
 
@@ -351,6 +371,28 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
     @objc private func outdentCurrentLine() {
         noteTextStorage.outdentLine(at: selectedRange.location)
         noteTextViewDelegate?.noteTextViewDidChange(self)
+    }
+
+    // MARK: - Move Line Up / Down
+
+    @objc private func moveCurrentLineUp() {
+        guard let lineIdx = lineIndexAtCursor(), lineIdx > 0 else { return }
+        // Move line at lineIdx to before the previous line (insertion index = lineIdx - 1)
+        noteTextViewDelegate?.noteTextView(self, moveLineAt: lineIdx, toLineAt: lineIdx - 1)
+    }
+
+    @objc private func moveCurrentLineDown() {
+        guard let lineIdx = lineIndexAtCursor(), lineIdx < lineCount() - 1 else { return }
+        // Move line at lineIdx to after the next line (insertion index = lineIdx + 2)
+        noteTextViewDelegate?.noteTextView(self, moveLineAt: lineIdx, toLineAt: lineIdx + 2)
+    }
+
+    /// Returns the line index where the cursor currently sits.
+    private func lineIndexAtCursor() -> Int? {
+        let charIndex = selectedRange.location
+        guard charIndex <= textStorage.length else { return nil }
+        let prefix = textStorage.string.prefix(charIndex)
+        return prefix.filter({ $0 == "\n" }).count
     }
 
     // MARK: - Long-Press Drag Reorder
@@ -391,6 +433,18 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
         // Only start if the touch is on a valid line
         let point = gestureRecognizer.location(in: self)
         return lineIndex(at: point) != nil
+    }
+
+    /// Make text interaction gestures (selection, magnifying glass) require our
+    /// reorder gesture to fail first, giving reorder priority on long-press.
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+        guard gestureRecognizer === reorderGesture else { return false }
+        // If the other gesture belongs to UITextInteraction, defer it
+        let otherName = String(describing: type(of: otherGestureRecognizer))
+        return otherName.contains("TextInteraction") || otherName.contains("TextSelection")
     }
 
     @objc private func handleReorderGesture(_ gesture: UILongPressGestureRecognizer) {

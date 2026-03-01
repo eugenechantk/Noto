@@ -20,7 +20,9 @@ struct NotoApp: App {
             BlockEmbedding.self,
             SearchIndex.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let isUITesting = ProcessInfo.processInfo.arguments.contains("-UITesting")
+            || ProcessInfo.processInfo.environment["UITESTING"] == "1"
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isUITesting)
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])

@@ -16,17 +16,9 @@ struct ContentView: View {
     @Query(sort: \Block.sortOrder)
     private var allBlocks: [Block]
 
-    /// DFS traversal of the block tree — parents before children.
+    /// Flat list of all blocks ordered by global sortOrder.
     private var flattenedBlocks: [Block] {
-        var result: [Block] = []
-        func flatten(_ blocks: [Block]) {
-            for block in blocks.sorted(by: { $0.sortOrder < $1.sortOrder }) {
-                result.append(block)
-                flatten(block.children.filter { !$0.isArchived })
-            }
-        }
-        flatten(allBlocks.filter { $0.parent == nil && !$0.isArchived })
-        return result
+        allBlocks.filter { !$0.isArchived }.sorted { $0.sortOrder < $1.sortOrder }
     }
 
     @State private var editableContent: String = ""
@@ -188,23 +180,68 @@ struct ContentView: View {
 
         let movedBlock = blocks[source]
 
-        // Build the virtual reordered array
+        // Build the new flat order
         blocks.remove(at: source)
-        // Adjust destination index after removal
         let insertAt = destination > source ? destination - 1 : destination
         blocks.insert(movedBlock, at: insertAt)
 
-        // Compute new sortOrder from neighbors
-        let before: Double? = insertAt > 0 ? blocks[insertAt - 1].sortOrder : nil
-        let after: Double? = insertAt < blocks.count - 1 ? blocks[insertAt + 1].sortOrder : nil
-        let newSortOrder = Block.sortOrderBetween(before, after)
+        // Adjust depth: a block can be at most 1 deeper than the block above it.
+        let blockAbove = insertAt > 0 ? blocks[insertAt - 1] : nil
+        let maxValidDepth = (blockAbove?.depth ?? -1) + 1
+        let newDepth = min(movedBlock.depth, maxValidDepth)
 
-        logger.debug("[reorderBlock] moving '\(movedBlock.content.prefix(20))' from \(source) to \(destination), new sortOrder=\(newSortOrder)")
+        if movedBlock.depth != newDepth {
+            logger.debug("[reorderBlock] adjusting depth \(movedBlock.depth)→\(newDepth)")
+        }
 
-        movedBlock.sortOrder = newSortOrder
-        movedBlock.updatedAt = Date()
+        // Find the parent for the (possibly adjusted) depth
+        var newParent: Block? = nil
+        if newDepth > 0 {
+            for j in stride(from: insertAt - 1, through: 0, by: -1) {
+                if blocks[j].depth == newDepth - 1 {
+                    newParent = blocks[j]
+                    break
+                }
+            }
+        }
+
+        logger.debug("[reorderBlock] moving '\(movedBlock.content.prefix(20))' from \(source) to \(destination), depth \(movedBlock.depth)→\(newDepth), newParent=\(newParent?.content.prefix(20) ?? "nil")")
+
+        // Update the moved block's parent and depth via move() (also updates descendants)
+        movedBlock.move(to: newParent, sortOrder: 0)
+
+        // Assign sequential sortOrders to ALL blocks to maintain the flat order
+        for (i, block) in blocks.enumerated() {
+            block.sortOrder = Double(i + 1)
+        }
+
+        // Reconcile parents for any blocks whose visual position now implies
+        // a different parent (e.g., a child that's now visually under a new parent)
+        reconcileParents(in: blocks)
 
         reloadContent()
+    }
+
+    /// Ensure each block's parent matches the flat visual order.
+    /// Walk the flat list and assign parents by looking backward for the nearest
+    /// block at depth - 1.
+    private func reconcileParents(in blocks: [Block]) {
+        for (i, block) in blocks.enumerated() {
+            let depth = block.depth
+            var correctParent: Block? = nil
+            if depth > 0 {
+                for j in stride(from: i - 1, through: 0, by: -1) {
+                    if blocks[j].depth == depth - 1 {
+                        correctParent = blocks[j]
+                        break
+                    }
+                }
+            }
+            if block.parent !== correctParent {
+                block.parent = correctParent
+                block.updatedAt = Date()
+            }
+        }
     }
 
     /// Regenerate `editableContent` from the current model state.

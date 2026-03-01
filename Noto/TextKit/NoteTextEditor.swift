@@ -40,6 +40,7 @@ struct NoteTextEditor: UIViewRepresentable {
         noteTextView.backgroundColor = .clear
         noteTextView.textContainerInset = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         noteTextView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        noteTextView.accessibilityIdentifier = "noteTextView"
 
         // Load initial content
         noteTextView.loadNote(text)
@@ -93,6 +94,8 @@ struct NoteTextEditor: UIViewRepresentable {
 
         func noteTextView(_ noteTextView: NoteTextView, moveLineAt sourceIndex: Int, toLineAt destinationIndex: Int) {
             parent.onReorderLine?(sourceIndex, destinationIndex)
+            // Force reload since isEditing blocks updateUIView
+            noteTextView.loadNote(parent.text)
         }
 
         private func syncText() {
