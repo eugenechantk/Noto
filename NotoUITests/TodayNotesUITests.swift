@@ -6,6 +6,10 @@
 //  hierarchy building, block protection, and day block editing.
 //  Maps to spec acceptance criteria: AC-GT-*, AC-SB-*, AC-AB-*, AC-BP-*, AC-DBE-*, AC-HSI-*.
 //
+//  NOTE: OutlineView uses a custom Liquid Glass toolbar with .navigationBarHidden(true).
+//  Back button is a GlassToolbarButton with accessibilityLabel "Back".
+//  Breadcrumb is a ScrollableBreadcrumb in the custom toolbar, not in a system nav bar.
+//
 
 import XCTest
 
@@ -53,9 +57,9 @@ final class TodayNotesUITests: XCTestCase {
         textView.value as? String ?? ""
     }
 
-    /// Tap the Back button in the navigation bar to go up one level.
+    /// Tap the Back button (custom Liquid Glass toolbar button with label "Back").
     private func tapBack() {
-        let backButton = app.navigationBars.buttons.element(boundBy: 0)
+        let backButton = app.buttons["Back"]
         if backButton.waitForExistence(timeout: 3) {
             backButton.tap()
             waitForNavigation()
@@ -82,49 +86,29 @@ final class TodayNotesUITests: XCTestCase {
         XCTAssertTrue(nodeViewTitle.waitForExistence(timeout: 5),
                        "Should navigate to a node view")
 
-        // Verify we're in the Today's Notes hierarchy by checking for
-        // "Today's Notes" text somewhere in the navigation bar (breadcrumb)
-        let todayNotesText = app.navigationBars.staticTexts["Today's Notes"]
-        let homeText = app.navigationBars.staticTexts["Home"]
-        XCTAssertTrue(todayNotesText.exists || homeText.exists,
-                       "Navigation bar should contain breadcrumb path segments")
+        // Verify the back button exists (stack is Home → Day block)
+        let backButton = app.buttons["Back"]
+        XCTAssertTrue(backButton.waitForExistence(timeout: 3),
+                       "Back button should be visible in the custom toolbar")
     }
 
-    // MARK: - AC-GT-7: Today button pushes full navigation path (back works)
+    // MARK: - AC-GT-7: Today button pushes directly, single back returns home
 
     @MainActor
-    func testTodayButtonPushesFullNavigationPath() throws {
+    func testTodayButtonBackReturnsHome() throws {
         XCTAssertTrue(todayButton.waitForExistence(timeout: 5))
         todayButton.tap()
         waitForNavigation()
 
-        // We should be on the day block. Navigate back through the hierarchy.
-        // Each Back tap should go up one level: Day → Week → Month → Year → Today's Notes → Home
+        // Should be on the day block
+        XCTAssertTrue(nodeViewTitle.waitForExistence(timeout: 5))
 
-        // First back should go to the week block
+        // Single back should return directly to home (stack is Home → Day, not full hierarchy)
         tapBack()
-        XCTAssertTrue(nodeViewTitle.waitForExistence(timeout: 5),
-                       "Should be on week node view after first back")
 
-        // Second back should go to the month block
-        tapBack()
-        if nodeViewTitle.waitForExistence(timeout: 3) {
-            // Third back should go to the year block
-            tapBack()
-            if nodeViewTitle.waitForExistence(timeout: 3) {
-                // Fourth back should go to Today's Notes root
-                tapBack()
-                if nodeViewTitle.waitForExistence(timeout: 3) {
-                    // Fifth back should return to home
-                    tapBack()
-                }
-            }
-        }
-
-        // Should be back on home screen
         let homeTitle = app.staticTexts["homeTitle"]
         XCTAssertTrue(homeTitle.waitForExistence(timeout: 5),
-                       "Should return to home screen after navigating all the way back")
+                       "Single back from Today should return to home screen")
     }
 
     // MARK: - AC-GT-2: Today button appears on node views
@@ -205,17 +189,19 @@ final class TodayNotesUITests: XCTestCase {
         todayButton.tap()
         waitForNavigation()
 
-        // Breadcrumb segments are StaticTexts inside the navigation bar.
-        // The deepest segments (rightmost) are always visible; earlier ones may clip.
-        // Check that at least some path segments exist in the nav bar.
-        let navBar = app.navigationBars.firstMatch
-        XCTAssertTrue(navBar.waitForExistence(timeout: 5),
-                       "Navigation bar should be visible in node view")
+        // The breadcrumb is in a custom Liquid Glass toolbar (nav bar is hidden).
+        // ScrollableBreadcrumb derives path from the node's parent chain,
+        // so it shows the full hierarchy: Home / Today's Notes / 2026 / Mar / W9 / Mar 1
+        let separator = app.staticTexts[" / "]
+        XCTAssertTrue(separator.waitForExistence(timeout: 5),
+                       "Breadcrumb should have ' / ' separator indicating a navigation path")
 
-        // Look for breadcrumb separator " / " which indicates multi-segment breadcrumb
-        let separators = navBar.staticTexts.matching(NSPredicate(format: "label == ' / '"))
-        XCTAssertGreaterThan(separators.count, 0,
-                              "Breadcrumb should have separator segments indicating a navigation path")
+        // Verify "Today's Notes" appears in the breadcrumb (full hierarchy path).
+        // Non-current breadcrumb segments are Buttons, not StaticTexts.
+        let todayNotesButton = app.buttons["Today's Notes"]
+        let todayNotesText = app.staticTexts["Today's Notes"]
+        XCTAssertTrue(todayNotesButton.exists || todayNotesText.exists,
+                       "Breadcrumb should contain 'Today's Notes' path segment")
     }
 
     // MARK: - AC-TNR-5: Double-tap Today's Notes drills into node view
@@ -289,21 +275,30 @@ final class TodayNotesUITests: XCTestCase {
 
     @MainActor
     func testProtectedBlocksResistDeletion() throws {
-        // Navigate into Today's Notes hierarchy
+        // First, trigger hierarchy building by navigating to today
         XCTAssertTrue(todayButton.waitForExistence(timeout: 5))
         todayButton.tap()
         waitForNavigation()
 
-        // Go back to the week level
+        // Go back to home
         tapBack()
-        XCTAssertTrue(nodeViewTitle.waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 0.5)
 
-        // The week view should show the day block as a child.
-        // The day block text should be visible in the editor.
+        // Now double-tap "Today's Notes" (line 0) to enter its node view,
+        // which shows the year block as a protected child.
         waitForTextView()
-        let textBefore = currentText()
+        let textInsetTop: CGFloat = 8
+        let lineHeight: CGFloat = 24
+        let base = textView.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+        let targetY = textInsetTop + lineHeight * 0.5
+        let lineCoord = base.withOffset(CGVector(dx: 100, dy: targetY))
+        lineCoord.doubleTap()
+        waitForNavigation()
 
-        // Try to select all and delete — protected blocks should resist
+        XCTAssertTrue(nodeViewTitle.waitForExistence(timeout: 5))
+        waitForTextView()
+
+        // Try to tap the text view and delete — protected blocks should resist
         textView.tap()
         Thread.sleep(forTimeInterval: 0.3)
 
@@ -314,9 +309,7 @@ final class TodayNotesUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.5)
 
         let textAfter = currentText()
-        // The auto-built day block label should still exist (isContentEditableByUser = false)
-        // We can't easily assert the exact content, but the text should not be empty
-        // since protected blocks resist deletion
+        // The auto-built hierarchy blocks should still exist (isContentEditableByUser = false)
         XCTAssertFalse(textAfter.isEmpty,
                         "Protected blocks should resist deletion — editor should not be empty")
     }
