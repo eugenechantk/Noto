@@ -68,10 +68,8 @@ struct ContentView: View {
                             .padding(.bottom, 8)
                     }
 
-                    // Bottom search bar
-                    GlassSearchBar(text: $searchText)
-                        .padding(.horizontal, 28)
-                        .padding(.bottom, 32)
+                    // Bottom toolbar: Today button + search bar
+                    bottomToolbar
                 }
             }
             .background(backgroundColor)
@@ -114,6 +112,7 @@ struct ContentView: View {
                 .font(.system(size: 34, weight: .bold))
                 .foregroundStyle(labelPrimary)
                 .tracking(0.4)
+                .accessibilityIdentifier("homeTitle")
 
             Text("Add tag here")
                 .font(.system(size: 15, weight: .medium))
@@ -122,6 +121,21 @@ struct ContentView: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 10)
+    }
+
+    private var bottomToolbar: some View {
+        GlassEffectContainer {
+            HStack(spacing: 12) {
+                GlassTodayButton {
+                    navigateToToday()
+                }
+
+                GlassSearchBar(text: $searchText)
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.bottom, 32)
+        .padding(.top, 4)
     }
 
     // MARK: - Colors
@@ -144,6 +158,20 @@ struct ContentView: View {
             : Color(red: 0.45, green: 0.45, blue: 0.45)
     }
 
+    // MARK: - Today Navigation
+
+    private func navigateToToday() {
+        let dayBlock = TodayNotesService.ensureToday(context: modelContext)
+        // Build the full navigation path: Today's Notes root → Year → Month → Week → Day
+        var path: [Block] = []
+        var current: Block? = dayBlock
+        while let block = current {
+            path.insert(block, at: 0)
+            current = block.parent
+        }
+        navigationPath = path
+    }
+
     // MARK: - Double-Tap Navigation
 
     private func handleDoubleTap(at lineIndex: Int) {
@@ -156,6 +184,9 @@ struct ContentView: View {
     private func loadContent() {
         guard !hasLoaded else { return }
         hasLoaded = true
+
+        // Ensure Today's Notes root exists
+        let _ = TodayNotesService.ensureRoot(context: modelContext)
 
         let blocks = flattenedBlocks
         if blocks.isEmpty {
@@ -196,19 +227,18 @@ struct ContentView: View {
         for i in 0..<min(parsed.count, blocks.count) {
             let (depth, content) = parsed[i]
 
-            if blocks[i].content != content {
+            // Guard: skip content sync for blocks not editable by user
+            if blocks[i].content != content && blocks[i].isContentEditableByUser {
                 blocks[i].content = content
                 blocks[i].updatedAt = Date()
             }
 
-            // Update depth / parent if changed
-            if blocks[i].depth != depth {
+            // Update depth / parent if changed (skip for non-movable blocks)
+            if blocks[i].depth != depth && blocks[i].isMovable {
                 let newParent = findParent(for: i, depth: depth, in: blocks, parsed: parsed)
                 logger.debug("[syncContent] block[\(i)] depth \(blocks[i].depth)→\(depth), parent: \(newParent?.content.prefix(20) ?? "nil")")
                 let newSortOrder = blocks[i].sortOrder
                 blocks[i].move(to: newParent, sortOrder: newSortOrder)
-                // move() computes depth from parent; override if the parsed
-                // depth disagrees (e.g. orphan indent with no valid parent).
                 if blocks[i].depth != depth {
                     blocks[i].depth = depth
                 }
@@ -222,7 +252,6 @@ struct ContentView: View {
                 let sortOrder = (blocks.last?.sortOrder ?? 0) + Double(i - blocks.count + 1)
                 let newParent = findParent(for: i, depth: depth, in: blocks, parsed: parsed)
                 let block = Block(content: content, parent: newParent, sortOrder: sortOrder)
-                // The Block init sets depth from parent, but we need to override for root blocks
                 if depth != block.depth {
                     block.depth = depth
                 }
@@ -231,10 +260,12 @@ struct ContentView: View {
             }
         }
 
-        // Delete excess blocks
+        // Delete excess blocks (skip non-deletable blocks)
         if blocks.count > parsed.count {
             for i in stride(from: blocks.count - 1, through: parsed.count, by: -1) {
-                modelContext.delete(blocks[i])
+                if blocks[i].isDeletable {
+                    modelContext.delete(blocks[i])
+                }
             }
         }
     }
@@ -259,7 +290,6 @@ struct ContentView: View {
     // MARK: - Reorder
 
     /// Move a block from `source` line index to `destination` insertion index.
-    /// Destination uses insertion semantics: 0 = before first, count = after last.
     private func reorderBlock(from source: Int, to destination: Int) {
         var blocks = flattenedBlocks
         guard source >= 0, source < blocks.count else { return }
@@ -268,12 +298,16 @@ struct ContentView: View {
 
         let movedBlock = blocks[source]
 
-        // Build the new flat order
+        // Guard: non-reorderable blocks cannot be moved
+        guard movedBlock.isReorderable else {
+            logger.debug("[reorderBlock] block '\(movedBlock.content.prefix(20))' is not reorderable")
+            return
+        }
+
         blocks.remove(at: source)
         let insertAt = destination > source ? destination - 1 : destination
         blocks.insert(movedBlock, at: insertAt)
 
-        // Adjust depth: a block can be at most 1 deeper than the block above it.
         let blockAbove = insertAt > 0 ? blocks[insertAt - 1] : nil
         let maxValidDepth = (blockAbove?.depth ?? -1) + 1
         let newDepth = min(movedBlock.depth, maxValidDepth)
@@ -282,7 +316,6 @@ struct ContentView: View {
             logger.debug("[reorderBlock] adjusting depth \(movedBlock.depth)→\(newDepth)")
         }
 
-        // Find the parent for the (possibly adjusted) depth
         var newParent: Block? = nil
         if newDepth > 0 {
             for j in stride(from: insertAt - 1, through: 0, by: -1) {
@@ -295,24 +328,16 @@ struct ContentView: View {
 
         logger.debug("[reorderBlock] moving '\(movedBlock.content.prefix(20))' from \(source) to \(destination), depth \(movedBlock.depth)→\(newDepth), newParent=\(newParent?.content.prefix(20) ?? "nil")")
 
-        // Update the moved block's parent and depth via move() (also updates descendants)
         movedBlock.move(to: newParent, sortOrder: 0)
 
-        // Assign sequential sortOrders to ALL blocks to maintain the flat order
         for (i, block) in blocks.enumerated() {
             block.sortOrder = Double(i + 1)
         }
 
-        // Reconcile parents for any blocks whose visual position now implies
-        // a different parent (e.g., a child that's now visually under a new parent)
         reconcileParents(in: blocks)
-
         reloadContent()
     }
 
-    /// Ensure each block's parent matches the flat visual order.
-    /// Walk the flat list and assign parents by looking backward for the nearest
-    /// block at depth - 1.
     private func reconcileParents(in blocks: [Block]) {
         for (i, block) in blocks.enumerated() {
             let depth = block.depth
@@ -332,7 +357,6 @@ struct ContentView: View {
         }
     }
 
-    /// Regenerate `editableContent` from the current model state.
     private func reloadContent() {
         isSyncing = true
         editableContent = flattenedBlocks.map { block in

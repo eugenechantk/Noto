@@ -27,6 +27,12 @@ final class Block: Hashable {
     var isArchived: Bool
     var extensionData: Data?
 
+    // Block protection properties — all default to true (unrestricted)
+    var isDeletable: Bool = true
+    var isContentEditableByUser: Bool = true
+    var isReorderable: Bool = true
+    var isMovable: Bool = true
+
     // Relationships
     var parent: Block?
 
@@ -51,7 +57,11 @@ final class Block: Hashable {
         parent: Block? = nil,
         sortOrder: Double = 0.0,
         isArchived: Bool = false,
-        extensionData: Data? = nil
+        extensionData: Data? = nil,
+        isDeletable: Bool = true,
+        isContentEditableByUser: Bool = true,
+        isReorderable: Bool = true,
+        isMovable: Bool = true
     ) {
         self.id = id
         self.content = content
@@ -62,6 +72,10 @@ final class Block: Hashable {
         self.isArchived = isArchived
         self.extensionData = extensionData
         self.parent = parent
+        self.isDeletable = isDeletable
+        self.isContentEditableByUser = isContentEditableByUser
+        self.isReorderable = isReorderable
+        self.isMovable = isMovable
     }
 
     // MARK: - Computed Properties
