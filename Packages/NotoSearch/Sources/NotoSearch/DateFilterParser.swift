@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import NotoCore
 
 public struct DateFilterParser {
 

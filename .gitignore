@@ -1,2 +1,16 @@
 build/
 *.mlpackage
+
+# SwiftPM build artifacts (root and nested local packages)
+**/.build/
+.swiftpm/
+**/.swiftpm/
+
+# SwiftPM/Xcode resolution files generated during local builds/tests
+Package.resolved
+**/Package.resolved
+
+# Xcode local build/test artifacts
+DerivedData/
+*.xcresult
+*.xctestproducts

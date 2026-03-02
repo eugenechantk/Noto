@@ -141,7 +141,8 @@ public final class SearchService {
             // Run keyword and semantic search in parallel
             async let keywordTask = fts5Engine.search(
                 query: query.text,
-                dateRange: query.dateRange,
+                dateRangeStart: query.dateRange?.start,
+                dateRangeEnd: query.dateRange?.end,
                 modelContext: modelContext
             )
             async let semanticTask = SemanticEngine(
@@ -153,22 +154,33 @@ public final class SearchService {
                 modelContext: modelContext
             )
 
-            keywordResults = await keywordTask
+            let rawKeywordResults = await keywordTask
+            keywordResults = rawKeywordResults.map {
+                KeywordSearchResult(blockId: $0.blockId, bm25Score: $0.bm25Score)
+            }
             semanticResults = await semanticTask
         } else {
-            keywordResults = await fts5Engine.search(
+            let rawKeywordResults = await fts5Engine.search(
                 query: query.text,
-                dateRange: query.dateRange,
+                dateRangeStart: query.dateRange?.start,
+                dateRangeEnd: query.dateRange?.end,
                 modelContext: modelContext
             )
+            keywordResults = rawKeywordResults.map {
+                KeywordSearchResult(blockId: $0.blockId, bm25Score: $0.bm25Score)
+            }
             semanticResults = []
         }
         #else
-        keywordResults = await fts5Engine.search(
+        let rawKeywordResults = await fts5Engine.search(
             query: query.text,
-            dateRange: query.dateRange,
+            dateRangeStart: query.dateRange?.start,
+            dateRangeEnd: query.dateRange?.end,
             modelContext: modelContext
         )
+        keywordResults = rawKeywordResults.map {
+            KeywordSearchResult(blockId: $0.blockId, bm25Score: $0.bm25Score)
+        }
         semanticResults = []
         #endif
 

@@ -9,7 +9,6 @@
 import Foundation
 import SwiftData
 import NotoModels
-import NotoCore
 import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "FTS5Engine")
@@ -25,21 +24,20 @@ public struct FTS5Engine {
     /// Optionally post-filters by date range using SwiftData.
     public func search(
         query: String,
-        dateRange: DateRange?,
+        dateRangeStart: Date?,
+        dateRangeEnd: Date?,
         modelContext: ModelContext
-    ) async -> [KeywordSearchResult] {
+    ) async -> [(blockId: UUID, bm25Score: Double)] {
         let sanitized = FTS5Engine.sanitizeQuery(query)
         guard !sanitized.isEmpty else { return [] }
 
         let rawResults = await fts5Database.search(query: sanitized)
         guard !rawResults.isEmpty else { return [] }
 
-        var results = rawResults.map { KeywordSearchResult(blockId: $0.blockId, bm25Score: $0.bm25Score) }
+        var results = rawResults
 
-        if let dateRange = dateRange {
+        if let start = dateRangeStart, let end = dateRangeEnd {
             let matchedIds = results.map { $0.blockId }
-            let start = dateRange.start
-            let end = dateRange.end
 
             let descriptor = FetchDescriptor<Block>(
                 predicate: #Predicate<Block> { block in

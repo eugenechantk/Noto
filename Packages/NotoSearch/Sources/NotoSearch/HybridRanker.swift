@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import NotoCore
 
 public struct HybridRanker {
 

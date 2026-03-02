@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-import NotoCore
 import NotoSearch
 
 struct SearchPackageTests {
