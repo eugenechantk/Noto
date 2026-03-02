@@ -6,6 +6,8 @@
 //  into SwiftUI.
 //
 
+// Inpsired by: https://github.com/pmattos/Simple-Notes
+
 import SwiftUI
 import UIKit
 
@@ -92,7 +94,7 @@ struct NoteTextEditor: UIViewRepresentable {
             self.parent = parent
         }
 
-        func noteTextViewDidBeginEditing(_ noteTextView: NoteTextView) {
+        func noteTextViewDidBeginEditing(_: NoteTextView) {
             isEditing = true
             parent.onBeginEditing?()
         }
@@ -113,7 +115,7 @@ struct NoteTextEditor: UIViewRepresentable {
             parent.onEndEditing?()
         }
 
-        func noteTextViewDidChange(_ noteTextView: NoteTextView) {
+        func noteTextViewDidChange(_: NoteTextView) {
             syncText()
         }
 
@@ -123,7 +125,7 @@ struct NoteTextEditor: UIViewRepresentable {
             noteTextView.loadNote(parent.text)
         }
 
-        func noteTextView(_ noteTextView: NoteTextView, didDoubleTapLineAt lineIndex: Int) {
+        func noteTextView(_: NoteTextView, didDoubleTapLineAt lineIndex: Int) {
             parent.onDoubleTapLine?(lineIndex)
         }
 

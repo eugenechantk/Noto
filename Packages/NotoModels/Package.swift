@@ -9,5 +9,9 @@ let package = Package(
     ],
     targets: [
         .target(name: "NotoModels"),
+        .testTarget(
+            name: "NotoModelsTests",
+            dependencies: ["NotoModels"]
+        ),
     ]
 )

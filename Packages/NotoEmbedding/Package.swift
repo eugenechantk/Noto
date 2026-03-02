@@ -9,5 +9,9 @@ let package = Package(
     ],
     targets: [
         .target(name: "NotoEmbedding"),
+        .testTarget(
+            name: "NotoEmbeddingTests",
+            dependencies: ["NotoEmbedding"]
+        ),
     ]
 )

@@ -22,5 +22,9 @@ let package = Package(
             "NotoEmbedding",
             .product(name: "USearch", package: "usearch"),
         ]),
+        .testTarget(
+            name: "NotoHNSWTests",
+            dependencies: ["NotoHNSW", "NotoEmbedding"]
+        ),
     ]
 )

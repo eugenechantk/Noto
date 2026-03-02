@@ -14,5 +14,9 @@ let package = Package(
     ],
     targets: [
         .target(name: "NotoFTS5", dependencies: ["NotoModels", "NotoCore", "NotoDirtyTracker"]),
+        .testTarget(
+            name: "NotoFTS5Tests",
+            dependencies: ["NotoFTS5", "NotoModels", "NotoCore", "NotoDirtyTracker"]
+        ),
     ]
 )

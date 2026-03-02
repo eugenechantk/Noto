@@ -13,5 +13,9 @@ let package = Package(
     ],
     targets: [
         .target(name: "NotoTodayNotes", dependencies: ["NotoModels", "NotoCore"]),
+        .testTarget(
+            name: "NotoTodayNotesTests",
+            dependencies: ["NotoTodayNotes", "NotoModels", "NotoCore"]
+        ),
     ]
 )

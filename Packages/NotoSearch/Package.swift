@@ -24,5 +24,17 @@ let package = Package(
             "NotoHNSW",
             "NotoEmbedding",
         ]),
+        .testTarget(
+            name: "NotoSearchTests",
+            dependencies: [
+                "NotoSearch",
+                "NotoModels",
+                "NotoCore",
+                "NotoDirtyTracker",
+                "NotoFTS5",
+                "NotoEmbedding",
+                "NotoHNSW",
+            ]
+        ),
     ]
 )
