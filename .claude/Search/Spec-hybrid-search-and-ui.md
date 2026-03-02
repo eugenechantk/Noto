@@ -2,6 +2,11 @@
 
 Based on [PRD-hybrid-search-and-ui.md](./PRD-hybrid-search-and-ui.md).
 
+**Dependencies:**
+- Spec-search-foundation (FTS5Database, DirtyTracker, DateRange)
+- Spec-keyword-search (FTS5Engine, FTS5Indexer, KeywordSearchResult)
+- Spec-semantic-search (SemanticEngine, EmbeddingIndexer, SemanticSearchResult)
+
 ---
 
 ## User Stories
@@ -50,9 +55,9 @@ SearchSheet (SwiftUI)
 ┌────────────────────┐
 │ SearchService      │
 │                    │
-│ 1. Flush dirty     │ → DirtyTracker + FTS5Indexer + EmbeddingIndexer
+│ 1. Flush dirty     │ → DirtyTracker (foundation) + FTS5Indexer (keyword) + EmbeddingIndexer (semantic)
 │ 2. Parse date      │ → DateFilterParser
-│ 3. Parallel search │ → FTS5Engine + SemanticEngine (async let)
+│ 3. Parallel search │ → FTS5Engine (keyword) + SemanticEngine (semantic)
 │ 4. Hybrid rank     │ → HybridRanker
 │ 5. Build results   │ → BreadcrumbBuilder
 │                    │
@@ -72,12 +77,7 @@ ContentView.navigationPath updated → navigates to block
 ```swift
 struct SearchQuery {
     let text: String          // search terms (temporal phrases stripped)
-    let dateRange: DateRange? // optional date filter
-}
-
-struct DateRange {
-    let start: Date
-    let end: Date
+    let dateRange: DateRange? // optional date filter (from foundation)
 }
 
 struct SearchResult: Identifiable {
@@ -93,6 +93,8 @@ struct SearchResult: Identifiable {
 #### 1. `DateFilterParser`
 
 Location: `Noto/Search/DateFilterParser.swift`
+
+**No cross-PRD dependencies — can be built in parallel with any phase.**
 
 Extracts temporal phrases from a raw query string and returns a cleaned query + optional date range.
 
@@ -117,28 +119,30 @@ struct DateFilterParser {
    ```
 
 2. For month/year patterns ("in March", "in 2024", "in March 2024"):
-   Use `NSDataDetector` with `.date` checking type to extract date references, then compute the full month/year range.
+   Use `NSDataDetector` with `.date` checking type, then compute the full month/year range.
 
 3. Scan the raw query against all patterns (case-insensitive).
 
 4. If a match is found:
    - Compute the `DateRange`
    - Remove the matched substring from the query
-   - Trim whitespace from the remaining text
+   - Trim whitespace from remaining text
    - Return `SearchQuery(text: cleanedText, dateRange: range)`
 
 5. If no match: return `SearchQuery(text: rawQuery, dateRange: nil)`
 
 **Edge cases:**
 - Multiple temporal phrases: use the first match (leftmost)
-- Empty text after stripping: return empty text (will produce no FTS5 results, semantic may still work)
-- Ambiguous phrases like "march" (could be month or verb): regex patterns are anchored to common phrasing ("in March", "last March") — bare "march" is not matched
+- Empty text after stripping: return empty text (triggers date-only path in SearchService)
+- Ambiguous phrases like "march" (could be month or verb): patterns are anchored to common phrasing ("in March", "last March") — bare "march" is not matched
 
 #### 2. `SearchService`
 
 Location: `Noto/Search/SearchService.swift`
 
-Orchestrates the full search pipeline. This is the single entry point for search.
+**Depends on: FTS5Engine (keyword), SemanticEngine (semantic), DirtyTracker (foundation), FTS5Indexer (keyword), EmbeddingIndexer (semantic).**
+
+Orchestrates the full search pipeline. Single entry point for search.
 
 ```swift
 class SearchService {
@@ -151,10 +155,7 @@ class SearchService {
     let hybridRanker: HybridRanker
     let modelContext: ModelContext
 
-    // Full search pipeline
     func search(rawQuery: String) async -> [SearchResult]
-
-    // Flush dirty blocks (called on search sheet appear)
     func ensureIndexFresh() async
 }
 ```
@@ -162,34 +163,30 @@ class SearchService {
 **`ensureIndexFresh()` algorithm:**
 1. `await dirtyTracker.flush()` — persist in-memory dirty set
 2. Fetch all dirty blocks from `dirty_blocks` table
-3. Run FTS5 and embedding indexing for dirty blocks (sequential — both need the same dirty set)
+3. Run FTS5 and embedding indexing for dirty blocks
 4. Save HNSW index
 
 **`search()` algorithm:**
 1. Parse date filter: `dateFilterParser.parse(rawQuery)` → `SearchQuery`
 2. If `query.text` is empty and `query.dateRange` is nil, return `[]`
-3. Run keyword and semantic search in parallel:
+3. **Short-circuit: empty text with date range** — if text is empty but dateRange set (e.g., "today"), skip FTS5/semantic. Fetch all blocks in date range from SwiftData, return sorted by `updatedAt` descending.
+4. Run keyword and semantic search in parallel:
    ```swift
-   async let keywordResults = fts5Engine.search(
-       query: query.text, dateRange: query.dateRange, modelContext: modelContext
-   )
-   async let semanticResults = semanticEngine.search(
-       query: query.text, dateRange: query.dateRange, modelContext: modelContext
-   )
+   async let keywordResults = fts5Engine.search(query:, dateRange:, modelContext:)
+   async let semanticResults = semanticEngine.search(query:, dateRange:, modelContext:)
    ```
-4. Pass both result sets to `hybridRanker.rank(keyword:, semantic:)`
-5. For each ranked result, build breadcrumb + fetch content:
+5. Pass both result sets to `hybridRanker.rank(keyword:, semantic:)`
+6. For each ranked result, build breadcrumb + fetch content:
    - Fetch `Block` from SwiftData by ID
    - Get `block.content` for display
    - Call `BreadcrumbBuilder.build(for: block)` for the breadcrumb string
-6. Return `[SearchResult]` sorted by `hybridScore` descending
-
-**Short-circuit: empty query text with date range:**
-If `query.text` is empty but `dateRange` is set (e.g., user typed just "today"), skip FTS5 and semantic search. Instead, fetch all blocks in the date range from SwiftData and return them sorted by `updatedAt` descending. This handles the "show me what I wrote today" case.
+7. Return `[SearchResult]` sorted by `hybridScore` descending
 
 #### 3. `HybridRanker`
 
 Location: `Noto/Search/HybridRanker.swift`
+
+**No cross-PRD dependencies — can be built in parallel with any phase.**
 
 Score normalization, combination, and thresholding.
 
@@ -232,13 +229,13 @@ struct RankedResult {
    - Results not in semantic set get normalized score = 0.0
 
 5. **Short-circuit check:**
-   - If keyword results are empty: set `effectiveAlpha = 0.0` (pure semantic)
-   - If semantic results are empty: set `effectiveAlpha = 1.0` (pure keyword)
+   - If keyword results are empty: `effectiveAlpha = 0.0` (pure semantic)
+   - If semantic results are empty: `effectiveAlpha = 1.0` (pure keyword)
    - Otherwise: `effectiveAlpha = alpha` (0.6)
 
 6. **Exact match boost:**
-   - For each keyword result, check if the query text appears verbatim in the block content (case-insensitive)
-   - If yes: multiply that result's normalized keyword score by 1.5 (capped at 1.0 after combination)
+   - For each keyword result, check if query text appears verbatim in block content (case-insensitive)
+   - If yes: multiply normalized keyword score by 1.5 (capped at 1.0 after combination)
 
 7. **Compute hybrid scores:**
    ```swift
@@ -246,55 +243,37 @@ struct RankedResult {
        let kw = normalizedKeyword[blockId] ?? 0.0
        let sem = normalizedSemantic[blockId] ?? 0.0
        let hybrid = effectiveAlpha * kw + (1 - effectiveAlpha) * sem
-       // cap at 1.0 (in case of exact match boost overflow)
        results.append(RankedResult(blockId: blockId, hybridScore: min(hybrid, 1.0)))
    }
    ```
 
 8. **Sort** by `hybridScore` descending.
 
-9. **No threshold on hybrid score.** Both individual engines already apply their own thresholds (BM25 threshold for FTS5, cosine >= 0.3 for HNSW). The hybrid ranker works only with results that already passed individual thresholds.
+9. **No threshold on hybrid score.** Both individual engines already apply their own thresholds.
 
 #### 4. `BreadcrumbBuilder`
 
 Location: `Noto/Search/BreadcrumbBuilder.swift`
 
+**Depends only on Block model (existing) — can be built in parallel with any phase.**
+
 Walks a block's ancestor chain and produces a display string.
 
 ```swift
 struct BreadcrumbBuilder {
-    func build(for block: Block) -> String
+    static func build(for block: Block) -> String
 }
 ```
 
 **Algorithm:**
-1. Start with the block's parent (not the block itself — the block's content is shown as the title)
+1. Start with the block's parent (not the block itself)
 2. Walk up the parent chain, collecting each ancestor's content
-3. For each ancestor's content: take the first line, truncate to 30 characters if longer, append "..." if truncated
-4. Reverse the collected array (root-first order)
-5. Replace the top-level root's content with "Home" (root blocks have `parent == nil`)
+3. For each: take first line, truncate to 30 characters + "..." if longer
+4. Reverse (root-first order)
+5. Replace the top-level root's content with "Home"
 6. Join with " / "
 
-```swift
-func build(for block: Block) -> String {
-    var ancestors: [String] = []
-    var current = block.parent
-    while let ancestor = current {
-        let title = ancestor.content.components(separatedBy: "\n").first ?? ""
-        let truncated = title.count > 30 ? String(title.prefix(30)) + "..." : title
-        ancestors.append(truncated)
-        current = ancestor.parent
-    }
-    ancestors.reverse()
-    // Replace the root with "Home"
-    if !ancestors.isEmpty {
-        ancestors[0] = "Home"
-    }
-    return ancestors.joined(separator: " / ")
-}
-```
-
-**Example outputs:**
+**Examples:**
 - Root-level block → `"Home"`
 - One level deep → `"Home / Not too bad"`
 - Two levels deep → `"Home / Not too bad / but this is a bullet"`
@@ -302,6 +281,8 @@ func build(for block: Block) -> String {
 #### 5. `SearchSheet` (SwiftUI View)
 
 Location: `Noto/Views/SearchSheet.swift`
+
+**Depends on: SearchService.**
 
 Bottom sheet with search bar, "Ask AI" row, and results list.
 
@@ -314,8 +295,8 @@ struct SearchSheet: View {
     @State private var isIndexing: Bool = false
 
     let searchService: SearchService
-    let onSelectResult: (Block) -> Void  // callback to navigate
-    let onAskAI: (String) -> Void        // callback for AI chat
+    let onSelectResult: (Block) -> Void
+    let onAskAI: (String) -> Void
 }
 ```
 
@@ -340,36 +321,17 @@ Sheet (presented as .sheet with detents)
 │   ├── Spacer
 │   │
 │   └── Search Bar (bottom, liquid glass style)
-│       ├── Search icon (SF Symbol: magnifyingglass)
+│       ├── Search icon (magnifyingglass)
 │       ├── TextField (placeholder: "Search or ask anything")
 │       ├── Clear button (X) — visible when text is non-empty
 │       └── Submit button (arrow.up.circle.fill) — triggers search
 ```
 
-**Sheet presentation:**
-```swift
-// In ContentView or the presenting view:
-.sheet(isPresented: $showSearch) {
-    SearchSheet(
-        searchService: searchService,
-        onSelectResult: { block in
-            showSearch = false
-            navigateToBlock(block)
-        },
-        onAskAI: { query in
-            // Future: navigate to AI chat with query
-        }
-    )
-    .presentationDetents([.large])
-    .presentationDragIndicator(.visible)
-}
-```
-
 **Behavior:**
-- `onAppear`: call `searchService.ensureIndexFresh()`, set `isIndexing = true` while running
-- Submit button action: set `isSearching = true`, call `searchService.search(rawQuery: queryText)`, set results, set `isSearching = false`
-- Clear button: set `queryText = ""`, clear `results`
-- Keyboard: auto-focus the text field on appear
+- `onAppear`: call `searchService.ensureIndexFresh()`, set `isIndexing` while running
+- Submit: set `isSearching`, call `searchService.search(rawQuery:)`, display results
+- Clear: reset `queryText` and `results`
+- Keyboard: auto-focus text field on appear
 
 #### 6. `SearchResultRow` (SwiftUI View)
 
@@ -384,7 +346,7 @@ struct SearchResultRow: View {
             Text(result.content)
                 .font(.system(size: 17))
                 .foregroundStyle(.primary)
-                .lineLimit(nil)  // wrap for long blocks
+                .lineLimit(nil)
 
             Text(result.breadcrumb)
                 .font(.system(size: 15))
@@ -398,17 +360,14 @@ struct SearchResultRow: View {
 }
 ```
 
-Row height is 68pt per the Figma design, with content vertically centered. Standard iOS separator between rows.
-
 ---
 
 ## Navigation on Result Tap
 
-When the user taps a search result, the app needs to navigate to that block within its note tree. This uses the existing `NavigationStack(path: $navigationPath)` pattern in `ContentView`.
+Same pattern as `navigateToToday()` in `ContentView.swift`:
 
-**Algorithm:**
-1. Fetch the `Block` from SwiftData by `result.id`
-2. Build the full ancestor path (same walk as BreadcrumbBuilder, but keeping Block references):
+1. Fetch `Block` by `result.id`
+2. Walk ancestor chain:
    ```swift
    var path: [Block] = []
    var current: Block? = block
@@ -417,16 +376,12 @@ When the user taps a search result, the app needs to navigate to that block with
        current = b.parent
    }
    ```
-3. Dismiss the search sheet
-4. Set `navigationPath = path` on ContentView
-
-This is the same pattern used by `navigateToToday()` in `ContentView.swift:158-168`. The search sheet communicates the selected block back to ContentView via the `onSelectResult` callback, which then builds and sets the navigation path.
+3. Dismiss search sheet
+4. Set `navigationPath = path`
 
 ---
 
 ## Dirty Flush on Sheet Appear
-
-The flush runs when the search sheet appears, before the user submits a query.
 
 ```swift
 .onAppear {
@@ -438,30 +393,8 @@ The flush runs when the search sheet appears, before the user submits a query.
 }
 ```
 
-**Small dirty set (typical):** < 100ms — imperceptible, no loading indicator needed.
-
-**Large dirty set (500+ blocks, e.g., first search after long writing session):**
-- FTS5 flush: ~100ms (fast)
-- Embedding generation: ~15 seconds for 500 blocks (30ms × 500)
-- Show a subtle loading indicator while `isIndexing` is true
-- The user can still type their query while indexing happens — search is triggered on submit, by which time indexing may have completed
-- If the user submits before indexing completes, search runs on whatever is indexed so far (stale but not empty)
-
----
-
-## File Structure
-
-```
-Noto/Search/
-├── DateFilterParser.swift     # Temporal phrase extraction
-├── SearchService.swift        # Orchestration — the single search entry point
-├── HybridRanker.swift         # Score normalization + combination
-├── BreadcrumbBuilder.swift    # Ancestor path display string
-
-Noto/Views/
-├── SearchSheet.swift          # Bottom sheet with search bar + results
-├── SearchResultRow.swift      # Single result row view
-```
+Small dirty set (< 100 blocks): < 100ms — imperceptible.
+Large dirty set (500+ blocks): show loading indicator while `isIndexing`.
 
 ---
 
@@ -469,13 +402,8 @@ Noto/Views/
 
 ### 1. Presenting the Search Sheet
 
-Add a search button to ContentView's toolbar (or the bottom bar per the Figma design). On tap, present the search sheet:
-
 ```swift
 @State private var showSearch = false
-
-// In toolbar or bottom bar:
-Button { showSearch = true } label: { Image(systemName: "magnifyingglass") }
 
 .sheet(isPresented: $showSearch) {
     SearchSheet(
@@ -486,12 +414,12 @@ Button { showSearch = true } label: { Image(systemName: "magnifyingglass") }
         },
         onAskAI: { query in /* future */ }
     )
+    .presentationDetents([.large])
+    .presentationDragIndicator(.visible)
 }
 ```
 
 ### 2. Navigation to Search Result
-
-Add a `navigateToBlock(_ block: Block)` method to ContentView (mirrors `navigateToToday()`):
 
 ```swift
 private func navigateToBlock(_ block: Block) {
@@ -507,19 +435,7 @@ private func navigateToBlock(_ block: Block) {
 
 ### 3. SearchService Initialization
 
-The `SearchService` is created once and shared. It holds references to all the indexing and search components:
-
 ```swift
-// In NotoApp or a dependency container:
-let fts5Database = FTS5Database(directory: appSupportDir)
-let dirtyTracker = DirtyTracker(fts5Database: fts5Database)
-let fts5Indexer = FTS5Indexer(fts5Database: fts5Database, modelContext: bgContext)
-let fts5Engine = FTS5Engine(fts5Database: fts5Database)
-let embeddingModel = try EmbeddingModel()
-let hnswIndex = HNSWIndex(path: vectorIndexPath)
-let embeddingIndexer = EmbeddingIndexer(embeddingModel: embeddingModel, hnswIndex: hnswIndex, modelContext: bgContext)
-let semanticEngine = SemanticEngine(embeddingModel: embeddingModel, hnswIndex: hnswIndex)
-
 let searchService = SearchService(
     dirtyTracker: dirtyTracker,
     fts5Indexer: fts5Indexer,
@@ -532,58 +448,203 @@ let searchService = SearchService(
 )
 ```
 
-Injected into views via SwiftUI environment or passed directly.
+---
+
+## File Structure
+
+```
+Noto/Search/
+├── DateFilterParser.swift     # Temporal phrase extraction
+├── SearchService.swift        # Orchestration — single search entry point
+├── HybridRanker.swift         # Score normalization + combination
+
+Noto/Views/
+├── SearchSheet.swift          # Bottom sheet with search bar + results
+├── SearchResultRow.swift      # Single result row view
+```
+
+`BreadcrumbBuilder` can live in `Noto/Search/` or `Noto/Views/` — either works.
 
 ---
 
 ## Testing Strategy
 
+### Design Principle
+
+Three testing layers: (1) unit tests for pure logic (no blocks, no engines), (2) integration tests for the full pipeline (small block fixture), (3) UI tests for sheet interaction (seeded app). Most tests are layer 1.
+
+### Test Helpers
+
+```swift
+func makeKeywordResults(_ entries: [(UUID, Double)]) -> [KeywordSearchResult] {
+    entries.map { KeywordSearchResult(blockId: $0.0, bm25Score: $0.1) }
+}
+
+func makeSemanticResults(_ entries: [(UUID, Float)]) -> [SemanticSearchResult] {
+    entries.map { SemanticSearchResult(blockId: $0.0, similarity: $0.1) }
+}
+```
+
 ### Unit Tests (Swift Testing)
 
-| Test | What it verifies |
-|------|-----------------|
-| DateFilterParser extracts "today" | Correct date range + stripped query |
-| DateFilterParser extracts "last week" | 7-day window |
-| DateFilterParser extracts "in March 2024" | Month range |
-| DateFilterParser returns nil for no temporal phrase | No false positives |
-| DateFilterParser strips phrase from query | "notes from today" → "notes" |
-| HybridRanker normalizes BM25 scores to [0,1] | Normalization math |
-| HybridRanker normalizes cosine similarity to [0,1] | Normalization math |
-| HybridRanker: both-engine results rank highest | Hybrid weighting |
-| HybridRanker: keyword-only caps at 0.6 | Missing semantic score = 0 |
-| HybridRanker: semantic-only caps at 0.4 | Missing keyword score = 0 |
-| HybridRanker: empty keyword → pure semantic (α=0) | Short-circuit |
-| HybridRanker: single result gets score 1.0 | Single-result normalization |
-| HybridRanker: exact match boost applied | Verbatim match detection |
-| BreadcrumbBuilder: root block → "Home" | Root handling |
-| BreadcrumbBuilder: nested block → correct path | Multi-level ancestors |
-| BreadcrumbBuilder: long ancestor title truncated | 30-char limit |
+#### DateFilterParser
+
+| Test | Input | Expected text | Expected dateRange |
+|------|-------|--------------|-------------------|
+| "today" | `"notes from today"` | `"notes from"` | start/end of today |
+| "yesterday" | `"what I wrote yesterday"` | `"what I wrote"` | yesterday |
+| "last week" | `"ideas from last week"` | `"ideas from"` | 7 days ago → now |
+| "this week" | `"meetings this week"` | `"meetings"` | start of week → now |
+| "last month" | `"projects last month"` | `"projects"` | last month range |
+| "this month" | `"tasks this month"` | `"tasks"` | start of month → now |
+| "last N days" | `"recent last 3 days"` | `"recent"` | 3 days ago → now |
+| "recent" | `"recent thoughts"` | `"thoughts"` | 7 days ago → now |
+| "in March" | `"notes in March"` | `"notes"` | March 1-31 |
+| "in March 2024" | `"food in March 2024"` | `"food"` | March 1-31 2024 |
+| "in 2024" | `"goals in 2024"` | `"goals"` | Jan 1 - Dec 31 2024 |
+| No temporal | `"design patterns"` | `"design patterns"` | `nil` |
+| False positive | `"march to the beat"` | `"march to the beat"` | `nil` |
+| Only temporal | `"today"` | `""` | today's range |
+| Multiple (first wins) | `"today and last week"` | `"and last week"` | today's range |
+| Case insensitive | `"notes from TODAY"` | `"notes from"` | today's range |
+
+#### HybridRanker
+
+| Test | Keyword | Semantic | Assert |
+|------|---------|----------|--------|
+| Both-engine highest | A: -5.0, B: -2.0 | A: 0.8 | A has highest hybrid |
+| Keyword-only caps at α | A: -5.0 | (none for A) | A's hybrid ≤ 0.6 |
+| Semantic-only caps at 1-α | (none for B) | B: 0.9 | B's hybrid ≤ 0.4 |
+| Empty keyword → α=0 | `[]` | A: 0.9, B: 0.5 | Pure semantic ranking |
+| Empty semantic → α=1 | A: -5.0 | `[]` | Pure keyword ranking |
+| Single keyword = 1.0 | A: -3.0 | (none) | A normalized = 1.0 |
+| Single semantic = 1.0 | (none) | A: 0.6 | A normalized = 1.0 |
+| BM25 normalization | A: -10.0, B: -2.0 | (none) | A > B |
+| Cosine normalization | (none) | A: 0.9, B: 0.4 | A=1.0, B=0.0 |
+| Exact match boost | A verbatim | same sim | A higher (1.5x) |
+| Boost capped | High + boost | - | ≤ 1.0 |
+| Disjoint merged | A kw-only, B sem-only | - | Both present |
+| Sorted descending | Multiple | - | Monotonic |
+
+#### BreadcrumbBuilder
+
+| Test | Structure | Expected |
+|------|-----------|----------|
+| Root block | `parent == nil` | `"Home"` |
+| One deep | Home → "Projects" → block | `"Home / Projects"` |
+| Two deep | Home → "Projects" → "Ideas" → block | `"Home / Projects / Ideas"` |
+| Four deep | Home → A → B → C → D → block | `"Home / A / B / C / D"` |
+| Long title | Ancestor > 30 chars | Truncated + "..." |
+| Multiline | Ancestor "L1\nL2" | Uses "L1" only |
+| Self excluded | Block content not in breadcrumb | True |
 
 ### Integration Tests
 
-| Test | What it verifies |
-|------|-----------------|
-| End-to-end: create blocks → flush → search → results ranked correctly | Full pipeline |
-| Search with date filter returns only blocks in range | Date filtering |
-| Search with "today" extracts date and returns today's blocks | Date parsing + search |
-| Result tap navigates to correct block | Navigation integration |
-| Dirty flush on sheet appear indexes pending blocks | Flush trigger |
+#### SearchTestFixture
+
+```swift
+struct SearchTestFixture {
+    let container: ModelContainer
+    let context: ModelContext
+    let searchService: SearchService
+
+    let coffeeBlock: Block       // "The taste of morning coffee is wonderful"
+    let designBlock: Block       // "Aesthetic taste in UI design principles"
+    let meetingBlock: Block      // "Team meeting to discuss project timeline"
+    let shoppingBlock: Block     // "Buy groceries: milk, eggs, bread"
+    let deepBlock: Block         // depth 3: Home → Projects → App Ideas → block
+    let yesterdayBlock: Block    // createdAt = yesterday
+    let lastWeekBlock: Block    // createdAt = 8 days ago
+    let lastMonthBlock: Block   // createdAt = 35 days ago
+    let shortBlock: Block       // "ok" (< 3 words)
+    let codeBlock: Block        // "**Bold** and `inline code` test"
+
+    @MainActor
+    static func create() async throws -> SearchTestFixture
+}
+```
+
+**Block tree:**
+
+```
+Home (root)
+├── coffeeBlock: "The taste of morning coffee is wonderful"
+├── shoppingBlock: "Buy groceries: milk, eggs, bread"
+├── shortBlock: "ok"
+├── codeBlock: "**Bold** and `inline code` test"
+├── Projects/
+│   ├── designBlock: "Aesthetic taste in UI design principles"
+│   ├── App Ideas/
+│   │   └── deepBlock: "Mobile app for tracking habits" (depth 3)
+│   └── meetingBlock: "Team meeting to discuss project timeline"
+├── Daily Notes/
+│   ├── yesterdayBlock (1 day ago)
+│   ├── lastWeekBlock (8 days ago)
+│   └── lastMonthBlock (35 days ago)
+└── "Quantum physics and wave function collapse"
+```
+
+#### Integration Test Cases
+
+| Test | Query | Assert |
+|------|-------|--------|
+| Keyword exact | `"coffee"` | coffeeBlock in results |
+| Semantic similarity | `"artistic judgement"` | designBlock found |
+| Hybrid ranking | `"taste"` | Both-engine match ranks highest |
+| Date: today | `"today"` | Only today's blocks |
+| Date: yesterday | `"work yesterday"` | yesterdayBlock only |
+| Date: last week | `"review last week"` | lastWeekBlock, not lastMonthBlock |
+| Date-only | `"today"` | All today's blocks by recency |
+| Short block | `"ok"` | Keyword only, not semantic |
+| Markdown stripped | `"Bold"` | codeBlock found |
+| Breadcrumb | Find deepBlock | "Home / Projects / App Ideas" |
+| No results | `"xyzzy zyxwv"` | Empty |
+| Dirty flush | Edit → open → search | Updated content found |
+
+#### Pipeline Tests
+
+| Test | Scenario | Assert |
+|------|----------|--------|
+| ensureIndexFresh | Mark dirty → ensure | dirty_blocks empty |
+| Empty text + dateRange | "today" | Blocks by recency |
+| Navigation path | navigateToBlock(deepBlock) | [root, Projects, Ideas, deep] |
 
 ### UI Tests (XCUITest)
 
-| Test | What it verifies |
-|------|-----------------|
-| Search sheet presents on button tap | Sheet presentation |
-| Type query + submit → results appear | Basic search flow |
-| Tap result → sheet dismisses, block visible | Navigation works |
-| Clear button clears text and results | Clear functionality |
-| "Ask AI" row shows query text | AI row display |
+Launch with `-UITesting` + `SEARCH_TEST_SEED=1`.
+
+```swift
+class SearchUITests: XCTestCase {
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["-UITesting"]
+        app.launchEnvironment["UITESTING"] = "1"
+        app.launchEnvironment["SEARCH_TEST_SEED"] = "1"
+        app.launch()
+    }
+}
+```
+
+| Test | Steps | Assert |
+|------|-------|--------|
+| Sheet presents | Tap search bar | Sheet visible |
+| Search results | Type "coffee" → submit | Result with "coffee" |
+| Breadcrumb shown | Type "habits" → submit | Breadcrumb has "Projects" |
+| Navigation | Type "coffee" → submit → tap | Sheet dismisses, block visible |
+| Clear | Type "test" → clear | Empty text, no results |
+| Ask AI row | Type "what is design" | Row with query text |
+| Empty results | Type "xyzzy" → submit | No rows |
+| Date filter | Type "work yesterday" → submit | Only yesterday's block |
+| Search bar position | Open sheet | Input at bottom |
 
 ---
 
 ## Performance Considerations
 
-- **Parallel search:** FTS5 and HNSW run concurrently via `async let`. Total search time is max(FTS5, HNSW) + ranking, not sum.
-- **Breadcrumb is O(depth):** Walking the parent chain for each result. Typical depth is 3-5 levels, so < 1ms per result. For 50 results: ~50ms total. Could cache if this becomes a bottleneck.
-- **Batch block fetch:** When building SearchResults, fetch all needed blocks in one SwiftData query rather than one-by-one.
-- **Lazy result rendering:** The SwiftUI List only renders visible rows. Breadcrumbs for off-screen results aren't computed until scrolled into view (if using `LazyVStack`).
+- **Parallel search:** FTS5 and HNSW via `async let`. Total = max(FTS5, HNSW) + ranking.
+- **Breadcrumb O(depth):** Typical 3-5 levels = < 1ms per result.
+- **Batch block fetch:** One SwiftData query for all result blocks, not one-by-one.
+- **Lazy rendering:** `LazyVStack` — off-screen breadcrumbs not computed until scrolled.

@@ -2,6 +2,8 @@
 
 Based on [PRD-semantic-search.md](./PRD-semantic-search.md).
 
+**Dependencies:** Spec-search-foundation (FTS5Database, DirtyTracker, PlainTextExtractor, vector_key_map table).
+
 ---
 
 ## User Stories
@@ -20,7 +22,7 @@ Based on [PRD-semantic-search.md](./PRD-semantic-search.md).
 - [ ] CoreML model (`bge-small-en-v1.5`) is bundled and produces 384-dim embeddings
 - [ ] WordPiece tokenizer correctly tokenizes input text for the BERT model
 - [ ] Blocks with < 3 words are skipped (no embedding, no HNSW entry)
-- [ ] Markdown is stripped before embedding generation
+- [ ] Markdown is stripped before embedding generation (via `PlainTextExtractor` from foundation)
 - [ ] Content hash (SHA256) prevents re-embedding unchanged blocks
 - [ ] HNSW index uses F16 quantization and cosine similarity metric
 - [ ] HNSW search returns results in < 10ms at 1M blocks
@@ -41,9 +43,9 @@ Based on [PRD-semantic-search.md](./PRD-semantic-search.md).
 ### Architecture Overview
 
 ```
-DirtyTracker (shared with keyword search)
+DirtyTracker (from foundation)
         │
-        │ dirty block IDs
+        │ dirty block IDs (from dirty_blocks table)
         ▼
 ┌───────────────────┐
 │ EmbeddingIndexer  │  Processes dirty blocks in batch
@@ -105,12 +107,9 @@ The converted CoreML model expects:
 - Input: `input_ids` (Int32 array), `attention_mask` (Int32 array) — from WordPiece tokenizer
 - Output: `sentence_embedding` (Float32 array, 384 dims) — the pooled sentence vector
 
-The conversion script (Python, one-time) handles the CLS pooling / mean pooling and normalization so the CoreML model outputs a ready-to-use normalized embedding.
+The conversion script bakes in CLS pooling and L2 normalization so the CoreML model outputs a ready-to-use normalized embedding.
 
 **WordPiece tokenizer:**
-
-BERT-style subword tokenization. Required files bundled in app:
-- `vocab.txt` — the BERT vocabulary (~30K tokens)
 
 Tokenization algorithm:
 1. Lowercase the input text
@@ -121,22 +120,21 @@ Tokenization algorithm:
 6. Pad or truncate to model's max sequence length (512 tokens)
 7. Generate `attention_mask` (1 for real tokens, 0 for padding)
 
-Implementation approach: vendor the tokenizer logic from `swift-embeddings` (https://github.com/jkrukowski/swift-embeddings) — specifically the `BertTokenizer` class. This avoids implementing the edge cases (unicode normalization, accent stripping, unknown token handling) from scratch.
+Implementation: vendor the tokenizer from `swift-embeddings` — specifically `BertTokenizer` and `WordPieceTokenizer`.
 
-**Vendored files from swift-embeddings:**
-- `BertTokenizer.swift` — tokenization logic
-- `WordPieceTokenizer.swift` — subword splitting
-- Place in `Noto/Search/Tokenizer/`
+**Vendored files:**
+- `Noto/Search/Tokenizer/BertTokenizer.swift`
+- `Noto/Search/Tokenizer/WordPieceTokenizer.swift`
 
 #### 2. `HNSWIndex`
 
 Location: `Noto/Search/HNSWIndex.swift`
 
-Wraps `usearch` with Noto-specific conventions. Translates between `UUID` block IDs and `usearch`'s `UInt64` keys.
+Wraps `usearch` with Noto-specific conventions. Translates between `UUID` block IDs and `usearch`'s `UInt64` keys via the foundation's `vector_key_map` table.
 
 ```
 class HNSWIndex {
-    init(path: URL)                    // loads existing index or creates new
+    init(path: URL, fts5Database: FTS5Database)
     func add(blockId: UUID, vector: [Float])
     func remove(blockId: UUID)
     func search(vector: [Float], count: Int) -> [(blockId: UUID, distance: Float)]
@@ -148,31 +146,13 @@ class HNSWIndex {
 
 **UUID ↔ UInt64 key mapping:**
 
-`usearch` uses `UInt64` keys. UUIDs are 128-bit, so they don't fit directly. Approach: maintain a bidirectional mapping.
+Use the first 8 bytes of UUID as UInt64 key (deterministic truncation). Store mapping in `vector_key_map` table (from foundation's `FTS5Database`).
 
-Option A — Deterministic hash:
 ```swift
-// Use the first 8 bytes of UUID as UInt64 key
-// UUID().uuid is a tuple of 16 UInt8 values
 func uuidToKey(_ uuid: UUID) -> UInt64 {
     let bytes = uuid.uuid
     return UInt64(bytes.0) | (UInt64(bytes.1) << 8) | ... | (UInt64(bytes.7) << 56)
 }
-```
-Risk: hash collisions (birthday problem at ~4B entries — effectively zero for our scale).
-
-Option B — Sequential counter with lookup table:
-Assign incrementing UInt64 keys and store a `[UUID: UInt64]` mapping persisted alongside the index. More complex but collision-free.
-
-**Recommendation: Option A** — deterministic truncation of UUID to UInt64. At millions of blocks, collision probability is negligible (~1 in 4 billion). Simpler, no extra state to maintain. Store a reverse mapping `[UInt64: UUID]` in memory for converting search results back to UUIDs. This reverse map is rebuilt on index load by reading all keys from the index and matching against `BlockEmbedding` records.
-
-Actually, a cleaner approach: store the UUID→UInt64 and UInt64→UUID mapping in a simple SQLite table in the FTS5 `search.sqlite` database (already exists). This avoids the reverse-lookup rebuild:
-
-```sql
-CREATE TABLE IF NOT EXISTS vector_key_map (
-    block_id TEXT PRIMARY KEY,
-    vector_key INTEGER UNIQUE NOT NULL
-);
 ```
 
 **Index configuration:**
@@ -187,12 +167,10 @@ let index = USearchIndex.make(
 
 **Index file location:**
 ```swift
-let indexPath = FileManager.default
-    .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-    .appendingPathComponent("vectors.usearch")
+let indexPath = appSupportDir.appendingPathComponent("vectors.usearch")
 ```
 
-**Persistence:** `save()` is called after batch operations (not after every single insert) to amortize disk I/O. Save triggers:
+**Persistence:** `save()` called after batch operations (not per insert). Save triggers:
 - After EmbeddingIndexer completes a flush batch
 - On app background
 - On app termination (if possible)
@@ -221,13 +199,8 @@ class EmbeddingIndexer {
     let hnswIndex: HNSWIndex
     let modelContext: ModelContext
 
-    // Process dirty blocks — generate embeddings + insert HNSW
     func processDirtyBlocks(blockIds: [(UUID, DirtyOperation)]) async
-
-    // Full rebuild for first launch
     func buildAll(progressHandler: ((Int, Int) -> Void)?) async
-
-    // Rebuild HNSW from existing BlockEmbedding records (no CoreML needed)
     func rebuildIndex() async
 }
 ```
@@ -242,53 +215,36 @@ For each (blockId, operation) pair:
    - Continue to next
 
 2. **Upsert operation:**
-   a. Fetch `Block` from SwiftData by ID. If not found (deleted between dirty mark and flush), skip.
-   b. Strip markdown from `block.content` using `PlainTextExtractor.plainText(from:)` (shared with FTS5 — see Spec-keyword-search.md)
+   a. Fetch `Block` from SwiftData by ID. If not found, skip.
+   b. Strip markdown via `PlainTextExtractor.plainText(from:)`
    c. Count words. If < 3 words:
-      - If block has an existing `BlockEmbedding`, delete it and remove from HNSW (block became too short)
+      - If block has existing `BlockEmbedding`, delete it and remove from HNSW
       - Skip to next
-   d. Compute `SHA256(plainText)`. If block has existing `BlockEmbedding` with matching `contentHash`, skip (content unchanged)
-   e. Generate embedding: `embeddingModel.embed(plainText)` → `[Float]` (384 dims)
+   d. Compute `SHA256(plainText)`. If existing `BlockEmbedding` has matching `contentHash`, skip
+   e. Generate embedding: `embeddingModel.embed(plainText)` → `[Float]`
    f. Insert/update HNSW: `hnswIndex.add(blockId: block.id, vector: embedding)`
-   g. Create or update `BlockEmbedding` in SwiftData:
-      ```swift
-      if let existing = block.embedding {
-          existing.embedding = embedding
-          existing.contentHash = hash
-          existing.generatedAt = Date()
-      } else {
-          let emb = BlockEmbedding(
-              block: block,
-              embedding: embedding,
-              modelVersion: "bge-small-en-v1.5",
-              contentHash: hash
-          )
-          modelContext.insert(emb)
-      }
-      ```
+   g. Create or update `BlockEmbedding` in SwiftData
    h. Save SwiftData context periodically (every 50 blocks)
 
 3. After all blocks processed: `hnswIndex.save()`
 
 **`buildAll()` algorithm (first launch):**
-1. Fetch all non-archived blocks from SwiftData that don't have a `BlockEmbedding`
+1. Fetch all non-archived blocks without a `BlockEmbedding`
 2. Process in batches of 50
-3. For each block: strip markdown, check word count, generate embedding, insert HNSW, create BlockEmbedding
-4. Call `progressHandler(completed, total)` after each batch
-5. Save HNSW index after all batches
+3. Call `progressHandler(completed, total)` after each batch
+4. Save HNSW index after all batches
 
 **`rebuildIndex()` algorithm (HNSW corruption recovery):**
-1. Fetch all `BlockEmbedding` records from SwiftData
-2. Create a fresh HNSW index
-3. For each record: `hnswIndex.add(blockId:, vector: embedding)`
+1. Fetch all `BlockEmbedding` records
+2. Create fresh HNSW index
+3. Insert all embeddings — no CoreML inference needed
 4. Save index
-5. No CoreML inference needed — embeddings already exist
 
 #### 4. `SemanticEngine`
 
 Location: `Noto/Search/SemanticEngine.swift`
 
-Query execution. Generates a query embedding, searches the HNSW index, post-filters, returns results.
+Query execution. Generates a query embedding, searches HNSW, post-filters, returns results.
 
 ```
 struct SemanticEngine {
@@ -317,10 +273,8 @@ struct SemanticSearchResult {
 6. If `dateRange` is provided:
    a. Collect passing block IDs
    b. Fetch from SwiftData: blocks where `id IN blockIds AND createdAt >= start AND createdAt <= end`
-   c. Filter results to only include blocks that passed the date check
-7. Return results sorted by similarity (descending)
-
-**Over-fetch rationale:** Request 200 from HNSW because post-filtering (threshold + date) may discard many. 200 is enough headroom while keeping the HNSW search fast (<10ms even at 1M blocks).
+   c. Filter results to only include blocks that passed
+7. Return sorted by similarity descending
 
 ---
 
@@ -328,31 +282,20 @@ struct SemanticSearchResult {
 
 ### CoreML Conversion Script
 
-Location: `scripts/convert_model.py` (not shipped in app, development-only)
-
-```python
-# Pseudocode for the conversion pipeline
-# 1. Load bge-small-en-v1.5 from HuggingFace
-# 2. Export to ONNX with sentence pooling + L2 normalization baked in
-# 3. Convert ONNX to CoreML via coremltools
-# 4. Output: bge-small-en-v1.5.mlmodelc + vocab.txt
-```
+Location: `scripts/convert_model.py` (development-only, not shipped)
 
 The conversion must bake in:
-- CLS token pooling (or mean pooling, matching the original model's strategy)
-- L2 normalization of the output vector
-- So the CoreML model outputs a ready-to-use unit-length embedding
+- CLS token pooling (or mean pooling, matching original model)
+- L2 normalization of output vector
 
-The resulting `.mlmodelc` directory and `vocab.txt` are added to the Xcode project as bundle resources.
+The resulting `.mlmodelc` directory and `vocab.txt` are added to Xcode as bundle resources.
 
 ### Validating the Conversion
 
-After conversion, verify that:
-1. The CoreML model produces the same embeddings (within floating-point tolerance) as the Python model for a set of test sentences
-2. Cosine similarity between known similar sentences is high (> 0.7)
-3. Cosine similarity between known dissimilar sentences is low (< 0.3)
-
-Include a test case that validates this with 5-10 sentence pairs.
+Verify that:
+1. CoreML model produces same embeddings as Python model (within floating-point tolerance)
+2. Cosine similarity between known similar sentences > 0.7
+3. Cosine similarity between known dissimilar sentences < 0.3
 
 ---
 
@@ -381,110 +324,158 @@ scripts/
 
 ### 1. Shared DirtyTracker
 
-The `DirtyTracker` from the keyword search spec is shared. When dirty blocks are flushed, both the FTS5 and embedding pipelines process them. The orchestration happens in the hybrid search layer (or a shared `IndexingService`):
+The `DirtyTracker` from foundation is shared. When dirty blocks are flushed, both FTS5 and embedding pipelines process them in a single orchestrated pass:
 
 ```swift
-// On flush trigger (search open, background, launch):
+// On flush trigger:
 await dirtyTracker.flush()
 let dirtyBlocks = await fts5Database.fetchAllDirty()
-await fts5Indexer.flushAll()              // keyword indexing
-await embeddingIndexer.processDirtyBlocks(dirtyBlocks)  // semantic indexing
+await fts5Indexer.flushAll()
+await embeddingIndexer.processDirtyBlocks(dirtyBlocks)
 ```
 
-Both pipelines read from the same `dirty_blocks` table. The FTS5 indexer removes entries after processing; the embedding indexer processes the same list. Coordination: either process both before removing from `dirty_blocks`, or let each pipeline track its own completion state.
-
-Simpler approach: the `dirty_blocks` table serves both pipelines. Process FTS5 and embeddings for each batch, then remove the batch from `dirty_blocks`. This is done in a single orchestrated pass.
+Both pipelines process the same batch before entries are removed from `dirty_blocks`.
 
 ### 2. Block Deletion Cascade
 
-The `BlockEmbedding` model already has a cascade delete relationship with `Block` (defined in `Block.swift`: `embedding: BlockEmbedding?` with cascade). When a Block is deleted via SwiftData, the BlockEmbedding is automatically removed.
-
-The HNSW index removal must be done explicitly since it's outside SwiftData. When `DirtyTracker.markDeleted()` is called, the embedding indexer handles the HNSW removal during flush.
+`BlockEmbedding` has cascade delete with `Block` in SwiftData — automatic cleanup. HNSW removal is explicit during `EmbeddingIndexer.processDirtyBlocks()`.
 
 ### 3. SPM Dependency
 
-Add `usearch` to `Package.swift` or the Xcode project's package dependencies:
-
+Add `usearch` to Xcode project's package dependencies:
 ```
 https://github.com/unum-cloud/usearch
 ```
-
 Import: `import USearch`
 
 ### 4. Initial Indexing Progress UI
 
-On first launch, if there are existing blocks without embeddings, the `EmbeddingIndexer.buildAll()` runs in the background. The progress handler updates a published property that a progress view observes:
-
+`EmbeddingIndexer.buildAll()` progress handler updates a published property for a progress view:
 ```swift
 @Published var indexingProgress: (completed: Int, total: Int)?
 ```
-
-This is shown in the search sheet or as a banner in the app. Not blocking — the user can continue using the app while indexing happens.
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests (Swift Testing)
+### Design Principle
 
-| Test | What it verifies |
-|------|-----------------|
-| EmbeddingModel produces 384-dim output | Model loaded, inference works |
-| EmbeddingModel output is normalized (L2 norm ≈ 1.0) | Conversion correctness |
-| Similar sentences have high cosine similarity | Model quality |
-| Dissimilar sentences have low cosine similarity | Model quality |
-| WordPiece tokenizer matches expected token IDs | Tokenizer correctness |
-| HNSWIndex add + search returns match | Basic HNSW operations |
-| HNSWIndex remove excludes from results | Deletion works |
-| HNSWIndex save + load preserves data | Persistence works |
-| HNSWIndex search returns correct distances | Distance computation |
-| EmbeddingIndexer skips blocks < 3 words | Short block handling |
-| EmbeddingIndexer skips unchanged content (hash match) | Content hash check |
-| EmbeddingIndexer creates BlockEmbedding in SwiftData | Storage integration |
-| EmbeddingIndexer handles delete operations | HNSW + SwiftData cleanup |
-| SemanticEngine applies similarity threshold | Threshold filtering |
-| SemanticEngine applies date post-filter | Date range support |
-| UUID→UInt64 key mapping is deterministic | Key consistency |
+Layered tests to minimize CoreML overhead. HNSW tests use synthetic vectors. Only `EmbeddingModel` and validation tests run real inference.
 
-### Integration Tests
+### Test Helpers
 
-| Test | What it verifies |
-|------|-----------------|
-| End-to-end: create block → flush → search finds it | Full pipeline |
-| Edit block content → re-embed → search reflects update | Content change handling |
-| Delete block → search no longer returns it | Deletion pipeline |
-| Rebuild HNSW from BlockEmbedding records | Corruption recovery |
-
-### Model Validation Tests
-
-Include a set of sentence pairs with expected similarity ranges:
 ```swift
-@Test func knownSimilarSentencesAreClose() {
-    let sim = cosineSimilarity(
-        model.embed("aesthetic taste in design"),
-        model.embed("artistic judgement and beauty")
-    )
-    #expect(sim > 0.5)
+func createTestHNSWIndex() throws -> (HNSWIndex, URL) {
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("hnsw-test-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    let (db, _) = try await createTestFTS5Database()  // from foundation test helpers
+    let index = HNSWIndex(path: tempDir.appendingPathComponent("test.usearch"), fts5Database: db)
+    return (index, tempDir)
 }
 
-@Test func knownDissimilarSentencesAreFar() {
-    let sim = cosineSimilarity(
-        model.embed("grocery shopping list"),
-        model.embed("quantum mechanics equations")
-    )
-    #expect(sim < 0.3)
+func randomVector(dimensions: Int = 384) -> [Float] {
+    var v = (0..<dimensions).map { _ in Float.random(in: -1...1) }
+    let norm = sqrt(v.reduce(0) { $0 + $1 * $1 })
+    return v.map { $0 / norm }
+}
+
+func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
+    zip(a, b).reduce(0) { $0 + $1.0 * $1.1 }
 }
 ```
+
+### Unit Tests (Swift Testing)
+
+#### EmbeddingModel (requires CoreML model)
+
+| Test | Setup | Assert |
+|------|-------|--------|
+| 384-dim output | `model.embed("hello world")` | `result.count == 384` |
+| Output normalized | `model.embed("any text")` | L2 norm ≈ 1.0 (within 0.001) |
+| Deterministic | Same input twice | Identical vectors |
+| Empty string | `model.embed("")` | Valid 384-dim vector |
+| Long text | 600-word input | Valid vector (truncated at 512 tokens) |
+| Batch inference | `model.embed(batch: ["a", "b", "c"])` | 3 vectors, each 384-dim |
+
+#### Model Validation (requires CoreML model)
+
+```swift
+// Similar pairs — cosine similarity > 0.5
+("aesthetic taste in design", "artistic judgement and beauty")
+("the morning coffee was delicious", "I enjoyed the espresso today")
+("meeting notes from the design review", "team discussion about UI feedback")
+("running a marathon in the rain", "jogging through a storm")
+("machine learning neural network", "deep learning AI model")
+
+// Dissimilar pairs — cosine similarity < 0.3
+("grocery shopping list", "quantum mechanics equations")
+("fixing a plumbing leak", "playing guitar at a concert")
+("baking chocolate cake recipe", "corporate tax regulations")
+```
+
+#### WordPiece Tokenizer
+
+| Test | Input | Assert |
+|------|-------|--------|
+| Basic tokenization | `"hello world"` | Starts with [CLS], ends with [SEP] |
+| Known token IDs | `"the"` | Expected ID from vocab |
+| Subword splitting | `"unaffable"` | Splits with `##` prefixes |
+| Punctuation | `"hello, world!"` | Punctuation separate |
+| Unicode | `"café"` | Handles accented characters |
+| Max length | 1000-word input | Capped at 512 tokens |
+| Attention mask | `"short"` | 1 for real tokens, 0 for padding |
+
+#### HNSWIndex (synthetic vectors)
+
+| Test | Setup | Assert |
+|------|-------|--------|
+| Add + search | Insert 1 vector → search same | Returns inserted ID, distance ≈ 0 |
+| K-nearest | Insert 10, one biased toward query | Biased vector ranks first |
+| Remove | Insert → remove → search | Removed ID absent |
+| Contains | Insert → contains | True; non-existent → false |
+| Save + load | Insert 100 → save → reload → search | Same results |
+| Count | Insert 5 → remove 2 | `count == 3` |
+| Empty search | No insertions | Returns `[]` |
+
+#### UUID Key Mapping
+
+| Test | Setup | Assert |
+|------|-------|--------|
+| Deterministic | Same UUID twice | Same UInt64 both times |
+| Distinct keys | 1000 random UUIDs | No collisions |
+| Round-trip via vector_key_map | Set → lookup | Correct UUID |
+
+#### EmbeddingIndexer (SwiftData container + HNSW temp)
+
+| Test | Setup | Assert |
+|------|-------|--------|
+| Skips < 3 words | Block "ok" | No BlockEmbedding, not in HNSW |
+| Skips unchanged | Process → process again | CoreML called once |
+| Creates BlockEmbedding | Block with 5+ words | BlockEmbedding exists with correct hash |
+| Handles delete | Process → delete → process | Removed from HNSW + BlockEmbedding |
+| Short → long | Block "ok" updated to longer | Now embedded |
+| Long → short | Long block updated to "ok" | Embedding removed |
+
+#### SemanticEngine
+
+| Test | Setup | Assert |
+|------|-------|--------|
+| Threshold filters | Known distances | Only similarity >= 0.3 |
+| Date post-filter | Blocks at different dates | Only in-range returned |
+| No date filter | No dateRange | All above-threshold returned |
+| Empty query | `search(query: "")` | Returns `[]` |
 
 ---
 
 ## Performance Considerations
 
-- **Neural Engine inference:** CoreML with `.computeUnits = .all` routes to Neural Engine when available (fastest), falls back to GPU → CPU. The ~30ms target assumes Neural Engine.
-- **No main thread blocking:** All embedding generation and HNSW operations run on background actors/tasks. The `EmbeddingModel` and `HNSWIndex` are not `@MainActor`.
-- **Batch save:** HNSW `save()` is called once per flush batch, not per insert. Amortizes disk I/O.
-- **F16 quantization:** Halves HNSW memory usage with negligible recall loss for 384-dim vectors.
-- **Over-fetch strategy:** Requesting 200 from HNSW when we may only need 50 after filtering. The extra HNSW work is ~1-2ms, much cheaper than multiple queries.
+- **Neural Engine inference:** CoreML `.computeUnits = .all` routes to Neural Engine when available (~30ms).
+- **No main thread blocking:** All embedding and HNSW operations on background actors.
+- **Batch save:** HNSW `save()` once per flush batch, not per insert.
+- **F16 quantization:** Halves memory with negligible recall loss.
+- **Over-fetch 200:** Extra HNSW work is ~1-2ms, cheaper than multiple queries.
 
 ---
 
@@ -492,6 +483,6 @@ Include a set of sentence pairs with expected similarity ranges:
 
 1. Add `usearch` SPM dependency
 2. Bundle `bge-small-en-v1.5.mlmodelc` and `vocab.txt` in Xcode project
-3. On first launch after update: `EmbeddingIndexer.buildAll()` runs in background, generating embeddings for all existing blocks and building the HNSW index
-4. Progress indicator shown until initial indexing completes
+3. On first launch: `EmbeddingIndexer.buildAll()` runs in background
+4. Progress indicator shown until complete
 5. Subsequent updates: incremental via dirty tracking

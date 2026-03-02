@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SwiftData
+import NotoModels
 
 struct DebugPanelView: View {
     let blocks: [Block]

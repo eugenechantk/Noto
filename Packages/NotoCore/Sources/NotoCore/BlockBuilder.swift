@@ -253,7 +253,8 @@ public struct BlockBuilder {
         for formatter in formatters {
             if let date = formatter.date(from: trimmed) {
                 let cal = Calendar(identifier: .gregorian)
-                return cal.dateComponents([.year, .month, .day], from: date)
+                // Only compare month and day — year may be absent or default
+                return cal.dateComponents([.month, .day], from: date)
             }
         }
 

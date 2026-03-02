@@ -8,6 +8,7 @@
 import Testing
 import Foundation
 import SwiftData
+import NotoModels
 @testable import Noto
 
 // MARK: - Test Container Helper
@@ -21,7 +22,6 @@ func createTestContainer() throws -> ModelContainer {
         BlockTag.self,
         MetadataField.self,
         BlockEmbedding.self,
-        SearchIndex.self,
     ])
     let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
     return try ModelContainer(for: schema, configurations: [config])

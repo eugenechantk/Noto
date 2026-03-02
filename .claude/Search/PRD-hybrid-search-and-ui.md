@@ -9,7 +9,10 @@ The orchestration layer that ties keyword search (FTS5) and semantic search (emb
 **Dependencies:**
 - PRD-keyword-search (FTS5Engine)
 - PRD-semantic-search (SemanticEngine)
+- PRD-search-foundation (DirtyTracker, FTS5Database, DateRange)
 - Figma design: figma.com/design/9nh3TpDEoZx8Pt8hVUrJgV, node 24:767
+
+**Phase:** Must start after keyword search and semantic search engines are functional. However, pure-logic components (`DateFilterParser`, `HybridRanker`, `BreadcrumbBuilder`) have no cross-PRD dependencies and can be built in parallel with Phase 1 of any PRD.
 
 ---
 
@@ -37,7 +40,7 @@ Both the rule-based and AI paths produce the same structured query:
 ```
 SearchQuery {
     text: String              // search terms (temporal phrases stripped)
-    dateRange: DateRange?     // optional date filter
+    dateRange: DateRange?     // optional date filter (from foundation)
 }
 ```
 
@@ -99,7 +102,7 @@ The AI path is out of scope for this PRD's implementation but the `SearchQuery` 
 
 ### Parallel Search Execution
 
-**FTS5:** Query with date filter via `WHERE` clause. Returns all results above BM25 threshold.
+**FTS5:** Query with date filter via post-filter. Returns all results above BM25 threshold.
 
 **HNSW:** Over-fetch top 200 from `usearch`, post-filter by date range, apply cosine similarity threshold (>= 0.3).
 
@@ -202,9 +205,9 @@ For each search result, walk the block's parent chain up to root:
 ## Dirty Flush on Search Open
 
 When the search sheet appears, before the user can submit a query, trigger the dirty flush pipeline:
-1. Persist in-memory dirty set to `dirty_blocks` table
-2. Flush `dirty_blocks` to FTS5 (batched)
-3. Generate embeddings + insert into HNSW for dirty blocks (batched)
+1. Persist in-memory dirty set to `dirty_blocks` table (via `DirtyTracker` from foundation)
+2. Flush `dirty_blocks` to FTS5 (via `FTS5Indexer` from keyword search)
+3. Generate embeddings + insert into HNSW for dirty blocks (via `EmbeddingIndexer` from semantic search)
 
 This ensures the index is fresh when the user searches. For small dirty sets (typical case), this completes in under 100ms and is imperceptible. For large dirty sets (e.g., first search after writing 500 blocks), show a brief loading indicator.
 
@@ -228,9 +231,59 @@ This ensures the index is fresh when the user searches. For small dirty sets (ty
 
 | Component | Responsibility |
 |-----------|---------------|
-| `DateFilterParser` | Extracts date ranges from natural language query strings. Returns cleaned query text + optional `DateRange`. |
-| `SearchService` | Orchestrates the full search pipeline. Takes raw query string, parses date filter, runs FTS5 + HNSW in parallel, normalizes scores, combines with hybrid ranking, constructs breadcrumbs, returns `[SearchResult]`. |
-| `HybridRanker` | Score normalization and combination logic. Takes raw FTS5 + HNSW results, normalizes to [0, 1], applies weighted combination, thresholds, sorts. |
-| `SearchSheet` | SwiftUI view — bottom sheet with search bar, "Ask AI" row, results list. |
+| `DateFilterParser` | Extracts date ranges from natural language query strings. Returns cleaned query text + optional `DateRange`. **No cross-PRD dependencies — can be built in parallel.** |
+| `HybridRanker` | Score normalization and combination logic. Takes raw FTS5 + HNSW results, normalizes to [0, 1], applies weighted combination, thresholds, sorts. **No cross-PRD dependencies — can be built in parallel.** |
+| `BreadcrumbBuilder` | Walks a block's ancestor chain and produces the display string. **Depends only on Block model (existing).** |
+| `SearchService` | Orchestrates the full search pipeline. Takes raw query string, parses date filter, runs FTS5 + HNSW in parallel, normalizes scores, combines with hybrid ranking, constructs breadcrumbs, returns `[SearchResult]`. **Depends on FTS5Engine + SemanticEngine.** |
+| `SearchSheet` | SwiftUI view — bottom sheet with search bar, "Ask AI" row, results list. **Depends on SearchService.** |
 | `SearchResultRow` | SwiftUI view — single result row with title + breadcrumb. |
-| `BreadcrumbBuilder` | Walks a block's ancestor chain and produces the display string. |
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+
+Pure logic components — no blocks, no engines needed.
+
+| Area | What to test |
+|------|-------------|
+| **Date filter parsing** | "today", "yesterday", "last week", "this week", "last month", "in March 2024", "recent", "last N days" — correct date range + stripped query |
+| **No false positives** | "march to the beat" does not extract a date; bare month names without "in"/"last" not matched |
+| **Multiple temporal phrases** | First (leftmost) match wins |
+| **Empty text after strip** | Query "today" → empty text + date range (triggers date-only path) |
+| **BM25 normalization** | Negative scores normalized to [0, 1]; single result → 1.0 |
+| **Cosine normalization** | Cosine similarities normalized to [0, 1]; single result → 1.0 |
+| **Hybrid scoring** | Both-engine results rank highest; keyword-only caps at α; semantic-only caps at (1-α) |
+| **Alpha short-circuit** | Empty keyword → α=0; empty semantic → α=1 |
+| **Exact match boost** | Verbatim query in content gets 1.5x keyword boost, capped at 1.0 |
+| **Breadcrumb format** | Root → "Home"; nested → "Home / Parent / Child"; long titles truncated at 30 chars |
+
+### Integration Tests
+
+Full pipeline tests with ~15-20 blocks at various depths and dates (SearchTestFixture).
+
+| Area | What to test |
+|------|-------------|
+| **End-to-end keyword** | Create blocks → flush → keyword search → correct block returned |
+| **End-to-end semantic** | Create blocks → flush → semantic search → conceptually similar block found |
+| **Hybrid ranking** | Block matching both engines ranks above single-engine match |
+| **Date filter + search** | "work yesterday" → only yesterday's blocks |
+| **Date-only query** | "today" → all today's blocks sorted by recency |
+| **Dirty flush on search** | Edit → open search → `ensureIndexFresh()` → updated content found |
+| **Breadcrumb accuracy** | Deeply nested block → breadcrumb matches ancestor chain |
+| **Result navigation** | Tap result → navigation path built → navigates to block |
+
+### UI Tests (XCUITest)
+
+Launch with `-UITesting` + `SEARCH_TEST_SEED=1` to pre-populate fixture blocks.
+
+| Area | What to test |
+|------|-------------|
+| **Sheet presents** | Tap search bar → bottom sheet appears |
+| **Search flow** | Type query → submit → result rows appear |
+| **Result navigation** | Tap result → sheet dismisses → block visible |
+| **Clear button** | Type → clear → text and results cleared |
+| **Ask AI row** | Type query → row shows query text |
+| **Empty results** | Gibberish query → no results |
+| **Date filter** | "work yesterday" → only yesterday's block |

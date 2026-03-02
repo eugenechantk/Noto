@@ -10,6 +10,12 @@
 import SwiftUI
 import SwiftData
 import os.log
+import NotoModels
+import NotoCore
+import NotoFTS5
+import NotoDirtyTracker
+import NotoSearch
+import NotoTodayNotes
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "OutlineView")
 
@@ -18,6 +24,7 @@ struct OutlineView: View {
     @Binding var navigationPath: [Block]
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var dirtyTracker: DirtyTracker
 
     @Query(sort: \Block.sortOrder) private var allBlocks: [Block]
 
@@ -25,7 +32,7 @@ struct OutlineView: View {
     @State private var isExpanded: Bool = false
     @State private var hasLoaded = false
     @State private var isSyncing = false
-    @State private var searchText: String = ""
+    @State private var showSearch = false
     @State private var showDebug = false
     @State private var ancestors: [Block] = []
 
@@ -61,6 +68,9 @@ struct OutlineView: View {
                 NoteTextEditor(
                     text: $editableContent,
                     nodeViewMode: !isRoot,
+                    onEndEditing: {
+                        Task { await dirtyTracker.flush() }
+                    },
                     onReorderLine: { source, destination in
                         reorderBlock(from: source, to: destination)
                     },
@@ -95,11 +105,29 @@ struct OutlineView: View {
             }
             loadContent()
         }
+        .onDisappear {
+            Task { await dirtyTracker.flush() }
+        }
         .onChange(of: editableContent) {
             syncContent()
         }
         .onChange(of: isExpanded) {
             reloadContent()
+        }
+        .sheet(isPresented: $showSearch) {
+            SearchSheet(
+                searchService: SearchService(
+                    fts5Database: sharedSearchDatabase,
+                    dirtyTracker: dirtyTracker,
+                    dirtyStore: sharedDirtyStore,
+                    modelContext: modelContext
+                ),
+                onSelectResult: { blockId in
+                    navigateToSearchResult(blockId: blockId)
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -145,7 +173,9 @@ struct OutlineView: View {
                     navigateToToday()
                 }
 
-                GlassSearchBar(text: $searchText)
+                GlassSearchBarTrigger {
+                    showSearch = true
+                }
             }
         }
         .padding(.horizontal, 28)
@@ -255,6 +285,7 @@ struct OutlineView: View {
             if blocks[i].content != content && blocks[i].isContentEditableByUser {
                 blocks[i].content = content
                 blocks[i].updatedAt = Date()
+                dirtyTracker.markDirty(blocks[i].id)
             }
 
             // Skip depth/parent changes for non-movable blocks
@@ -281,6 +312,7 @@ struct OutlineView: View {
                 }
                 modelContext.insert(block)
                 blocks.append(block)
+                dirtyTracker.markDirty(block.id)
             }
         }
 
@@ -288,6 +320,7 @@ struct OutlineView: View {
         if blocks.count > parsed.count {
             for i in stride(from: blocks.count - 1, through: parsed.count, by: -1) {
                 if blocks[i].isDeletable {
+                    dirtyTracker.markDeleted(blocks[i].id)
                     modelContext.delete(blocks[i])
                 }
             }
@@ -392,6 +425,22 @@ struct OutlineView: View {
         guard lineIndex >= 0, lineIndex < blocks.count else { return }
         let tappedBlock = blocks[lineIndex]
         navigationPath.append(tappedBlock)
+    }
+
+    private func navigateToSearchResult(blockId: UUID) {
+        let descriptor = FetchDescriptor<Block>(
+            predicate: #Predicate<Block> { $0.id == blockId }
+        )
+        guard let block = try? modelContext.fetch(descriptor).first else { return }
+
+        // Build full ancestor path from root to block
+        var path: [Block] = []
+        var current: Block? = block
+        while let b = current {
+            path.insert(b, at: 0)
+            current = b.parent
+        }
+        navigationPath = path
     }
 
     // MARK: - Auto-Building

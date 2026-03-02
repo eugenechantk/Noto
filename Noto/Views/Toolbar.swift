@@ -35,6 +35,38 @@ struct GlassSearchBar: View {
     }
 }
 
+// MARK: - Glass Search Bar Trigger
+
+/// Looks like GlassSearchBar but acts as a tappable button to present the search sheet.
+struct GlassSearchBarTrigger: View {
+    var placeholder: String = "Ask anything or search"
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(.primary)
+
+                Text(placeholder)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Image(systemName: "mic")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 11)
+            .frame(height: 48)
+        }
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .accessibilityIdentifier("searchBarTrigger")
+    }
+}
+
 // MARK: - Glass Toolbar Button
 
 struct GlassToolbarButton: View {

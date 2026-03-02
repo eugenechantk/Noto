@@ -8,6 +8,9 @@
 import Testing
 import Foundation
 import SwiftData
+import NotoModels
+import NotoCore
+import NotoTodayNotes
 @testable import Noto
 
 // MARK: - BlockBuilder Tests

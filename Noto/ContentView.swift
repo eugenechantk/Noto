@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import NotoModels
 
 struct ContentView: View {
     @State private var navigationPath: [Block] = []
@@ -23,5 +24,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Block.self, BlockLink.self, Tag.self, BlockTag.self, MetadataField.self, BlockEmbedding.self, SearchIndex.self], inMemory: true)
+        .modelContainer(for: [Block.self, BlockLink.self, Tag.self, BlockTag.self, MetadataField.self, BlockEmbedding.self], inMemory: true)
 }

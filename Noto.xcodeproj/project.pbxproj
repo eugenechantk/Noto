@@ -6,6 +6,9 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		5DF5FB0F2F0EC373008EDC76 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -30,21 +33,9 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		5DF5FB002F0EC372008EDC76 /* Noto */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Noto;
-			sourceTree = "<group>";
-		};
-		5DF5FB112F0EC373008EDC76 /* NotoTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = NotoTests;
-			sourceTree = "<group>";
-		};
-		5DF5FB1B2F0EC373008EDC76 /* NotoUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = NotoUITests;
-			sourceTree = "<group>";
-		};
+		5DF5FB002F0EC372008EDC76 /* Noto */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Noto; sourceTree = "<group>"; };
+		5DF5FB112F0EC373008EDC76 /* NotoTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = NotoTests; sourceTree = "<group>"; };
+		5DF5FB1B2F0EC373008EDC76 /* NotoUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = NotoUITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,6 +103,14 @@
 			);
 			name = Noto;
 			packageProductDependencies = (
+				CCDD00010000000000000001 /* NotoModels */,
+				CCDD00020000000000000002 /* NotoCore */,
+				CCDD00030000000000000003 /* NotoDirtyTracker */,
+				CCDD00040000000000000004 /* NotoFTS5 */,
+				CCDD00050000000000000005 /* NotoEmbedding */,
+				CCDD00060000000000000006 /* NotoHNSW */,
+				CCDD00070000000000000007 /* NotoSearch */,
+				CCDD00080000000000000008 /* NotoTodayNotes */,
 			);
 			productName = Noto;
 			productReference = 5DF5FAFE2F0EC372008EDC76 /* Noto.app */;
@@ -135,6 +134,14 @@
 			);
 			name = NotoTests;
 			packageProductDependencies = (
+				EEFF00010000000000000001 /* NotoModels */,
+				EEFF00020000000000000002 /* NotoCore */,
+				EEFF00030000000000000003 /* NotoDirtyTracker */,
+				EEFF00040000000000000004 /* NotoFTS5 */,
+				EEFF00050000000000000005 /* NotoEmbedding */,
+				EEFF00060000000000000006 /* NotoHNSW */,
+				EEFF00070000000000000007 /* NotoSearch */,
+				EEFF00080000000000000008 /* NotoTodayNotes */,
 			);
 			productName = NotoTests;
 			productReference = 5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */;
@@ -195,6 +202,17 @@
 			);
 			mainGroup = 5DF5FAF52F0EC372008EDC76;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* XCRemoteSwiftPackageReference "usearch" */,
+				AABB00010000000000000001 /* XCLocalSwiftPackageReference "NotoModels" */,
+				AABB00020000000000000002 /* XCLocalSwiftPackageReference "NotoCore" */,
+				AABB00030000000000000003 /* XCLocalSwiftPackageReference "NotoDirtyTracker" */,
+				AABB00040000000000000004 /* XCLocalSwiftPackageReference "NotoFTS5" */,
+				AABB00050000000000000005 /* XCLocalSwiftPackageReference "NotoEmbedding" */,
+				AABB00060000000000000006 /* XCLocalSwiftPackageReference "NotoHNSW" */,
+				AABB00070000000000000007 /* XCLocalSwiftPackageReference "NotoSearch" */,
+				AABB00080000000000000008 /* XCLocalSwiftPackageReference "NotoTodayNotes" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DF5FAFF2F0EC372008EDC76 /* Products */;
 			projectDirPath = "";
@@ -595,6 +613,111 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AABB00010000000000000001 /* XCLocalSwiftPackageReference "NotoModels" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoModels;
+		};
+		AABB00020000000000000002 /* XCLocalSwiftPackageReference "NotoCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoCore;
+		};
+		AABB00030000000000000003 /* XCLocalSwiftPackageReference "NotoDirtyTracker" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoDirtyTracker;
+		};
+		AABB00040000000000000004 /* XCLocalSwiftPackageReference "NotoFTS5" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoFTS5;
+		};
+		AABB00050000000000000005 /* XCLocalSwiftPackageReference "NotoEmbedding" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoEmbedding;
+		};
+		AABB00060000000000000006 /* XCLocalSwiftPackageReference "NotoHNSW" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoHNSW;
+		};
+		AABB00070000000000000007 /* XCLocalSwiftPackageReference "NotoSearch" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoSearch;
+		};
+		AABB00080000000000000008 /* XCLocalSwiftPackageReference "NotoTodayNotes" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoTodayNotes;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CCDD00010000000000000001 /* NotoModels */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoModels;
+		};
+		CCDD00020000000000000002 /* NotoCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoCore;
+		};
+		CCDD00030000000000000003 /* NotoDirtyTracker */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoDirtyTracker;
+		};
+		CCDD00040000000000000004 /* NotoFTS5 */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoFTS5;
+		};
+		CCDD00050000000000000005 /* NotoEmbedding */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoEmbedding;
+		};
+		CCDD00060000000000000006 /* NotoHNSW */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoHNSW;
+		};
+		CCDD00070000000000000007 /* NotoSearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoSearch;
+		};
+		CCDD00080000000000000008 /* NotoTodayNotes */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoTodayNotes;
+		};
+		EEFF00010000000000000001 /* NotoModels */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoModels;
+		};
+		EEFF00020000000000000002 /* NotoCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoCore;
+		};
+		EEFF00030000000000000003 /* NotoDirtyTracker */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoDirtyTracker;
+		};
+		EEFF00040000000000000004 /* NotoFTS5 */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoFTS5;
+		};
+		EEFF00050000000000000005 /* NotoEmbedding */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoEmbedding;
+		};
+		EEFF00060000000000000006 /* NotoHNSW */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoHNSW;
+		};
+		EEFF00070000000000000007 /* NotoSearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoSearch;
+		};
+		EEFF00080000000000000008 /* NotoTodayNotes */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoTodayNotes;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5DF5FAF62F0EC372008EDC76 /* Project object */;
 }

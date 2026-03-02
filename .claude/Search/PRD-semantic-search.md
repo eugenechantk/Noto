@@ -4,9 +4,13 @@
 
 On-device semantic search using a bundled CoreML sentence-transformer model (`bge-small-en-v1.5`) and an HNSW vector index (`usearch` library). Users can search by meaning — a query like "something related to taste" finds blocks about aesthetics, design commentary, and artistic judgement even when the word "taste" never appears.
 
-**Scope:** Embedding generation + HNSW vector index + semantic query execution. Does not include the search UI or hybrid ranking — those are separate PRDs.
+**Scope:** Embedding generation, HNSW vector index, semantic query execution, embedding indexing pipeline.
 
-**Dependencies:**
+**Dependencies:** PRD-search-foundation (FTS5Database, DirtyTracker, PlainTextExtractor, DateRange, vector_key_map table).
+
+**Can run in parallel with:** PRD-keyword-search (after foundation is complete).
+
+**External dependencies:**
 - `usearch` (SPM) — HNSW vector index. The one external dependency in the project.
 - `bge-small-en-v1.5.mlmodelc` — CoreML model bundled in the app (~33MB).
 
@@ -22,7 +26,7 @@ On-device semantic search using a bundled CoreML sentence-transformer model (`bg
 | Offline-first | On-device CoreML inference, local HNSW index |
 | Cross-platform consistency | 384 dims on both iOS and macOS (bundled model) |
 | Short blocks skipped | No embedding for blocks under 3 words |
-| Markdown stripped before embedding | Use `NoteTextStorage.deformatted()` |
+| Markdown stripped before embedding | `PlainTextExtractor` from foundation |
 
 ---
 
@@ -94,13 +98,17 @@ At 1M blocks × 384 dims with F16 quantization: ~0.75-1GB.
 
 If corrupted or deleted, fully rebuildable from `BlockEmbedding` SwiftData records.
 
+### UUID ↔ UInt64 Key Mapping
+
+`usearch` uses `UInt64` keys. UUIDs are 128-bit. Approach: truncate UUID's first 8 bytes to UInt64 (collision risk ~1 in 4B — negligible at our scale). Store the bidirectional mapping in the foundation's `vector_key_map` table.
+
 ---
 
 ## Indexing Pipeline
 
 ### Embedding Generation Triggers
 
-Embedding generation is lazy — it does not run while the user is typing. It shares the same dirty-set mechanism as keyword search (see PRD-keyword-search.md).
+Embedding generation is lazy — it does not run while the user is typing. It shares the `DirtyTracker` from the foundation layer.
 
 **When embeddings are generated:**
 - On search open (flush dirty blocks)
@@ -109,7 +117,7 @@ Embedding generation is lazy — it does not run while the user is typing. It sh
 
 For each dirty block in the flush pass:
 1. Fetch block content from SwiftData
-2. Strip markdown via `deformatted()`
+2. Strip markdown via `PlainTextExtractor`
 3. Check word count — skip if < 3 words (no embedding, no HNSW entry)
 4. Check content hash — skip if `SHA256(content) == blockEmbedding.contentHash` (unchanged)
 5. Run CoreML inference (~30ms) → 384-dim float vector
@@ -119,13 +127,13 @@ For each dirty block in the flush pass:
 
 ### HNSW Insert Timing
 
-HNSW inserts happen immediately after each embedding is generated (same pass), not deferred. The insert cost (~1-5ms) is negligible compared to the embedding generation (~30ms) and they naturally pair together.
+HNSW inserts happen immediately after each embedding is generated (same pass), not deferred. The insert cost (~1-5ms) is negligible compared to embedding generation (~30ms).
 
 ### Block Deletion
 
 When a block is deleted:
 - Remove from HNSW index: `index.remove(key: blockId)`
-- Delete the `BlockEmbedding` SwiftData record
+- `BlockEmbedding` SwiftData record cascade-deletes automatically
 
 ### Initial Indexing (First Launch)
 
@@ -141,8 +149,6 @@ On first launch or when search is enabled for an existing note collection:
 
 ### Interface
 
-The semantic engine takes a query string and optional date filter, returns block IDs with cosine similarity scores.
-
 ```
 SemanticEngine.search(query: String, dateRange: DateRange?) -> [(blockId: UUID, similarity: Float)]
 ```
@@ -152,7 +158,7 @@ SemanticEngine.search(query: String, dateRange: DateRange?) -> [(blockId: UUID, 
 1. Strip markdown from query (if any)
 2. Generate query embedding via CoreML (~30ms)
 3. Search HNSW index — over-fetch top 200 results
-4. If date filter provided: post-filter by block `createdAt`, keep results that pass the date range
+4. If date filter provided: post-filter by block `createdAt` (same cross-database post-filter pattern as keyword search)
 5. Apply cosine similarity threshold (>= 0.3 starting point, tune empirically)
 6. Return passing results with similarity scores
 
@@ -160,12 +166,9 @@ SemanticEngine.search(query: String, dateRange: DateRange?) -> [(blockId: UUID, 
 
 `usearch` returns cosine distance. Convert to similarity: `similarity = 1 - distance`.
 
-- Distance 0 → identical meaning (similarity 1.0)
-- Distance 1 → unrelated (similarity 0.0)
-
 ### Short Block Handling
 
-Blocks with < 3 words have no embedding and no HNSW entry. They are invisible to semantic search but still findable via keyword search (FTS5).
+Blocks with < 3 words have no embedding and no HNSW entry. They are invisible to semantic search but still findable via keyword search.
 
 ---
 
@@ -189,6 +192,17 @@ Embeddings sync as data (block ID + 384 floats, ~1.5KB each) through whatever sy
 
 ---
 
+## Components
+
+| Component | Responsibility |
+|-----------|---------------|
+| `EmbeddingModel` | Wraps CoreML model + WordPiece tokenizer. Takes a string, returns 384-dim float vector. Handles model loading and inference. |
+| `HNSWIndex` | Wraps `usearch`. Insert, remove, search, save, load. Manages the binary index file and UUID↔UInt64 key mapping via `vector_key_map` table. |
+| `SemanticEngine` | Query execution. Takes query string + optional filters, generates query embedding, searches HNSW, post-filters, returns results with similarity scores. |
+| `EmbeddingIndexer` | Processes dirty blocks — generates embeddings, inserts into HNSW, stores in `BlockEmbedding`. Handles batch processing and initial indexing. |
+
+---
+
 ## Performance Targets
 
 | Operation | Target |
@@ -202,11 +216,28 @@ Embeddings sync as data (block ID + 384 floats, ~1.5KB each) through whatever sy
 
 ---
 
-## Components
+## Testing Strategy
 
-| Component | Responsibility |
-|-----------|---------------|
-| `EmbeddingModel` | Wraps CoreML model + WordPiece tokenizer. Takes a string, returns 384-dim float vector. Handles model loading and inference. |
-| `HNSWIndex` | Wraps `usearch`. Insert, remove, search, save, load. Manages the binary index file on disk. |
-| `SemanticEngine` | Query execution. Takes query string + optional filters, generates query embedding, searches HNSW, post-filters, returns results with similarity scores. |
-| `EmbeddingIndexer` | Processes dirty blocks — generates embeddings, inserts into HNSW, stores in `BlockEmbedding`. Handles batch processing and initial indexing. |
+### Unit Tests
+
+| Area | What to test |
+|------|-------------|
+| **Model output shape** | `embed()` returns exactly 384 dimensions |
+| **Model normalization** | Output vectors have L2 norm ≈ 1.0 |
+| **Semantic quality** | Known-similar sentences have cosine similarity > 0.5; known-dissimilar < 0.3 |
+| **WordPiece tokenizer** | Tokenization matches expected token IDs; handles unicode, punctuation, unknown tokens; max length truncation |
+| **HNSW basic ops** | Insert → search returns it; remove → not returned; k-nearest ordered by distance |
+| **HNSW persistence** | Save → load → search still works; rebuild from BlockEmbedding matches original |
+| **UUID key mapping** | `uuidToKey()` is deterministic; reverse mapping resolves correctly; stored in `vector_key_map` |
+| **Short block skip** | Blocks < 3 words produce no embedding and no HNSW entry |
+| **Content hash skip** | Unchanged content (same SHA256) skips re-embedding |
+| **Cosine threshold** | Results with similarity < 0.3 filtered out |
+| **Date post-filtering** | Out-of-range results excluded after HNSW search |
+| **Delete pipeline** | Deleted block removed from HNSW + BlockEmbedding |
+
+### Test Approach
+
+- `EmbeddingModel` tests require the bundled CoreML model — they run real inference. Include 5-10 sentence pairs as a validation suite.
+- `HNSWIndex` tests use synthetic 384-dim vectors in a temp directory. No CoreML needed.
+- `EmbeddingIndexer` tests need a SwiftData in-memory container + HNSW temp index.
+- `SemanticEngine` tests can mock HNSW with pre-inserted vectors to avoid CoreML overhead.

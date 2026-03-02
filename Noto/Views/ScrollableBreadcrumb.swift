@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import NotoModels
 
 struct ScrollableBreadcrumb: View {
     /// Full ancestor path from root to current node (inclusive), computed by the caller.

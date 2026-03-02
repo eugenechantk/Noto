@@ -9,6 +9,7 @@
 import Testing
 import Foundation
 import SwiftData
+import NotoModels
 @testable import Noto
 
 struct BlockProtectionTests {
