@@ -37,33 +37,8 @@ public struct FTS5Indexer {
             let batch = await dirtyStore.fetchDirtyBatch(limit: 50)
             if batch.isEmpty { break }
 
-            var processedIds: [UUID] = []
-
-            for entry in batch {
-                switch entry.operation {
-                case .upsert:
-                    let blockId = entry.blockId
-                    let descriptor = FetchDescriptor<Block>(
-                        predicate: #Predicate<Block> { $0.id == blockId }
-                    )
-                    do {
-                        let blocks = try modelContext.fetch(descriptor)
-                        if let block = blocks.first {
-                            let plainText = PlainTextExtractor.plainText(from: block.content)
-                            await fts5Database.upsertBlock(blockId: block.id, content: plainText)
-                        } else {
-                            // Block no longer exists in SwiftData — treat as delete
-                            await fts5Database.deleteBlock(blockId: blockId)
-                        }
-                    } catch {
-                        logger.error("flushAll fetch block \(blockId) failed: \(error)")
-                    }
-                case .delete:
-                    await fts5Database.deleteBlock(blockId: entry.blockId)
-                }
-                processedIds.append(entry.blockId)
-            }
-
+            await processBatch(batch)
+            let processedIds = batch.map { $0.blockId }
             await dirtyStore.removeDirty(blockIds: processedIds)
             totalProcessed += processedIds.count
         }
@@ -74,6 +49,33 @@ public struct FTS5Indexer {
 
         if totalProcessed > 0 {
             logger.info("flushAll processed \(totalProcessed) dirty blocks")
+        }
+    }
+
+    /// Processes a single batch of dirty entries into the FTS5 index.
+    /// Used by SearchService to coordinate FTS5 and embedding indexing from the same batch.
+    public func processBatch(_ batch: [(blockId: UUID, operation: DirtyOperation)]) async {
+        for entry in batch {
+            switch entry.operation {
+            case .upsert:
+                let blockId = entry.blockId
+                let descriptor = FetchDescriptor<Block>(
+                    predicate: #Predicate<Block> { $0.id == blockId }
+                )
+                do {
+                    let blocks = try modelContext.fetch(descriptor)
+                    if let block = blocks.first {
+                        let plainText = PlainTextExtractor.plainText(from: block.content)
+                        await fts5Database.upsertBlock(blockId: block.id, content: plainText)
+                    } else {
+                        await fts5Database.deleteBlock(blockId: blockId)
+                    }
+                } catch {
+                    logger.error("processBatch fetch block \(blockId) failed: \(error)")
+                }
+            case .delete:
+                await fts5Database.deleteBlock(blockId: entry.blockId)
+            }
         }
     }
 

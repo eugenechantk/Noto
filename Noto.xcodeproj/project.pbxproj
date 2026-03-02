@@ -203,7 +203,6 @@
 			mainGroup = 5DF5FAF52F0EC372008EDC76;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				A1B2C3D4E5F6A7B8C9D0E1F2 /* XCRemoteSwiftPackageReference "usearch" */,
 				AABB00010000000000000001 /* XCLocalSwiftPackageReference "NotoModels" */,
 				AABB00020000000000000002 /* XCLocalSwiftPackageReference "NotoCore" */,
 				AABB00030000000000000003 /* XCLocalSwiftPackageReference "NotoDirtyTracker" */,
@@ -648,9 +647,6 @@
 			relativePath = Packages/NotoTodayNotes;
 		};
 /* End XCLocalSwiftPackageReference section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		CCDD00010000000000000001 /* NotoModels */ = {

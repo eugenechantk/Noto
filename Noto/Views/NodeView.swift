@@ -16,6 +16,11 @@ import NotoFTS5
 import NotoDirtyTracker
 import NotoSearch
 import NotoTodayNotes
+import NotoEmbedding
+
+#if canImport(USearch)
+import NotoHNSW
+#endif
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "OutlineView")
 
@@ -116,12 +121,26 @@ struct OutlineView: View {
         }
         .sheet(isPresented: $showSearch) {
             SearchSheet(
-                searchService: SearchService(
-                    fts5Database: sharedSearchDatabase,
-                    dirtyTracker: dirtyTracker,
-                    dirtyStore: sharedDirtyStore,
-                    modelContext: modelContext
-                ),
+                searchService: {
+                    #if canImport(USearch)
+                    return SearchService(
+                        fts5Database: sharedSearchDatabase,
+                        dirtyTracker: dirtyTracker,
+                        dirtyStore: sharedDirtyStore,
+                        modelContext: modelContext,
+                        embeddingModel: sharedEmbeddingModel,
+                        hnswIndex: sharedHNSWIndex,
+                        vectorKeyStore: sharedVectorKeyStore
+                    )
+                    #else
+                    return SearchService(
+                        fts5Database: sharedSearchDatabase,
+                        dirtyTracker: dirtyTracker,
+                        dirtyStore: sharedDirtyStore,
+                        modelContext: modelContext
+                    )
+                    #endif
+                }(),
                 onSelectResult: { blockId in
                     navigateToSearchResult(blockId: blockId)
                 }

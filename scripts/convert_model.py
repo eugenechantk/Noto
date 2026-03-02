@@ -4,17 +4,16 @@ Convert bge-small-en-v1.5 from HuggingFace to CoreML format.
 
 This script:
 1. Downloads the BAAI/bge-small-en-v1.5 model from HuggingFace
-2. Traces it with CLS pooling and L2 normalization baked in
-3. Converts to CoreML .mlpackage / .mlmodelc
+2. JIT-traces a custom wrapper (CLS pooling + L2 norm baked in)
+3. Converts to CoreML .mlpackage
 4. Extracts vocab.txt from the tokenizer
 
-Usage:
-    pip install coremltools transformers torch numpy
-    python scripts/convert_model.py
+Usage (specific versions required for compatibility):
+    uv run --with 'coremltools<9.0,>=8.0' --with 'transformers==4.36.0' --with 'torch==2.5.0' --with numpy python scripts/convert_model.py
 
 Output:
-    Noto/Search/Resources/bge-small-en-v1_5.mlpackage
-    Noto/Search/Resources/vocab.txt
+    Noto/Resources/bge-small-en-v1_5.mlpackage
+    Noto/Resources/vocab.txt
 """
 
 import os
@@ -27,17 +26,47 @@ import torch.nn as nn
 from transformers import AutoModel, AutoTokenizer
 
 
-class BGEWithPoolingAndNorm(nn.Module):
-    """Wraps the BERT model with CLS pooling and L2 normalization."""
+MAX_SEQ_LENGTH = 512
+
+
+class BGECoreMLWrapper(nn.Module):
+    """
+    Wraps BERT encoder weights directly with manual forward pass to avoid
+    HuggingFace's internal tracing issues. Includes CLS pooling + L2 norm.
+    """
 
     def __init__(self, base_model):
         super().__init__()
-        self.base_model = base_model
+        self.embeddings = base_model.embeddings
+        self.encoder = base_model.encoder
+        self.pooler = base_model.pooler
 
-    def forward(self, input_ids, attention_mask):
-        outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
+    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+        # Compute embeddings manually to avoid position_ids int() cast issue
+        seq_length = input_ids.shape[1]
+        position_ids = torch.arange(seq_length, device=input_ids.device).unsqueeze(0)
+        token_type_ids = torch.zeros_like(input_ids)
+
+        word_embeds = self.embeddings.word_embeddings(input_ids)
+        position_embeds = self.embeddings.position_embeddings(position_ids)
+        token_type_embeds = self.embeddings.token_type_embeddings(token_type_ids)
+
+        embeddings = word_embeds + position_embeds + token_type_embeds
+        embeddings = self.embeddings.LayerNorm(embeddings)
+        embeddings = self.embeddings.dropout(embeddings)
+
+        # Create extended attention mask (1.0 for tokens, -10000.0 for padding)
+        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2).to(embeddings.dtype)
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+
+        # Run through encoder
+        hidden_states = embeddings
+        for layer in self.encoder.layer:
+            layer_output = layer(hidden_states, attention_mask=extended_attention_mask)
+            hidden_states = layer_output[0]
+
         # CLS token pooling (first token)
-        cls_embedding = outputs.last_hidden_state[:, 0, :]
+        cls_embedding = hidden_states[:, 0, :]
         # L2 normalize
         normalized = torch.nn.functional.normalize(cls_embedding, p=2, dim=1)
         return normalized
@@ -45,22 +74,22 @@ class BGEWithPoolingAndNorm(nn.Module):
 
 def main():
     model_name = "BAAI/bge-small-en-v1.5"
-    output_dir = os.path.join(os.path.dirname(__file__), "..", "Noto", "Search", "Resources")
+    output_dir = os.path.join(os.path.dirname(__file__), "..", "Noto", "Resources")
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"Loading {model_name}...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    base_model = AutoModel.from_pretrained(model_name)
+    base_model = AutoModel.from_pretrained(model_name, attn_implementation="eager")
     base_model.eval()
 
-    model = BGEWithPoolingAndNorm(base_model)
+    # Wrap with custom forward to avoid tracing issues
+    model = BGECoreMLWrapper(base_model)
     model.eval()
 
-    # Trace the model
-    max_seq_length = 512
-    dummy_input_ids = torch.zeros(1, max_seq_length, dtype=torch.int32)
-    dummy_attention_mask = torch.ones(1, max_seq_length, dtype=torch.int32)
+    dummy_input_ids = torch.zeros(1, MAX_SEQ_LENGTH, dtype=torch.int32)
+    dummy_attention_mask = torch.ones(1, MAX_SEQ_LENGTH, dtype=torch.int32)
 
+    # JIT trace the custom wrapper (avoids HF position_ids cast issue)
     print("Tracing model...")
     with torch.no_grad():
         traced = torch.jit.trace(model, (dummy_input_ids, dummy_attention_mask))
@@ -70,8 +99,8 @@ def main():
     mlmodel = ct.convert(
         traced,
         inputs=[
-            ct.TensorType(name="input_ids", shape=(1, max_seq_length), dtype=np.int32),
-            ct.TensorType(name="attention_mask", shape=(1, max_seq_length), dtype=np.int32),
+            ct.TensorType(name="input_ids", shape=(1, MAX_SEQ_LENGTH), dtype=np.int32),
+            ct.TensorType(name="attention_mask", shape=(1, MAX_SEQ_LENGTH), dtype=np.int32),
         ],
         outputs=[
             ct.TensorType(name="sentence_embedding"),
@@ -81,6 +110,8 @@ def main():
 
     # Save as .mlpackage
     mlpackage_path = os.path.join(output_dir, "bge-small-en-v1_5.mlpackage")
+    if os.path.exists(mlpackage_path):
+        shutil.rmtree(mlpackage_path)
     print(f"Saving model to {mlpackage_path}...")
     mlmodel.save(mlpackage_path)
 
@@ -95,6 +126,10 @@ def main():
 
     # Validate
     print("\nValidating conversion...")
+    # Also create reference model using HF's own forward for comparison
+    ref_model = BGECoreMLWrapper(base_model)
+    ref_model.eval()
+
     test_texts = [
         "aesthetic taste in design",
         "artistic judgement and beauty",
@@ -102,22 +137,22 @@ def main():
     ]
 
     for text in test_texts:
-        inputs = tokenizer(text, return_tensors="pt", max_length=max_seq_length,
+        inputs = tokenizer(text, return_tensors="pt", max_length=MAX_SEQ_LENGTH,
                           padding="max_length", truncation=True)
-        input_ids = inputs["input_ids"].numpy().astype(np.int32)
-        attention_mask = inputs["attention_mask"].numpy().astype(np.int32)
+        input_ids_np = inputs["input_ids"].numpy().astype(np.int32)
+        attention_mask_np = inputs["attention_mask"].numpy().astype(np.int32)
 
         # PyTorch output
         with torch.no_grad():
-            pt_output = model(
-                torch.tensor(input_ids),
-                torch.tensor(attention_mask),
+            pt_output = ref_model(
+                inputs["input_ids"].to(torch.int32),
+                inputs["attention_mask"].to(torch.int32),
             ).numpy()[0]
 
         # CoreML output
         pred = mlmodel.predict({
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
+            "input_ids": input_ids_np,
+            "attention_mask": attention_mask_np,
         })
         ct_output = pred["sentence_embedding"].flatten()
 

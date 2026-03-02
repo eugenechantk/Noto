@@ -1,0 +1,87 @@
+[
+  {
+    "metadataOutputVersion" : "3.0",
+    "storagePrecision" : "Float16",
+    "outputSchema" : [
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Float16",
+        "formattedType" : "MultiArray (Float16 1 × 384)",
+        "shortDescription" : "",
+        "shape" : "[1, 384]",
+        "name" : "sentence_embedding",
+        "type" : "MultiArray"
+      }
+    ],
+    "modelParameters" : [
+
+    ],
+    "specificationVersion" : 7,
+    "mlProgramOperationTypeHistogram" : {
+      "Tile" : 1,
+      "Ios16.cast" : 1,
+      "Ios16.mul" : 13,
+      "Ios16.layerNorm" : 25,
+      "SliceByIndex" : 1,
+      "Ios16.sub" : 1,
+      "Transpose" : 48,
+      "Ios16.linear" : 72,
+      "Ios16.add" : 38,
+      "Ios16.realDiv" : 1,
+      "Ios16.matmul" : 24,
+      "Ios16.softmax" : 12,
+      "Ios16.gelu" : 12,
+      "ExpandDims" : 2,
+      "Ios16.gather" : 1,
+      "Ios16.reduceL2Norm" : 1,
+      "Ios16.reshape" : 48,
+      "Ios16.maximum" : 1
+    },
+    "computePrecision" : "Mixed (Float16, Int32)",
+    "isUpdatable" : "0",
+    "stateSchema" : [
+
+    ],
+    "availability" : {
+      "macOS" : "13.0",
+      "tvOS" : "16.0",
+      "visionOS" : "1.0",
+      "watchOS" : "9.0",
+      "iOS" : "16.0",
+      "macCatalyst" : "16.0"
+    },
+    "modelType" : {
+      "name" : "MLModelType_mlProgram"
+    },
+    "userDefinedMetadata" : {
+      "com.github.apple.coremltools.source_dialect" : "TorchScript",
+      "com.github.apple.coremltools.version" : "8.3.0",
+      "com.github.apple.coremltools.source" : "torch==2.5.0"
+    },
+    "inputSchema" : [
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Int32",
+        "formattedType" : "MultiArray (Int32 1 × 512)",
+        "shortDescription" : "",
+        "shape" : "[1, 512]",
+        "name" : "input_ids",
+        "type" : "MultiArray"
+      },
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Int32",
+        "formattedType" : "MultiArray (Int32 1 × 512)",
+        "shortDescription" : "",
+        "shape" : "[1, 512]",
+        "name" : "attention_mask",
+        "type" : "MultiArray"
+      }
+    ],
+    "generatedClassName" : "bge_small_en_v1_5",
+    "method" : "predict"
+  }
+]

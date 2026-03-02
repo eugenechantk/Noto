@@ -12,8 +12,7 @@ let package = Package(
         .package(path: "../NotoCore"),
         .package(path: "../NotoDirtyTracker"),
         .package(path: "../NotoEmbedding"),
-        // USearch SPM will be added later:
-        // .package(url: "https://github.com/unum-cloud/usearch", from: "2.0.0"),
+        .package(url: "https://github.com/unum-cloud/usearch", from: "2.0.0"),
     ],
     targets: [
         .target(name: "NotoHNSW", dependencies: [
@@ -21,7 +20,7 @@ let package = Package(
             "NotoCore",
             "NotoDirtyTracker",
             "NotoEmbedding",
-            // "USearch",  // uncomment when USearch SPM is added
+            .product(name: "USearch", package: "usearch"),
         ]),
     ]
 )

@@ -11,6 +11,11 @@ import os.log
 import NotoModels
 import NotoFTS5
 import NotoDirtyTracker
+import NotoEmbedding
+
+#if canImport(USearch)
+import NotoHNSW
+#endif
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NotoApp")
 
@@ -43,6 +48,34 @@ let sharedDirtyStore: DirtyStore = {
     Task { await store.createTablesIfNeeded() }
     return store
 }()
+
+/// Shared EmbeddingModel for the app lifecycle. nil if model/vocab not bundled.
+@MainActor
+let sharedEmbeddingModel: EmbeddingModel? = {
+    do {
+        return try EmbeddingModel()
+    } catch {
+        logger.info("EmbeddingModel not available: \(error). Semantic search disabled.")
+        return nil
+    }
+}()
+
+#if canImport(USearch)
+/// Shared VectorKeyStore for the app lifecycle.
+@MainActor
+let sharedVectorKeyStore: VectorKeyStore = {
+    let store = VectorKeyStore(directory: sharedStorageDirectory)
+    Task { await store.createTablesIfNeeded() }
+    return store
+}()
+
+/// Shared HNSWIndex for the app lifecycle.
+@MainActor
+let sharedHNSWIndex: HNSWIndex = {
+    let indexPath = sharedStorageDirectory.appendingPathComponent("vectors.usearch")
+    return HNSWIndex(path: indexPath, vectorKeyStore: sharedVectorKeyStore)
+}()
+#endif
 
 @MainActor
 private let sharedDirtyTracker: DirtyTracker = {
@@ -111,5 +144,17 @@ struct NotoApp: App {
         let bgContext = ModelContext(sharedModelContainer)
         let reconciler = IndexReconciler(fts5Database: sharedSearchDatabase, dirtyStore: sharedDirtyStore, modelContext: bgContext)
         await reconciler.reconcileIfNeeded()
+
+        #if canImport(USearch)
+        // Rebuild HNSW index from persisted BlockEmbedding records if index file is missing
+        if let embeddingModel = sharedEmbeddingModel {
+            let indexPath = sharedStorageDirectory.appendingPathComponent("vectors.usearch")
+            if !FileManager.default.fileExists(atPath: indexPath.path) {
+                let indexer = EmbeddingIndexer(embeddingModel: embeddingModel, hnswIndex: sharedHNSWIndex, modelContext: bgContext)
+                await indexer.rebuildIndex()
+                logger.info("Rebuilt HNSW index from persisted embeddings")
+            }
+        }
+        #endif
     }
 }

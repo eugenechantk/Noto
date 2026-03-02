@@ -46,6 +46,7 @@ struct SearchSheet: View {
                     } else {
                         ForEach(results) { result in
                             SearchResultRow(result: result)
+                                .accessibilityIdentifier("searchResultRow")
                                 .onTapGesture {
                                     onSelectResult(result.id)
                                     dismiss()
@@ -129,6 +130,7 @@ struct SearchSheet: View {
             .font(.system(size: 15))
             .foregroundStyle(.secondary)
             .padding(.top, 40)
+            .accessibilityIdentifier("noResultsText")
     }
 
     // MARK: - Search Bar
@@ -148,6 +150,7 @@ struct SearchSheet: View {
                     performSearch()
                 }
                 .submitLabel(.search)
+                .accessibilityIdentifier("searchTextField")
 
             if !queryText.isEmpty {
                 Button {
@@ -159,6 +162,7 @@ struct SearchSheet: View {
                         .font(.system(size: 17))
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityIdentifier("clearSearchButton")
             }
         }
         .padding(.horizontal, 14)

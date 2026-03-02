@@ -15,6 +15,10 @@ import NotoDirtyTracker
 import NotoFTS5
 import NotoEmbedding
 
+#if canImport(USearch)
+import NotoHNSW
+#endif
+
 private let logger = Logger(subsystem: "com.noto", category: "SearchService")
 
 public final class SearchService {
@@ -27,23 +31,81 @@ public final class SearchService {
     private let dateFilterParser = DateFilterParser()
     private let hybridRanker = HybridRanker()
 
+    #if canImport(USearch)
+    private let embeddingModel: EmbeddingModel?
+    private let hnswIndex: HNSWIndex?
+    private let vectorKeyStore: VectorKeyStore?
+    #endif
+
+    #if canImport(USearch)
+    public init(
+        fts5Database: FTS5Database,
+        dirtyTracker: DirtyTracker,
+        dirtyStore: DirtyStore,
+        modelContext: ModelContext,
+        embeddingModel: EmbeddingModel?,
+        hnswIndex: HNSWIndex?,
+        vectorKeyStore: VectorKeyStore?
+    ) {
+        self.fts5Database = fts5Database
+        self.dirtyTracker = dirtyTracker
+        self.dirtyStore = dirtyStore
+        self.modelContext = modelContext
+        self.embeddingModel = embeddingModel
+        self.hnswIndex = hnswIndex
+        self.vectorKeyStore = vectorKeyStore
+    }
+    #else
     public init(fts5Database: FTS5Database, dirtyTracker: DirtyTracker, dirtyStore: DirtyStore, modelContext: ModelContext) {
         self.fts5Database = fts5Database
         self.dirtyTracker = dirtyTracker
         self.dirtyStore = dirtyStore
         self.modelContext = modelContext
     }
+    #endif
 
     // MARK: - Index Freshness
 
     /// Flushes dirty blocks from memory to the dirty_blocks table,
-    /// then processes them into the FTS5 index.
+    /// then processes them through both FTS5 and embedding pipelines.
     @MainActor
     public func ensureIndexFresh() async {
         await dirtyTracker.flush()
 
-        let indexer = FTS5Indexer(fts5Database: fts5Database, dirtyStore: dirtyStore, modelContext: modelContext)
-        await indexer.flushAll()
+        let fts5Indexer = FTS5Indexer(fts5Database: fts5Database, dirtyStore: dirtyStore, modelContext: modelContext)
+
+        #if canImport(USearch)
+        if let embeddingModel = embeddingModel, let hnswIndex = hnswIndex {
+            // Coordinate both pipelines from the same dirty batch
+            let embeddingIndexer = EmbeddingIndexer(embeddingModel: embeddingModel, hnswIndex: hnswIndex, modelContext: modelContext)
+            var totalProcessed = 0
+
+            while true {
+                let batch = await dirtyStore.fetchDirtyBatch(limit: 50)
+                if batch.isEmpty { break }
+
+                // Process through both pipelines
+                await fts5Indexer.processBatch(batch)
+                await embeddingIndexer.processDirtyBlocks(blockIds: batch.map { ($0.blockId, $0.operation) })
+
+                // Remove after both succeed
+                let processedIds = batch.map { $0.blockId }
+                await dirtyStore.removeDirty(blockIds: processedIds)
+                totalProcessed += processedIds.count
+            }
+
+            if totalProcessed > 0 {
+                let timestamp = ISO8601DateFormatter().string(from: Date())
+                await dirtyStore.setMetadata(key: "lastFullReconciliationAt", value: timestamp)
+                logger.info("ensureIndexFresh processed \(totalProcessed) dirty blocks (FTS5 + embedding)")
+            }
+        } else {
+            // Fallback: keyword-only
+            await fts5Indexer.flushAll()
+        }
+        #else
+        await fts5Indexer.flushAll()
+        #endif
     }
 
     // MARK: - Search
@@ -71,18 +133,47 @@ public final class SearchService {
 
         // Run keyword search
         let fts5Engine = FTS5Engine(fts5Database: fts5Database)
-        let keywordResults = await fts5Engine.search(
+        let keywordResults: [KeywordSearchResult]
+        let semanticResults: [SemanticSearchResult]
+
+        #if canImport(USearch)
+        if let embeddingModel = embeddingModel, let hnswIndex = hnswIndex {
+            // Run keyword and semantic search in parallel
+            async let keywordTask = fts5Engine.search(
+                query: query.text,
+                dateRange: query.dateRange,
+                modelContext: modelContext
+            )
+            async let semanticTask = SemanticEngine(
+                embeddingModel: embeddingModel,
+                hnswIndex: hnswIndex
+            ).search(
+                query: query.text,
+                dateRange: query.dateRange,
+                modelContext: modelContext
+            )
+
+            keywordResults = await keywordTask
+            semanticResults = await semanticTask
+        } else {
+            keywordResults = await fts5Engine.search(
+                query: query.text,
+                dateRange: query.dateRange,
+                modelContext: modelContext
+            )
+            semanticResults = []
+        }
+        #else
+        keywordResults = await fts5Engine.search(
             query: query.text,
             dateRange: query.dateRange,
             modelContext: modelContext
         )
-
-        // Semantic search is only available when USearch is compiled in.
-        // For now, pass empty semantic results -- HybridRanker will use alpha=1.0 (pure keyword).
-        let semanticResults: [SemanticSearchResult] = []
+        semanticResults = []
+        #endif
 
         // Fetch block contents for exact match boost
-        let allBlockIds = Set(keywordResults.map { $0.blockId })
+        let allBlockIds = Set(keywordResults.map { $0.blockId } + semanticResults.map { $0.blockId })
         let blockContents = fetchBlockContents(blockIds: allBlockIds)
 
         // Hybrid rank
