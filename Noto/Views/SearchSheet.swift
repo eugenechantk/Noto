@@ -15,7 +15,6 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 
 struct SearchSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
     @FocusState private var isSearchFocused: Bool
 
     let searchService: SearchService
@@ -26,15 +25,18 @@ struct SearchSheet: View {
     @State private var isSearching = false
     @State private var isIndexing = false
     @State private var hasSearched = false
+    @State private var debounceTask: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 0) {
             // Results area
             ScrollView {
-                LazyVStack(spacing: 0) {
+                VStack(spacing: 0) {
                     // Ask AI row
                     if !queryText.trimmingCharacters(in: .whitespaces).isEmpty {
                         askAIRow
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
                     }
 
                     if isIndexing {
@@ -43,18 +45,10 @@ struct SearchSheet: View {
                         searchingIndicator
                     } else if hasSearched && results.isEmpty {
                         emptyResultsView
-                    } else {
-                        ForEach(results) { result in
-                            SearchResultRow(result: result)
-                                .accessibilityIdentifier("searchResultRow")
-                                .onTapGesture {
-                                    onSelectResult(result.id)
-                                    dismiss()
-                                }
-                        }
+                    } else if !results.isEmpty {
+                        resultsSection
                     }
                 }
-                .padding(.top, 8)
             }
 
             Spacer(minLength: 0)
@@ -62,7 +56,10 @@ struct SearchSheet: View {
             // Bottom search bar
             searchBar
         }
-        .background(backgroundColor.ignoresSafeArea())
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .onChange(of: queryText) {
+            debouncedSearch()
+        }
         .onAppear {
             isSearchFocused = true
             Task {
@@ -80,27 +77,59 @@ struct SearchSheet: View {
             // Future: navigate to AI chat with query
             logger.debug("Ask AI tapped: \(queryText)")
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "sparkles")
+            HStack(spacing: 16) {
+                Image(systemName: "square.dashed")
                     .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(.primary)
+                    .frame(width: 36, height: 36)
 
                 Text("Ask AI \"\(queryText)\"")
-                    .font(.system(size: 17))
+                    .font(.system(size: 20))
+                    .tracking(-0.45)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
             }
-            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .frame(height: 68)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("askAIRow")
+    }
+
+    // MARK: - Results Section
+
+    private var resultsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Results")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+
+            VStack(spacing: 0) {
+                ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
+                    VStack(spacing: 0) {
+                        if index > 0 {
+                            Divider()
+                        }
+                        SearchResultRow(result: result)
+                            .accessibilityIdentifier("searchResultRow")
+                            .onTapGesture {
+                                onSelectResult(result.id)
+                                dismiss()
+                            }
+                    }
+                }
+            }
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
             .padding(.horizontal, 16)
         }
-        .accessibilityIdentifier("askAIRow")
     }
 
     // MARK: - Loading States
@@ -146,14 +175,12 @@ struct SearchSheet: View {
                 .foregroundStyle(.primary)
                 .tint(.primary)
                 .focused($isSearchFocused)
-                .onSubmit {
-                    performSearch()
-                }
-                .submitLabel(.search)
+                .submitLabel(.send)
                 .accessibilityIdentifier("searchTextField")
 
             if !queryText.isEmpty {
                 Button {
+                    debounceTask?.cancel()
                     queryText = ""
                     results = []
                     hasSearched = false
@@ -172,26 +199,27 @@ struct SearchSheet: View {
         .padding(.bottom, 12)
     }
 
-    // MARK: - Colors
-
-    private var backgroundColor: Color {
-        colorScheme == .dark
-            ? Color(red: 0.07, green: 0.07, blue: 0.07)
-            : .white
-    }
-
     // MARK: - Search
 
-    private func performSearch() {
+    private func debouncedSearch() {
+        debounceTask?.cancel()
+
         let trimmed = queryText.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else {
+            results = []
+            hasSearched = false
+            return
+        }
 
-        isSearching = true
-        hasSearched = true
-
-        Task {
-            results = await searchService.search(rawQuery: trimmed)
-            isSearching = false
+        debounceTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            isSearching = true
+            hasSearched = true
+            defer { isSearching = false }
+            let searchResults = await searchService.search(rawQuery: trimmed)
+            guard !Task.isCancelled else { return }
+            results = searchResults
         }
     }
 }
@@ -202,20 +230,21 @@ struct SearchResultRow: View {
     let result: SearchResult
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(displayContent)
-                .font(.system(size: 17))
+                .font(.system(size: 20))
+                .tracking(-0.45)
                 .foregroundStyle(.primary)
-                .lineLimit(3)
 
             Text(result.breadcrumb)
                 .font(.system(size: 15))
+                .tracking(-0.23)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+        .padding(.vertical, 4)
         .padding(.horizontal, 16)
     }
 

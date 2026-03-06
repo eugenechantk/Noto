@@ -10,6 +10,9 @@ import UIKit
 import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NoteTextStorage")
+private let mainContentFontSize: CGFloat = 20
+private let mainContentLineHeight: CGFloat = 28
+private let mainContentTracking: CGFloat = mainContentFontSize * -0.01
 
 /// Stores a given note text with rich formatting.
 /// This implements the core text formatting engine.
@@ -83,17 +86,19 @@ final class NoteTextStorage: NSTextStorage {
 
     // MARK: - Rich Text Formatting
 
-    let bodyFont = UIFont.systemFont(ofSize: 18)
+    let bodyFont = UIFont.systemFont(ofSize: mainContentFontSize)
 
     var bodyStyle: [NSAttributedString.Key: Any] {
         let bodyParagraphStyle = NSMutableParagraphStyle()
         bodyParagraphStyle.paragraphSpacingBefore = 2.5
+        bodyParagraphStyle.minimumLineHeight = mainContentLineHeight
+        bodyParagraphStyle.maximumLineHeight = mainContentLineHeight
 
         return [
             .paragraphStyle: bodyParagraphStyle,
             .font: bodyFont,
             .foregroundColor: UIColor.label,
-            .kern: NSNumber(value: 0.0)
+            .kern: NSNumber(value: mainContentTracking)
         ]
     }
 
@@ -352,14 +357,14 @@ fileprivate final class WordsFormatter: Formatter {
     private let italicFormat = WordFormat(
         key: .italic,
         regex: regex("(?<=^|[^*])[*_]{1}(?<text>\\w+(\\s+\\w+)*)[*_]{1}"),
-        style: [.italic: true, .font: UIFont.italicSystemFont(ofSize: 18), .foregroundColor: UIColor.label],
+        style: [.italic: true, .font: UIFont.italicSystemFont(ofSize: mainContentFontSize), .foregroundColor: UIColor.label],
         enclosingChars: "*"
     )
 
     private let boldFormat = WordFormat(
         key:   .bold,
         regex: regex("[*_]{2}(?<text>\\w+(\\s+\\w+)*)[*_]{2}"),
-        style: [.bold: true, .font: UIFont.systemFont(ofSize: 18, weight: .bold), .foregroundColor: UIColor.label],
+        style: [.bold: true, .font: UIFont.systemFont(ofSize: mainContentFontSize, weight: .bold), .foregroundColor: UIColor.label],
         enclosingChars: "**"
     )
 
@@ -555,6 +560,8 @@ enum ListItem: CaseIterable, CustomStringConvertible {
         paragraphStyle.firstLineHeadIndent = 10
         paragraphStyle.headIndent = 10
         paragraphStyle.paragraphSpacingBefore = 2.5
+        paragraphStyle.minimumLineHeight = mainContentLineHeight
+        paragraphStyle.maximumLineHeight = mainContentLineHeight
 
         switch self {
         case .bullet, .dashed, .ordered:
@@ -909,6 +916,8 @@ fileprivate final class IndentFormatter: Formatter {
         style.firstLineHeadIndent = indent
         style.headIndent = hasBullet ? indent + IndentFormatter.bulletExtra : indent
         style.paragraphSpacingBefore = 2.5
+        style.minimumLineHeight = mainContentLineHeight
+        style.maximumLineHeight = mainContentLineHeight
         return style
     }
 
