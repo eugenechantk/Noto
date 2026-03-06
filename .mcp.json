@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "XcodeBuildMCP": {
+      "command": "xcodebuildmcp",
+      "args": ["mcp"]
+    },
     "xc-build": {
       "command": "node",
       "args": ["/Users/eugenechan/.claude/plugins/marketplaces/xclaude-plugin-marketplace/mcp-servers/xc-build/dist/index.js"],
