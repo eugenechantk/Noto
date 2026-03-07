@@ -40,6 +40,7 @@ struct OutlineView: View {
     @State private var showSearch = false
     @State private var showDebug = false
     @State private var ancestors: [Block] = []
+    @State private var isKeyboardVisible = false
 
     private var isRoot: Bool { node == nil }
     private var baseDepth: Int { node?.depth ?? -1 }
@@ -87,16 +88,19 @@ struct OutlineView: View {
             }
 
             // Floating overlays
-            VStack(spacing: 0) {
-                Spacer()
+            if !isKeyboardVisible {
+                VStack(spacing: 0) {
+                    Spacer()
 
-                if showDebug {
-                    DebugPanelView(blocks: currentBlocks())
-                        .transition(.move(edge: .bottom))
-                        .padding(.bottom, 8)
+                    if showDebug {
+                        DebugPanelView(blocks: currentBlocks())
+                            .transition(.move(edge: .bottom))
+                            .padding(.bottom, 8)
+                    }
+
+                    bottomToolbar
                 }
-
-                bottomToolbar
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .background {
@@ -112,6 +116,12 @@ struct OutlineView: View {
         }
         .onDisappear {
             Task { await dirtyTracker.flush() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            withAnimation(.easeInOut(duration: 0.25)) { isKeyboardVisible = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            withAnimation(.easeInOut(duration: 0.25)) { isKeyboardVisible = false }
         }
         .onChange(of: editableContent) {
             syncContent()
@@ -180,7 +190,6 @@ struct OutlineView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 8)
     }
 
     // MARK: - Bottom Toolbar
@@ -198,7 +207,6 @@ struct OutlineView: View {
             }
         }
         .padding(.horizontal, 28)
-        .padding(.bottom, 32)
         .padding(.top, 4)
     }
 

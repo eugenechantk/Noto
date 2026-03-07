@@ -90,7 +90,7 @@ final class NoteTextStorage: NSTextStorage {
 
     var bodyStyle: [NSAttributedString.Key: Any] {
         let bodyParagraphStyle = NSMutableParagraphStyle()
-        bodyParagraphStyle.paragraphSpacingBefore = 2.5
+        bodyParagraphStyle.paragraphSpacing = 12
         bodyParagraphStyle.minimumLineHeight = mainContentLineHeight
         bodyParagraphStyle.maximumLineHeight = mainContentLineHeight
 
@@ -559,7 +559,7 @@ enum ListItem: CaseIterable, CustomStringConvertible {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.firstLineHeadIndent = 10
         paragraphStyle.headIndent = 10
-        paragraphStyle.paragraphSpacingBefore = 2.5
+        paragraphStyle.paragraphSpacing = 12
         paragraphStyle.minimumLineHeight = mainContentLineHeight
         paragraphStyle.maximumLineHeight = mainContentLineHeight
 
@@ -569,7 +569,6 @@ enum ListItem: CaseIterable, CustomStringConvertible {
         case .checkmark:
             paragraphStyle.firstLineHeadIndent = 26
             paragraphStyle.headIndent = 26
-            paragraphStyle.paragraphSpacing = 10
         }
         return paragraphStyle
     }
@@ -915,7 +914,7 @@ fileprivate final class IndentFormatter: Formatter {
         }
         style.firstLineHeadIndent = indent
         style.headIndent = hasBullet ? indent + IndentFormatter.bulletExtra : indent
-        style.paragraphSpacingBefore = 2.5
+        style.paragraphSpacing = 12
         style.minimumLineHeight = mainContentLineHeight
         style.maximumLineHeight = mainContentLineHeight
         return style

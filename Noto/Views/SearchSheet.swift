@@ -7,14 +7,19 @@
 //
 
 import SwiftUI
+import SwiftData
 import os.log
 import NotoCore
 import NotoSearch
+import NotoAIChat
+import NotoDirtyTracker
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "SearchSheet")
 
 struct SearchSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var dirtyTracker: DirtyTracker
     @FocusState private var isSearchFocused: Bool
 
     let searchService: SearchService
@@ -26,10 +31,11 @@ struct SearchSheet: View {
     @State private var isIndexing = false
     @State private var hasSearched = false
     @State private var debounceTask: Task<Void, Never>?
+    @State private var showAIChat = false
+    @State private var aiChatViewModel: AIChatViewModel?
 
     var body: some View {
         VStack(spacing: 0) {
-            // Results area
             ScrollView {
                 VStack(spacing: 0) {
                     // Ask AI row
@@ -50,15 +56,20 @@ struct SearchSheet: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
 
-            Spacer(minLength: 0)
-
-            // Bottom search bar
             searchBar
         }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .onChange(of: queryText) {
             debouncedSearch()
+        }
+        .sheet(isPresented: $showAIChat) {
+            if let vm = aiChatViewModel {
+                AIChatSheet(viewModel: vm)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
         }
         .onAppear {
             isSearchFocused = true
@@ -74,8 +85,14 @@ struct SearchSheet: View {
 
     private var askAIRow: some View {
         Button {
-            // Future: navigate to AI chat with query
             logger.debug("Ask AI tapped: \(queryText)")
+            aiChatViewModel = AIChatViewModel(
+                modelContext: modelContext,
+                dirtyTracker: dirtyTracker,
+                searchService: searchService,
+                initialQuery: queryText
+            )
+            showAIChat = true
         } label: {
             HStack(spacing: 16) {
                 Image(systemName: "square.dashed")

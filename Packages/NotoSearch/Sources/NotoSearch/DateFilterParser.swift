@@ -101,6 +101,37 @@ public struct DateFilterParser {
             }
         ))
 
+        // "this year"
+        list.append(TemporalPattern(
+            regex: try! NSRegularExpression(pattern: #"\bthis\s+year\b"#, options: .caseInsensitive),
+            dateRange: { now in
+                var comps = calendar.dateComponents([.year], from: now)
+                comps.month = 1
+                comps.day = 1
+                let start = calendar.date(from: comps)!
+                return DateRange(start: start, end: now)
+            }
+        ))
+
+        // "last year" / "last year's"
+        list.append(TemporalPattern(
+            regex: try! NSRegularExpression(pattern: #"\blast\s+year(?:'s)?\b"#, options: .caseInsensitive),
+            dateRange: { now in
+                let currentYear = calendar.component(.year, from: now)
+                var startComps = DateComponents()
+                startComps.year = currentYear - 1
+                startComps.month = 1
+                startComps.day = 1
+                let start = calendar.date(from: startComps)!
+                var endComps = DateComponents()
+                endComps.year = currentYear
+                endComps.month = 1
+                endComps.day = 1
+                let end = calendar.date(from: endComps)!
+                return DateRange(start: start, end: end)
+            }
+        ))
+
         // "in <Month> <Year>" -- e.g. "in March 2024"
         list.append(TemporalPattern(
             regex: try! NSRegularExpression(
@@ -176,10 +207,12 @@ public struct DateFilterParser {
                 let start = calendar.date(byAdding: .day, value: -n, to: calendar.startOfDay(for: now))!
                 dateRange = DateRange(start: start, end: now)
 
-            case 7: // "recent(ly)"
+            case 7, // "recent(ly)"
+                 8, // "this year"
+                 9: // "last year('s)"
                 dateRange = pattern.dateRange(now)
 
-            case 8: // "in <Month> <Year>"
+            case 10: // "in <Month> <Year>"
                 let monthRange = match.range(at: 1)
                 let yearRange = match.range(at: 2)
                 guard let monthSwiftRange = Range(monthRange, in: rawQuery),
@@ -198,7 +231,7 @@ public struct DateFilterParser {
                 }
                 dateRange = DateRange(start: start, end: end)
 
-            case 9: // "in <Month>" (current year)
+            case 11: // "in <Month>" (current year)
                 let monthRange = match.range(at: 1)
                 guard let monthSwiftRange = Range(monthRange, in: rawQuery),
                       let month = monthNames[rawQuery[monthSwiftRange].lowercased()] else {
@@ -215,7 +248,7 @@ public struct DateFilterParser {
                 }
                 dateRange = DateRange(start: start, end: end)
 
-            case 10: // "in <Year>"
+            case 12: // "in <Year>"
                 let yearRange = match.range(at: 1)
                 guard let yearSwiftRange = Range(yearRange, in: rawQuery),
                       let year = Int(rawQuery[yearSwiftRange]) else {

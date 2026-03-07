@@ -33,10 +33,6 @@ struct GlassSearchBar: View {
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(toolbarForegroundColor)
                 .tint(toolbarForegroundColor)
-
-            Image(systemName: "mic")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(toolbarSecondaryColor)
         }
         .padding(.horizontal, 11)
         .frame(height: 48)
@@ -72,10 +68,6 @@ struct GlassSearchBarTrigger: View {
                     .foregroundStyle(toolbarSecondaryColor)
 
                 Spacer()
-
-                Image(systemName: "mic")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(toolbarSecondaryColor)
             }
             .padding(.horizontal, 11)
             .frame(height: 48)

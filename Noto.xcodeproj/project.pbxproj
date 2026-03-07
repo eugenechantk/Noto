@@ -111,6 +111,8 @@
 				CCDD00060000000000000006 /* NotoHNSW */,
 				CCDD00070000000000000007 /* NotoSearch */,
 				CCDD00080000000000000008 /* NotoTodayNotes */,
+				CCDD00090000000000000009 /* NotoAIChat */,
+				CCDD000A000000000000000A /* NotoClaudeAPI */,
 			);
 			productName = Noto;
 			productReference = 5DF5FAFE2F0EC372008EDC76 /* Noto.app */;
@@ -142,6 +144,8 @@
 				EEFF00060000000000000006 /* NotoHNSW */,
 				EEFF00070000000000000007 /* NotoSearch */,
 				EEFF00080000000000000008 /* NotoTodayNotes */,
+				EEFF00090000000000000009 /* NotoAIChat */,
+				EEFF000A000000000000000A /* NotoClaudeAPI */,
 			);
 			productName = NotoTests;
 			productReference = 5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */;
@@ -211,6 +215,8 @@
 				AABB00060000000000000006 /* XCLocalSwiftPackageReference "NotoHNSW" */,
 				AABB00070000000000000007 /* XCLocalSwiftPackageReference "NotoSearch" */,
 				AABB00080000000000000008 /* XCLocalSwiftPackageReference "NotoTodayNotes" */,
+				AABB00090000000000000009 /* XCLocalSwiftPackageReference "NotoAIChat" */,
+				AABB000A000000000000000A /* XCLocalSwiftPackageReference "NotoClaudeAPI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DF5FAFF2F0EC372008EDC76 /* Products */;
@@ -646,6 +652,14 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoTodayNotes;
 		};
+		AABB00090000000000000009 /* XCLocalSwiftPackageReference "NotoAIChat" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoAIChat;
+		};
+		AABB000A000000000000000A /* XCLocalSwiftPackageReference "NotoClaudeAPI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoClaudeAPI;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -712,6 +726,22 @@
 		EEFF00080000000000000008 /* NotoTodayNotes */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoTodayNotes;
+		};
+		CCDD00090000000000000009 /* NotoAIChat */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoAIChat;
+		};
+		CCDD000A000000000000000A /* NotoClaudeAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoClaudeAPI;
+		};
+		EEFF00090000000000000009 /* NotoAIChat */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoAIChat;
+		};
+		EEFF000A000000000000000A /* NotoClaudeAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoClaudeAPI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

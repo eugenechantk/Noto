@@ -67,6 +67,13 @@ public struct BuildStep {
     }
 }
 
+// MARK: - BlockBuilderError
+
+public enum BlockBuilderError: Error, Equatable {
+    case notEditable(UUID)
+    case notDeletable(UUID)
+}
+
 // MARK: - BlockBuilder
 
 /// Generic service for programmatically creating block hierarchies.
@@ -110,6 +117,60 @@ public struct BlockBuilder {
         }
 
         return currentParent
+    }
+
+    // MARK: - Generic Block Operations
+
+    /// Add a new block as a child of `parent`, positioned after `afterSibling` if provided,
+    /// or appended at the end of the parent's children.
+    @MainActor
+    @discardableResult
+    public static func addBlock(
+        content: String,
+        parent: Block,
+        afterSibling: Block? = nil,
+        extensionData: Data? = nil,
+        context: ModelContext
+    ) -> Block {
+        let sortOrder: Double
+        if let afterSibling {
+            let sorted = parent.sortedChildren
+            let nextSibling = sorted.first { $0.sortOrder > afterSibling.sortOrder }
+            sortOrder = Block.sortOrderBetween(afterSibling.sortOrder, nextSibling?.sortOrder)
+        } else {
+            sortOrder = Block.sortOrderForAppending(to: parent.sortedChildren)
+        }
+
+        let newBlock = Block(
+            content: content,
+            parent: parent,
+            sortOrder: sortOrder,
+            extensionData: extensionData
+        )
+        context.insert(newBlock)
+        logger.debug("[addBlock] created '\(content)' under '\(parent.content)' (sortOrder: \(sortOrder))")
+        return newBlock
+    }
+
+    /// Update a block's content. Throws if the block is not editable.
+    @MainActor
+    public static func updateBlock(_ block: Block, newContent: String) throws {
+        guard block.isContentEditableByUser else {
+            throw BlockBuilderError.notEditable(block.id)
+        }
+        block.updateContent(newContent)
+        logger.debug("[updateBlock] updated '\(block.id)' content")
+    }
+
+    /// Archive (soft-delete) a block. Throws if the block is not deletable.
+    @MainActor
+    public static func archiveBlock(_ block: Block) throws {
+        guard block.isDeletable else {
+            throw BlockBuilderError.notDeletable(block.id)
+        }
+        block.isArchived = true
+        block.updatedAt = Date()
+        logger.debug("[archiveBlock] archived '\(block.id)'")
     }
 
     // MARK: - Private

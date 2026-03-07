@@ -114,7 +114,16 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
         doneButton.accessibilityIdentifier = "dismissKeyboard"
         doneButton.accessibilityLabel = "Dismiss Keyboard"
         toolbar.items = [indentButton, outdentButton, moveUpButton, moveDownButton, flexSpace, doneButton]
-        self.inputAccessoryView = toolbar
+
+        // Wrap toolbar in a container with bottom spacing
+        let bottomSpacing: CGFloat = 8
+        let toolbarHeight = toolbar.frame.height
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: toolbar.frame.width, height: toolbarHeight + bottomSpacing))
+        container.backgroundColor = toolbarBackground
+        toolbar.frame = CGRect(x: 0, y: 0, width: toolbar.frame.width, height: toolbarHeight)
+        toolbar.autoresizingMask = [.flexibleWidth]
+        container.addSubview(toolbar)
+        self.inputAccessoryView = container
     }
 
     @objc private func dismissKeyboardTapped() {
