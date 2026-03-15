@@ -27,49 +27,50 @@ struct ChatComposerBar: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Text field with glass effect
-            HStack(spacing: 4) {
-                TextField("Ask anything", text: $text)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(toolbarForegroundColor)
-                    .tint(toolbarForegroundColor)
-                    .focused($isFocused)
-                    .submitLabel(.send)
-                    .disabled(isDisabled)
-                    .onSubmit {
-                        guard !isDisabled, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                        onSend()
-                    }
-                    .accessibilityIdentifier("chatTextField")
-                    .accessibilityLabel("Message input")
+        GlassEffectContainer {
+            HStack(spacing: 12) {
+                // Text field
+                HStack(spacing: 4) {
+                    TextField("Ask anything", text: $text)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(toolbarForegroundColor)
+                        .tint(toolbarForegroundColor)
+                        .focused($isFocused)
+                        .submitLabel(.send)
+                        .disabled(isDisabled)
+                        .onSubmit {
+                            guard !isDisabled, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                            onSend()
+                        }
+                        .accessibilityIdentifier("chatTextField")
+                        .accessibilityLabel("Message input")
 
-                Spacer()
-            }
-            .padding(.horizontal, 11)
-            .frame(height: 48)
-            .glassEffect(.regular, in: .capsule)
+                    Spacer()
+                }
+                .padding(.horizontal, 11)
+                .frame(height: 48)
+                .glassEffect(.regular, in: .capsule)
 
-            // Send button
-            Button {
-                guard !isDisabled, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                onSend()
-            } label: {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(placeholderColor)
-                    .frame(width: 36, height: 36)
+                // Send button
+                Button {
+                    guard !isDisabled, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                    onSend()
+                } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(placeholderColor)
+                        .frame(width: 36, height: 36)
+                }
+                .frame(height: 48)
+                .padding(.horizontal, 6)
+                .disabled(isDisabled)
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .accessibilityIdentifier("chatSendButton")
+                .accessibilityLabel("Send message")
             }
-            .frame(height: 48)
-            .padding(.horizontal, 6)
-            .disabled(isDisabled)
-            .glassEffect(.regular.interactive(), in: .capsule)
-            .accessibilityIdentifier("chatSendButton")
-            .accessibilityLabel("Send message")
         }
         .opacity(isDisabled ? 0.5 : 1.0)
         .padding(.horizontal, 28)
-        .padding(.bottom, 32)
         .padding(.top, 4)
     }
 }

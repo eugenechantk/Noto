@@ -12,6 +12,7 @@ import NotoModels
 import NotoFTS5
 import NotoDirtyTracker
 import NotoEmbedding
+import NotoAIChat
 
 #if canImport(USearch)
 import NotoHNSW
@@ -126,6 +127,7 @@ struct NotoApp: App {
             ContentView()
                 .environmentObject(dirtyTracker)
                 .task {
+                    seedAPIKeyIfNeeded()
                     await runLaunchReconciliation()
                 }
         }
@@ -134,6 +136,20 @@ struct NotoApp: App {
             if newPhase == .background {
                 Task { await dirtyTracker.flush() }
             }
+        }
+    }
+
+    /// Seed the API key into the Keychain from Secrets.swift or environment.
+    private func seedAPIKeyIfNeeded() {
+        let desired = Secrets.anthropicAPIKey
+        // Always update if the stored key differs from the compiled-in secret
+        if !desired.isEmpty, APIKeyStore.load() != desired {
+            APIKeyStore.save(desired)
+            return
+        }
+        guard APIKeyStore.load() == nil else { return }
+        if let envKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !envKey.isEmpty {
+            APIKeyStore.save(envKey)
         }
     }
 

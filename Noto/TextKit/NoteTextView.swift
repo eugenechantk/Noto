@@ -135,6 +135,29 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
     }
 
     private func resetTypingAttributes() {
+        // Instead of always resetting to body style, inherit the attributes
+        // from the character at (or just before) the cursor position.
+        // This ensures that after markdown formatting is applied (e.g., heading),
+        // subsequent typing continues in the same style.
+        let cursorPos = selectedRange.location
+        let length = noteTextStorage.length
+
+        if length > 0 {
+            // Use the character just before the cursor (what the user just typed after),
+            // or the first character if at position 0
+            let attrIndex = cursorPos > 0 ? cursorPos - 1 : 0
+            if attrIndex < length {
+                var attrs = noteTextStorage.attributes(at: attrIndex, effectiveRange: nil)
+                // Remove transient attributes that shouldn't carry into typing
+                attrs.removeValue(forKey: .caret)
+                attrs.removeValue(forKey: .indentBullet)
+                // Don't carry list marker attributes into typed text
+                attrs.removeValue(forKey: .list)
+                typingAttributes = attrs
+                return
+            }
+        }
+
         typingAttributes = noteTextStorage.bodyStyle
     }
 
@@ -161,6 +184,42 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
         return false
     }
 
+    // MARK: - Backspace on Empty Line
+
+    /// Override deleteBackward to handle backspace at the start of an empty line.
+    /// Normally, pressing backspace at position 0 does nothing because there's no
+    /// character before the cursor to delete. This override detects that case and
+    /// instead removes the newline *after* the empty line, merging it with the
+    /// next line below. This allows users to delete empty blocks (especially the
+    /// first child in node view) by pressing backspace.
+    override func deleteBackward() {
+        let cursorPos = selectedRange.location
+        let text = textStorage.string
+
+        // Only act when the cursor is an insertion point (no selection)
+        guard selectedRange.length == 0 else {
+            super.deleteBackward()
+            return
+        }
+
+        // Special case: cursor is at the very start (position 0) of an empty line
+        // and there is a newline after it — delete that newline to merge with next line
+        let isFirstLineEmpty = cursorPos == 0
+            && text.count > 0
+            && (text as NSString).character(at: 0) == 0x0A // '\n'
+        if isFirstLineEmpty {
+            logger.debug("[deleteBackward] removing empty first line (merging with next line)")
+            let deleteRange = NSRange(location: 0, length: 1)
+            textStorage.replaceCharacters(in: deleteRange, with: "")
+            selectedRange = NSRange(location: 0, length: 0)
+            // Trigger the change flow
+            textViewDidChange(self)
+            return
+        }
+
+        super.deleteBackward()
+    }
+
     // MARK: - Editing Flow
 
     func textViewDidBeginEditing(_ textView: UITextView) {
@@ -177,7 +236,14 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
         if let caretRange = formattedText?.caretRange {
             fixCaretPosition(in: caretRange)
         }
-        resetTypingAttributes()
+        if let typingStyle = formattedText?.typingStyle {
+            // Formatter explicitly provided typing attributes (e.g., heading
+            // format applied on an empty line where there's no adjacent
+            // character to inherit from).
+            typingAttributes = typingStyle
+        } else {
+            resetTypingAttributes()
+        }
         layoutCheckmarkViews()
         noteTextViewDelegate?.noteTextViewDidChange(self)
     }
@@ -279,6 +345,41 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
             self.addSubview(checkmarkView)
             self.checkmarkViews.append(checkmarkView)
         }
+    }
+
+    // MARK: - Caret Height Fix
+
+    /// Adjusts the caret rect so its height matches the font's line height
+    /// rather than the paragraph style's minimum/maximumLineHeight.
+    /// Without this, the caret is visually taller than the text on heading
+    /// lines because the paragraph style inflates the line height beyond
+    /// the font metrics.
+    override func caretRect(for position: UITextPosition) -> CGRect {
+        var rect = super.caretRect(for: position)
+
+        // Determine the font at the caret position
+        let offset = self.offset(from: beginningOfDocument, to: position)
+        let font: UIFont
+        if offset < textStorage.length {
+            font = textStorage.attribute(.font, at: offset, effectiveRange: nil) as? UIFont
+                ?? noteTextStorage.bodyFont
+        } else if textStorage.length > 0 {
+            // At the very end — use the font of the last character
+            font = textStorage.attribute(.font, at: textStorage.length - 1, effectiveRange: nil) as? UIFont
+                ?? noteTextStorage.bodyFont
+        } else {
+            font = noteTextStorage.bodyFont
+        }
+
+        let fontLineHeight = font.lineHeight
+        if rect.height > fontLineHeight {
+            // Trim caret to font line height, keeping it top-aligned.
+            // Text is top-aligned within the inflated paragraph line height
+            // (no baselineOffset is set), so the extra space is at the bottom.
+            rect.size.height = fontLineHeight
+        }
+
+        return rect
     }
 
     // Gate all automatic scrolling. Only allow scroll when:
@@ -622,35 +723,36 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
     // MARK: Reorder — line geometry helpers
 
     private func lineIndex(at point: CGPoint) -> Int? {
-        let adjustedPoint = CGPoint(
-            x: point.x - textContainerInset.left,
-            y: point.y - textContainerInset.top
-        )
-        let charIndex = layoutManager.characterIndex(
-            for: adjustedPoint,
-            in: textContainer,
-            fractionOfDistanceBetweenInsertionPoints: nil
-        )
-        guard charIndex < textStorage.length else { return nil }
+        let total = lineCount()
+        guard total > 0 else { return nil }
 
-        let text = textStorage.string
-        var lineIdx = 0
-        var searchStart = text.startIndex
-        while searchStart < text.endIndex {
-            let lineEnd = text[searchStart...].firstIndex(of: "\n") ?? text.endIndex
-            let nsLoc = text.distance(from: text.startIndex, to: searchStart)
-            let nsEnd = text.distance(from: text.startIndex, to: lineEnd)
-            if charIndex >= nsLoc && charIndex <= nsEnd {
-                return lineIdx
+        // Use Y-coordinate hit testing against line bounding rects
+        // instead of characterIndex(for:...) which can return the wrong
+        // line when tapping in paragraph-spacing gaps or indented
+        // whitespace regions where no glyphs exist on the target line.
+
+        // First, check if point falls directly within a line's rect
+        for i in 0..<total {
+            let rect = rectForLine(i)
+            if point.y >= rect.minY && point.y <= rect.maxY {
+                return i
             }
-            if lineEnd < text.endIndex {
-                searchStart = text.index(after: lineEnd)
-            } else {
-                break
-            }
-            lineIdx += 1
         }
-        return lineIdx
+
+        // Point is in a gap between lines (paragraph spacing) or
+        // above/below all lines. Find the nearest line by comparing
+        // vertical distance to each line's center.
+        var bestLine = 0
+        var bestDist = CGFloat.greatestFiniteMagnitude
+        for i in 0..<total {
+            let rect = rectForLine(i)
+            let dist = abs(point.y - rect.midY)
+            if dist < bestDist {
+                bestDist = dist
+                bestLine = i
+            }
+        }
+        return bestLine
     }
 
     private func lineCount() -> Int {

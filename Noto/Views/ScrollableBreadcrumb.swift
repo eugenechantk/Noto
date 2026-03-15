@@ -9,6 +9,7 @@
 
 import SwiftUI
 import NotoModels
+import NotoCore
 
 struct ScrollableBreadcrumb: View {
     /// Full ancestor path from root to current node (inclusive), computed by the caller.
@@ -32,7 +33,8 @@ struct ScrollableBreadcrumb: View {
                             separator
 
                             let isLast = block.id == currentNode.id
-                            let label = block.content.isEmpty ? "Untitled" : block.content
+                            let stripped = PlainTextExtractor.plainText(from: block.content)
+                            let label = stripped.isEmpty ? "Untitled" : stripped
 
                             if isLast {
                                 breadcrumbSegment(label, isLast: true)

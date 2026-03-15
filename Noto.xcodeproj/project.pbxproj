@@ -7,6 +7,26 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5DFAED752F5F135300F3DACD /* NotoModels in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD00010000000000000001 /* NotoModels */; };
+		5DFAED762F5F135300F3DACD /* NotoCore in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD00020000000000000002 /* NotoCore */; };
+		5DFAED772F5F135300F3DACD /* NotoDirtyTracker in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD00030000000000000003 /* NotoDirtyTracker */; };
+		5DFAED782F5F135300F3DACD /* NotoFTS5 in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD00040000000000000004 /* NotoFTS5 */; };
+		5DFAED792F5F135300F3DACD /* NotoEmbedding in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD00050000000000000005 /* NotoEmbedding */; };
+		5DFAED7A2F5F135300F3DACD /* NotoHNSW in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD00060000000000000006 /* NotoHNSW */; };
+		5DFAED7B2F5F135300F3DACD /* NotoSearch in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD00070000000000000007 /* NotoSearch */; };
+		5DFAED7C2F5F135300F3DACD /* NotoTodayNotes in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD00080000000000000008 /* NotoTodayNotes */; };
+		5DFAED7D2F5F135300F3DACD /* NotoAIChat in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD00090000000000000009 /* NotoAIChat */; };
+		5DFAED7E2F5F135300F3DACD /* NotoClaudeAPI in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD000A000000000000000A /* NotoClaudeAPI */; };
+		5DFAED7F2F5F135300F3DACD /* NotoModels in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF00010000000000000001 /* NotoModels */; };
+		5DFAED802F5F135300F3DACD /* NotoCore in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF00020000000000000002 /* NotoCore */; };
+		5DFAED812F5F135300F3DACD /* NotoDirtyTracker in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF00030000000000000003 /* NotoDirtyTracker */; };
+		5DFAED822F5F135300F3DACD /* NotoFTS5 in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF00040000000000000004 /* NotoFTS5 */; };
+		5DFAED832F5F135300F3DACD /* NotoEmbedding in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF00050000000000000005 /* NotoEmbedding */; };
+		5DFAED842F5F135300F3DACD /* NotoHNSW in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF00060000000000000006 /* NotoHNSW */; };
+		5DFAED852F5F135300F3DACD /* NotoSearch in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF00070000000000000007 /* NotoSearch */; };
+		5DFAED862F5F135300F3DACD /* NotoTodayNotes in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF00080000000000000008 /* NotoTodayNotes */; };
+		5DFAED872F5F135300F3DACD /* NotoAIChat in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF00090000000000000009 /* NotoAIChat */; };
+		5DFAED882F5F135300F3DACD /* NotoClaudeAPI in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF000A000000000000000A /* NotoClaudeAPI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,9 +53,21 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		5DF5FB002F0EC372008EDC76 /* Noto */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Noto; sourceTree = "<group>"; };
-		5DF5FB112F0EC373008EDC76 /* NotoTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = NotoTests; sourceTree = "<group>"; };
-		5DF5FB1B2F0EC373008EDC76 /* NotoUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = NotoUITests; sourceTree = "<group>"; };
+		5DF5FB002F0EC372008EDC76 /* Noto */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Noto;
+			sourceTree = "<group>";
+		};
+		5DF5FB112F0EC373008EDC76 /* NotoTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NotoTests;
+			sourceTree = "<group>";
+		};
+		5DF5FB1B2F0EC373008EDC76 /* NotoUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NotoUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -43,6 +75,16 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DFAED7E2F5F135300F3DACD /* NotoClaudeAPI in Frameworks */,
+				5DFAED7D2F5F135300F3DACD /* NotoAIChat in Frameworks */,
+				5DFAED7C2F5F135300F3DACD /* NotoTodayNotes in Frameworks */,
+				5DFAED7B2F5F135300F3DACD /* NotoSearch in Frameworks */,
+				5DFAED7A2F5F135300F3DACD /* NotoHNSW in Frameworks */,
+				5DFAED792F5F135300F3DACD /* NotoEmbedding in Frameworks */,
+				5DFAED782F5F135300F3DACD /* NotoFTS5 in Frameworks */,
+				5DFAED772F5F135300F3DACD /* NotoDirtyTracker in Frameworks */,
+				5DFAED762F5F135300F3DACD /* NotoCore in Frameworks */,
+				5DFAED752F5F135300F3DACD /* NotoModels in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -50,6 +92,16 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DFAED882F5F135300F3DACD /* NotoClaudeAPI in Frameworks */,
+				5DFAED872F5F135300F3DACD /* NotoAIChat in Frameworks */,
+				5DFAED862F5F135300F3DACD /* NotoTodayNotes in Frameworks */,
+				5DFAED852F5F135300F3DACD /* NotoSearch in Frameworks */,
+				5DFAED842F5F135300F3DACD /* NotoHNSW in Frameworks */,
+				5DFAED832F5F135300F3DACD /* NotoEmbedding in Frameworks */,
+				5DFAED822F5F135300F3DACD /* NotoFTS5 in Frameworks */,
+				5DFAED812F5F135300F3DACD /* NotoDirtyTracker in Frameworks */,
+				5DFAED802F5F135300F3DACD /* NotoCore in Frameworks */,
+				5DFAED7F2F5F135300F3DACD /* NotoModels in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -207,16 +259,16 @@
 			mainGroup = 5DF5FAF52F0EC372008EDC76;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				AABB00010000000000000001 /* XCLocalSwiftPackageReference "NotoModels" */,
-				AABB00020000000000000002 /* XCLocalSwiftPackageReference "NotoCore" */,
-				AABB00030000000000000003 /* XCLocalSwiftPackageReference "NotoDirtyTracker" */,
-				AABB00040000000000000004 /* XCLocalSwiftPackageReference "NotoFTS5" */,
-				AABB00050000000000000005 /* XCLocalSwiftPackageReference "NotoEmbedding" */,
-				AABB00060000000000000006 /* XCLocalSwiftPackageReference "NotoHNSW" */,
-				AABB00070000000000000007 /* XCLocalSwiftPackageReference "NotoSearch" */,
-				AABB00080000000000000008 /* XCLocalSwiftPackageReference "NotoTodayNotes" */,
-				AABB00090000000000000009 /* XCLocalSwiftPackageReference "NotoAIChat" */,
-				AABB000A000000000000000A /* XCLocalSwiftPackageReference "NotoClaudeAPI" */,
+				AABB00010000000000000001 /* XCLocalSwiftPackageReference "Packages/NotoModels" */,
+				AABB00020000000000000002 /* XCLocalSwiftPackageReference "Packages/NotoCore" */,
+				AABB00030000000000000003 /* XCLocalSwiftPackageReference "Packages/NotoDirtyTracker" */,
+				AABB00040000000000000004 /* XCLocalSwiftPackageReference "Packages/NotoFTS5" */,
+				AABB00050000000000000005 /* XCLocalSwiftPackageReference "Packages/NotoEmbedding" */,
+				AABB00060000000000000006 /* XCLocalSwiftPackageReference "Packages/NotoHNSW" */,
+				AABB00070000000000000007 /* XCLocalSwiftPackageReference "Packages/NotoSearch" */,
+				AABB00080000000000000008 /* XCLocalSwiftPackageReference "Packages/NotoTodayNotes" */,
+				AABB00090000000000000009 /* XCLocalSwiftPackageReference "Packages/NotoAIChat" */,
+				AABB000A000000000000000A /* XCLocalSwiftPackageReference "Packages/NotoClaudeAPI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DF5FAFF2F0EC372008EDC76 /* Products */;
@@ -620,43 +672,43 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		AABB00010000000000000001 /* XCLocalSwiftPackageReference "NotoModels" */ = {
+		AABB00010000000000000001 /* XCLocalSwiftPackageReference "Packages/NotoModels" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoModels;
 		};
-		AABB00020000000000000002 /* XCLocalSwiftPackageReference "NotoCore" */ = {
+		AABB00020000000000000002 /* XCLocalSwiftPackageReference "Packages/NotoCore" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoCore;
 		};
-		AABB00030000000000000003 /* XCLocalSwiftPackageReference "NotoDirtyTracker" */ = {
+		AABB00030000000000000003 /* XCLocalSwiftPackageReference "Packages/NotoDirtyTracker" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoDirtyTracker;
 		};
-		AABB00040000000000000004 /* XCLocalSwiftPackageReference "NotoFTS5" */ = {
+		AABB00040000000000000004 /* XCLocalSwiftPackageReference "Packages/NotoFTS5" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoFTS5;
 		};
-		AABB00050000000000000005 /* XCLocalSwiftPackageReference "NotoEmbedding" */ = {
+		AABB00050000000000000005 /* XCLocalSwiftPackageReference "Packages/NotoEmbedding" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoEmbedding;
 		};
-		AABB00060000000000000006 /* XCLocalSwiftPackageReference "NotoHNSW" */ = {
+		AABB00060000000000000006 /* XCLocalSwiftPackageReference "Packages/NotoHNSW" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoHNSW;
 		};
-		AABB00070000000000000007 /* XCLocalSwiftPackageReference "NotoSearch" */ = {
+		AABB00070000000000000007 /* XCLocalSwiftPackageReference "Packages/NotoSearch" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoSearch;
 		};
-		AABB00080000000000000008 /* XCLocalSwiftPackageReference "NotoTodayNotes" */ = {
+		AABB00080000000000000008 /* XCLocalSwiftPackageReference "Packages/NotoTodayNotes" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoTodayNotes;
 		};
-		AABB00090000000000000009 /* XCLocalSwiftPackageReference "NotoAIChat" */ = {
+		AABB00090000000000000009 /* XCLocalSwiftPackageReference "Packages/NotoAIChat" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoAIChat;
 		};
-		AABB000A000000000000000A /* XCLocalSwiftPackageReference "NotoClaudeAPI" */ = {
+		AABB000A000000000000000A /* XCLocalSwiftPackageReference "Packages/NotoClaudeAPI" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoClaudeAPI;
 		};
@@ -695,6 +747,14 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoTodayNotes;
 		};
+		CCDD00090000000000000009 /* NotoAIChat */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoAIChat;
+		};
+		CCDD000A000000000000000A /* NotoClaudeAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoClaudeAPI;
+		};
 		EEFF00010000000000000001 /* NotoModels */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoModels;
@@ -726,14 +786,6 @@
 		EEFF00080000000000000008 /* NotoTodayNotes */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoTodayNotes;
-		};
-		CCDD00090000000000000009 /* NotoAIChat */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = NotoAIChat;
-		};
-		CCDD000A000000000000000A /* NotoClaudeAPI */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = NotoClaudeAPI;
 		};
 		EEFF00090000000000000009 /* NotoAIChat */ = {
 			isa = XCSwiftPackageProductDependency;

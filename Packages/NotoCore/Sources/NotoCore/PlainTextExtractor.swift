@@ -16,36 +16,100 @@ public struct PlainTextExtractor {
     public static func plainText(from content: String) -> String {
         var text = content
 
-        // 1. Bold: **text** → text
+        // 1. Headings: # text → text
+        text = text.replacingOccurrences(
+            of: #"^#{1,6}\s+"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 2. Blockquotes: > text → text (supports nested >>> )
+        text = text.replacingOccurrences(
+            of: #"^(?:>\s*)+"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 3. Images: ![alt](url) → alt
+        text = text.replacingOccurrences(
+            of: #"!\[([^\]]*)\]\([^\)]+\)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // 4. Links: [text](url) → text
+        text = text.replacingOccurrences(
+            of: #"\[([^\]]+)\]\([^\)]+\)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // 5. Bold+italic: ***text*** or ___text___ → text
+        text = text.replacingOccurrences(
+            of: #"\*{3}(.+?)\*{3}"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        text = text.replacingOccurrences(
+            of: #"_{3}(.+?)_{3}"#,
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // 6. Bold: **text** or __text__ → text
         text = text.replacingOccurrences(
             of: #"\*\*(.+?)\*\*"#,
             with: "$1",
             options: .regularExpression
         )
+        text = text.replacingOccurrences(
+            of: #"__(.+?)__"#,
+            with: "$1",
+            options: .regularExpression
+        )
 
-        // 2. Italic: *text* → text (single asterisk not preceded/followed by another asterisk)
+        // 7. Italic: *text* or _text_ → text
         text = text.replacingOccurrences(
             of: #"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)"#,
             with: "$1",
             options: .regularExpression
         )
+        text = text.replacingOccurrences(
+            of: #"(?<!_)_(?!_)(.+?)(?<!_)_(?!_)"#,
+            with: "$1",
+            options: .regularExpression
+        )
 
-        // 3. Strikethrough: ~~text~~ → text
+        // 8. Strikethrough: ~~text~~ → text
         text = text.replacingOccurrences(
             of: #"~~(.+?)~~"#,
             with: "$1",
             options: .regularExpression
         )
 
-        // 4. Inline code: `text` → text
+        // 9. Inline code: `text` → text
         text = text.replacingOccurrences(
             of: #"`(.+?)`"#,
             with: "$1",
             options: .regularExpression
         )
 
-        // 5. List prefixes (checked/unchecked checkboxes first, then bullet/dash/ordered)
-        //    Handles both `- [x] ` / `- [ ] ` and `[x] ` / `[_] ` (NoteTextStorage format)
+        // 10. Code fence markers: ``` or ```lang → (remove entire line)
+        text = text.replacingOccurrences(
+            of: #"^```\w*\s*$"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 11. Horizontal rules: ---, ***, ___ (standalone) → empty
+        text = text.replacingOccurrences(
+            of: #"^[-*_]{3,}\s*$"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 12. List prefixes (checked/unchecked checkboxes first, then bullet/dash/ordered)
+        //     Handles both `- [x] ` / `- [ ] ` and `[x] ` / `[_] ` (NoteTextStorage format)
         text = text.replacingOccurrences(
             of: #"^- \[[x ]\] "#,
             with: "",
@@ -75,7 +139,7 @@ public struct PlainTextExtractor {
             options: .regularExpression
         )
 
-        // 6. Trim whitespace
+        // 13. Trim whitespace
         text = text.trimmingCharacters(in: .whitespaces)
 
         return text

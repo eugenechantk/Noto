@@ -98,9 +98,9 @@ public final class AIChatViewModel: ObservableObject {
         noteContext: NoteContext? = nil,
         initialQuery: String? = nil
     ) {
-        let apiKey = ProcessInfo.processInfo.environment["CLAUDE_API_KEY"]
+        let apiKey = APIKeyStore.load()
+            ?? ProcessInfo.processInfo.environment["CLAUDE_API_KEY"]
             ?? ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"]
-            ?? UserDefaults.standard.string(forKey: "claude_api_key")
             ?? ""
         let chatService = AIChatService(
             apiKey: apiKey,
@@ -156,6 +156,14 @@ public final class AIChatViewModel: ObservableObject {
             context: modelContext,
             dirtyTracker: dirtyTracker
         )
+
+        // Set conversation title to the first user message
+        if conversation.content == "Conversation" {
+            conversation.content = trimmed
+            conversation.updatedAt = Date()
+            dirtyTracker.markDirty(conversation.id)
+        }
+
         try? modelContext.save()
 
         // Add to display
@@ -325,6 +333,24 @@ public final class AIChatViewModel: ObservableObject {
         logger.debug("Edit dismissed for message \(messageId)")
     }
 
+    /// Delete the entire conversation and all its child blocks.
+    public func deleteConversation() {
+        guard let conversation = conversationBlock else { return }
+        // Delete all children first
+        for child in conversation.sortedChildren {
+            dirtyTracker.markDeleted(child.id)
+            modelContext.delete(child)
+        }
+        dirtyTracker.markDeleted(conversation.id)
+        modelContext.delete(conversation)
+        try? modelContext.save()
+        conversationBlock = nil
+        messages = []
+        apiHistory = []
+        state = .idle
+        logger.debug("Deleted conversation")
+    }
+
     /// Retry the last failed message.
     public func retryLastMessage() {
         guard let last = lastUserMessage else { return }
@@ -346,7 +372,14 @@ public final class AIChatViewModel: ObservableObject {
     static func friendlyErrorMessage(_ error: Error) -> String {
         if let apiError = error as? ClaudeAPIError {
             switch apiError {
-            case .httpError(let statusCode, _):
+            case .httpError(let statusCode, let body):
+                // Try to parse the API error message from the response body
+                if let body = body, let data = body.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errorObj = json["error"] as? [String: Any],
+                   let message = errorObj["message"] as? String {
+                    return message
+                }
                 switch statusCode {
                 case 429:
                     return "Too many requests. Please wait a moment and try again."

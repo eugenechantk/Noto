@@ -14,3 +14,8 @@ Package.resolved
 DerivedData/
 *.xcresult
 *.xctestproducts
+
+# Secrets (API keys)
+Secrets.swift
+
+.flowdeck/

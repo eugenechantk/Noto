@@ -7,7 +7,7 @@ public struct ChatLoopConfig: Sendable {
     public var maxToolIterations: Int
 
     public init(
-        model: String = "claude-sonnet-4-6",
+        model: String = "anthropic/claude-sonnet-4.6",
         maxTokens: Int = 4096,
         maxToolIterations: Int = 5
     ) {

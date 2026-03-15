@@ -43,6 +43,7 @@ final class NoteTextStorage: NSTextStorage {
         listsFormatter.storage = self
         indentFormatter.storage = self
         indentFormatter.nodeViewMode = nodeViewMode
+        headingsFormatter.storage = self
     }
 
     /// Update the indent formatter's mode when nodeViewMode changes.
@@ -105,6 +106,7 @@ final class NoteTextStorage: NSTextStorage {
     private let wordsFormatter = WordsFormatter()
     private let listsFormatter = ListsFormatter()
     private let indentFormatter = IndentFormatter()
+    private let headingsFormatter = HeadingsFormatter()
 
     private func performRichFormatting(in editedRange: NSRange,
                                        with editedMask: EditActions) -> FormattedText? {
@@ -139,6 +141,10 @@ final class NoteTextStorage: NSTextStorage {
 
         // Check dash-indent before other formatters
         if let formattedText = indentFormatter.handleDashIndent(for: changedText) {
+            return formattedText
+        }
+
+        if let formattedText = headingsFormatter.formatHeading(in: changedText) {
             return formattedText
         }
 
@@ -226,6 +232,9 @@ final class NoteTextStorage: NSTextStorage {
         // Indent formatter runs first to strip tabs and set .blockDepth
         noteString = indentFormatter.format(in: noteString)
 
+        // Headings before words/lists so heading lines get styled first
+        noteString = headingsFormatter.format(noteString)
+
         let formatters = [wordsFormatter.format, listsFormatter.format]
         for format in formatters {
             noteString = format(noteString)
@@ -254,6 +263,9 @@ final class NoteTextStorage: NSTextStorage {
         }
 
         var markdownString = NSAttributedString(attributedString: self)
+
+        // Headings deformat first to re-insert # prefixes
+        markdownString = headingsFormatter.deformat(markdownString)
 
         let deformatters = [wordsFormatter.deformat, listsFormatter.deformat]
         for deformat in deformatters {
@@ -304,9 +316,15 @@ fileprivate struct ChangedText: CustomStringConvertible {
 /// Metadata about the resulting formatted text, if any.
 struct FormattedText {
     var caretRange: NSRange?
+    /// Optional typing attributes to apply after formatting, overriding the
+    /// default attribute-inheritance logic. Used when formatting produces an
+    /// empty line (e.g., heading trigger on "## " with no content yet) where
+    /// there is no adjacent character to inherit attributes from.
+    var typingStyle: [NSAttributedString.Key: Any]?
 
-    init(caretRange: NSRange? = nil) {
+    init(caretRange: NSRange? = nil, typingStyle: [NSAttributedString.Key: Any]? = nil) {
         self.caretRange = caretRange
+        self.typingStyle = typingStyle
     }
 }
 
@@ -337,8 +355,9 @@ extension NSAttributedString.Key {
 }
 
 fileprivate extension NSAttributedString.Key {
-    static let italic = NSAttributedString.Key("markdown.italic")
-    static let bold   = NSAttributedString.Key("markdown.bold")
+    static let italic  = NSAttributedString.Key("markdown.italic")
+    static let bold    = NSAttributedString.Key("markdown.bold")
+    static let heading = NSAttributedString.Key("markdown.heading")
 }
 
 fileprivate final class WordsFormatter: Formatter {
@@ -456,6 +475,181 @@ fileprivate final class WordsFormatter: Formatter {
                 mutableLine.removeAttribute(format.key, range: attrib.range)
                 mutableLine.replaceCharacters(in: attrib.range, with: markdownText)
             }
+            return mutableLine
+        }
+    }
+}
+
+// MARK: - Headings Formatting
+
+fileprivate final class HeadingsFormatter: Formatter {
+
+    private struct HeadingLevel {
+        let level: Int
+        let fontSize: CGFloat
+        let lineHeight: CGFloat
+    }
+
+    private static let levels: [HeadingLevel] = [
+        HeadingLevel(level: 1, fontSize: 28, lineHeight: 36),
+        HeadingLevel(level: 2, fontSize: 24, lineHeight: 32),
+        HeadingLevel(level: 3, fontSize: 20, lineHeight: 28),
+    ]
+
+    private static let headingRegex = regex("^(#{1,3})\\s+(.+)")
+    /// Like headingRegex but allows empty content after the space — used during
+    /// interactive editing so the heading format triggers immediately on typing
+    /// the space, before any content text is entered.
+    private static let headingTriggerRegex = regex("^(#{1,3})\\s+(.*)")
+
+    private func headingStyle(for level: Int) -> [NSAttributedString.Key: Any] {
+        let info = HeadingsFormatter.levels.first { $0.level == level }
+            ?? HeadingsFormatter.levels.last!
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.paragraphSpacing = 12
+        paragraphStyle.minimumLineHeight = info.lineHeight
+        paragraphStyle.maximumLineHeight = info.lineHeight
+        return [
+            .font: UIFont.systemFont(ofSize: info.fontSize, weight: .bold),
+            .foregroundColor: UIColor.label,
+            .kern: NSNumber(value: Double(info.fontSize * -0.01)),
+            .paragraphStyle: paragraphStyle,
+            .heading: level,
+        ]
+    }
+
+    // MARK: - Interactive editing
+
+    func formatHeading(in change: ChangedText) -> FormattedText? {
+        guard change.contents == " " && change.mask.contains(.editedCharacters) else {
+            return nil
+        }
+        let lineRange = backingStore.lineRange(for: change.range.location)
+        let lineString = (backingStore.string as NSString).substring(with: lineRange)
+        let lineNSRange = NSMakeRange(0, (lineString as NSString).length)
+
+        // Use headingTriggerRegex which allows empty content after the space,
+        // so the heading format applies immediately when the user types "## "
+        // (before any content text is entered).
+        guard let match = HeadingsFormatter.headingTriggerRegex.firstMatch(in: lineString, range: lineNSRange) else {
+            return nil
+        }
+
+        let hashes = (lineString as NSString).substring(with: match.range(at: 1))
+        let level = hashes.count
+        guard level >= 1 && level <= 3 else { return nil }
+
+        let textRange = match.range(at: 2)
+        let text = textRange.length > 0
+            ? (lineString as NSString).substring(with: textRange)
+            : ""
+        let prefixLength = textRange.location  // characters before content start
+        let style = headingStyle(for: level)
+
+        let styledText: NSMutableAttributedString
+        if text.isEmpty {
+            // No visible content yet — use a zero-width space as a placeholder
+            // to keep the line alive in the backing store with heading attributes.
+            // This ensures deformat can find the heading attribute and re-insert
+            // the "## " prefix when saving.
+            styledText = NSMutableAttributedString(string: zeroWidthSpace, attributes: style)
+        } else {
+            styledText = NSMutableAttributedString(string: text, attributes: style)
+        }
+
+        // Preserve trailing newline if present
+        let fullLineEnd = lineRange.location + lineRange.length
+        let textEnd = lineRange.location + prefixLength + (text as NSString).length
+        if textEnd < fullLineEnd {
+            styledText.append(NSAttributedString(string: "\n", attributes: style))
+        }
+
+        if text.isEmpty {
+            // Place caret on the zero-width space (index 0) so the cursor
+            // lands right after it (position 1 in styledText = right after
+            // ZWS, before any trailing newline). This keeps cursor on the
+            // heading line, not the next line.
+            styledText.addAttribute(.caret, value: true, range: NSMakeRange(0, 1))
+        } else {
+            styledText.addAttribute(.caret, value: true,
+                                    range: NSMakeRange(styledText.length - 1, 1))
+        }
+
+        // Replace the entire line content (prefix + text + optional newline) with styled text
+        let replaceRange = NSMakeRange(lineRange.location, lineRange.length)
+        storage.replaceCharacters(in: replaceRange, with: styledText)
+
+        var result = formattedText(caretAtLine: lineRange.location)
+        // When content is empty, there's no adjacent heading-styled character
+        // for resetTypingAttributes to inherit from, so provide the heading
+        // style explicitly so subsequent typing is correctly styled.
+        if text.isEmpty {
+            result.typingStyle = style
+        }
+        return result
+    }
+
+    // MARK: - Load-time formatting
+
+    func format(_ markdownString: NSAttributedString) -> NSAttributedString {
+        return markdownString.mapLines { attribLine in
+            let line = attribLine.string
+            let lineRange = attribLine.range
+
+            // Use headingTriggerRegex so "## " with no content is also
+            // recognized on load (e.g., after saving an empty heading).
+            guard let match = HeadingsFormatter.headingTriggerRegex.firstMatch(in: line, range: lineRange) else {
+                return attribLine
+            }
+
+            let hashes = (line as NSString).substring(with: match.range(at: 1))
+            let level = hashes.count
+            guard level >= 1 && level <= 3 else { return attribLine }
+
+            let textRange = match.range(at: 2)
+            let text = textRange.length > 0
+                ? (line as NSString).substring(with: textRange)
+                : ""
+            let style = headingStyle(for: level)
+
+            let content = text.isEmpty ? zeroWidthSpace : text
+            let mutableLine = NSMutableAttributedString(string: content, attributes: style)
+
+            // Preserve trailing newline with heading style
+            let afterText = textRange.location + textRange.length
+            if afterText < lineRange.length {
+                let trailing = (line as NSString).substring(from: afterText)
+                mutableLine.append(NSAttributedString(string: trailing, attributes: style))
+            }
+
+            return mutableLine
+        }
+    }
+
+    // MARK: - Save-time deformatting
+
+    func deformat(_ attribString: NSAttributedString) -> NSAttributedString {
+        return attribString.mapLines { attribLine in
+            let mutableLine = NSMutableAttributedString(attributedString: attribLine)
+            guard mutableLine.length > 0 else { return mutableLine }
+
+            // Check if the first character has a heading attribute
+            guard let level = mutableLine.attribute(.heading, at: 0, effectiveRange: nil) as? Int else {
+                return mutableLine
+            }
+
+            let prefix = String(repeating: "#", count: level) + " "
+            mutableLine.removeAttribute(.heading, range: mutableLine.range)
+            // Strip placeholder zero-width spaces that formatHeading inserts
+            // for empty heading lines.
+            let lineStr = mutableLine.string
+            let zwsRanges = lineStr.enumerated()
+                .filter { String($0.element) == zeroWidthSpace }
+                .map { NSRange(location: $0.offset, length: 1) }
+            for r in zwsRanges.reversed() {
+                mutableLine.replaceCharacters(in: r, with: "")
+            }
+            mutableLine.insert(NSAttributedString(string: prefix), at: 0)
             return mutableLine
         }
     }
@@ -739,8 +933,25 @@ fileprivate final class ListsFormatter: Formatter {
         }
 
         // Fixes previous formatting issues, if any.
+        // Only reset to body style if the character isn't already heading-formatted.
+        // Without this guard, typing on a heading line would lose the heading style
+        // because this cleanup overwrites all non-list attributes with bodyStyle.
         if listItem(at: change.range) == nil {
-            storage.setAttributes(bodyStyle, range: change.range)
+            let hasHeading: Bool = {
+                guard change.range.location < backingStore.length else { return false }
+                let lineRange = backingStore.lineRange(for: change.range.location)
+                var found = false
+                backingStore.enumerateAttribute(.heading, in: lineRange) { val, _, stop in
+                    if val != nil {
+                        found = true
+                        stop.pointee = true
+                    }
+                }
+                return found
+            }()
+            if !hasHeading {
+                storage.setAttributes(bodyStyle, range: change.range)
+            }
         }
 
         return nil

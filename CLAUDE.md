@@ -12,51 +12,48 @@ Minimal external dependencies — only USearch (via NotoHNSW) for vector search.
 
 ## Simulator Isolation (IMPORTANT)
 
-Multiple Claude Code sessions and worktrees may run concurrently. **Each session MUST use its own dedicated simulator** to avoid conflicts. Use the `/flowdeck` skill for all simulator lifecycle management.
+Multiple Claude Code sessions and worktrees may run concurrently. **Each session MUST use its own dedicated simulator** to avoid conflicts. Use XcodeBuildMCP MCP tools for all simulator and build operations.
 
 ### Setup (do this once before first build/test/simulator use in a session)
 
 ```bash
-# 1. Create a dedicated simulator for this session
+# 1. Create a dedicated simulator clone with a unique name
 SIM_NAME="Noto-$(uuidgen | head -c 8)"
-flowdeck simulator create --name "$SIM_NAME" --device-type "iPhone 16 Pro" --runtime "iOS 26.2" --json
-# Parse the UDID from JSON output
-
-# 2. Boot it
-flowdeck simulator boot "$SIM_UDID"
-
-# 3. (Optional) Save config so subsequent commands use this simulator
-flowdeck config set -w Noto.xcodeproj -s Noto -S "$SIM_UDID" --force
+SIM_UDID=$(xcrun simctl clone "iPhone 16 Pro" "$SIM_NAME" | tail -1)
+echo "Session simulator: $SIM_NAME ($SIM_UDID)"
 ```
 
-**Store `$SIM_UDID` and use it for ALL subsequent commands in the session.** Never use a shared simulator name or `booted` — always use the UDID.
+Then set session defaults via the `session_set_defaults` MCP tool:
+```
+session_set_defaults({
+  projectPath: "/Users/eugenechan/dev/personal/Noto/Noto.xcodeproj",
+  scheme: "Noto",
+  simulatorId: "$SIM_UDID"
+})
+```
+
+Then boot the simulator via the `boot_sim` MCP tool.
+
+**Store `$SIM_UDID` and use it for ALL subsequent commands in the session.** Never use a shared simulator name or `booted`.
 
 ### Cleanup (do this when all testing/building is done)
 
 ```bash
-flowdeck ui simulator session stop -S "$SIM_UDID"   # Stop any active UI session
-flowdeck stop --all                                   # Stop running apps
-flowdeck simulator shutdown "$SIM_UDID"
-flowdeck simulator delete "$SIM_UDID"
-flowdeck config reset                                 # Clear saved config
+xcrun simctl shutdown "$SIM_UDID"
+xcrun simctl delete "$SIM_UDID"
 ```
+
+Then clear session defaults via the `session_clear_defaults` MCP tool.
 
 ### Housekeeping (remove orphaned session simulators)
 
 ```bash
-flowdeck simulator list --json | python3 -c "
-import json, sys
-for s in json.load(sys.stdin).get('simulators', []):
-    if s['name'].startswith('Noto-'):
-        print(s['udid'], s['name'], s['state'])
-"
-# Then delete any that are no longer needed:
-# flowdeck simulator delete "<UDID>"
+xcrun simctl list devices | grep "Noto-" | grep -oE '[0-9A-F-]{36}' | xargs -I{} xcrun simctl delete {}
 ```
 
 ## Build & Test Commands
 
-All commands use `$SIM_UDID` — the session's dedicated simulator (see Simulator Isolation above).
+All commands use session defaults set via `session_set_defaults` MCP tool (see Simulator Isolation above).
 
 ```bash
 # ── Package-level (preferred for logic testing — no simulator needed) ──
@@ -65,40 +62,64 @@ cd Packages/NotoCore && swift test
 
 # Test all packages
 for pkg in Packages/*/; do (cd "$pkg" && swift test); done
-
-# ── App-level (requires simulator — use for UI integration) ──
-# Build only (compile check)
-flowdeck build -w Noto.xcodeproj -s Noto -S "$SIM_UDID"
-
-# Build and run (build + install + launch in one step)
-flowdeck run -w Noto.xcodeproj -s Noto -S "$SIM_UDID"
-
-# Run all unit tests (Swift Testing framework)
-flowdeck test -w Noto.xcodeproj -s Noto -S "$SIM_UDID"
-
-# Run a specific test target
-flowdeck test -w Noto.xcodeproj -s Noto -S "$SIM_UDID" --only NotoTests/BlockTests
-
-# View os_log output from session's simulator
-flowdeck apps                          # Get app ID
-flowdeck logs <app-id>                 # Stream logs
-# Or run with logs: flowdeck run -w Noto.xcodeproj -s Noto -S "$SIM_UDID" --log
 ```
+
+**App-level (requires simulator — use for UI integration):**
+
+Use XcodeBuildMCP MCP tools (session defaults provide project/scheme/simulator automatically):
+
+| Task | MCP Tool |
+|------|----------|
+| Build only (compile check) | `build_sim` |
+| Build + install + launch | `build_run_sim` |
+| Run all unit tests | `test_sim` |
+| Run specific tests | `test_sim` with `extraArgs: ["-only-testing:NotoTests/BlockTests"]` |
+| Start log capture | `start_sim_log_cap` with `subsystemFilter: "app"` |
+| Stop log capture + get logs | `stop_sim_log_cap` with the `logSessionId` |
+| Launch app (already built) | `launch_app_sim` or `launch_app_logs_sim` |
+| Stop running app | `stop_app_sim` |
 
 ### UI Inspection
 
+Use XcodeBuildMCP MCP tools:
+
+| Task | MCP Tool |
+|------|----------|
+| Accessibility tree (AXLabel, AXValue, role, frame, etc.) | `snapshot_ui` |
+| Screenshot (returns path or base64) | `screenshot` |
+
+For UI automation via the CLI:
 ```bash
-# FlowDeck accessibility tree (flat list: label, id, role, frame, center, enabled, visible)
-flowdeck ui simulator screen -S "$SIM_UDID" --tree --json
+# Tap by accessibility label
+xcodebuildmcp ui-automation tap --simulator-id "$SIM_UDID" --label "Search"
 
-# Full AX attributes including AXValue (use idb alongside FlowDeck)
-idb ui describe-all --udid "$SIM_UDID"
+# Tap by accessibility identifier
+xcodebuildmcp ui-automation tap --simulator-id "$SIM_UDID" --id "searchButton"
 
-# Screenshot
-flowdeck ui simulator screen -S "$SIM_UDID" --output /tmp/screenshot.png
+# Type text
+xcodebuildmcp ui-automation type-text --simulator-id "$SIM_UDID" --text "hello"
 
-# Tap by label
-flowdeck ui simulator tap "Search" -S "$SIM_UDID"
+# Swipe/scroll
+xcodebuildmcp ui-automation gesture --simulator-id "$SIM_UDID" --preset scroll-down
+```
+
+### Physical Device (iPhone)
+
+Use the XcodeBuildMCP CLI for device workflows:
+```bash
+# List connected devices
+xcodebuildmcp device list
+
+# Build for device
+xcodebuildmcp device build --scheme Noto --project-path ./Noto.xcodeproj
+
+# Get built app path and bundle ID
+xcodebuildmcp device get-app-path --scheme Noto --project-path ./Noto.xcodeproj
+xcodebuildmcp device get-app-bundle-id --app-path /path/to/Noto.app
+
+# Install and launch on device
+xcodebuildmcp device install --device-id <DEVICE_UDID> --app-path /path/to/Noto.app
+xcodebuildmcp device launch --device-id <DEVICE_UDID> --bundle-id <BUNDLE_ID>
 ```
 
 ## Architecture
@@ -191,5 +212,5 @@ func createTestContainer() throws -> ModelContainer  // in-memory, all models re
 - **Logging**: Always use `os_log` (`Logger`) instead of `print()`. Pattern: `private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "ClassName")`
 - **SwiftLint**: `line_length` and `identifier_name` rules are disabled
 - PRD documents live in `.claude/` directory (PRD-data-structure.md, PRD-user-interface-v1.md)
-- **Testing & Simulator**: Always invoke the `/flowdeck` skill instead of directly using `xcodebuild` or `xcrun simctl` CLI commands. The skill ensures simulator isolation (per-session dedicated simulator), build/run/test, UI automation, and proper teardown. Never run `xcodebuild`, `xcrun simctl`, or `xcrun devicectl` directly — use FlowDeck for all Apple platform operations. For full AX attributes (AXValue, custom_actions), use `idb ui describe-all --udid "$SIM_UDID"` alongside FlowDeck.
-- **UI/UX tasks**: When working on any UI or UX related task (layout changes, styling, new views, design implementation, visual updates), always invoke the `/flowdeck` skill after making changes to build, deploy to the simulator, and visually verify the result. Do not consider a UI/UX task complete without visual confirmation on the simulator.
+- **Testing & Simulator**: Use XcodeBuildMCP MCP tools (`build_sim`, `build_run_sim`, `test_sim`, `snapshot_ui`, `screenshot`, etc.) for all simulator build/run/test/UI inspection. Use the `xcodebuildmcp` CLI for device workflows and UI automation (tap, type, swipe). Set session defaults via `session_set_defaults` at session start to avoid repeating project/scheme/simulator on every call.
+- **UI/UX tasks**: When working on any UI or UX related task (layout changes, styling, new views, design implementation, visual updates), always build and deploy to the simulator after making changes, then use `snapshot_ui` and `screenshot` MCP tools to visually verify the result. Do not consider a UI/UX task complete without visual confirmation on the simulator.

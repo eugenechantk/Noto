@@ -92,9 +92,12 @@ struct AIChatSheet: View {
 
             Spacer()
 
-            // Trailing spacer for centering
-            Color.clear
-                .frame(width: 44, height: 44)
+            GlassToolbarButton(systemImage: "trash") {
+                viewModel.deleteConversation()
+                dismiss()
+            }
+            .accessibilityLabel("Delete conversation")
+            .accessibilityIdentifier("chatDeleteButton")
         }
         .overlay {
             Text("AI Chat")

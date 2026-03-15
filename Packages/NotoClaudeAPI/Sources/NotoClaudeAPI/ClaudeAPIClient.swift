@@ -17,7 +17,7 @@ public struct ClaudeAPIClient: ClaudeAPIClientProtocol, Sendable {
 
     public init(
         apiKey: String,
-        baseURL: URL = URL(string: "https://api.anthropic.com/v1/messages")!,
+        baseURL: URL = URL(string: "https://ai-gateway.vercel.sh/v1/messages")!,
         session: URLSession = .shared,
         anthropicVersion: String = "2023-06-01"
     ) {
@@ -35,6 +35,7 @@ public struct ClaudeAPIClient: ClaudeAPIClientProtocol, Sendable {
         urlRequest.setValue(anthropicVersion, forHTTPHeaderField: "anthropic-version")
 
         let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
         urlRequest.httpBody = try encoder.encode(request)
 
         logger.debug("Sending request to Claude API: model=\(request.model), maxTokens=\(request.maxTokens)")

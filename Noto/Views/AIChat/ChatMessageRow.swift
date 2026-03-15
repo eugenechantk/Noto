@@ -12,9 +12,17 @@ import NotoAIChat
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "ChatMessageRow")
 
 struct ChatMessageRow: View {
+    @Environment(\.colorScheme) private var colorScheme
     let message: ChatMessage
     var onAcceptEdit: (() -> Void)?
     var onDismissEdit: (() -> Void)?
+
+    /// User bubble background — white in light mode, elevated dark in dark mode.
+    private var userBubbleBackground: Color {
+        colorScheme == .dark
+            ? Color(red: 0.22, green: 0.22, blue: 0.24)
+            : .white
+    }
 
     var body: some View {
         switch message.role {
@@ -45,7 +53,7 @@ struct ChatMessageRow: View {
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(Color(.secondarySystemGroupedBackground))
+                .background(userBubbleBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .accessibilityLabel("You said: \(message.text)")
         }
@@ -59,11 +67,7 @@ struct ChatMessageRow: View {
                 ReferencesSection(references: message.references)
             }
 
-            Text(message.text)
-                .font(.system(size: 20))
-                .tracking(-0.45)
-                .foregroundStyle(.primary)
-                .lineSpacing(3)
+            MarkdownTextView(text: message.text)
 
             if let proposal = message.editProposal {
                 SuggestedEditCard(

@@ -44,7 +44,10 @@ struct OutlineView: View {
 
     private var isRoot: Bool { node == nil }
     private var baseDepth: Int { node?.depth ?? -1 }
-    private var displayTitle: String { node?.content ?? "Home" }
+    private var displayTitle: String {
+        guard let content = node?.content else { return "Home" }
+        return PlainTextExtractor.plainText(from: content)
+    }
 
     /// Root blocks (parent == nil, not archived), used only in root mode.
     private var rootBlocks: [Block] {
@@ -302,6 +305,7 @@ struct OutlineView: View {
         let lines = editableContent.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let parsed = lines.map { parseLine($0) }
         var blocks = currentBlocks()
+        var depthChanged = false
 
         // Update existing blocks
         for i in 0..<min(parsed.count, blocks.count) {
@@ -322,6 +326,15 @@ struct OutlineView: View {
                 blocks[i].move(to: newParent, sortOrder: newSortOrder)
                 if blocks[i].depth != absoluteDepth {
                     blocks[i].depth = absoluteDepth
+                }
+                depthChanged = true
+
+                // In node view (non-root, non-expanded), an indented block
+                // gets reparented to a previous sibling. Expand the view
+                // so the user can see the indented block as a child of
+                // the line above, rather than navigating away.
+                if !isRoot && !isExpanded, let newParent = newParent, newParent !== node {
+                    isExpanded = true
                 }
             }
         }
@@ -351,6 +364,11 @@ struct OutlineView: View {
                     modelContext.delete(blocks[i])
                 }
             }
+        }
+
+        // When a block's depth/parent changed, rebuild content so the text editor stays in sync.
+        if depthChanged {
+            buildEditableContent()
         }
     }
 
