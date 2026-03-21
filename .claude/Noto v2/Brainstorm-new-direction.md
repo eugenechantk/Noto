@@ -1,6 +1,6 @@
 # Brainstorm: Noto v2 — Note-Based with Paragraph Mobility
 
-A clean break from the outline-based model. Noto becomes a note-taking app organized by folders and notes, where the atomic unit of interaction is the **paragraph** (not the block/bullet). Four pillars: daily notes, line-level mentions, hybrid search, and **markdown files as the canonical storage format**. Paragraph moving is just deleting from one note and inserting into another — standard editing, no special mechanism needed.
+A clean break from the outline-based model. Noto becomes a note-taking app organized by folders and notes, where the atomic unit of interaction is the **paragraph** (not the block/bullet). Five pillars: daily notes, line-level mentions, hybrid search, **markdown files as the canonical storage format**, and **AI-operability** (every operation accessible via CLI, MCP, or API). Paragraph moving is just deleting from one note and inserting into another — standard editing, no special mechanism needed.
 
 ---
 
@@ -14,7 +14,7 @@ A clean break from the outline-based model. Noto becomes a note-taking app organ
 
 ---
 
-## The Four Pillars
+## The Five Pillars
 
 ### 1. Today's Note
 
@@ -111,7 +111,7 @@ Both levels go through the same hybrid ranking pipeline (BM25 + cosine similarit
 
 ---
 
-## Pillar 5: Markdown Files as Storage
+## Pillar 4: Markdown Files as Storage
 
 Every note is a `.md` file on disk. Folders are real directories. The filesystem is the source of truth, not a database.
 
@@ -690,15 +690,46 @@ Options:
 
 ---
 
+## Pillar 5: AI-Operability
+
+Every action in Noto — creating notes, creating folders, editing content, moving paragraphs, searching, reading — must be performable programmatically via a CLI, MCP server, or tool call interface. The app is not just for human users; an AI agent should be able to operate on the vault as a first-class participant.
+
+**Why this matters:** Markdown files on disk already make the vault readable/writable by any program. But structured operations (create note in folder, search by meaning, resolve mentions) need a proper API surface beyond raw file manipulation. Exposing these as CLI commands or MCP tools means an AI agent can:
+
+- Create and organize notes on behalf of the user
+- Search across the vault and surface relevant content
+- Move paragraphs between notes programmatically
+- Read and summarize note content
+- Build automations and workflows on top of the vault
+
+**Design principle:** Every operation — vault management, note editing, search, mentions — must be operable by an AI agent via CLI, MCP server, or API. If a human can do it in the UI, an agent can do it via a tool call. No operation is UI-only. The vault's file-based storage makes this natural — the CLI/MCP layer is a thin wrapper around the same operations the app performs internally.
+
+**Core operations for AI agents:**
+
+*Vault operations (map directly to filesystem — no custom interface needed on macOS):*
+- **Create folder** — `mkdir` / `FileManager.createDirectory`
+- **Create note** — write a `.md` file
+- **Delete note/folder** — remove file/directory
+- **Move note** — move file between directories
+- **Read note** — read file contents
+- **List folder** — list directory contents
+
+*Edit operations (require a structured interface — the agent edits note content):*
+- **Append** — add content to the end of a note. Safest and simplest. The AI suggests text and it lands at the bottom. No risk of clobbering existing content.
+- **Insert at line** — add content at a specific line number or after a specific heading/paragraph. Enables the AI to place content precisely (e.g., add a bullet under "Shopping List", insert a paragraph after the introduction). Requires the agent to know the note's structure — read first, then insert.
+- **Replace range** — swap out a line range or paragraph with new content. This is how the AI applies suggested edits — "replace lines 5-8 with this revised version." The most powerful but also the most dangerous operation; the agent must match the exact range to avoid unintended overwrites.
+
+*On iOS:* These edit operations would be exposed as MCP tools running inside the app. The MCP server calls the same `MarkdownNoteStore` methods the UI uses. On macOS or via terminal, vault operations work with standard shell commands; edit operations could use a lightweight CLI that reads/modifies the `.md` files directly (like `sed` but with line-aware markdown operations).
+
 ## Summary
 
-Noto v2 trades the outline's infinite structure for a more intuitive notes-and-folders model backed by **plain markdown files on disk**, then adds four superpowers that most note apps lack:
+Noto v2 trades the outline's infinite structure for a more intuitive notes-and-folders model backed by **plain markdown files on disk**, then adds five superpowers that most note apps lack:
 
 1. **Daily note** as the default writing surface
-2. **Paragraph mobility** — move any paragraph to any note
-3. **Per-line mentions** — live references to specific paragraphs across notes using `@[[Note#id]]` syntax, always showing current content
-4. **Hybrid search** — find anything by keyword or meaning, at both paragraph and document level
-5. **Markdown files as storage** — notes are portable `.md` files, not locked in a database
+2. **Per-line mentions** — live references to specific paragraphs across notes using `@[[Note#id]]` syntax, always showing current content
+3. **Hybrid search** — find anything by keyword or meaning, at both paragraph and document level
+4. **Markdown files as storage** — notes are portable `.md` files, not locked in a database
+5. **AI-operability** — every operation (create, read, edit, search, organize) is accessible via CLI, MCP server, or API, so AI agents can operate on the vault as first-class participants
 
 The storage shift from SwiftData to filesystem + SQLite sidecar is the biggest architectural change. It trades the convenience of a managed database for total portability, interoperability (Obsidian, iA Writer, git), and user ownership of their data. The sidecar index provides the structured query capabilities (paragraph identity, mentions, search) that files alone can't offer, while remaining fully rebuildable from the markdown files.
 
