@@ -110,79 +110,7 @@ final class NoteTextStorage: NSTextStorage {
 
     private func performRichFormatting(in editedRange: NSRange,
                                        with editedMask: EditActions) -> FormattedText? {
-        let lineRange = backingStore.lineRange(for: editedRange.location)
-        let editedLineRange = NSUnionRange(editedRange, lineRange)
-        let editedString = backingString.substring(with: editedRange)
-
-        // Capture blockDepth from the line before formatters may strip it.
-        // formatLists cleanup uses setAttributes(bodyStyle) which wipes .blockDepth.
-        // Scan the whole line rather than just position 0 — when the user types
-        // at the beginning of an indented line, the new character has typing
-        // attributes without .blockDepth, so position 0 alone would read 0.
-        var savedDepth: Int = 0
-        if lineRange.length > 0, lineRange.location < backingStore.length {
-            backingStore.enumerateAttribute(.blockDepth, in: lineRange) { val, _, stop in
-                if let depth = val as? Int, depth > 0 {
-                    savedDepth = depth
-                    stop.pointee = true
-                }
-            }
-        }
-
-        let changedText = ChangedText(
-            contents: editedString,
-            mask: editedMask,
-            range: editedRange,
-            lineRange: editedLineRange,
-            listItem: listsFormatter.listItem(at: editedLineRange)
-        )
-
-        logger.debug("\(changedText.description)")
-
-        // Check dash-indent before other formatters
-        if let formattedText = indentFormatter.handleDashIndent(for: changedText) {
-            return formattedText
-        }
-
-        if let formattedText = headingsFormatter.formatHeading(in: changedText) {
-            return formattedText
-        }
-
-        let formatters = [wordsFormatter.formatWords, listsFormatter.formatLists]
-        for format in formatters {
-            if let formattedText = format(changedText) {
-                return formattedText
-            }
-        }
-
-        // Restore blockDepth that formatLists cleanup may have stripped.
-        // Apply to the full line so the entire line keeps its indent,
-        // not just the edited character.
-        if savedDepth > 0 {
-            let restoreRange = backingStore.lineRange(for: editedRange.location)
-            if restoreRange.length > 0, restoreRange.max <= backingStore.length {
-                backingStore.addAttribute(.blockDepth, value: savedDepth, range: restoreRange)
-                backingStore.addAttribute(.paragraphStyle,
-                                          value: indentFormatter.paragraphStylePublic(for: savedDepth),
-                                          range: restoreRange)
-
-                // Re-insert bullet if it was stripped by a formatter
-                let needsBullet = indentFormatter.nodeViewMode
-                    ? !indentFormatter.bulletString(for: savedDepth).isEmpty
-                    : true
-                if needsBullet && !indentFormatter.lineHasBullet(at: restoreRange) {
-                    let bullet = indentFormatter.makeBulletPublic(for: savedDepth)
-                    backingStore.insert(bullet, at: restoreRange.location)
-                    // Re-stamp depth & style on the now-longer line
-                    let updatedRange = backingStore.lineRange(for: restoreRange.location)
-                    backingStore.addAttribute(.blockDepth, value: savedDepth, range: updatedRange)
-                    backingStore.addAttribute(.paragraphStyle,
-                                              value: indentFormatter.paragraphStylePublic(for: savedDepth),
-                                              range: updatedRange)
-                }
-            }
-        }
-
+        // Plain text mode — no formatting applied
         return nil
     }
 
@@ -216,64 +144,34 @@ final class NoteTextStorage: NSTextStorage {
     // MARK: - Indent Support
 
     func indentLine(at index: Int) {
-        indentFormatter.indentLine(at: index)
+        let lineRange = (self as NSAttributedString).lineRange(for: index)
+        beginEditing()
+        backingStore.insert(NSAttributedString(string: "\t", attributes: bodyStyle), at: lineRange.location)
+        edited(.editedCharacters, range: NSRange(location: lineRange.location, length: 0), changeInLength: 1)
+        endEditing()
     }
 
     func outdentLine(at index: Int) {
-        indentFormatter.outdentLine(at: index)
+        let lineRange = (self as NSAttributedString).lineRange(for: index)
+        guard lineRange.length > 0,
+              backingString.character(at: lineRange.location) == 0x09 else { return } // tab = 0x09
+        beginEditing()
+        backingStore.deleteCharacters(in: NSRange(location: lineRange.location, length: 1))
+        edited(.editedCharacters, range: NSRange(location: lineRange.location, length: 1), changeInLength: -1)
+        endEditing()
     }
 
     // MARK: - Note IO
 
-    /// Loads the specified Markdown-ish formatted note.
+    /// Loads the specified note as plain text with body style.
     func load(note: String) {
-        var noteString = NSAttributedString(string: note, attributes: bodyStyle)
-
-        // Indent formatter runs first to strip tabs and set .blockDepth
-        noteString = indentFormatter.format(in: noteString)
-
-        // Headings before words/lists so heading lines get styled first
-        noteString = headingsFormatter.format(noteString)
-
-        let formatters = [wordsFormatter.format, listsFormatter.format]
-        for format in formatters {
-            noteString = format(noteString)
-        }
+        let noteString = NSAttributedString(string: note, attributes: bodyStyle)
         setAttributedString(noteString)
     }
 
-    /// Returns a Markdown-ish formatted note with this text contents.
+    /// Returns the plain text contents.
     func deformatted() -> String {
-        // Dump blockDepth attributes for debugging
-        var depthInfo: [(line: Int, depth: Int)] = []
-        var lineNum = 0
-        (self as NSAttributedString).enumerateLines { line in
-            let depth: Int
-            if line.length > 0,
-               let val = line.attribute(.blockDepth, at: 0, effectiveRange: nil) as? Int {
-                depth = val
-            } else {
-                depth = 0
-            }
-            depthInfo.append((lineNum, depth))
-            lineNum += 1
-        }
-        if depthInfo.contains(where: { $0.depth > 0 }) {
-            logger.debug("[deformatted] blockDepth per line: \(depthInfo.map { "L\($0.line)=\($0.depth)" }.joined(separator: ", "))")
-        }
-
-        var markdownString = NSAttributedString(attributedString: self)
-
-        // Headings deformat first to re-insert # prefixes
-        markdownString = headingsFormatter.deformat(markdownString)
-
-        let deformatters = [wordsFormatter.deformat, listsFormatter.deformat]
-        for deformat in deformatters {
-            markdownString = deformat(markdownString)
-        }
-        // Indent deformatter runs last to re-insert tab prefixes
-        markdownString = indentFormatter.deformat(markdownString)
-        return markdownString.string
+        return backingStore.string
     }
 }
 

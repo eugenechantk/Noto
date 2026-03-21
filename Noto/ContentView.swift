@@ -2,7 +2,8 @@
 //  ContentView.swift
 //  Noto
 //
-//  Thin wrapper that owns the NavigationStack and delegates to OutlineView.
+//  Root view: OutlineView for the continuous outline editor.
+//  node=nil shows root blocks, double-tap drills into a block.
 //
 
 import SwiftUI

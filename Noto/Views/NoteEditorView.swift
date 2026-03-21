@@ -1,10 +1,10 @@
 //
-//  OutlineView.swift
+//  NoteEditorView.swift
 //  Noto
 //
-//  Unified outline view for both home (root) and drill-down (node) modes.
-//  When node is nil, shows root-level blocks. When node is non-nil, shows
-//  that node's descendants. The only difference is which node is focused.
+//  Full-screen editor for a single note (Block). Shows the note's content
+//  in a plain text editor. Children are displayed as indented lines when expanded.
+//  Inspired by Simple-Notes (github.com/pmattos/Simple-Notes).
 //
 
 import SwiftUI
@@ -14,75 +14,66 @@ import NotoModels
 import NotoCore
 import NotoDirtyTracker
 
-// MARK: - Non-core imports (commented out for minimal app)
-// import NotoFTS5
-// import NotoSearch
-// import NotoTodayNotes
-// import NotoEmbedding
-// #if canImport(USearch)
-// import NotoHNSW
-// #endif
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NoteEditorView")
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "OutlineView")
-
-struct OutlineView: View {
-    let node: Block?
+struct NoteEditorView: View {
+    let note: Block
     @Binding var navigationPath: [Block]
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var dirtyTracker: DirtyTracker
 
-    @Query(sort: \Block.sortOrder) private var allBlocks: [Block]
-
     @State private var editableContent: String = ""
     @State private var isExpanded: Bool = false
     @State private var hasLoaded = false
     @State private var isSyncing = false
-    @State private var isKeyboardVisible = false
 
-    private var isRoot: Bool { node == nil }
-    private var baseDepth: Int { node?.depth ?? -1 }
-    private var displayTitle: String {
-        guard let content = node?.content else { return "Home" }
-        return PlainTextExtractor.plainText(from: content)
-    }
-
-    /// Root blocks (parent == nil, not archived), used only in root mode.
-    private var rootBlocks: [Block] {
-        allBlocks.filter { $0.parent == nil && !$0.isArchived }
-            .sorted { $0.sortOrder < $1.sortOrder }
-    }
+    private var baseDepth: Int { note.depth }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Toolbar
-            outlineToolbar
-
-            // Title area
-            VStack(alignment: .leading, spacing: 4) {
-                Text(displayTitle)
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(labelPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
-                    .accessibilityIdentifier(isRoot ? "homeTitle" : "nodeViewTitle")
-            }
-
-            // Content editor
-            OutlineEditor(
+            NoteTextEditor(
                 text: $editableContent,
+                nodeViewMode: true,
                 onEndEditing: {
                     Task { await dirtyTracker.flush() }
+                },
+                onReorderLine: { source, destination in
+                    reorderBlock(from: source, to: destination)
+                },
+                onDoubleTapLine: { lineIndex in
+                    handleDoubleTap(at: lineIndex)
                 }
             )
-            .ignoresSafeArea(.keyboard)
         }
-        .background {
-            backgroundColor.ignoresSafeArea()
+        .background(backgroundColor.ignoresSafeArea())
+        .navigationTitle(displayTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    navigationPath.removeLast()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 17, weight: .semibold))
+                        Text("Notes")
+                            .font(.system(size: 17))
+                    }
+                }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    dismissKeyboardAndToggle()
+                } label: {
+                    Image(systemName: isExpanded ? "list.bullet" : "list.bullet.indent")
+                        .font(.system(size: 17, weight: .medium))
+                }
+                .accessibilityLabel(isExpanded ? "Collapse" : "Expand")
+            }
         }
-        .navigationBarHidden(true)
         .onAppear {
             loadContent()
         }
@@ -97,28 +88,12 @@ struct OutlineView: View {
         }
     }
 
-    // MARK: - Toolbar
+    // MARK: - Display
 
-    private var outlineToolbar: some View {
-        HStack {
-            if node != nil {
-                GlassToolbarButton(systemImage: "chevron.left") {
-                    navigationPath.removeLast()
-                }
-                .accessibilityLabel("Back")
-            }
-
-            Spacer()
-
-            GlassToolbarButton(systemImage: isExpanded ? "list.bullet" : "list.bullet.indent") {
-                dismissKeyboardAndToggle()
-            }
-            .accessibilityLabel(isExpanded ? "Collapse" : "Expand")
-        }
-        .padding(.horizontal, 16)
+    private var displayTitle: String {
+        let plain = PlainTextExtractor.plainText(from: note.content)
+        return plain.isEmpty ? "New Note" : plain
     }
-
-    // MARK: - Colors
 
     private var backgroundColor: Color {
         colorScheme == .dark
@@ -126,36 +101,12 @@ struct OutlineView: View {
             : .white
     }
 
-    private var labelPrimary: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.9)
-            : Color(red: 0.1, green: 0.1, blue: 0.1)
-    }
-
     // MARK: - Data
 
-    /// Build the flat list of (block, indentLevel) entries for display.
     private func displayEntries() -> [(block: Block, indentLevel: Int)] {
-        if let node = node {
-            return node.flattenedDescendants(expanded: isExpanded).map { ($0.block, $0.indentLevel) }
-        } else {
-            if isExpanded {
-                var result: [(Block, Int)] = []
-                func walk(_ blocks: [Block]) {
-                    for block in blocks {
-                        result.append((block, block.depth))
-                        walk(block.sortedChildren.filter { !$0.isArchived })
-                    }
-                }
-                walk(rootBlocks)
-                return result
-            } else {
-                return rootBlocks.map { ($0, 0) }
-            }
-        }
+        return note.flattenedDescendants(expanded: isExpanded).map { ($0.block, $0.indentLevel) }
     }
 
-    /// Flat list of blocks currently displayed.
     private func currentBlocks() -> [Block] {
         displayEntries().map { $0.block }
     }
@@ -169,18 +120,7 @@ struct OutlineView: View {
     private func loadContent() {
         guard !hasLoaded else { return }
         hasLoaded = true
-
-        if isRoot {
-            let blocks = rootBlocks
-            if blocks.isEmpty {
-                let block = Block(content: "", sortOrder: 1.0)
-                modelContext.insert(block)
-            } else {
-                editableContent = blocks.map { $0.content }.joined(separator: "\n")
-            }
-        } else {
-            buildEditableContent()
-        }
+        buildEditableContent()
     }
 
     private func parseLine(_ line: String) -> (depth: Int, content: String) {
@@ -203,7 +143,6 @@ struct OutlineView: View {
         var blocks = currentBlocks()
         var depthChanged = false
 
-        // Update existing blocks
         for i in 0..<min(parsed.count, blocks.count) {
             let (relativeDepth, content) = parsed[i]
             let absoluteDepth = baseDepth + 1 + relativeDepth
@@ -223,20 +162,19 @@ struct OutlineView: View {
                 }
                 depthChanged = true
 
-                if !isRoot && !isExpanded, let newParent = newParent, newParent !== node {
+                if !isExpanded, let newParent = newParent, newParent !== note {
                     isExpanded = true
                 }
             }
         }
 
-        // Create new blocks for extra lines
         if parsed.count > blocks.count {
             for i in blocks.count..<parsed.count {
                 let (relativeDepth, content) = parsed[i]
                 let absoluteDepth = baseDepth + 1 + relativeDepth
                 let sortOrder = (blocks.last?.sortOrder ?? 0) + Double(i - blocks.count + 1)
                 let newParent = findParent(for: i, relativeDepth: relativeDepth, in: blocks, parsed: parsed)
-                let block = Block(content: content, parent: newParent ?? node, sortOrder: sortOrder)
+                let block = Block(content: content, parent: newParent ?? note, sortOrder: sortOrder)
                 if block.depth != absoluteDepth {
                     block.depth = absoluteDepth
                 }
@@ -246,7 +184,6 @@ struct OutlineView: View {
             }
         }
 
-        // Delete excess blocks
         if blocks.count > parsed.count {
             for i in stride(from: blocks.count - 1, through: parsed.count, by: -1) {
                 if blocks[i].isDeletable {
@@ -262,7 +199,7 @@ struct OutlineView: View {
     }
 
     private func findParent(for index: Int, relativeDepth: Int, in blocks: [Block], parsed: [(depth: Int, content: String)]) -> Block? {
-        if relativeDepth == 0 { return node }
+        if relativeDepth == 0 { return note }
         for j in stride(from: index - 1, through: 0, by: -1) {
             let candidateRelDepth: Int
             if j < blocks.count {
@@ -274,7 +211,7 @@ struct OutlineView: View {
                 return blocks[j]
             }
         }
-        return node
+        return note
     }
 
     // MARK: - Reorder
@@ -286,10 +223,7 @@ struct OutlineView: View {
         guard source != destination, source != destination - 1 else { return }
 
         let movedBlock = blocks[source]
-        guard movedBlock.isReorderable else {
-            logger.debug("[reorderBlock] block '\(movedBlock.content.prefix(20))' is not reorderable")
-            return
-        }
+        guard movedBlock.isReorderable else { return }
 
         blocks.remove(at: source)
         let insertAt = destination > source ? destination - 1 : destination
@@ -299,7 +233,7 @@ struct OutlineView: View {
         let maxValidDepth = (blockAbove?.depth ?? baseDepth) + 1
         let newDepth = min(movedBlock.depth, maxValidDepth)
 
-        var newParent: Block? = node
+        var newParent: Block? = note
         if newDepth > baseDepth + 1 {
             for j in stride(from: insertAt - 1, through: 0, by: -1) {
                 if blocks[j].depth == newDepth - 1 {
@@ -322,7 +256,7 @@ struct OutlineView: View {
     private func reconcileParents(in blocks: [Block]) {
         for (i, block) in blocks.enumerated() {
             let depth = block.depth
-            var correctParent: Block? = node
+            var correctParent: Block? = note
             if depth > baseDepth + 1 {
                 for j in stride(from: i - 1, through: 0, by: -1) {
                     if blocks[j].depth == depth - 1 {
@@ -349,8 +283,7 @@ struct OutlineView: View {
     private func handleDoubleTap(at lineIndex: Int) {
         let blocks = currentBlocks()
         guard lineIndex >= 0, lineIndex < blocks.count else { return }
-        let tappedBlock = blocks[lineIndex]
-        navigationPath.append(tappedBlock)
+        navigationPath.append(blocks[lineIndex])
     }
 
     // MARK: - Expand/Collapse
@@ -361,10 +294,4 @@ struct OutlineView: View {
             isExpanded.toggle()
         }
     }
-
-    // MARK: - Non-core features (commented out for minimal app)
-    // private func navigateToToday() { ... }
-    // private func triggerAutoBuilding() { ... }
-    // private func navigateToSearchResult(blockId: UUID) { ... }
-    // private func buildAncestorPath() { ... }
 }

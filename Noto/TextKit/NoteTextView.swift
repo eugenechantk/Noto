@@ -135,35 +135,11 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
     }
 
     private func resetTypingAttributes() {
-        // Instead of always resetting to body style, inherit the attributes
-        // from the character at (or just before) the cursor position.
-        // This ensures that after markdown formatting is applied (e.g., heading),
-        // subsequent typing continues in the same style.
-        let cursorPos = selectedRange.location
-        let length = noteTextStorage.length
-
-        if length > 0 {
-            // Use the character just before the cursor (what the user just typed after),
-            // or the first character if at position 0
-            let attrIndex = cursorPos > 0 ? cursorPos - 1 : 0
-            if attrIndex < length {
-                var attrs = noteTextStorage.attributes(at: attrIndex, effectiveRange: nil)
-                // Remove transient attributes that shouldn't carry into typing
-                attrs.removeValue(forKey: .caret)
-                attrs.removeValue(forKey: .indentBullet)
-                // Don't carry list marker attributes into typed text
-                attrs.removeValue(forKey: .list)
-                typingAttributes = attrs
-                return
-            }
-        }
-
         typingAttributes = noteTextStorage.bodyStyle
     }
 
     func loadNote(_ contents: String) {
         noteTextStorage.load(note: contents)
-        layoutCheckmarkViews()
     }
 
     /// Returns the deformatted markdown-ish string.
@@ -232,37 +208,11 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
     }
 
     func textViewDidChange(_ noteView: UITextView) {
-        let formattedText = noteTextStorage.processRichFormatting()
-        if let caretRange = formattedText?.caretRange {
-            fixCaretPosition(in: caretRange)
-        }
-        if let typingStyle = formattedText?.typingStyle {
-            // Formatter explicitly provided typing attributes (e.g., heading
-            // format applied on an empty line where there's no adjacent
-            // character to inherit from).
-            typingAttributes = typingStyle
-        } else {
-            resetTypingAttributes()
-        }
-        layoutCheckmarkViews()
+        _ = noteTextStorage.processRichFormatting()
+        resetTypingAttributes()
         noteTextViewDelegate?.noteTextViewDidChange(self)
     }
 
-    private func fixCaretPosition(in caretRange: NSRange) {
-        let caretRange = noteTextStorage.lineRange(for: caretRange.location)
-        guard let caret = noteTextStorage.attribute(.caret, in: caretRange).first else {
-            return
-        }
-        DispatchQueue.main.async {
-            self.noteTextStorage.removeAttribute(.caret, range: caret.range)
-            self.setCaretPosition(to: caret.range.max)
-        }
-    }
-
-    private func setCaretPosition(to caret: Int) {
-        self.selectedRange = NSRange(location: caret, length: 0)
-        self.resetTypingAttributes()
-    }
 
     private var oldSelectedRange: NSRange?
 
@@ -280,72 +230,6 @@ final class NoteTextView: UITextView, UITextViewDelegate, UITextPasteDelegate, U
         self.oldSelectedRange = selectedRange
     }
 
-    // MARK: - Checkmarks Views Overlay
-
-    func insertCheckmarkAtCaretPosition() {
-        noteTextStorage.insertCheckmark(at: selectedRange.location, withValue: false)
-        moveCaretToLineEnd(at: selectedRange.location)
-        layoutCheckmarkViews()
-    }
-
-    private func moveCaretToLineEnd(at index: Int) {
-        guard index < noteTextStorage.length - 1 else {
-            fixCaretPosition(in: NSMakeRange(index, 0))
-            return
-        }
-        let lineRange = noteTextStorage.lineRange(for: index)
-        DispatchQueue.main.async {
-            self.setCaretPosition(to: lineRange.max - 1)
-        }
-    }
-
-    private func reuseCheckmarkView() -> CheckmarkView {
-        let checkmarkView = CheckmarkView()
-        checkmarkView.frame = CGRect(x: 0, y: 0, width: 25, height: 25)
-        checkmarkView.addTarget(
-            self, action: #selector(didTapCheckmark),
-            for: .primaryActionTriggered
-        )
-        return checkmarkView
-    }
-
-    @IBAction private func didTapCheckmark(_ checkmarkView: CheckmarkView) {
-        precondition(checkmarkView.tag >= 0 && checkmarkView.tag < noteTextStorage.length)
-        noteTextStorage.setCheckmark(
-            atLine: NSRange(location: checkmarkView.tag, length: 0),
-            to: checkmarkView.tickShown
-        )
-    }
-
-    private var checkmarkViews: [CheckmarkView] = []
-
-    private func layoutCheckmarkViews() {
-        for checkmarkView in checkmarkViews {
-            checkmarkView.removeFromSuperview()
-        }
-        checkmarkViews.removeAll()
-
-        noteTextStorage.enumerateAttribute(.list, in: noteTextStorage.range) {
-            (attribValue, attribRange, stop) in
-            guard let attribValue = attribValue as? String else { return }
-            guard let listItem = ListItem(rawValue: attribValue) else { return }
-            guard case let ListItem.checkmark(checkmarkValue) = listItem else { return }
-
-            let textRange = self.textRange(from: attribRange)!
-            let checkmarkRect = self.firstRect(for: textRange)
-
-            let checkmarkView = self.reuseCheckmarkView()
-            checkmarkView.tag = attribRange.location
-            checkmarkView.showTick(checkmarkValue!)
-
-            checkmarkView.frame.origin = CGPoint(
-                x: 0,
-                y: checkmarkRect.midY - checkmarkView.frame.height/2 + 0.5
-            )
-            self.addSubview(checkmarkView)
-            self.checkmarkViews.append(checkmarkView)
-        }
-    }
 
     // MARK: - Caret Height Fix
 
