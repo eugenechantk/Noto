@@ -197,6 +197,11 @@ final class MarkdownNoteStore: ObservableObject {
         }.sorted { $0.modifiedDate > $1.modifiedDate }
 
         items = folders + notes
+        for item in items {
+            if case .note(let n) = item {
+                logger.info("[loadItems] note title='\(n.title)' file=\(n.fileURL.lastPathComponent)")
+            }
+        }
     }
 
     // MARK: - Notes
@@ -226,39 +231,65 @@ final class MarkdownNoteStore: ObservableObject {
         return note
     }
 
-    /// Saves content and returns the updated note (fileURL may change due to rename).
+    /// Saves content immediately (writes file + updates list title). Does NOT rename.
     @discardableResult
-    func save(content: String, for note: MarkdownNote) -> MarkdownNote {
+    func saveContent(_ content: String, for note: MarkdownNote) -> MarkdownNote {
         do {
             let contentToSave = MarkdownNote.updateTimestamp(in: content)
             try contentToSave.write(to: note.fileURL, atomically: true, encoding: .utf8)
 
             let newTitle = MarkdownNote.titleFrom(content)
-            var finalURL = note.fileURL
-
-            // Rename file if title changed and it's not a date-based daily note
-            let currentStem = note.fileURL.deletingPathExtension().lastPathComponent
-            let isDailyNote = currentStem.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil
-            let sanitized = Self.sanitizeFilename(newTitle)
-
-            if !isDailyNote && !sanitized.isEmpty && sanitized != "Untitled" && sanitized != currentStem {
-                let newURL = note.fileURL.deletingLastPathComponent()
-                    .appendingPathComponent(sanitized)
-                    .appendingPathExtension("md")
-
-                // Avoid collision with existing file
-                if !FileManager.default.fileExists(atPath: newURL.path) {
-                    try FileManager.default.moveItem(at: note.fileURL, to: newURL)
-                    finalURL = newURL
-                    logger.info("Renamed note to \(sanitized).md")
-                }
-            }
+            logger.info("[saveContent] title='\(newTitle)' file=\(note.fileURL.lastPathComponent) contentLen=\(content.count)")
+            logger.info("[saveContent] first100='\(String(content.prefix(100)))'")
 
             let updated = MarkdownNote(
                 id: note.id,
-                fileURL: finalURL,
+                fileURL: note.fileURL,
                 title: newTitle,
                 modifiedDate: Date()
+            )
+
+            if let idx = items.firstIndex(where: { $0.id == note.id }) {
+                items.remove(at: idx)
+                items.insert(.note(updated), at: folderCount)
+                logger.info("[saveContent] updated items at idx=\(idx)")
+            } else {
+                logger.warning("[saveContent] note id=\(note.id) NOT FOUND in items (count=\(self.items.count))")
+            }
+
+            return updated
+        } catch {
+            logger.error("Failed to save note: \(error)")
+            return note
+        }
+    }
+
+    /// Renames the file to match the note title. Returns updated note with new fileURL.
+    @discardableResult
+    func renameFileIfNeeded(for note: MarkdownNote) -> MarkdownNote {
+        let currentStem = note.fileURL.deletingPathExtension().lastPathComponent
+        let isDailyNote = currentStem.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil
+        let sanitized = Self.sanitizeFilename(note.title)
+
+        guard !isDailyNote && !sanitized.isEmpty && sanitized != "Untitled" && sanitized != currentStem else {
+            return note
+        }
+
+        let newURL = note.fileURL.deletingLastPathComponent()
+            .appendingPathComponent(sanitized)
+            .appendingPathExtension("md")
+
+        guard !FileManager.default.fileExists(atPath: newURL.path) else { return note }
+
+        do {
+            try FileManager.default.moveItem(at: note.fileURL, to: newURL)
+            logger.info("Renamed note to \(sanitized).md")
+
+            let updated = MarkdownNote(
+                id: note.id,
+                fileURL: newURL,
+                title: note.title,
+                modifiedDate: note.modifiedDate
             )
 
             if let idx = items.firstIndex(where: { $0.id == note.id }) {
@@ -268,7 +299,7 @@ final class MarkdownNoteStore: ObservableObject {
 
             return updated
         } catch {
-            logger.error("Failed to save note: \(error)")
+            logger.error("Failed to rename note: \(error)")
             return note
         }
     }
@@ -319,7 +350,8 @@ final class MarkdownNoteStore: ObservableObject {
 
         if !fm.fileExists(atPath: fileURL.path) {
             let id = UUID()
-            let content = MarkdownNote.makeFrontmatter(id: id) + "# \(displayDate)\n"
+            let template = NoteTemplate.dailyNote
+            let content = MarkdownNote.makeFrontmatter(id: id) + "# \(displayDate)\n\(template.body)"
             try? content.write(to: fileURL, atomically: true, encoding: .utf8)
         }
 
