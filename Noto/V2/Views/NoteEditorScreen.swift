@@ -8,6 +8,7 @@ struct NoteEditorScreen: View {
     @ObservedObject var store: MarkdownNoteStore
     var isNew: Bool = false
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var note: MarkdownNote
     @State private var content: String = ""
     @State private var hasLoaded = false
@@ -34,6 +35,12 @@ struct NoteEditorScreen: View {
         .onDisappear {
             saveTask?.cancel()
             note = store.save(content: content, for: note)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .inactive {
+                saveTask?.cancel()
+                note = store.save(content: content, for: note)
+            }
         }
     }
 
