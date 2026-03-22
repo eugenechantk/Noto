@@ -171,13 +171,27 @@ This reminds me of what I wrote in @[[Project Alpha > the migration plan needs t
 
 **Body:** Standard markdown. Paragraphs separated by blank lines (or single newlines — see paragraph granularity question). Mentions use a wikilink-inspired syntax.
 
+### Note Identity — Frontmatter UUID
+
+Every note has a stable UUID assigned at creation, stored in YAML frontmatter:
+
+```yaml
+---
+id: 550e8400-e29b-41d4-a716-446655440000
+---
+```
+
+This UUID is the note's permanent identity. **Filenames can change freely** (e.g., renaming `Untitled.md` to `My Project.md` when the user edits the title) without breaking anything — the sidecar index maps `frontmatter_id → current_file_path` and updates the path on rename. Paragraph identity, mentions, and search results all reference the frontmatter UUID, not the filename.
+
+**Why not use the filename as identity:** Filenames change. The title is the filename (minus `.md`), and users edit titles. If identity was path-based, every title edit would break all paragraph UUIDs and mentions pointing to that note. Frontmatter UUIDs decouple identity from naming.
+
 ### Paragraph Identity — Sidecar Index
 
 Paragraphs need stable IDs for mentions and moves, but markdown has no concept of paragraph identity. **Decision: sidecar index.** Paragraph IDs live in `.noto/index.sqlite`, not in the markdown files. Files stay completely clean.
 
-The index maps `(noteId, contentHash, paragraphIndex)` → `paragraphId (UUID)`. When a file changes, the index diffs against the previous version to maintain paragraph identity using content hash + position matching (see "How the Index Stays in Sync" for the full algorithm).
+The index maps `(frontmatter_note_id, contentHash, paragraphIndex)` → `paragraphId (UUID)`. The `frontmatter_note_id` is the note's UUID from frontmatter — stable across file renames. When a file changes, the index diffs against the previous version to maintain paragraph identity using content hash + position matching (see "How the Index Stays in Sync" for the full algorithm).
 
-**Trade-off:** If the index is lost and rebuilt, paragraph-level mentions may not re-resolve if the paragraph content has changed significantly since the mention was created. Note-level mentions are unaffected (they resolve by filename). This is acceptable — the index is a local cache that rarely gets deleted, and the degradation is graceful (mention falls back to note-level).
+**Trade-off:** If the index is lost and rebuilt, paragraph-level mentions may not re-resolve if the paragraph content has changed significantly since the mention was created. Note-level mentions are unaffected (they resolve by frontmatter UUID, which is always present in the file). This is acceptable — the index is a local cache that rarely gets deleted, and the degradation is graceful (mention falls back to note-level).
 
 ### Mention Syntax in Markdown
 

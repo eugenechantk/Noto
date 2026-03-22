@@ -10,15 +10,76 @@ struct MarkdownNote: Identifiable, Hashable {
     var title: String
     var modifiedDate: Date
 
-    /// Derives title from the first line of content, stripping leading `# `.
+    /// Derives title from content, skipping YAML frontmatter and stripping heading prefix.
     static func titleFrom(_ content: String) -> String {
-        let firstLine = content.prefix(while: { $0 != "\n" })
+        let body = stripFrontmatter(content)
+        let firstLine = body.prefix(while: { $0 != "\n" })
         var title = String(firstLine).trimmingCharacters(in: .whitespaces)
-        // Strip leading markdown heading prefix (# , ## , ### , or bare #)
         if let match = title.range(of: #"^#{1,3}\s*"#, options: .regularExpression) {
             title = String(title[match.upperBound...])
         }
         return title.isEmpty ? "Untitled" : title
+    }
+
+    /// Strips YAML frontmatter (--- ... ---) from the beginning of content.
+    static func stripFrontmatter(_ content: String) -> String {
+        guard content.hasPrefix("---") else { return content }
+        // Find the closing ---
+        let searchRange = content.index(content.startIndex, offsetBy: 3)..<content.endIndex
+        guard let closeRange = content.range(of: "\n---", range: searchRange) else { return content }
+        let afterFrontmatter = content[closeRange.upperBound...]
+        // Skip leading newlines after frontmatter
+        return String(afterFrontmatter.drop(while: { $0 == "\n" }))
+    }
+
+    /// Extracts the UUID from YAML frontmatter, if present.
+    static func idFromFrontmatter(_ content: String) -> UUID? {
+        guard content.hasPrefix("---") else { return nil }
+        let searchRange = content.index(content.startIndex, offsetBy: 3)..<content.endIndex
+        guard let closeRange = content.range(of: "\n---", range: searchRange) else { return nil }
+        let frontmatter = String(content[content.startIndex..<closeRange.upperBound])
+        // Find id: line
+        for line in frontmatter.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("id:") {
+                let value = trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
+                return UUID(uuidString: value)
+            }
+        }
+        return nil
+    }
+
+    /// Generates YAML frontmatter block for a new note.
+    static func makeFrontmatter(id: UUID, createdAt: Date = Date()) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let now = formatter.string(from: createdAt)
+        return """
+        ---
+        id: \(id.uuidString)
+        created: \(now)
+        updated: \(now)
+        ---
+
+        """
+    }
+
+    /// Updates the `updated` timestamp in existing frontmatter content.
+    static func updateTimestamp(in content: String) -> String {
+        guard content.hasPrefix("---") else { return content }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let now = formatter.string(from: Date())
+
+        let lines = content.components(separatedBy: "\n")
+        var updated = lines
+        for (i, line) in lines.enumerated() {
+            if line.trimmingCharacters(in: .whitespaces).hasPrefix("updated:") {
+                updated[i] = "updated: \(now)"
+                break
+            }
+        }
+        return updated.joined(separator: "\n")
     }
 }
 
@@ -107,18 +168,20 @@ final class MarkdownNoteStore: ObservableObject {
                 loaded.append(.folder(NotoFolder(id: id, folderURL: url, name: name, modifiedDate: modDate)))
             } else if url.pathExtension == "md" {
                 let title: String
+                let noteId: UUID
                 if let handle = try? FileHandle(forReadingFrom: url) {
-                    let data = handle.readData(ofLength: 512)
+                    let data = handle.readData(ofLength: 1024)
                     handle.closeFile()
                     let snippet = String(data: data, encoding: .utf8) ?? ""
                     title = MarkdownNote.titleFrom(snippet)
+                    noteId = MarkdownNote.idFromFrontmatter(snippet)
+                        ?? UUID(uuid: UUID.nameToUUID(url.path))
                 } else {
                     title = "Untitled"
+                    noteId = UUID(uuid: UUID.nameToUUID(url.path))
                 }
 
-                let stem = url.deletingPathExtension().lastPathComponent
-                let id = UUID(uuidString: stem) ?? UUID(uuid: UUID.nameToUUID(stem))
-                loaded.append(.note(MarkdownNote(id: id, fileURL: url, title: title, modifiedDate: modDate)))
+                loaded.append(.note(MarkdownNote(id: noteId, fileURL: url, title: title, modifiedDate: modDate)))
             }
         }
 
@@ -150,7 +213,7 @@ final class MarkdownNoteStore: ObservableObject {
         let id = UUID()
         let filename = "\(id.uuidString).md"
         let fileURL = directoryURL.appendingPathComponent(filename)
-        let initialContent = "# "
+        let initialContent = MarkdownNote.makeFrontmatter(id: id) + "# "
 
         do {
             try initialContent.write(to: fileURL, atomically: true, encoding: .utf8)
@@ -163,22 +226,63 @@ final class MarkdownNoteStore: ObservableObject {
         return note
     }
 
-    func save(content: String, for note: MarkdownNote) {
+    /// Saves content and returns the updated note (fileURL may change due to rename).
+    @discardableResult
+    func save(content: String, for note: MarkdownNote) -> MarkdownNote {
         do {
-            try content.write(to: note.fileURL, atomically: true, encoding: .utf8)
+            let contentToSave = MarkdownNote.updateTimestamp(in: content)
+            try contentToSave.write(to: note.fileURL, atomically: true, encoding: .utf8)
+
+            let newTitle = MarkdownNote.titleFrom(content)
+            var finalURL = note.fileURL
+
+            // Rename file if title changed and it's not a date-based daily note
+            let currentStem = note.fileURL.deletingPathExtension().lastPathComponent
+            let isDailyNote = currentStem.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil
+            let sanitized = Self.sanitizeFilename(newTitle)
+
+            if !isDailyNote && !sanitized.isEmpty && sanitized != "Untitled" && sanitized != currentStem {
+                let newURL = note.fileURL.deletingLastPathComponent()
+                    .appendingPathComponent(sanitized)
+                    .appendingPathExtension("md")
+
+                // Avoid collision with existing file
+                if !FileManager.default.fileExists(atPath: newURL.path) {
+                    try FileManager.default.moveItem(at: note.fileURL, to: newURL)
+                    finalURL = newURL
+                    logger.info("Renamed note to \(sanitized).md")
+                }
+            }
+
+            let updated = MarkdownNote(
+                id: note.id,
+                fileURL: finalURL,
+                title: newTitle,
+                modifiedDate: Date()
+            )
+
             if let idx = items.firstIndex(where: { $0.id == note.id }) {
-                let updated = MarkdownNote(
-                    id: note.id,
-                    fileURL: note.fileURL,
-                    title: MarkdownNote.titleFrom(content),
-                    modifiedDate: Date()
-                )
                 items.remove(at: idx)
                 items.insert(.note(updated), at: folderCount)
             }
+
+            return updated
         } catch {
             logger.error("Failed to save note: \(error)")
+            return note
         }
+    }
+
+    /// Sanitize a string for use as a filename.
+    private static func sanitizeFilename(_ name: String) -> String {
+        let illegal = CharacterSet(charactersIn: "/\\:?\"<>|*")
+        var sanitized = name.components(separatedBy: illegal).joined()
+        sanitized = sanitized.trimmingCharacters(in: .whitespaces)
+        // Limit length
+        if sanitized.count > 100 {
+            sanitized = String(sanitized.prefix(100))
+        }
+        return sanitized
     }
 
     func deleteNote(_ note: MarkdownNote) {
@@ -188,6 +292,56 @@ final class MarkdownNoteStore: ObservableObject {
         } catch {
             logger.error("Failed to delete note: \(error)")
         }
+    }
+
+    // MARK: - Today's Note
+
+    /// Returns today's note, creating the Daily Notes folder and note file if needed.
+    /// Today's note lives at `Daily Notes/YYYY-MM-DD.md`.
+    func todayNote() -> (store: MarkdownNoteStore, note: MarkdownNote) {
+        let dailyFolderURL = vaultRootURL.appendingPathComponent("Daily Notes")
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: dailyFolderURL.path) {
+            try? fm.createDirectory(at: dailyFolderURL, withIntermediateDirectories: true)
+        }
+
+        // Filename uses ISO date for chronological sorting
+        let isoFormatter = DateFormatter()
+        isoFormatter.dateFormat = "yyyy-MM-dd"
+        let isoDate = isoFormatter.string(from: Date())
+        let filename = "\(isoDate).md"
+        let fileURL = dailyFolderURL.appendingPathComponent(filename)
+
+        // Display title: "22 Mar, 26 (Sat)"
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateFormat = "dd MMM, yy (EEE)"
+        let displayDate = displayFormatter.string(from: Date())
+
+        if !fm.fileExists(atPath: fileURL.path) {
+            let id = UUID()
+            let content = MarkdownNote.makeFrontmatter(id: id) + "# \(displayDate)\n"
+            try? content.write(to: fileURL, atomically: true, encoding: .utf8)
+        }
+
+        // Read ID from frontmatter of existing file
+        let id: UUID
+        if let data = try? Data(contentsOf: fileURL),
+           let snippet = String(data: data, encoding: .utf8),
+           let fmId = MarkdownNote.idFromFrontmatter(snippet) {
+            id = fmId
+        } else {
+            id = UUID(uuid: UUID.nameToUUID(fileURL.path))
+        }
+        let attrs = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey])
+        let note = MarkdownNote(
+            id: id,
+            fileURL: fileURL,
+            title: displayDate,
+            modifiedDate: attrs?.contentModificationDate ?? Date()
+        )
+
+        let dailyStore = MarkdownNoteStore(directoryURL: dailyFolderURL, vaultRootURL: vaultRootURL)
+        return (dailyStore, note)
     }
 
     // MARK: - Folders

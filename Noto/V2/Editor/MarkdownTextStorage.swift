@@ -8,6 +8,7 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 final class MarkdownTextStorage: NSTextStorage {
 
     private let backing = NSMutableAttributedString()
+    private var isFormatting = false
 
     // MARK: - NSTextStorage required overrides
 
@@ -32,7 +33,11 @@ final class MarkdownTextStorage: NSTextStorage {
     }
 
     override func processEditing() {
-        applyMarkdownFormatting()
+        if !isFormatting {
+            isFormatting = true
+            applyMarkdownFormatting()
+            isFormatting = false
+        }
         super.processEditing()
     }
 
@@ -62,16 +67,41 @@ final class MarkdownTextStorage: NSTextStorage {
 
         let text = backing.string
 
-        // Process line by line
-        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: [.byLines, .substringNotRequired]) { [weak self] _, substringRange, _, _ in
-            guard let self else { return }
-            let nsRange = NSRange(substringRange, in: text)
-            let line = String(text[substringRange])
-            self.formatLine(line, range: nsRange)
+        // Hide YAML frontmatter block
+        var contentStart = 0
+        if text.hasPrefix("---") {
+            if let closeRange = text.range(of: "\n---", range: text.index(text.startIndex, offsetBy: 3)..<text.endIndex) {
+                let fmEnd = text.index(closeRange.upperBound, offsetBy: 0)
+                contentStart = NSRange(text.startIndex..<fmEnd, in: text).length
+                // Make frontmatter tiny and invisible
+                let fmRange = NSRange(location: 0, length: contentStart)
+                let fmStyle = NSMutableParagraphStyle()
+                fmStyle.lineSpacing = 0
+                fmStyle.paragraphSpacing = 0
+                fmStyle.minimumLineHeight = 0.1
+                fmStyle.maximumLineHeight = 0.1
+                backing.addAttributes([
+                    .font: UIFont.systemFont(ofSize: 0.1),
+                    .foregroundColor: UIColor.clear,
+                    .paragraphStyle: fmStyle
+                ], range: fmRange)
+            }
         }
 
-        // Inline formatting across entire text
-        applyInlineFormatting(in: fullRange, text: text)
+        // Process line by line (skip frontmatter)
+        let bodyStart = text.index(text.startIndex, offsetBy: contentStart)
+        if bodyStart < text.endIndex {
+            text.enumerateSubstrings(in: bodyStart..<text.endIndex, options: [.byLines, .substringNotRequired]) { [weak self] _, substringRange, _, _ in
+                guard let self else { return }
+                let nsRange = NSRange(substringRange, in: text)
+                let line = String(text[substringRange])
+                self.formatLine(line, range: nsRange)
+            }
+
+            // Inline formatting across body only
+            let bodyRange = NSRange(location: contentStart, length: fullRange.length - contentStart)
+            applyInlineFormatting(in: bodyRange, text: text)
+        }
     }
 
     private func formatLine(_ line: String, range: NSRange) {
@@ -83,18 +113,19 @@ final class MarkdownTextStorage: NSTextStorage {
         } else if line.hasPrefix("### ") {
             applyHeading(level: 3, range: range)
         }
-        // List items
-        else if line.hasPrefix("- ") || line.hasPrefix("* ") {
-            applyListIndent(range: range)
+        // Bullet lists: count leading spaces to determine nesting level
+        else if let match = line.range(of: #"^(\s*)[*-] "#, options: .regularExpression) {
+            let leadingSpaces = line.prefix(while: { $0 == " " || $0 == "\t" })
+            let level = (leadingSpaces.count / 2) + 1 // 0 spaces = level 1, 2 spaces = level 2, etc.
+            let prefixLength = line.distance(from: line.startIndex, to: match.upperBound)
+            applyBulletList(range: range, prefixLength: prefixLength, level: level)
         }
         // Ordered list
-        else if line.range(of: #"^\d+\. "#, options: .regularExpression) != nil {
-            applyListIndent(range: range)
-        }
-        // Checkmarks
-        else if line.hasPrefix("- [x] ") || line.hasPrefix("- [ ] ") ||
-                    line.hasPrefix("* [x] ") || line.hasPrefix("* [ ] ") {
-            applyListIndent(range: range)
+        else if let match = line.range(of: #"^(\s*)\d+\. "#, options: .regularExpression) {
+            let leadingSpaces = line.prefix(while: { $0 == " " || $0 == "\t" })
+            let level = (leadingSpaces.count / 2) + 1
+            let prefixLength = line.distance(from: line.startIndex, to: match.upperBound)
+            applyOrderedList(range: range, prefixLength: prefixLength, level: level)
         }
     }
 
@@ -120,11 +151,44 @@ final class MarkdownTextStorage: NSTextStorage {
         }
     }
 
-    private func applyListIndent(range: NSRange) {
+    private static let indentPerLevel: CGFloat = 8
+
+    /// Custom attribute to mark bullet characters that were replaced from `-` or `*`.
+    private static let bulletMarkerKey = NSAttributedString.Key("noto.bulletMarker")
+
+    private func applyBulletList(range: NSRange, prefixLength: Int, level: Int) {
+        let indent = Self.indentPerLevel * CGFloat(level)
+
         let style = NSMutableParagraphStyle()
         style.lineSpacing = 4
-        style.headIndent = 20
-        style.firstLineHeadIndent = 0
+        style.firstLineHeadIndent = indent - Self.indentPerLevel
+        style.headIndent = indent
+        backing.addAttribute(.paragraphStyle, value: style, range: range)
+
+        // Hide leading whitespace
+        let prefixStr = (backing.string as NSString).substring(with: NSRange(location: range.location, length: prefixLength))
+        let leadingSpaceCount = prefixStr.prefix(while: { $0 == " " || $0 == "\t" }).count
+        if leadingSpaceCount > 0 {
+            backing.addAttribute(.foregroundColor, value: UIColor.clear, range: NSRange(location: range.location, length: leadingSpaceCount))
+        }
+
+        // Replace `-` or `*` with `•`
+        let bulletCharRange = NSRange(location: range.location + leadingSpaceCount, length: 1)
+        let originalChar = (backing.string as NSString).substring(with: bulletCharRange)
+        if originalChar == "-" || originalChar == "*" {
+            backing.replaceCharacters(in: bulletCharRange, with: "•")
+            backing.addAttribute(Self.bulletMarkerKey, value: originalChar, range: bulletCharRange)
+            backing.addAttribute(.foregroundColor, value: Self.bodyColor, range: bulletCharRange)
+        }
+    }
+
+    private func applyOrderedList(range: NSRange, prefixLength: Int, level: Int) {
+        let indent = Self.indentPerLevel * CGFloat(level)
+
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = 4
+        style.firstLineHeadIndent = indent - Self.indentPerLevel
+        style.headIndent = indent
         backing.addAttribute(.paragraphStyle, value: style, range: range)
     }
 
@@ -190,6 +254,13 @@ final class MarkdownTextStorage: NSTextStorage {
     }
 
     func markdownContent() -> String {
-        backing.string
+        let result = NSMutableString(string: backing.string)
+        // Reverse bullet replacements: `•` back to original `-` or `*`
+        backing.enumerateAttribute(Self.bulletMarkerKey, in: NSRange(location: 0, length: backing.length)) { value, attrRange, _ in
+            if let original = value as? String {
+                result.replaceCharacters(in: attrRange, with: original)
+            }
+        }
+        return result as String
     }
 }

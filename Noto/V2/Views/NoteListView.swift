@@ -6,11 +6,36 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 /// Root entry point — wraps FolderContentView in a NavigationStack.
 struct NoteListView: View {
     @ObservedObject var store: MarkdownNoteStore
+    var locationManager: VaultLocationManager?
+    @State private var showTodayNote = false
+    @State private var todayNoteData: (store: MarkdownNoteStore, note: MarkdownNote)?
+    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
-            FolderContentView(store: store, title: "Notes")
+            FolderContentView(
+                store: store,
+                title: "Notes",
+                isRoot: true,
+                onTodayTap: openTodayNote,
+                onSettingsTap: locationManager != nil ? { showSettings = true } : nil
+            )
+            .navigationDestination(isPresented: $showTodayNote) {
+                if let data = todayNoteData {
+                    NoteEditorScreen(store: data.store, note: data.note)
+                }
+            }
+            .navigationDestination(isPresented: $showSettings) {
+                if let locationManager {
+                    SettingsView(locationManager: locationManager)
+                }
+            }
         }
+    }
+
+    private func openTodayNote() {
+        todayNoteData = store.todayNote()
+        showTodayNote = true
     }
 }
 
@@ -18,6 +43,9 @@ struct NoteListView: View {
 struct FolderContentView: View {
     @ObservedObject var store: MarkdownNoteStore
     let title: String
+    var isRoot: Bool = false
+    var onTodayTap: (() -> Void)?
+    var onSettingsTap: (() -> Void)?
 
     @State private var showNewFolderAlert = false
     @State private var newFolderName = ""
@@ -59,17 +87,31 @@ struct FolderContentView: View {
             }
         }
         .toolbar {
+            if isRoot {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { onTodayTap?() }) {
+                        Label("Today", systemImage: "calendar")
+                    }
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button(action: createNote) {
-                        Label("New Note", systemImage: "doc.badge.plus")
+                HStack(spacing: 16) {
+                    if isRoot, let onSettingsTap {
+                        Button(action: onSettingsTap) {
+                            Image(systemName: "gearshape")
+                        }
                     }
-                    Button(action: { showNewFolderAlert = true }) {
-                        Label("New Folder", systemImage: "folder.badge.plus")
+                    Menu {
+                        Button(action: createNote) {
+                            Label("New Note", systemImage: "doc.badge.plus")
+                        }
+                        Button(action: { showNewFolderAlert = true }) {
+                            Label("New Folder", systemImage: "folder.badge.plus")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .accessibilityLabel("Add")
                     }
-                } label: {
-                    Image(systemName: "plus")
-                        .accessibilityLabel("Add")
                 }
             }
         }
