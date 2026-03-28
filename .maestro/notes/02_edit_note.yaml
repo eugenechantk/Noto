@@ -1,0 +1,26 @@
+appId: com.eugenechan.Noto
+name: "Open and edit an existing note"
+tags:
+  - notes
+---
+- launchApp:
+    clearState: true
+- runFlow: ../common/setup_vault.yaml
+# Create first note
+- runFlow: ../common/create_note.yaml
+- inputText: "First Note"
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "First Note"
+    timeout: 5000
+# Create a second note to verify multiple notes work
+- runFlow: ../common/create_note.yaml
+- inputText: "Second Note"
+- stopApp
+- launchApp
+# Both notes should appear
+- extendedWaitUntil:
+    visible: "First Note"
+    timeout: 5000
+- assertVisible: "Second Note"

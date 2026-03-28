@@ -103,6 +103,7 @@ struct MarkdownEditorView: UIViewRepresentable {
         textView.autocorrectionType = .default
         textView.autocapitalizationType = .sentences
         textView.keyboardDismissMode = .interactive
+        textView.accessibilityIdentifier = "note_editor"
         textView.delegate = context.coordinator
         textView.inputAccessoryView = context.coordinator.makeKeyboardToolbar(for: textView)
 

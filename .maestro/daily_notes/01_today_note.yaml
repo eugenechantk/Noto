@@ -1,0 +1,18 @@
+appId: com.eugenechan.Noto
+name: "Open today's note"
+tags:
+  - daily
+---
+- launchApp:
+    clearState: true
+- runFlow: ../common/setup_vault.yaml
+# Tap today button
+- tapOn:
+    id: "today_button"
+# Verify editor opens
+- assertVisible:
+    id: "note_editor"
+# Relaunch to verify Daily Notes folder was created
+- stopApp
+- launchApp
+- assertVisible: "Daily Notes"

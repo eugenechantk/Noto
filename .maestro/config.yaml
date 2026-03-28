@@ -1,0 +1,10 @@
+flows:
+  - notes/*
+  - navigation/*
+  - daily_notes/*
+
+excludeTags:
+  - util
+
+executionOrder:
+  continueOnFailure: false

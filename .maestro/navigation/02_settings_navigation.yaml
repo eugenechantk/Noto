@@ -1,0 +1,23 @@
+appId: com.eugenechan.Noto
+name: "Navigate to settings and back"
+tags:
+  - navigation
+---
+- launchApp:
+    clearState: true
+- runFlow: ../common/setup_vault.yaml
+
+# Tap settings
+- tapOn:
+    id: "settings_button"
+
+# Verify settings screen
+- assertVisible: "Settings"
+- assertVisible: "Vault Location"
+
+# Go back
+- runFlow: ../common/go_back.yaml
+
+# Verify we're back at note list
+- assertVisible:
+    id: "note_list"

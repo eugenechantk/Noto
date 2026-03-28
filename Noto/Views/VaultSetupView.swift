@@ -46,6 +46,7 @@ struct VaultSetupView: View {
                         .padding()
                     }
                     .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
+                    .accessibilityIdentifier("choose_location_button")
 
                     Button(action: { locationManager.setLocalVault() }) {
                         HStack {
@@ -65,6 +66,7 @@ struct VaultSetupView: View {
                         .padding()
                     }
                     .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
+                    .accessibilityIdentifier("local_vault_button")
                 }
             }
             .padding(.horizontal)

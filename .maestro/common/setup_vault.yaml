@@ -1,0 +1,16 @@
+appId: com.eugenechan.Noto
+name: "Setup vault (reusable)"
+tags:
+  - util
+---
+# If vault setup screen is visible, tap "On This Device" to skip it
+- runFlow:
+    when:
+      visible: "Welcome to Noto"
+    commands:
+      - tapOn:
+          id: "local_vault_button"
+      - extendedWaitUntil:
+          visible:
+            id: "note_list"
+          timeout: 5000

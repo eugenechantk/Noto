@@ -1,0 +1,9 @@
+appId: com.eugenechan.Noto
+name: "Navigate back from editor (reusable)"
+tags:
+  - util
+---
+# Tap on the system back button area (top-left corner, iOS nav bar)
+# This avoids keyboard interaction issues with swipe gestures
+- tapOn:
+    point: "10%,6%"

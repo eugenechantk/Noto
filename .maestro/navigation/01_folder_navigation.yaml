@@ -1,0 +1,30 @@
+appId: com.eugenechan.Noto
+name: "Create and navigate into a folder"
+tags:
+  - navigation
+---
+- launchApp:
+    clearState: true
+- runFlow: ../common/setup_vault.yaml
+
+# Create a folder
+- tapOn:
+    id: "add_menu"
+- tapOn: "New Folder"
+- inputText: "Projects"
+- tapOn: "Create"
+
+# Verify folder appears
+- assertVisible: "Projects"
+
+# Navigate into folder
+- tapOn: "Projects"
+
+# The folder should be empty
+- assertVisible: "Empty"
+
+# Go back
+- runFlow: ../common/go_back.yaml
+
+# Verify we're back at root
+- assertVisible: "Projects"

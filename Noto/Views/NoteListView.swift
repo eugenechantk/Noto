@@ -6,7 +6,7 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 // MARK: - Navigation Route
 
 enum NoteRoute: Hashable {
-    case note(MarkdownNote, directoryURL: URL, vaultRootURL: URL)
+    case note(MarkdownNote, directoryURL: URL, vaultRootURL: URL, isNew: Bool = false)
     case folder(folderURL: URL, name: String, vaultRootURL: URL)
     case settings
     case todayNote
@@ -32,10 +32,11 @@ struct NoteListView: View {
             )
             .navigationDestination(for: NoteRoute.self) { route in
                 switch route {
-                case .note(let note, let directoryURL, let vaultRootURL):
+                case .note(let note, let directoryURL, let vaultRootURL, let isNew):
                     NoteEditorScreen(
                         store: MarkdownNoteStore(directoryURL: directoryURL, vaultRootURL: vaultRootURL),
                         note: note,
+                        isNew: isNew,
                         fileWatcher: fileWatcher
                     )
                 case .folder(let folderURL, let name, let vaultRootURL):
@@ -104,6 +105,7 @@ struct FolderContentView: View {
                     } label: {
                         FolderRow(folder: folder)
                     }
+                    .accessibilityIdentifier("folder_\(folder.name)")
                 case .note(let note):
                     Button {
                         path.append(NoteRoute.note(
@@ -114,11 +116,13 @@ struct FolderContentView: View {
                     } label: {
                         MarkdownNoteRow(note: note)
                     }
+                    .accessibilityIdentifier("note_\(note.title)")
                 }
             }
             .onDelete(perform: deleteItems)
         }
         .listStyle(.plain)
+        .accessibilityIdentifier("note_list")
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -128,6 +132,7 @@ struct FolderContentView: View {
                         Label("Today", systemImage: "calendar")
                     }
                     .buttonStyle(.glass)
+                    .accessibilityIdentifier("today_button")
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -137,19 +142,23 @@ struct FolderContentView: View {
                             Image(systemName: "gearshape")
                         }
                         .buttonStyle(.glass)
+                        .accessibilityIdentifier("settings_button")
                     }
                     Menu {
                         Button(action: createNote) {
                             Label("New Note", systemImage: "doc.badge.plus")
                         }
+                        .accessibilityIdentifier("new_note_button")
                         Button(action: { showNewFolderAlert = true }) {
                             Label("New Folder", systemImage: "folder.badge.plus")
                         }
+                        .accessibilityIdentifier("new_folder_button")
                     } label: {
                         Image(systemName: "plus")
                             .accessibilityLabel("Add")
                     }
                     .buttonStyle(.glass)
+                    .accessibilityIdentifier("add_menu")
                 }
             }
         }
@@ -163,6 +172,9 @@ struct FolderContentView: View {
                 newFolderName = ""
             }
             Button("Cancel", role: .cancel) { newFolderName = "" }
+        }
+        .onAppear {
+            store.loadItems()
         }
         .overlay {
             if store.items.isEmpty {
@@ -181,7 +193,8 @@ struct FolderContentView: View {
         path.append(NoteRoute.note(
             note,
             directoryURL: store.directoryURL,
-            vaultRootURL: store.vaultRootURL
+            vaultRootURL: store.vaultRootURL,
+            isNew: true
         ))
     }
 
