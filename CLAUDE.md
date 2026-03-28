@@ -4,213 +4,146 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Noto is a universal Apple (iOS/macOS) outline-based note-taking app. Each note entry is a **Block** that can be infinitely nested. The app uses SwiftUI + SwiftData for the UI/data layer, with a custom UIKit TextKit 1 stack for rich text editing.
+Noto is an iOS note-taking app where every note is a **markdown file on disk**. Folders are real directories. The filesystem is the source of truth — no database for content storage.
 
-All business logic lives in **local Swift packages** (`Packages/`) that are independently buildable and testable via CLI (`swift build` / `swift test`). The Xcode app target is a thin UI shell. See the Architecture section for the full package map and design rationale.
+The app is a **clean-sheet rewrite** (v2) of an earlier outline-based version. V1 code is preserved in `archive/` for reference but is not imported or compiled. The v2 brainstorm and design docs live in `.claude/Noto v2/`.
 
-Minimal external dependencies — only USearch (via NotoHNSW) for vector search. Everything else uses pure Apple frameworks.
+**Key concepts:**
 
-## Simulator Isolation (IMPORTANT)
+- Notes are `.md` files with YAML frontmatter (UUID, timestamps)
+- A "vault" is a user-chosen root directory containing all notes
+- Daily notes auto-create in a `Daily Notes/` folder, one per day
+- Note templates pre-populate content for specific note types (e.g. daily reflections)
+- Markdown rendering with live syntax highlighting (headings, bold, italic, lists, checkmarks, code)
+- All actions can be done by AI agents as well, not just by the user using GUI
 
-Multiple Claude Code sessions and worktrees may run concurrently. **Each session MUST use its own dedicated simulator** to avoid conflicts. Use XcodeBuildMCP MCP tools for all simulator and build operations.
+**No external dependencies.** Pure Apple frameworks only.
 
-### Setup (do this once before first build/test/simulator use in a session)
+## Principles
+
+1. **Packages for all non-UI logic.** Any code that doesn't require UIKit/SwiftUI/AppKit must live in a local Swift package under `Packages/`. This ensures it can be built and tested independently via `swift build` / `swift test` — no Xcode project or simulator needed. The app target is a thin UI shell that imports packages; it should never contain business logic, data transformations, or service code.
+
+2. **Test everything, regress nothing.** All work must be validated before it's considered done:
+   - Write or update unit tests for any new or changed logic (package-level tests via `swift test`, app-level tests via `test_sim`).
+   - Run the full relevant test suite — not just the new tests — to catch regressions against existing features.
+   - For UI changes, build and deploy to the simulator, then visually verify with `snapshot_ui` and `screenshot`.
+
+## Development Workflow
+
+These are the standard workflows for all development work on this project. Follow them every time.
+
+### New features → `/ios-development` skill
+
+When asked to build any new feature or enhancement, always load and follow the `/ios-development` skill. This ensures a consistent flow: feature doc → tests → implementation → simulator verification.
+
+### Bug fixes and corrections → `/ios-debug-flow` skill
+
+When asked to fix a bug, or when something built doesn't work as expected, always load and follow the `/ios-debug-flow` skill. This ensures structured debugging: reproduce → diagnose → fix → verify.
+
+## Architecture
+
+### Storage Model: Filesystem + Markdown
+
+```
+Vault/                          # user-chosen root folder
+  Daily Notes/
+    2026-03-16.md
+  Projects/
+    Project Alpha.md
+```
+
+Each `.md` file has YAML frontmatter:
+
+```yaml
+---
+id: 550e8400-e29b-41d4-a716-446655440000
+created: 2026-03-16T09:30:00Z
+modified: 2026-03-16T14:22:00Z
+---
+```
+
+The frontmatter UUID is the note's permanent identity. Filenames can change freely.
+
+### App Target (`Noto/`)
+
+Thin UI shell — SwiftUI views + UIKit TextKit 1 bridge for the editor.
+
+```
+Noto/
+  NotoApp.swift              # App entry: vault setup → main app flow
+  Storage/
+    VaultLocationManager     # Persists vault location via security-scoped bookmark
+    MarkdownNoteStore        # Note CRUD: list, create, read, write, delete .md files
+    NoteTemplate             # Templates for note creation (daily note prompts)
+  Editor/
+    MarkdownTextStorage      # NSTextStorage subclass — live markdown syntax highlighting
+    MarkdownEditorView       # UIKit UITextView wrapped for SwiftUI
+  Views/
+    NoteListView             # Main list of notes with folder navigation
+    NoteEditorScreen         # Full editor screen (wraps MarkdownEditorView)
+    VaultSetupView           # First-launch vault picker
+    SettingsView             # App settings
+```
+
+### Packages (`Packages/`)
+
+Business logic extracted into local Swift packages, independently testable via CLI.
+
+```
+Packages/
+  NotoVault/                 # Filesystem I/O: read/write .md files, frontmatter parsing
+    Sources/NotoVault/
+      VaultManager           # File CRUD: list, read, write, delete notes in vault dir
+      NoteFile               # Note model: id, content, title (derived from first line), dates
+      Frontmatter            # YAML frontmatter parser/serializer (id, created, modified)
+```
+
+Currently only one package. New packages will be added as features grow (search index, mentions, embeddings — see brainstorm doc).
+
+### When to Create a New Package vs. Add to Existing
+
+- **New package**: Distinct responsibility with its own testable surface (e.g. search index, mention resolution, embedding pipeline).
+- **Add to existing**: Utility or extension within an existing package's domain.
+- **Never in app target**: If the code doesn't require UIKit/SwiftUI/AppKit, it belongs in a package.
+
+### Archive (`archive/`)
+
+V1 code preserved for reference. Not compiled, not imported.
+
+```
+archive/
+  Noto/          # V1 app code (outline editor, AI chat views, TextKit stack)
+  Packages/      # V1 packages (NotoModels, NotoCore, NotoFTS5, NotoHNSW, etc.)
+  NotoUITests/   # V1 UI tests
+  NotoTests/     # V1 unit tests
+```
+
+## Build & Test
+
+Use the `/flowdeck` skill for **all** build, test, simulator, and device operations. Do not use xcodebuildmcp MCP tools directly.
 
 ```bash
-# 1. Create a dedicated simulator clone with a unique name
-SIM_NAME="Noto-$(uuidgen | head -c 8)"
-SIM_UDID=$(xcrun simctl clone "iPhone 16 Pro" "$SIM_NAME" | tail -1)
-echo "Session simulator: $SIM_NAME ($SIM_UDID)"
-```
-
-Then set session defaults via the `session_set_defaults` MCP tool:
-```
-session_set_defaults({
-  projectPath: "/Users/eugenechan/dev/personal/Noto/Noto.xcodeproj",
-  scheme: "Noto",
-  simulatorId: "$SIM_UDID"
-})
-```
-
-Then boot the simulator via the `boot_sim` MCP tool.
-
-**Store `$SIM_UDID` and use it for ALL subsequent commands in the session.** Never use a shared simulator name or `booted`.
-
-### Cleanup (do this when all testing/building is done)
-
-```bash
-xcrun simctl shutdown "$SIM_UDID"
-xcrun simctl delete "$SIM_UDID"
-```
-
-Then clear session defaults via the `session_clear_defaults` MCP tool.
-
-### Housekeeping (remove orphaned session simulators)
-
-```bash
-xcrun simctl list devices | grep "Noto-" | grep -oE '[0-9A-F-]{36}' | xargs -I{} xcrun simctl delete {}
-```
-
-## Build & Test Commands
-
-All commands use session defaults set via `session_set_defaults` MCP tool (see Simulator Isolation above).
-
-```bash
-# ── Package-level (preferred for logic testing — no simulator needed) ──
-# Test a single package
-cd Packages/NotoCore && swift test
+# Package-level (preferred for logic testing — no simulator needed)
+cd Packages/NotoVault && swift test
 
 # Test all packages
 for pkg in Packages/*/; do (cd "$pkg" && swift test); done
 ```
 
-**App-level (requires simulator — use for UI integration):**
+For app-level builds, tests, simulator management, UI automation, log capture, device install — use `/flowdeck`.
 
-Use XcodeBuildMCP MCP tools (session defaults provide project/scheme/simulator automatically):
+### Simulator Isolation
 
-| Task | MCP Tool |
-|------|----------|
-| Build only (compile check) | `build_sim` |
-| Build + install + launch | `build_run_sim` |
-| Run all unit tests | `test_sim` |
-| Run specific tests | `test_sim` with `extraArgs: ["-only-testing:NotoTests/BlockTests"]` |
-| Start log capture | `start_sim_log_cap` with `subsystemFilter: "app"` |
-| Stop log capture + get logs | `stop_sim_log_cap` with the `logSessionId` |
-| Launch app (already built) | `launch_app_sim` or `launch_app_logs_sim` |
-| Stop running app | `stop_app_sim` |
+Multiple Claude Code sessions may run concurrently. Each session MUST use its own dedicated simulator to avoid conflicts. Use flowdeck to create, boot, and manage session simulators.
 
-### UI Inspection
+## Unit Testing
 
-Use XcodeBuildMCP MCP tools:
-
-| Task | MCP Tool |
-|------|----------|
-| Accessibility tree (AXLabel, AXValue, role, frame, etc.) | `snapshot_ui` |
-| Screenshot (returns path or base64) | `screenshot` |
-
-For UI automation via the CLI:
-```bash
-# Tap by accessibility label
-xcodebuildmcp ui-automation tap --simulator-id "$SIM_UDID" --label "Search"
-
-# Tap by accessibility identifier
-xcodebuildmcp ui-automation tap --simulator-id "$SIM_UDID" --id "searchButton"
-
-# Type text
-xcodebuildmcp ui-automation type-text --simulator-id "$SIM_UDID" --text "hello"
-
-# Swipe/scroll
-xcodebuildmcp ui-automation gesture --simulator-id "$SIM_UDID" --preset scroll-down
-```
-
-### Physical Device (iPhone)
-
-Use the XcodeBuildMCP CLI for device workflows:
-```bash
-# List connected devices
-xcodebuildmcp device list
-
-# Build for device
-xcodebuildmcp device build --scheme Noto --project-path ./Noto.xcodeproj
-
-# Get built app path and bundle ID
-xcodebuildmcp device get-app-path --scheme Noto --project-path ./Noto.xcodeproj
-xcodebuildmcp device get-app-bundle-id --app-path /path/to/Noto.app
-
-# Install and launch on device
-xcodebuildmcp device install --device-id <DEVICE_UDID> --app-path /path/to/Noto.app
-xcodebuildmcp device launch --device-id <DEVICE_UDID> --bundle-id <BUNDLE_ID>
-```
-
-## Architecture
-
-### Core Principle: Swift Packages with CLI-Testable Logic, Thin UI Shell
-
-All business logic, data models, and services are extracted into **local Swift packages** under `Packages/`. The Xcode app target (`Noto/`) is a **thin shell** containing only UI views, controllers, and TextKit bridging code that imports and calls into these packages. Nothing in `Noto/` should contain business logic that could live in a package.
-
-**Why this architecture:**
-- **Independent testability**: Each package can be built and tested via `swift build` / `swift test` from the CLI, without Xcode or a simulator. This makes tests fast, parallelizable, and CI-friendly.
-- **Clear boundaries**: Packages enforce explicit dependency graphs. A package can only use what it declares in its `Package.swift` dependencies — no implicit coupling.
-- **Faster iteration**: Changes to a package only recompile that package and its dependents, not the entire app. CLI tests run in seconds vs. minutes for simulator-based tests.
-- **Reusability**: Packages can be shared across targets (app, extensions, widgets) without duplicating code.
-
-### Package Dependency Graph
-
-```
-Packages/
-├── NotoModels          ← SwiftData @Model classes (Block, Tag, BlockLink, etc.)
-├── NotoCore            ← Core utilities (BlockBuilder, BreadcrumbBuilder, PlainTextExtractor)
-│   └── depends on: NotoModels
-├── NotoDirtyTracker    ← Change tracking for incremental indexing
-│   └── depends on: NotoModels, NotoCore
-├── NotoEmbedding       ← CoreML embedding model + BERT tokenizer (no deps on other Noto packages)
-├── NotoFTS5            ← SQLite FTS5 full-text search engine
-│   └── depends on: NotoModels, NotoCore, NotoDirtyTracker
-├── NotoHNSW            ← HNSW vector index (USearch) for semantic search
-│   └── depends on: NotoModels, NotoCore, NotoDirtyTracker, NotoEmbedding, USearch (external)
-├── NotoSearch          ← Hybrid search orchestrator (FTS5 + semantic + date filtering)
-│   └── depends on: NotoModels, NotoCore, NotoDirtyTracker, NotoFTS5, NotoHNSW, NotoEmbedding
-└── NotoTodayNotes      ← "Today" notes service
-    └── depends on: NotoModels, NotoCore
-```
-
-**Note:** `NotoHNSW` (via USearch) is the only package with an external dependency. All others use pure Apple frameworks.
-
-### App Target (`Noto/`) — UI & Controllers Only
-
-The Xcode app target contains only:
-- **Views** (`Views/`, `ContentView.swift`): SwiftUI views that call package methods
-- **TextKit bridge** (`TextKit/`): UIKit TextKit 1 stack wrapped for SwiftUI (NoteTextStorage, NoteTextView, NoteTextEditor)
-- **App entry** (`NotoApp.swift`): SwiftData schema registration, container setup
-
-### Building & Testing Packages from CLI
-
-```bash
-# Build a single package
-cd Packages/NotoModels && swift build
-
-# Test a single package
-cd Packages/NotoCore && swift test
-
-# Test all packages (from repo root)
-for pkg in Packages/*/; do (cd "$pkg" && swift test); done
-```
-
-This is the **preferred way to test logic** — only use `xcodebuild` / simulator when testing UI integration.
-
-### When to Create a New Package vs. Add to Existing
-
-- **New package**: When the feature has a distinct responsibility and its own testable surface (e.g., a new search engine, a sync service, a new data pipeline).
-- **Add to existing**: When the code is a utility or extension that naturally belongs to an existing package's domain (e.g., a new query helper belongs in NotoCore).
-- **Never in app target**: If the code doesn't require UIKit/SwiftUI/AppKit, it belongs in a package.
-
-### Key Data Patterns
-
-- **Fractional indexing**: `Block.sortOrder` (Double) avoids rewriting siblings on reorder. Use `sortOrderBetween(_:_:)` for insertions.
-- **Denormalized depth**: `Block.depth` cached for query efficiency; must be updated via `move(to:sortOrder:)` which cascades to descendants.
-- **Parent finding**: Walk backward through flat list for nearest block at `depth - 1`.
-- **Content sync** (`ContentView.syncContent`): Parses `editableContent` lines → updates/creates/deletes Blocks to match. Guarded by `isSyncing` flag to prevent re-entrancy.
-- **Reorder** (`ContentView.reorderBlock`): Removes block from flat list, reinserts at destination, adjusts depth, reconciles all parents, reassigns sequential sortOrders.
-
-### UI Testing
-
-- `NotoApp.swift` checks for `-UITesting` launch argument or `UITESTING=1` env var to use in-memory ModelContainer
-- UI tests use `app.launchArguments = ["-UITesting"]` + `app.launchEnvironment["UITESTING"] = "1"` for isolation
-- Coordinate-based `tapOnLine()` is unreliable for non-zero line indices in XCUITest; prefer natural cursor position (always on last line after `typeText`)
-- After `loadNote()`, cursor resets to end of text
-
-### Unit Testing
-
-Uses Swift Testing framework (`@Test` macro, `#expect`), not XCTest assertions. Test container helper:
-```swift
-@MainActor
-func createTestContainer() throws -> ModelContainer  // in-memory, all models registered
-```
+Uses Swift Testing framework (`@Test` macro, `#expect`), not XCTest assertions.
 
 ## Conventions
 
 - **Logging**: Always use `os_log` (`Logger`) instead of `print()`. Pattern: `private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "ClassName")`
 - **SwiftLint**: `line_length` and `identifier_name` rules are disabled
-- PRD documents live in `.claude/` directory (PRD-data-structure.md, PRD-user-interface-v1.md)
-- **Testing & Simulator**: Use XcodeBuildMCP MCP tools (`build_sim`, `build_run_sim`, `test_sim`, `snapshot_ui`, `screenshot`, etc.) for all simulator build/run/test/UI inspection. Use the `xcodebuildmcp` CLI for device workflows and UI automation (tap, type, swipe). Set session defaults via `session_set_defaults` at session start to avoid repeating project/scheme/simulator on every call.
-- **UI/UX tasks**: When working on any UI or UX related task (layout changes, styling, new views, design implementation, visual updates), always build and deploy to the simulator after making changes, then use `snapshot_ui` and `screenshot` MCP tools to visually verify the result. Do not consider a UI/UX task complete without visual confirmation on the simulator.
+- **Design docs**: PRD and brainstorm documents live in `.claude/` directory
+- **Build & Simulator**: Use `/flowdeck` for all simulator build/run/test/UI inspection and device workflows.
+- **UI/UX tasks**: Always build and deploy to the simulator after making UI changes, then visually verify with screenshots. Do not consider a UI/UX task complete without visual confirmation.

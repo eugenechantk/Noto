@@ -7,6 +7,7 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 struct NoteListView: View {
     @ObservedObject var store: MarkdownNoteStore
     var locationManager: VaultLocationManager?
+    var fileWatcher: VaultFileWatcher?
     @State private var showTodayNote = false
     @State private var todayNoteData: (store: MarkdownNoteStore, note: MarkdownNote)?
     @State private var showSettings = false
@@ -17,12 +18,13 @@ struct NoteListView: View {
                 store: store,
                 title: "Notes",
                 isRoot: true,
+                fileWatcher: fileWatcher,
                 onTodayTap: openTodayNote,
                 onSettingsTap: locationManager != nil ? { showSettings = true } : nil
             )
             .navigationDestination(isPresented: $showTodayNote) {
                 if let data = todayNoteData {
-                    NoteEditorScreen(store: data.store, note: data.note)
+                    NoteEditorScreen(store: data.store, note: data.note, fileWatcher: fileWatcher)
                 }
             }
             .navigationDestination(isPresented: $showSettings) {
@@ -44,6 +46,7 @@ struct FolderContentView: View {
     @ObservedObject var store: MarkdownNoteStore
     let title: String
     var isRoot: Bool = false
+    var fileWatcher: VaultFileWatcher?
     var onTodayTap: (() -> Void)?
     var onSettingsTap: (() -> Void)?
 
@@ -63,14 +66,15 @@ struct FolderContentView: View {
                                 directoryURL: folder.folderURL,
                                 vaultRootURL: store.vaultRootURL
                             ),
-                            title: folder.name
+                            title: folder.name,
+                            fileWatcher: fileWatcher
                         )
                     } label: {
                         FolderRow(folder: folder)
                     }
                 case .note(let note):
                     NavigationLink {
-                        NoteEditorScreen(store: store, note: note)
+                        NoteEditorScreen(store: store, note: note, fileWatcher: fileWatcher)
                     } label: {
                         MarkdownNoteRow(note: note)
                     }
@@ -83,7 +87,7 @@ struct FolderContentView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $shouldNavigateToNew) {
             if let note = navigateToNewNote {
-                NoteEditorScreen(store: store, note: note, isNew: true)
+                NoteEditorScreen(store: store, note: note, isNew: true, fileWatcher: fileWatcher)
             }
         }
         .toolbar {
@@ -136,7 +140,6 @@ struct FolderContentView: View {
                 .allowsHitTesting(false)
             }
         }
-        .onAppear { store.loadItems() }
     }
 
     private func createNote() {

@@ -133,14 +133,9 @@ final class MarkdownNoteStore: ObservableObject {
     }
 
     private func ensureDirectoryExists() {
-        let fm = FileManager.default
-        if !fm.fileExists(atPath: directoryURL.path) {
-            do {
-                try fm.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-                logger.info("Created directory at \(self.directoryURL.path)")
-            } catch {
-                logger.error("Failed to create directory: \(error)")
-            }
+        if !FileManager.default.fileExists(atPath: directoryURL.path) {
+            CoordinatedFileManager.createDirectory(at: directoryURL)
+            logger.info("Created directory at \(self.directoryURL.path)")
         }
     }
 
@@ -169,10 +164,8 @@ final class MarkdownNoteStore: ObservableObject {
             } else if url.pathExtension == "md" {
                 let title: String
                 let noteId: UUID
-                if let handle = try? FileHandle(forReadingFrom: url) {
-                    let data = handle.readData(ofLength: 1024)
-                    handle.closeFile()
-                    let snippet = String(data: data, encoding: .utf8) ?? ""
+                if let data = CoordinatedFileManager.readPrefix(from: url, maxBytes: 1024),
+                   let snippet = String(data: data, encoding: .utf8) {
                     title = MarkdownNote.titleFrom(snippet)
                     noteId = MarkdownNote.idFromFrontmatter(snippet)
                         ?? UUID(uuid: UUID.nameToUUID(url.path))
@@ -211,7 +204,7 @@ final class MarkdownNoteStore: ObservableObject {
     }
 
     func readContent(of note: MarkdownNote) -> String {
-        (try? String(contentsOf: note.fileURL, encoding: .utf8)) ?? ""
+        CoordinatedFileManager.readString(from: note.fileURL) ?? ""
     }
 
     func createNote() -> MarkdownNote {
@@ -220,10 +213,8 @@ final class MarkdownNoteStore: ObservableObject {
         let fileURL = directoryURL.appendingPathComponent(filename)
         let initialContent = MarkdownNote.makeFrontmatter(id: id) + "# "
 
-        do {
-            try initialContent.write(to: fileURL, atomically: true, encoding: .utf8)
-        } catch {
-            logger.error("Failed to create note: \(error)")
+        if !CoordinatedFileManager.writeString(initialContent, to: fileURL) {
+            logger.error("Failed to create note at \(fileURL.lastPathComponent)")
         }
 
         let note = MarkdownNote(id: id, fileURL: fileURL, title: "Untitled", modifiedDate: Date())
@@ -232,36 +223,40 @@ final class MarkdownNoteStore: ObservableObject {
     }
 
     /// Saves content immediately (writes file + updates list title). Does NOT rename.
+    /// Only writes to disk and updates the `updated` timestamp if the content body has actually changed.
     @discardableResult
     func saveContent(_ content: String, for note: MarkdownNote) -> MarkdownNote {
-        do {
-            let contentToSave = MarkdownNote.updateTimestamp(in: content)
-            try contentToSave.write(to: note.fileURL, atomically: true, encoding: .utf8)
+        // Check if the body (non-frontmatter) content actually changed
+        let existingContent = CoordinatedFileManager.readString(from: note.fileURL) ?? ""
+        let existingBody = MarkdownNote.stripFrontmatter(existingContent)
+        let newBody = MarkdownNote.stripFrontmatter(content)
 
-            let newTitle = MarkdownNote.titleFrom(content)
-            logger.info("[saveContent] title='\(newTitle)' file=\(note.fileURL.lastPathComponent) contentLen=\(content.count)")
-            logger.info("[saveContent] first100='\(String(content.prefix(100)))'")
-
-            let updated = MarkdownNote(
-                id: note.id,
-                fileURL: note.fileURL,
-                title: newTitle,
-                modifiedDate: Date()
-            )
-
-            if let idx = items.firstIndex(where: { $0.id == note.id }) {
-                items.remove(at: idx)
-                items.insert(.note(updated), at: folderCount)
-                logger.info("[saveContent] updated items at idx=\(idx)")
-            } else {
-                logger.warning("[saveContent] note id=\(note.id) NOT FOUND in items (count=\(self.items.count))")
-            }
-
-            return updated
-        } catch {
-            logger.error("Failed to save note: \(error)")
+        guard existingBody != newBody else {
+            // No body change — don't write, don't update timestamp, don't touch items
             return note
         }
+
+        let contentToSave = MarkdownNote.updateTimestamp(in: content)
+        guard CoordinatedFileManager.writeString(contentToSave, to: note.fileURL) else {
+            logger.error("Failed to save note \(note.fileURL.lastPathComponent)")
+            return note
+        }
+
+        let newTitle = MarkdownNote.titleFrom(content)
+
+        let updated = MarkdownNote(
+            id: note.id,
+            fileURL: note.fileURL,
+            title: newTitle,
+            modifiedDate: Date()
+        )
+
+        if let idx = items.firstIndex(where: { $0.id == note.id }) {
+            items.remove(at: idx)
+            items.insert(.note(updated), at: folderCount)
+        }
+
+        return updated
     }
 
     /// Renames the file to match the note title. Returns updated note with new fileURL.
@@ -281,27 +276,26 @@ final class MarkdownNoteStore: ObservableObject {
 
         guard !FileManager.default.fileExists(atPath: newURL.path) else { return note }
 
-        do {
-            try FileManager.default.moveItem(at: note.fileURL, to: newURL)
-            logger.info("Renamed note to \(sanitized).md")
-
-            let updated = MarkdownNote(
-                id: note.id,
-                fileURL: newURL,
-                title: note.title,
-                modifiedDate: note.modifiedDate
-            )
-
-            if let idx = items.firstIndex(where: { $0.id == note.id }) {
-                items.remove(at: idx)
-                items.insert(.note(updated), at: folderCount)
-            }
-
-            return updated
-        } catch {
-            logger.error("Failed to rename note: \(error)")
+        guard CoordinatedFileManager.move(from: note.fileURL, to: newURL) else {
+            logger.error("Failed to rename note to \(sanitized).md")
             return note
         }
+
+        logger.info("Renamed note to \(sanitized).md")
+
+        let updated = MarkdownNote(
+            id: note.id,
+            fileURL: newURL,
+            title: note.title,
+            modifiedDate: note.modifiedDate
+        )
+
+        if let idx = items.firstIndex(where: { $0.id == note.id }) {
+            items.remove(at: idx)
+            items.insert(.note(updated), at: folderCount)
+        }
+
+        return updated
     }
 
     /// Sanitize a string for use as a filename.
@@ -317,12 +311,120 @@ final class MarkdownNoteStore: ObservableObject {
     }
 
     func deleteNote(_ note: MarkdownNote) {
-        do {
-            try FileManager.default.removeItem(at: note.fileURL)
+        if CoordinatedFileManager.delete(at: note.fileURL) {
             items.removeAll { $0.id == note.id }
-        } catch {
-            logger.error("Failed to delete note: \(error)")
+        } else {
+            logger.error("Failed to delete note \(note.fileURL.lastPathComponent)")
         }
+    }
+
+    // MARK: - Move
+
+    /// Moves a note to a different directory. Creates the destination if needed.
+    /// On filename conflict, appends (2), (3), etc. Returns the moved note.
+    @discardableResult
+    func moveNote(_ note: MarkdownNote, to destinationDirectory: URL) -> MarkdownNote {
+        // No-op if already in the destination
+        if note.fileURL.deletingLastPathComponent().standardizedFileURL == destinationDirectory.standardizedFileURL {
+            return note
+        }
+
+        // Create destination if needed
+        if !FileManager.default.fileExists(atPath: destinationDirectory.path) {
+            guard CoordinatedFileManager.createDirectory(at: destinationDirectory) else {
+                logger.error("Failed to create destination directory")
+                return note
+            }
+        }
+
+        let destURL = Self.resolveConflict(
+            for: note.fileURL.lastPathComponent,
+            in: destinationDirectory
+        )
+
+        guard CoordinatedFileManager.move(from: note.fileURL, to: destURL) else {
+            logger.error("Failed to move note to \(destURL.lastPathComponent)")
+            return note
+        }
+
+        items.removeAll { $0.id == note.id }
+        logger.info("Moved note to \(destURL.path)")
+
+        return MarkdownNote(
+            id: note.id,
+            fileURL: destURL,
+            title: note.title,
+            modifiedDate: note.modifiedDate
+        )
+    }
+
+    /// Moves a folder to a different directory. Creates the destination if needed.
+    /// On name conflict, appends (2), (3), etc. Returns the moved folder.
+    @discardableResult
+    func moveFolder(_ folder: NotoFolder, to destinationDirectory: URL) -> NotoFolder {
+        // No-op if already in the destination
+        if folder.folderURL.deletingLastPathComponent().standardizedFileURL == destinationDirectory.standardizedFileURL {
+            return folder
+        }
+
+        // Create destination if needed
+        if !FileManager.default.fileExists(atPath: destinationDirectory.path) {
+            guard CoordinatedFileManager.createDirectory(at: destinationDirectory) else {
+                logger.error("Failed to create destination directory")
+                return folder
+            }
+        }
+
+        let destURL = Self.resolveConflictForFolder(
+            named: folder.name,
+            in: destinationDirectory
+        )
+
+        guard CoordinatedFileManager.move(from: folder.folderURL, to: destURL) else {
+            logger.error("Failed to move folder to \(destURL.lastPathComponent)")
+            return folder
+        }
+
+        items.removeAll { $0.id == folder.id }
+        logger.info("Moved folder to \(destURL.path)")
+
+        return NotoFolder(
+            id: folder.id,
+            folderURL: destURL,
+            name: destURL.lastPathComponent,
+            modifiedDate: folder.modifiedDate
+        )
+    }
+
+    /// Resolves filename conflicts by appending (2), (3), etc.
+    private static func resolveConflict(for filename: String, in directory: URL) -> URL {
+        let fm = FileManager.default
+        var candidate = directory.appendingPathComponent(filename)
+        guard fm.fileExists(atPath: candidate.path) else { return candidate }
+
+        let stem = candidate.deletingPathExtension().lastPathComponent
+        let ext = candidate.pathExtension
+        var counter = 2
+        while fm.fileExists(atPath: candidate.path) {
+            let newName = ext.isEmpty ? "\(stem)(\(counter))" : "\(stem)(\(counter)).\(ext)"
+            candidate = directory.appendingPathComponent(newName)
+            counter += 1
+        }
+        return candidate
+    }
+
+    /// Resolves folder name conflicts by appending (2), (3), etc.
+    private static func resolveConflictForFolder(named name: String, in directory: URL) -> URL {
+        let fm = FileManager.default
+        var candidate = directory.appendingPathComponent(name)
+        guard fm.fileExists(atPath: candidate.path) else { return candidate }
+
+        var counter = 2
+        while fm.fileExists(atPath: candidate.path) {
+            candidate = directory.appendingPathComponent("\(name)(\(counter))")
+            counter += 1
+        }
+        return candidate
     }
 
     // MARK: - Today's Note
@@ -331,9 +433,8 @@ final class MarkdownNoteStore: ObservableObject {
     /// Today's note lives at `Daily Notes/YYYY-MM-DD.md`.
     func todayNote() -> (store: MarkdownNoteStore, note: MarkdownNote) {
         let dailyFolderURL = vaultRootURL.appendingPathComponent("Daily Notes")
-        let fm = FileManager.default
-        if !fm.fileExists(atPath: dailyFolderURL.path) {
-            try? fm.createDirectory(at: dailyFolderURL, withIntermediateDirectories: true)
+        if !FileManager.default.fileExists(atPath: dailyFolderURL.path) {
+            CoordinatedFileManager.createDirectory(at: dailyFolderURL)
         }
 
         // Filename uses ISO date for chronological sorting
@@ -348,18 +449,25 @@ final class MarkdownNoteStore: ObservableObject {
         displayFormatter.dateFormat = "dd MMM, yy (EEE)"
         let displayDate = displayFormatter.string(from: Date())
 
-        if !fm.fileExists(atPath: fileURL.path) {
+        if !FileManager.default.fileExists(atPath: fileURL.path) {
             let id = UUID()
             let template = NoteTemplate.dailyNote
             let content = MarkdownNote.makeFrontmatter(id: id) + "# \(displayDate)\n\(template.body)"
-            try? content.write(to: fileURL, atomically: true, encoding: .utf8)
+            CoordinatedFileManager.writeString(content, to: fileURL)
         }
 
-        // Read ID from frontmatter of existing file
+        // Read existing file content
+        let existingContent = CoordinatedFileManager.readString(from: fileURL) ?? ""
+
+        // Retroactively apply template to pre-existing daily notes that don't have it
+        let template = NoteTemplate.dailyNote
+        if let updated = template.applyRetroactively(to: existingContent) {
+            CoordinatedFileManager.writeString(updated, to: fileURL)
+        }
+
+        // Read ID from frontmatter
         let id: UUID
-        if let data = try? Data(contentsOf: fileURL),
-           let snippet = String(data: data, encoding: .utf8),
-           let fmId = MarkdownNote.idFromFrontmatter(snippet) {
+        if let fmId = MarkdownNote.idFromFrontmatter(existingContent) {
             id = fmId
         } else {
             id = UUID(uuid: UUID.nameToUUID(fileURL.path))
@@ -388,11 +496,7 @@ final class MarkdownNoteStore: ObservableObject {
 
     func createFolder(name: String) -> NotoFolder {
         let folderURL = directoryURL.appendingPathComponent(name)
-        do {
-            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
-        } catch {
-            logger.error("Failed to create folder: \(error)")
-        }
+        CoordinatedFileManager.createDirectory(at: folderURL)
 
         let folder = NotoFolder(
             id: UUID(uuid: UUID.nameToUUID(folderURL.path)),
@@ -408,11 +512,10 @@ final class MarkdownNoteStore: ObservableObject {
     }
 
     func deleteFolder(_ folder: NotoFolder) {
-        do {
-            try FileManager.default.removeItem(at: folder.folderURL)
+        if CoordinatedFileManager.delete(at: folder.folderURL) {
             items.removeAll { $0.id == folder.id }
-        } catch {
-            logger.error("Failed to delete folder: \(error)")
+        } else {
+            logger.error("Failed to delete folder \(folder.name)")
         }
     }
 
