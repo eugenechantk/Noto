@@ -6,9 +6,10 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 /// Manages the vault folder location — stores/resolves a security-scoped bookmark
 /// so the app can access a user-chosen folder across launches.
 @MainActor
-final class VaultLocationManager: ObservableObject {
-    @Published var vaultURL: URL?
-    @Published var isVaultConfigured: Bool = false
+@Observable
+final class VaultLocationManager {
+    var vaultURL: URL?
+    var isVaultConfigured: Bool = false
 
     private static let bookmarkKey = "vaultBookmarkData"
     private static let isLocalKey = "vaultIsLocal"

@@ -6,16 +6,17 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 /// Monitors a vault directory for external file changes (iCloud sync, other apps).
 /// Publishes `onChange` notifications debounced to avoid rapid-fire reloads.
 @MainActor
-final class VaultFileWatcher: ObservableObject {
+@Observable
+final class VaultFileWatcher {
 
     /// Fires when external changes are detected. Subscribers should reload their data.
-    @Published private(set) var changeCount: Int = 0
+    private(set) var changeCount: Int = 0
 
     /// The URL of the specific file that was last changed externally, if known.
     /// nil means the directory itself changed (add/delete) — reload everything.
-    @Published private(set) var lastChangedFileURL: URL?
+    private(set) var lastChangedFileURL: URL?
 
-    private var presenter: VaultPresenter?
+    @ObservationIgnored nonisolated(unsafe) private var presenter: VaultPresenter?
     private var debounceTask: Task<Void, Never>?
 
     /// Starts watching the given directory for external changes.
@@ -55,8 +56,6 @@ final class VaultFileWatcher: ObservableObject {
     }
 
     deinit {
-        // Can't call stop() from deinit on a MainActor class directly,
-        // but we can remove the presenter synchronously.
         if let presenter {
             NSFileCoordinator.removeFilePresenter(presenter)
         }

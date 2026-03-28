@@ -5,7 +5,7 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 
 @main
 struct NotoApp: App {
-    @StateObject private var locationManager = VaultLocationManager()
+    @State private var locationManager = VaultLocationManager()
 
     init() {
         NSSetUncaughtExceptionHandler { exception in
@@ -23,7 +23,6 @@ struct NotoApp: App {
     var body: some Scene {
         WindowGroup {
             if Self.isRunningTests {
-                // Skip full app init when running unit tests
                 Color.clear
             } else if locationManager.isVaultConfigured, let vaultURL = locationManager.vaultURL {
                 MainAppView(vaultURL: vaultURL, locationManager: locationManager)
@@ -37,15 +36,15 @@ struct NotoApp: App {
 /// Wrapper that owns the MarkdownNoteStore for a given vault URL.
 struct MainAppView: View {
     let vaultURL: URL
-    let locationManager: VaultLocationManager
-    @StateObject private var store: MarkdownNoteStore
-    @StateObject private var fileWatcher = VaultFileWatcher()
+    var locationManager: VaultLocationManager
+    @State private var store: MarkdownNoteStore
+    @State private var fileWatcher = VaultFileWatcher()
     @Environment(\.scenePhase) private var scenePhase
 
     init(vaultURL: URL, locationManager: VaultLocationManager) {
         self.vaultURL = vaultURL
         self.locationManager = locationManager
-        _store = StateObject(wrappedValue: MarkdownNoteStore(vaultURL: vaultURL))
+        _store = State(wrappedValue: MarkdownNoteStore(vaultURL: vaultURL))
     }
 
     var body: some View {

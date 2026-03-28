@@ -4,7 +4,7 @@ import os.log
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NoteEditorScreen")
 
 struct NoteEditorScreen: View {
-    @ObservedObject var store: MarkdownNoteStore
+    var store: MarkdownNoteStore
     var isNew: Bool = false
     var fileWatcher: VaultFileWatcher?
 
@@ -12,6 +12,7 @@ struct NoteEditorScreen: View {
     @State private var content: String = ""
     @State private var hasLoaded = false
     @State private var isDownloading = false
+    @State private var downloadFailed = false
     @State private var saveTask: Task<Void, Never>?
     @State private var renameTask: Task<Void, Never>?
 
@@ -24,7 +25,13 @@ struct NoteEditorScreen: View {
 
     var body: some View {
         Group {
-            if isDownloading {
+            if downloadFailed {
+                ContentUnavailableView(
+                    "Download Failed",
+                    systemImage: "exclamationmark.icloud",
+                    description: Text("Could not download this note from iCloud. Check your connection and try again.")
+                )
+            } else if isDownloading {
                 VStack(spacing: 12) {
                     ProgressView()
                     Text("Downloading from iCloud...")
@@ -40,15 +47,14 @@ struct NoteEditorScreen: View {
         }
         .navigationTitle(MarkdownNote.titleFrom(content))
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            if !hasLoaded {
-                loadNoteContent()
-            }
+        .task {
+            guard !hasLoaded else { return }
+            await loadNoteContent()
         }
         .onDisappear {
             saveTask?.cancel()
             renameTask?.cancel()
-            if !isDownloading {
+            if !isDownloading && !downloadFailed {
                 note = store.saveContent(content, for: note)
                 note = store.renameFileIfNeeded(for: note)
             }
@@ -59,7 +65,6 @@ struct NoteEditorScreen: View {
     }
 
     /// Reloads the editor content if the file was changed externally (e.g. iCloud sync).
-    /// Only reloads if the on-disk content differs from what's in the editor.
     private func reloadIfChangedExternally() {
         guard hasLoaded, !isDownloading else { return }
         let diskContent = store.readContent(of: note)
@@ -69,22 +74,27 @@ struct NoteEditorScreen: View {
         }
     }
 
-    private func loadNoteContent() {
+    private func loadNoteContent() async {
         if CoordinatedFileManager.isDownloaded(at: note.fileURL) {
             content = store.readContent(of: note)
             hasLoaded = true
         } else {
             isDownloading = true
             CoordinatedFileManager.startDownloading(at: note.fileURL)
-            // Poll until downloaded
-            Task { @MainActor in
-                while !CoordinatedFileManager.isDownloaded(at: note.fileURL) {
-                    try? await Task.sleep(for: .milliseconds(500))
+            // Poll until downloaded, with timeout
+            let deadline = Date().addingTimeInterval(30)
+            while !CoordinatedFileManager.isDownloaded(at: note.fileURL) {
+                if Date() > deadline {
+                    downloadFailed = true
+                    isDownloading = false
+                    return
                 }
-                content = store.readContent(of: note)
-                hasLoaded = true
-                isDownloading = false
+                try? await Task.sleep(for: .milliseconds(500))
+                if Task.isCancelled { return }
             }
+            content = store.readContent(of: note)
+            hasLoaded = true
+            isDownloading = false
         }
     }
 

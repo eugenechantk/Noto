@@ -4,7 +4,7 @@ import os.log
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "SettingsView")
 
 struct SettingsView: View {
-    @ObservedObject var locationManager: VaultLocationManager
+    var locationManager: VaultLocationManager
     @State private var showFolderPicker = false
     @State private var isMoving = false
     @Environment(\.dismiss) private var dismiss
@@ -44,7 +44,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showFolderPicker) {
             FolderPickerView { url in
                 if let url {
-                    moveVault(to: url)
+                    Task {
+                        await moveVault(to: url)
+                    }
                 }
             }
         }
@@ -70,11 +72,11 @@ struct SettingsView: View {
         return url.lastPathComponent
     }
 
-    private func moveVault(to newParentURL: URL) {
+    @MainActor
+    private func moveVault(to newParentURL: URL) async {
         guard let currentVaultURL = locationManager.vaultURL else { return }
         let newVaultURL = newParentURL.appendingPathComponent("Noto")
 
-        // Don't move to the same location
         if currentVaultURL.standardizedFileURL == newVaultURL.standardizedFileURL {
             logger.info("Same location selected, skipping move")
             return
@@ -82,14 +84,12 @@ struct SettingsView: View {
 
         isMoving = true
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        let success = await Task.detached {
             _ = newParentURL.startAccessingSecurityScopedResource()
             let fm = FileManager.default
 
             do {
-                // If destination Noto folder already exists, merge by copying contents
                 if fm.fileExists(atPath: newVaultURL.path) {
-                    // Copy each item from current vault to new vault
                     let items = try fm.contentsOfDirectory(at: currentVaultURL, includingPropertiesForKeys: nil)
                     for item in items {
                         let dest = newVaultURL.appendingPathComponent(item.lastPathComponent)
@@ -100,22 +100,18 @@ struct SettingsView: View {
                 } else {
                     try fm.copyItem(at: currentVaultURL, to: newVaultURL)
                 }
-
-                // Remove old vault
                 try fm.removeItem(at: currentVaultURL)
-
                 logger.info("Moved vault from \(currentVaultURL.path) to \(newVaultURL.path)")
-
-                DispatchQueue.main.async {
-                    locationManager.setVault(toParent: newParentURL)
-                    isMoving = false
-                }
+                return true
             } catch {
                 logger.error("Failed to move vault: \(error)")
-                DispatchQueue.main.async {
-                    isMoving = false
-                }
+                return false
             }
+        }.value
+
+        if success {
+            locationManager.setVault(toParent: newParentURL)
         }
+        isMoving = false
     }
 }

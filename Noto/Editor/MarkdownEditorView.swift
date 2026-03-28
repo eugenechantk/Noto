@@ -309,9 +309,10 @@ struct MarkdownEditorView: UIViewRepresentable {
             wrapper.backgroundColor = .clear
             wrapper.autoresizingMask = .flexibleWidth
 
-            // Compact pill — sized to fit buttons only
-            let pill = UIView()
-            pill.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
+            // Compact pill — Liquid Glass effect
+            let glassEffect = UIGlassEffect()
+            glassEffect.isInteractive = true
+            let pill = UIVisualEffectView(effect: glassEffect)
             pill.layer.cornerRadius = pillHeight / 2
             pill.clipsToBounds = true
             pill.translatesAutoresizingMaskIntoConstraints = false
@@ -338,7 +339,7 @@ struct MarkdownEditorView: UIViewRepresentable {
             stack.spacing = buttonSpacing
             stack.alignment = .center
             stack.translatesAutoresizingMaskIntoConstraints = false
-            pill.addSubview(stack)
+            pill.contentView.addSubview(stack)
 
             NSLayoutConstraint.activate([
                 // Pill anchored to trailing edge with bottom margin
@@ -346,10 +347,10 @@ struct MarkdownEditorView: UIViewRepresentable {
                 pill.topAnchor.constraint(equalTo: wrapper.topAnchor),
                 pill.heightAnchor.constraint(equalToConstant: pillHeight),
 
-                // Stack inside pill with horizontal padding
-                stack.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: pillPadding),
-                stack.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -pillPadding),
-                stack.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
+                // Stack inside pill contentView with horizontal padding
+                stack.leadingAnchor.constraint(equalTo: pill.contentView.leadingAnchor, constant: pillPadding),
+                stack.trailingAnchor.constraint(equalTo: pill.contentView.trailingAnchor, constant: -pillPadding),
+                stack.centerYAnchor.constraint(equalTo: pill.contentView.centerYAnchor),
 
                 outdentButton.widthAnchor.constraint(equalToConstant: buttonSize),
                 outdentButton.heightAnchor.constraint(equalToConstant: buttonSize),

@@ -113,8 +113,9 @@ enum DirectoryItem: Identifiable, Hashable {
 
 /// File-based note storage. Reads/writes .md files and folders in a vault directory.
 @MainActor
-final class MarkdownNoteStore: ObservableObject {
-    @Published private(set) var items: [DirectoryItem] = []
+@Observable
+final class MarkdownNoteStore {
+    private(set) var items: [DirectoryItem] = []
 
     let directoryURL: URL
     let vaultRootURL: URL

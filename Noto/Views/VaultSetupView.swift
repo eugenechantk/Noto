@@ -6,7 +6,7 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 
 /// First-launch screen where the user picks where to store their notes.
 struct VaultSetupView: View {
-    @ObservedObject var locationManager: VaultLocationManager
+    var locationManager: VaultLocationManager
     @State private var showFolderPicker = false
 
     var body: some View {
@@ -26,45 +26,45 @@ struct VaultSetupView: View {
 
             Spacer()
 
-            VStack(spacing: 16) {
-                Button(action: { showFolderPicker = true }) {
-                    HStack {
-                        Image(systemName: "icloud.fill")
-                            .font(.title3)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Choose Location")
-                                .font(.headline)
-                            Text("A Noto folder will be created here")
-                                .font(.caption)
+            GlassEffectContainer(spacing: 20) {
+                VStack(spacing: 16) {
+                    Button(action: { showFolderPicker = true }) {
+                        HStack {
+                            Image(systemName: "icloud.fill")
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Choose Location")
+                                    .font(.headline)
+                                Text("A Noto folder will be created here")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
+                        .padding()
                     }
-                    .padding()
-                    .background(.quaternary)
-                    .cornerRadius(12)
-                }
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
 
-                Button(action: { locationManager.setLocalVault() }) {
-                    HStack {
-                        Image(systemName: "iphone")
-                            .font(.title3)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("On This Device")
-                                .font(.headline)
-                            Text("Notes are deleted if the app is removed")
-                                .font(.caption)
+                    Button(action: { locationManager.setLocalVault() }) {
+                        HStack {
+                            Image(systemName: "iphone")
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("On This Device")
+                                    .font(.headline)
+                                Text("Notes are deleted if the app is removed")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
+                        .padding()
                     }
-                    .padding()
-                    .background(.quaternary)
-                    .cornerRadius(12)
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
                 }
             }
             .padding(.horizontal)

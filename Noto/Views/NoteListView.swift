@@ -3,78 +3,114 @@ import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NoteListView")
 
+// MARK: - Navigation Route
+
+enum NoteRoute: Hashable {
+    case note(MarkdownNote, directoryURL: URL, vaultRootURL: URL)
+    case folder(folderURL: URL, name: String, vaultRootURL: URL)
+    case settings
+    case todayNote
+}
+
 /// Root entry point — wraps FolderContentView in a NavigationStack.
 struct NoteListView: View {
-    @ObservedObject var store: MarkdownNoteStore
+    var store: MarkdownNoteStore
     var locationManager: VaultLocationManager?
     var fileWatcher: VaultFileWatcher?
-    @State private var showTodayNote = false
-    @State private var todayNoteData: (store: MarkdownNoteStore, note: MarkdownNote)?
-    @State private var showSettings = false
+    @State private var path = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             FolderContentView(
                 store: store,
                 title: "Notes",
                 isRoot: true,
                 fileWatcher: fileWatcher,
-                onTodayTap: openTodayNote,
-                onSettingsTap: locationManager != nil ? { showSettings = true } : nil
+                path: $path,
+                onTodayTap: { path.append(NoteRoute.todayNote) },
+                onSettingsTap: locationManager != nil ? { path.append(NoteRoute.settings) } : nil
             )
-            .navigationDestination(isPresented: $showTodayNote) {
-                if let data = todayNoteData {
-                    NoteEditorScreen(store: data.store, note: data.note, fileWatcher: fileWatcher)
-                }
-            }
-            .navigationDestination(isPresented: $showSettings) {
-                if let locationManager {
-                    SettingsView(locationManager: locationManager)
+            .navigationDestination(for: NoteRoute.self) { route in
+                switch route {
+                case .note(let note, let directoryURL, let vaultRootURL):
+                    NoteEditorScreen(
+                        store: MarkdownNoteStore(directoryURL: directoryURL, vaultRootURL: vaultRootURL),
+                        note: note,
+                        fileWatcher: fileWatcher
+                    )
+                case .folder(let folderURL, let name, let vaultRootURL):
+                    FolderContentView(
+                        store: MarkdownNoteStore(directoryURL: folderURL, vaultRootURL: vaultRootURL),
+                        title: name,
+                        fileWatcher: fileWatcher,
+                        path: $path
+                    )
+                case .settings:
+                    if let locationManager {
+                        SettingsView(locationManager: locationManager)
+                    }
+                case .todayNote:
+                    TodayNoteDestination(store: store, fileWatcher: fileWatcher)
                 }
             }
         }
     }
+}
 
-    private func openTodayNote() {
-        todayNoteData = store.todayNote()
-        showTodayNote = true
+/// Resolves and displays today's note. Separated to avoid computing todayNote() at route creation time.
+private struct TodayNoteDestination: View {
+    var store: MarkdownNoteStore
+    var fileWatcher: VaultFileWatcher?
+    @State private var data: (store: MarkdownNoteStore, note: MarkdownNote)?
+
+    var body: some View {
+        Group {
+            if let data {
+                NoteEditorScreen(store: data.store, note: data.note, fileWatcher: fileWatcher)
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            data = store.todayNote()
+        }
     }
 }
 
 /// Reusable view that shows the contents of a directory (folders + notes).
 struct FolderContentView: View {
-    @ObservedObject var store: MarkdownNoteStore
+    var store: MarkdownNoteStore
     let title: String
     var isRoot: Bool = false
     var fileWatcher: VaultFileWatcher?
+    @Binding var path: NavigationPath
     var onTodayTap: (() -> Void)?
     var onSettingsTap: (() -> Void)?
 
     @State private var showNewFolderAlert = false
     @State private var newFolderName = ""
-    @State private var navigateToNewNote: MarkdownNote?
-    @State private var shouldNavigateToNew = false
 
     var body: some View {
         List {
             ForEach(store.items) { item in
                 switch item {
                 case .folder(let folder):
-                    NavigationLink {
-                        FolderContentView(
-                            store: MarkdownNoteStore(
-                                directoryURL: folder.folderURL,
-                                vaultRootURL: store.vaultRootURL
-                            ),
-                            title: folder.name,
-                            fileWatcher: fileWatcher
-                        )
+                    Button {
+                        path.append(NoteRoute.folder(
+                            folderURL: folder.folderURL,
+                            name: folder.name,
+                            vaultRootURL: store.vaultRootURL
+                        ))
                     } label: {
                         FolderRow(folder: folder)
                     }
                 case .note(let note):
-                    NavigationLink {
-                        NoteEditorScreen(store: store, note: note, fileWatcher: fileWatcher)
+                    Button {
+                        path.append(NoteRoute.note(
+                            note,
+                            directoryURL: store.directoryURL,
+                            vaultRootURL: store.vaultRootURL
+                        ))
                     } label: {
                         MarkdownNoteRow(note: note)
                     }
@@ -85,17 +121,13 @@ struct FolderContentView: View {
         .listStyle(.plain)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $shouldNavigateToNew) {
-            if let note = navigateToNewNote {
-                NoteEditorScreen(store: store, note: note, isNew: true, fileWatcher: fileWatcher)
-            }
-        }
         .toolbar {
             if isRoot {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { onTodayTap?() }) {
                         Label("Today", systemImage: "calendar")
                     }
+                    .buttonStyle(.glass)
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -104,6 +136,7 @@ struct FolderContentView: View {
                         Button(action: onSettingsTap) {
                             Image(systemName: "gearshape")
                         }
+                        .buttonStyle(.glass)
                     }
                     Menu {
                         Button(action: createNote) {
@@ -116,6 +149,7 @@ struct FolderContentView: View {
                         Image(systemName: "plus")
                             .accessibilityLabel("Add")
                     }
+                    .buttonStyle(.glass)
                 }
             }
         }
@@ -144,8 +178,11 @@ struct FolderContentView: View {
 
     private func createNote() {
         let note = store.createNote()
-        navigateToNewNote = note
-        shouldNavigateToNew = true
+        path.append(NoteRoute.note(
+            note,
+            directoryURL: store.directoryURL,
+            vaultRootURL: store.vaultRootURL
+        ))
     }
 
     private func deleteItems(at offsets: IndexSet) {
