@@ -1,0 +1,14 @@
+appId: com.eugenechan.Noto
+name: "Prepare testing environment (reusable)"
+tags:
+  - util
+---
+# Vault is pre-seeded by seed-vault.sh before running Maestro.
+# Stop and relaunch to pick up the seeded vault and UserDefaults.
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: "note_list"
+    timeout: 5000

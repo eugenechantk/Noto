@@ -1,19 +1,81 @@
 appId: com.eugenechan.Noto
-name: "Open and edit an existing note"
+name: "Edit note with headings, nested bullets, and todos"
 tags:
   - notes
+  - editor
+  - regression
 ---
-- runFlow: ../common/setup_vault_with_content.yaml
-# Setup already created notes — verify they exist
-- assertVisible: "Meeting Notes"
-- assertVisible: "Shopping List"
-# Create an additional note
-- runFlow: ../common/create_note.yaml
-- inputText: "Extra Note"
-- stopApp
-- launchApp
-# All notes should appear
+- runFlow: ../common/prep_testing_environment.yaml
+
+# Create a fresh note
+- tapOn:
+    id: "add_menu"
+- tapOn: "New Note"
+- tapOn:
+    id: "note_editor"
+- waitForAnimationToEnd
+
+# Title + headings
+- inputText: "Editor Coverage Note"
+- assertVisible: "Editor Coverage Note"
+- pressKey: Enter
+- pressKey: Enter
+- inputText: "## Structure"
+- pressKey: Enter
+- pressKey: Enter
+- inputText: "Alpha paragraph."
+- pressKey: Enter
+- pressKey: Enter
+- inputText: "### Details"
+- pressKey: Enter
+- pressKey: Enter
+- inputText: "Beta details."
+- pressKey: Enter
+- pressKey: Enter
+
+# Bullets at multiple levels
+- inputText: "- Parent bullet"
+- pressKey: Enter
+- tapOn:
+    id: "indentButton"
+- inputText: "Nested bullet"
+- pressKey: Enter
+- tapOn:
+    id: "indentButton"
+- inputText: "Deep bullet"
+- pressKey: Enter
+- pressKey: Enter
+- tapOn:
+    id: "outdentButton"
+- inputText: "- Sibling bullet"
+- pressKey: Enter
+- pressKey: Enter
+- tapOn:
+    id: "todoButton"
+- inputText: "Todo item"
+- tapOn:
+    id: "todoButton"
+- tapOn:
+    id: "todoButton"
+- pressKey: Enter
+- pressKey: Enter
+
+# Navigate back to trigger save (onDisappear)
+- tapOn:
+    id: "back_button"
 - extendedWaitUntil:
-    visible: "Meeting Notes"
+    visible:
+      id: "note_list"
     timeout: 5000
-- assertVisible: "Extra Note"
+
+# Verify the note persisted with its title
+- assertVisible: "Editor Coverage Note"
+
+# Re-open the note and verify the editor loads
+- tapOn: "Editor Coverage Note"
+- extendedWaitUntil:
+    visible:
+      id: "note_editor"
+    timeout: 5000
+- assertVisible:
+    id: "note_editor"

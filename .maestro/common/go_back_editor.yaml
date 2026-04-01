@@ -1,8 +1,0 @@
-appId: com.eugenechan.Noto
-name: "Navigate back from editor (reusable)"
-tags:
-  - util
----
-# Tap the custom back button by accessibility identifier
-- tapOn:
-    id: "back_button"

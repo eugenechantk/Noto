@@ -3,7 +3,7 @@ name: "Open today's note"
 tags:
   - daily
 ---
-- runFlow: ../common/setup_vault_with_content.yaml
+- runFlow: ../common/prep_testing_environment.yaml
 # Tap today button
 - tapOn:
     id: "today_button"

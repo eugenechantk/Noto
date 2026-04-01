@@ -400,6 +400,7 @@ struct FolderContentView: View {
     var onTodayTap: (() -> Void)?
     var onSettingsTap: (() -> Void)?
 
+    @Environment(\.dismiss) private var dismiss
     @State private var showNewFolderAlert = false
     @State private var newFolderName = ""
 
@@ -437,6 +438,7 @@ struct FolderContentView: View {
         .accessibilityIdentifier("note_list")
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(!isRoot)
         .toolbar {
             if isRoot {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -444,6 +446,13 @@ struct FolderContentView: View {
                         Label("Today", systemImage: "calendar")
                     }
                     .accessibilityIdentifier("today_button")
+                }
+            } else {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                    }
+                    .accessibilityIdentifier("back_button")
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {

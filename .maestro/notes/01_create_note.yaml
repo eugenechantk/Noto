@@ -4,13 +4,23 @@ tags:
   - smoke
   - notes
 ---
-- runFlow: ../common/setup_vault_with_content.yaml
-- runFlow: ../common/create_note.yaml
+- runFlow: ../common/prep_testing_environment.yaml
+
+# Create a new note
+- tapOn:
+    id: "add_menu"
+- tapOn: "New Note"
+- tapOn:
+    id: "note_editor"
 - inputText: "Shopping List Extra"
-# Relaunch to verify persistence (avoids iOS 26 keyboard back-nav issue)
-- stopApp
-- launchApp
-# Note should appear in list after relaunch
+
+# Navigate back to save
+- tapOn:
+    id: "back_button"
 - extendedWaitUntil:
-    visible: "Shopping List Extra"
+    visible:
+      id: "note_list"
     timeout: 5000
+
+# Note should appear in list
+- assertVisible: "Shopping List Extra"

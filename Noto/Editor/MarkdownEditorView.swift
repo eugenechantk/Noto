@@ -157,7 +157,13 @@ struct MarkdownEditorView: UIViewRepresentable {
 
     func updateUIView(_ textView: UITextView, context: Context) {
         guard let textStorage = context.coordinator.textStorage else { return }
+        // Skip if we're the source of the change (re-entrant from textViewDidChange)
         guard !context.coordinator.isUpdatingText else { return }
+        // Skip if the user is actively typing — the binding may lag behind the
+        // text storage by one render cycle, causing a just-typed character to be
+        // reverted. External changes (e.g. iCloud sync) will apply when the
+        // keyboard is dismissed.
+        guard !textView.isFirstResponder else { return }
         if textStorage.markdownContent() != text {
             let selectedRange = textView.selectedRange
             textStorage.load(markdown: text)

@@ -3,7 +3,7 @@ name: "Create and navigate into a folder"
 tags:
   - navigation
 ---
-- runFlow: ../common/setup_vault_with_content.yaml
+- runFlow: ../common/prep_testing_environment.yaml
 
 # "Projects" folder was created by setup — navigate into it
 - tapOn: "Projects"
@@ -12,7 +12,8 @@ tags:
 - assertVisible: "Empty"
 
 # Go back
-- runFlow: ../common/go_back.yaml
+- tapOn:
+    id: "back_button"
 
 # Verify we're back at root with both folders
 - assertVisible: "Projects"

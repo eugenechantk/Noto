@@ -35,6 +35,15 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "chevron.left")
+                }
+                .accessibilityIdentifier("back_button")
+            }
+        }
         #elseif os(macOS)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {

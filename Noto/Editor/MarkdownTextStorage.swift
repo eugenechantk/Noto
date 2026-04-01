@@ -96,7 +96,7 @@ final class MarkdownTextStorage: NSTextStorage {
     override func processEditing() {
         if !isFormatting {
             isFormatting = true
-            applyMarkdownFormatting()
+            applyFormattingToRegion(around: editedRange)
             isFormatting = false
         }
         super.processEditing()
@@ -524,19 +524,18 @@ final class MarkdownTextStorage: NSTextStorage {
         cachedFrontmatterEnd = nil
         cachedFirstHeadingLocation = nil
 
-        // Pre-format the backing store before notifying the layout manager.
-        // If applyMarkdownFormatting runs inside processEditing (triggered by endEditing),
-        // it crashes — the layout manager holds stale geometry during reconciliation.
-        isFormatting = true
-        let oldLength = backing.length
-        backing.setAttributedString(NSAttributedString(string: markdown, attributes: Self.bodyAttributes))
-        applyMarkdownFormatting()
+        // Replace content. processEditing will apply incremental formatting
+        // to the edited region. Then we do a full format pass afterward.
+        let fullRange = NSRange(location: 0, length: backing.length)
+        replaceCharacters(in: fullRange, with: markdown)
 
-        // Notify TextKit that both characters and attributes changed.
-        // isFormatting is still true so processEditing skips applyMarkdownFormatting
-        // and only calls super to let the layout manager reconcile.
+        // Full format pass for the complete document (incremental only
+        // covered the edited region around the replacement point).
+        guard backing.length > 0 else { return }
+        isFormatting = true
         beginEditing()
-        edited([.editedCharacters, .editedAttributes], range: NSRange(location: 0, length: oldLength), changeInLength: backing.length - oldLength)
+        applyMarkdownFormatting()
+        edited(.editedAttributes, range: NSRange(location: 0, length: backing.length), changeInLength: 0)
         endEditing()
         isFormatting = false
     }

@@ -134,7 +134,14 @@ For app-level builds, tests, simulator management, UI automation, log capture, d
 
 ### Simulator Isolation
 
-Multiple Claude Code sessions may run concurrently. Each session MUST use its own dedicated simulator to avoid conflicts. Use flowdeck to create, boot, and manage session simulators.
+Multiple Claude Code sessions may run concurrently. Each session MUST create and use its own dedicated simulator to avoid conflicts:
+
+1. **Create:** `flowdeck simulator create --name "Noto-Test-<short-id>" --device-type "iPhone 16 Pro" --runtime "iOS 26"`
+2. **Build/run to it:** `flowdeck run -S "Noto-Test-<short-id>"`
+3. **Maestro against it:** `maestro --device <UDID> test .maestro/`
+4. **Clean up when done**
+
+Never use the default/shared simulator for testing. Use the first 8 chars of `$CLAUDE_SESSION_ID` as `<short-id>`.
 
 ## Unit Testing
 

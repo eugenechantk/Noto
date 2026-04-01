@@ -1,0 +1,50 @@
+appId: com.eugenechan.Noto
+name: "Bug 005: App crashes when using todo toolbar button"
+tags:
+  - bug-005
+  - regression
+---
+- runFlow: ../common/prep_testing_environment.yaml
+
+# Create a new note
+- tapOn:
+    id: "add_menu"
+- tapOn: "New Note"
+- tapOn:
+    id: "note_editor"
+
+# Type a title
+- inputText: "Todo Test Note"
+- pressKey: Enter
+- pressKey: Enter
+
+# Tap the todo toolbar button (3rd button in the pill)
+- tapOn:
+    id: "todoButton"
+- waitForAnimationToEnd
+
+# Type first todo item
+- inputText: "Buy groceries"
+- pressKey: Enter
+- waitForAnimationToEnd
+
+# Type second todo item (auto-continued)
+- inputText: "Walk the dog"
+- pressKey: Enter
+- waitForAnimationToEnd
+
+# Type third todo item
+- inputText: "Clean house"
+- pressKey: Enter
+- waitForAnimationToEnd
+
+# Press Enter on empty todo to exit
+- pressKey: Enter
+- waitForAnimationToEnd
+
+# Type normal text after exiting todo
+- inputText: "Regular text after todos"
+- waitForAnimationToEnd
+
+# If we get here without crashing, the bug is fixed
+- assertVisible: "note_editor"
