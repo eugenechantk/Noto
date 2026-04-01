@@ -4,15 +4,13 @@ tags:
   - smoke
   - notes
 ---
-- launchApp:
-    clearState: true
-- runFlow: ../common/setup_vault.yaml
+- runFlow: ../common/setup_vault_with_content.yaml
 - runFlow: ../common/create_note.yaml
-- inputText: "Shopping List"
+- inputText: "Shopping List Extra"
 # Relaunch to verify persistence (avoids iOS 26 keyboard back-nav issue)
 - stopApp
 - launchApp
 # Note should appear in list after relaunch
 - extendedWaitUntil:
-    visible: "Shopping List"
+    visible: "Shopping List Extra"
     timeout: 5000

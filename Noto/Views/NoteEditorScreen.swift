@@ -23,6 +23,8 @@ struct NoteEditorScreen: View {
         _note = State(initialValue: note)
     }
 
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         Group {
             if downloadFailed {
@@ -48,6 +50,15 @@ struct NoteEditorScreen: View {
         .navigationTitle(MarkdownNote.titleFrom(content))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "chevron.left")
+                }
+                .accessibilityIdentifier("back_button")
+            }
+        }
         #endif
         .task {
             guard !hasLoaded else { return }

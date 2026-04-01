@@ -3,9 +3,7 @@ name: "Navigate to settings and back"
 tags:
   - navigation
 ---
-- launchApp:
-    clearState: true
-- runFlow: ../common/setup_vault.yaml
+- runFlow: ../common/setup_vault_with_content.yaml
 
 # Tap settings
 - tapOn:

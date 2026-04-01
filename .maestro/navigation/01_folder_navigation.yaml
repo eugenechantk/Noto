@@ -3,28 +3,17 @@ name: "Create and navigate into a folder"
 tags:
   - navigation
 ---
-- launchApp:
-    clearState: true
-- runFlow: ../common/setup_vault.yaml
+- runFlow: ../common/setup_vault_with_content.yaml
 
-# Create a folder
-- tapOn:
-    id: "add_menu"
-- tapOn: "New Folder"
-- inputText: "Projects"
-- tapOn: "Create"
-
-# Verify folder appears
-- assertVisible: "Projects"
-
-# Navigate into folder
+# "Projects" folder was created by setup — navigate into it
 - tapOn: "Projects"
 
-# The folder should be empty
+# The folder should be empty (no notes created inside it)
 - assertVisible: "Empty"
 
 # Go back
 - runFlow: ../common/go_back.yaml
 
-# Verify we're back at root
+# Verify we're back at root with both folders
 - assertVisible: "Projects"
+- assertVisible: "Archive"

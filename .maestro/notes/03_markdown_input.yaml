@@ -4,9 +4,7 @@ tags:
   - notes
   - editor
 ---
-- launchApp:
-    clearState: true
-- runFlow: ../common/setup_vault.yaml
+- runFlow: ../common/setup_vault_with_content.yaml
 - runFlow: ../common/create_note.yaml
 # Type a heading - becomes the note title
 - inputText: "Test Heading"

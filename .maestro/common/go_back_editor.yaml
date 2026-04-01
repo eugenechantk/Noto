@@ -3,7 +3,6 @@ name: "Navigate back from editor (reusable)"
 tags:
   - util
 ---
-# Tap on the system back button area (top-left corner, iOS nav bar)
-# This avoids keyboard interaction issues with swipe gestures
+# Tap the custom back button by accessibility identifier
 - tapOn:
-    point: "10%,6%"
+    id: "back_button"

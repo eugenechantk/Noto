@@ -3,24 +3,17 @@ name: "Open and edit an existing note"
 tags:
   - notes
 ---
-- launchApp:
-    clearState: true
-- runFlow: ../common/setup_vault.yaml
-# Create first note
+- runFlow: ../common/setup_vault_with_content.yaml
+# Setup already created notes — verify they exist
+- assertVisible: "Meeting Notes"
+- assertVisible: "Shopping List"
+# Create an additional note
 - runFlow: ../common/create_note.yaml
-- inputText: "First Note"
+- inputText: "Extra Note"
 - stopApp
 - launchApp
+# All notes should appear
 - extendedWaitUntil:
-    visible: "First Note"
+    visible: "Meeting Notes"
     timeout: 5000
-# Create a second note to verify multiple notes work
-- runFlow: ../common/create_note.yaml
-- inputText: "Second Note"
-- stopApp
-- launchApp
-# Both notes should appear
-- extendedWaitUntil:
-    visible: "First Note"
-    timeout: 5000
-- assertVisible: "Second Note"
+- assertVisible: "Extra Note"

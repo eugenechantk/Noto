@@ -6,20 +6,10 @@ tags:
 ---
 # NOTE: Swipe-to-delete on Button-based list rows is unreliable in Maestro + iOS 26.
 # This test verifies the list state is correct. Deletion itself is covered by unit tests.
-- launchApp:
-    clearState: true
-- runFlow: ../common/setup_vault.yaml
-# Create two notes
-- runFlow: ../common/create_note.yaml
-- inputText: "Note Alpha"
-- stopApp
-- launchApp
-- runFlow: ../common/create_note.yaml
-- inputText: "Note Beta"
-- stopApp
-- launchApp
-# Verify both notes appear
+- runFlow: ../common/setup_vault_with_content.yaml
+# Verify notes from setup appear
 - extendedWaitUntil:
-    visible: "Note Alpha"
+    visible: "Meeting Notes"
     timeout: 5000
-- assertVisible: "Note Beta"
+- assertVisible: "Shopping List"
+- assertVisible: "Project Plan"

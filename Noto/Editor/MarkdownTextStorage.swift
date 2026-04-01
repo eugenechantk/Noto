@@ -300,7 +300,10 @@ final class MarkdownTextStorage: NSTextStorage {
             lines.append((nsText.substring(with: substringRange), substringRange))
         }
         var foundFirstHeading = false
+        let currentLength = backing.length
         for (line, range) in lines {
+            // Safety: skip lines whose ranges are now out of bounds
+            guard range.location >= 0, NSMaxRange(range) <= currentLength else { continue }
             let isTitle = !foundFirstHeading && line.hasPrefix("# ")
             formatLine(line, range: range, isTitle: isTitle)
             if line.hasPrefix("#") { foundFirstHeading = true }
@@ -333,6 +336,14 @@ final class MarkdownTextStorage: NSTextStorage {
             applyHeading(level: 2, range: range)
         } else if line.hasPrefix("### ") {
             applyHeading(level: 3, range: range)
+        }
+        // Todo items: - [ ] or - [x]
+        else if let match = line.range(of: #"^(\s*)[*\-•] \[([ x])\] "#, options: .regularExpression) {
+            let leadingSpaces = line.prefix(while: { $0 == " " || $0 == "\t" })
+            let level = (leadingSpaces.count / 2) + 1
+            let prefixLength = line.distance(from: line.startIndex, to: match.upperBound)
+            let isChecked = line.contains("[x]")
+            applyTodo(range: range, prefixLength: prefixLength, level: level, isChecked: isChecked)
         } else if let match = line.range(of: #"^(\s*)[*\-•] "#, options: .regularExpression) {
             let leadingSpaces = line.prefix(while: { $0 == " " || $0 == "\t" })
             let level = (leadingSpaces.count / 2) + 1
@@ -388,6 +399,37 @@ final class MarkdownTextStorage: NSTextStorage {
     }
 
     private static let indentPerLevel: CGFloat = 12
+
+    // MARK: - Todo checkboxes
+
+    private static let todoGoldColor = UIColor(red: 0.92, green: 0.75, blue: 0.20, alpha: 1.0)
+
+    private func applyTodo(range: NSRange, prefixLength: Int, level: Int, isChecked: Bool) {
+        let levelIndent = Self.indentPerLevel * CGFloat(level)
+        guard prefixLength <= range.length else { return }
+        guard NSMaxRange(range) <= backing.length else { return }
+
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = 4
+        style.paragraphSpacing = 4
+        style.firstLineHeadIndent = levelIndent
+        style.headIndent = levelIndent + Self.bulletTextWidth
+        backing.addAttribute(.paragraphStyle, value: style, range: range)
+
+        // Color the entire prefix "- [ ] " or "- [x] " as the indicator
+        let prefixRange = NSRange(location: range.location, length: min(prefixLength, range.length))
+        let prefixColor = isChecked ? Self.todoGoldColor : UIColor.systemGray3
+        backing.addAttribute(.foregroundColor, value: prefixColor, range: prefixRange)
+
+        // If checked, dim the text content
+        if isChecked {
+            let contentStart = range.location + prefixLength
+            let contentLength = range.length - prefixLength
+            if contentLength > 0 && contentStart + contentLength <= backing.length {
+                backing.addAttribute(.foregroundColor, value: UIColor.secondaryLabel, range: NSRange(location: contentStart, length: contentLength))
+            }
+        }
+    }
 
     private func applyBulletList(range: NSRange, prefixLength: Int, level: Int) {
         let levelIndent = Self.indentPerLevel * CGFloat(level)
@@ -481,11 +523,22 @@ final class MarkdownTextStorage: NSTextStorage {
     func load(markdown: String) {
         cachedFrontmatterEnd = nil
         cachedFirstHeadingLocation = nil
-        let attrStr = NSAttributedString(string: markdown, attributes: Self.bodyAttributes)
+
+        // Pre-format the backing store before notifying the layout manager.
+        // If applyMarkdownFormatting runs inside processEditing (triggered by endEditing),
+        // it crashes — the layout manager holds stale geometry during reconciliation.
+        isFormatting = true
+        let oldLength = backing.length
+        backing.setAttributedString(NSAttributedString(string: markdown, attributes: Self.bodyAttributes))
+        applyMarkdownFormatting()
+
+        // Notify TextKit that both characters and attributes changed.
+        // isFormatting is still true so processEditing skips applyMarkdownFormatting
+        // and only calls super to let the layout manager reconcile.
         beginEditing()
-        backing.setAttributedString(attrStr)
-        edited(.editedCharacters, range: NSRange(location: 0, length: 0), changeInLength: backing.length)
+        edited([.editedCharacters, .editedAttributes], range: NSRange(location: 0, length: oldLength), changeInLength: backing.length - oldLength)
         endEditing()
+        isFormatting = false
     }
 
     func markdownContent() -> String {

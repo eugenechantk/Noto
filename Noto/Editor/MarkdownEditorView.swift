@@ -175,6 +175,27 @@ struct MarkdownEditorView: UIViewRepresentable {
         private var keyboardObservers: [Any] = []
         private var saveWorkItem: DispatchWorkItem?
         var isUpdatingText = false
+        /// Guards against re-entrant shouldChangeTextIn during programmatic insertText.
+        private var isInsertingProgrammatically = false
+
+        /// Inserts text programmatically with re-entrancy guard.
+        private func programmaticInsert(_ text: String, in textView: UITextView) {
+            isInsertingProgrammatically = true
+            textView.insertText(text)
+            isInsertingProgrammatically = false
+        }
+
+        /// Deferred text replacement — schedules on next runloop tick.
+        /// Used from shouldChangeTextIn to avoid confusing UIKit's text input system.
+        private func deferredReplace(range: NSRange, with text: String, in textView: UITextView) {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.isInsertingProgrammatically = true
+                textView.selectedRange = range
+                textView.insertText(text)
+                self.isInsertingProgrammatically = false
+            }
+        }
 
         init(text: Binding<String>, onTextChange: ((String) -> Void)?) {
             _text = text
@@ -229,22 +250,42 @@ struct MarkdownEditorView: UIViewRepresentable {
                 return false
             }
 
+            // Skip auto-continue if we're already doing a programmatic insert
+            guard !isInsertingProgrammatically else { return true }
+
             // Auto-continue bullet/ordered lists on Enter
             if text == "\n" {
                 let nsText = fullText as NSString
+                guard range.location <= nsText.length else { return true }
                 let lineRange = nsText.lineRange(for: NSRange(location: range.location, length: 0))
+                guard lineRange.length > 0, NSMaxRange(lineRange) <= nsText.length else { return true }
                 let line = nsText.substring(with: lineRange)
 
-                if let match = line.range(of: #"^(\s*[*\-•] )"#, options: .regularExpression) {
-                    let prefix = String(line[match])
+                // Match todo: - [ ] or - [x] — continue as unchecked todo
+                if let match = line.range(of: #"^(\s*[*\-•] \[[ x]\] )"#, options: .regularExpression) {
+                    let leadingSpaces = String(line.prefix(while: { $0 == " " || $0 == "\t" }))
+                    let todoPrefix = leadingSpaces + "- [ ] "
+
                     let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
                     if content.isEmpty {
-                        let prefixNSRange = NSRange(location: lineRange.location, length: prefix.count)
-                        textView.selectedRange = prefixNSRange
-                        textView.insertText("")
+                        let prefixLen = line.distance(from: line.startIndex, to: match.upperBound)
+                        deferredReplace(range: NSRange(location: lineRange.location, length: prefixLen), with: "", in: textView)
                         return false
                     }
-                    textView.insertText("\n" + prefix)
+                    deferredReplace(range: range, with: "\n" + todoPrefix, in: textView)
+                    return false
+                }
+
+                // Match bullet: optional leading spaces + (- or * or •) + space
+                if let match = line.range(of: #"^(\s*[*\-•] )"#, options: .regularExpression) {
+                    let prefix = String(line[match])
+
+                    let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if content.isEmpty {
+                        deferredReplace(range: NSRange(location: lineRange.location, length: prefix.count), with: "", in: textView)
+                        return false
+                    }
+                    deferredReplace(range: range, with: "\n" + prefix, in: textView)
                     return false
                 }
 
@@ -255,15 +296,14 @@ struct MarkdownEditorView: UIViewRepresentable {
                         let numStr = String(stripped[stripped.startIndex..<dotIndex])
                         if let num = Int(numStr) {
                             let prefix = "\(leadingSpaces)\(num + 1). "
+
                             let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
                             if content.isEmpty {
                                 let matchLen = line.distance(from: line.startIndex, to: match.upperBound)
-                                let prefixNSRange = NSRange(location: lineRange.location, length: matchLen)
-                                textView.selectedRange = prefixNSRange
-                                textView.insertText("")
+                                deferredReplace(range: NSRange(location: lineRange.location, length: matchLen), with: "", in: textView)
                                 return false
                             }
-                            textView.insertText("\n" + prefix)
+                            deferredReplace(range: range, with: "\n" + prefix, in: textView)
                             return false
                         }
                     }
@@ -311,7 +351,14 @@ struct MarkdownEditorView: UIViewRepresentable {
             indentButton.accessibilityLabel = "Indent"
             indentButton.accessibilityIdentifier = "indentButton"
 
-            let stack = UIStackView(arrangedSubviews: [outdentButton, indentButton])
+            let todoButton = UIButton(type: .system)
+            todoButton.setImage(UIImage(systemName: "checklist", withConfiguration: symbolConfig), for: .normal)
+            todoButton.tintColor = .white
+            todoButton.addTarget(self, action: #selector(todoTapped), for: .touchUpInside)
+            todoButton.accessibilityLabel = "Todo"
+            todoButton.accessibilityIdentifier = "todoButton"
+
+            let stack = UIStackView(arrangedSubviews: [outdentButton, indentButton, todoButton])
             stack.axis = .horizontal
             stack.spacing = buttonSpacing
             stack.alignment = .center
@@ -329,6 +376,8 @@ struct MarkdownEditorView: UIViewRepresentable {
                 outdentButton.heightAnchor.constraint(equalToConstant: buttonSize),
                 indentButton.widthAnchor.constraint(equalToConstant: buttonSize),
                 indentButton.heightAnchor.constraint(equalToConstant: buttonSize),
+                todoButton.widthAnchor.constraint(equalToConstant: buttonSize),
+                todoButton.heightAnchor.constraint(equalToConstant: buttonSize),
             ])
 
             return wrapper
@@ -343,7 +392,7 @@ struct MarkdownEditorView: UIViewRepresentable {
             let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
             let insertRange = NSRange(location: lineRange.location, length: 0)
             textView.selectedRange = insertRange
-            textView.insertText("  ")
+            self.programmaticInsert("  ", in: textView)
             textView.selectedRange = NSRange(location: cursorPos + 2, length: 0)
         }
 
@@ -362,12 +411,47 @@ struct MarkdownEditorView: UIViewRepresentable {
 
             let removeRange = NSRange(location: lineRange.location, length: spacesToRemove)
             textView.selectedRange = removeRange
-            textView.insertText("")
+            self.programmaticInsert("", in: textView)
             let newCursor = max(cursorPos - spacesToRemove, lineRange.location)
             textView.selectedRange = NSRange(location: newCursor, length: 0)
         }
 
+        @objc private func todoTapped() {
+            guard let textView else { return }
+            let nsText = textView.text as NSString
+            let cursorPos = textView.selectedRange.location
+            guard cursorPos <= nsText.length else { return }
+
+            let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
+            let line = nsText.substring(with: lineRange)
+
+            if line.contains("- [x] ") || line.contains("* [x] ") {
+                // Checked → unchecked
+                let checkRange = (line as NSString).range(of: "[x]")
+                guard checkRange.location != NSNotFound else { return }
+                let absRange = NSRange(location: lineRange.location + checkRange.location, length: 3)
+                textView.selectedRange = absRange
+                self.programmaticInsert("[ ]", in: textView)
+            } else if line.contains("- [ ] ") || line.contains("* [ ] ") {
+                // Unchecked → checked
+                let checkRange = (line as NSString).range(of: "[ ]")
+                guard checkRange.location != NSNotFound else { return }
+                let absRange = NSRange(location: lineRange.location + checkRange.location, length: 3)
+                textView.selectedRange = absRange
+                self.programmaticInsert("[x]", in: textView)
+            } else {
+                // Plain line → add todo prefix
+                let insertPos = lineRange.location
+                textView.selectedRange = NSRange(location: insertPos, length: 0)
+                self.programmaticInsert("- [ ] ", in: textView)
+                textView.selectedRange = NSRange(location: cursorPos + 6, length: 0)
+            }
+        }
+
         func textViewDidChangeSelection(_ textView: UITextView) {
+            // Skip during programmatic inserts to avoid re-entrant formatting
+            guard !isInsertingProgrammatically else { return }
+
             let fullText = textView.text ?? ""
             let protectedEnd = protectedRangeEnd(in: fullText)
             let selection = textView.selectedRange
