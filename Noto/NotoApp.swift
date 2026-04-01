@@ -3,9 +3,44 @@ import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NotoApp")
 
+
+#if os(macOS)
+/// Hides the app instead of closing the window when the user clicks the red X.
+/// Clicking the dock icon unhides it — window size and position are preserved automatically.
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Set ourselves as delegate on all windows so we intercept close
+        for window in NSApp.windows {
+            window.delegate = self
+        }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Ensure any new windows also get our delegate
+        for window in NSApp.windows where window.delegate == nil {
+            window.delegate = self
+        }
+        // If no windows are visible (user closed via red X then clicked dock), show them
+        if NSApp.windows.allSatisfy({ !$0.isVisible }) {
+            for window in NSApp.windows {
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        NSApp.hide(nil)
+        return false
+    }
+}
+#endif
+
 @main
 struct NotoApp: App {
     @State private var locationManager = VaultLocationManager()
+    #if os(macOS)
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    #endif
 
     init() {
         NSSetUncaughtExceptionHandler { exception in
@@ -21,7 +56,7 @@ struct NotoApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             if Self.isRunningTests {
                 Color.clear
             } else if locationManager.isVaultConfigured, let vaultURL = locationManager.vaultURL {
@@ -30,6 +65,9 @@ struct NotoApp: App {
                 VaultSetupView(locationManager: locationManager)
             }
         }
+        #if os(macOS)
+        .defaultSize(width: 800, height: 600)
+        #endif
     }
 }
 

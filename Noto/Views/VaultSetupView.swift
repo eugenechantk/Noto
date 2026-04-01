@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "VaultSetupView")
@@ -7,7 +6,8 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 /// First-launch screen where the user picks where to store their notes.
 struct VaultSetupView: View {
     var locationManager: VaultLocationManager
-    @State private var showFolderPicker = false
+    @State private var showCreatePicker = false
+    @State private var showOpenPicker = false
 
     var body: some View {
         VStack(spacing: 32) {
@@ -19,69 +19,121 @@ struct VaultSetupView: View {
                     .foregroundStyle(.secondary)
                 Text("Welcome to Noto")
                     .font(.largeTitle.bold())
-                Text("Choose where to store your notes")
+                Text("Your notes, your files, your folders.")
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            GlassEffectContainer(spacing: 20) {
-                VStack(spacing: 16) {
-                    Button(action: { showFolderPicker = true }) {
-                        HStack {
-                            Image(systemName: "icloud.fill")
-                                .font(.title3)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Choose Location")
-                                    .font(.headline)
-                                Text("A Noto folder will be created here")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
+            VStack(spacing: 16) {
+                // Create New Vault
+                Button(action: createNewVault) {
+                    HStack {
+                        Image(systemName: "plus.rectangle.on.folder.fill")
+                            .font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Create New Vault")
+                                .font(.headline)
+                            Text("Pick a location — a Noto folder will be created")
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        .padding()
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
                     }
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
-                    .accessibilityIdentifier("choose_location_button")
-
-                    Button(action: { locationManager.setLocalVault() }) {
-                        HStack {
-                            Image(systemName: "iphone")
-                                .font(.title3)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("On This Device")
-                                    .font(.headline)
-                                Text("Notes are deleted if the app is removed")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding()
-                    }
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
-                    .accessibilityIdentifier("local_vault_button")
+                    .padding()
+                    .background(.quaternary)
+                    .cornerRadius(12)
                 }
+                .accessibilityIdentifier("create_vault_button")
+
+                // Open Existing Vault
+                Button(action: openExistingVault) {
+                    HStack {
+                        Image(systemName: "folder.fill")
+                            .font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Open Existing Vault")
+                                .font(.headline)
+                            Text("Choose a folder that already has markdown files")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .background(.quaternary)
+                    .cornerRadius(12)
+                }
+                .accessibilityIdentifier("open_vault_button")
             }
             .padding(.horizontal)
 
             Spacer()
         }
-        .sheet(isPresented: $showFolderPicker) {
+        #if os(iOS)
+        .sheet(isPresented: $showCreatePicker) {
             FolderPickerView { url in
                 if let url {
                     locationManager.setVault(toParent: url)
                 }
             }
         }
+        .sheet(isPresented: $showOpenPicker) {
+            FolderPickerView { url in
+                if let url {
+                    locationManager.setVault(directURL: url)
+                }
+            }
+        }
+        #endif
+    }
+
+    private func createNewVault() {
+        #if os(iOS)
+        showCreatePicker = true
+        #elseif os(macOS)
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Pick a location. A Noto folder will be created inside."
+        panel.prompt = "Create Here"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            locationManager.setVault(toParent: url)
+        }
+        #endif
+    }
+
+    private func openExistingVault() {
+        #if os(iOS)
+        showOpenPicker = true
+        #elseif os(macOS)
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose the folder that contains your markdown notes."
+        panel.prompt = "Open"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            locationManager.setVault(directURL: url)
+        }
+        #endif
     }
 }
+
+// MARK: - iOS Folder Picker
+
+#if os(iOS)
+import UIKit
 
 /// UIDocumentPickerViewController wrapper for selecting a folder.
 struct FolderPickerView: UIViewControllerRepresentable {
@@ -116,3 +168,4 @@ struct FolderPickerView: UIViewControllerRepresentable {
         }
     }
 }
+#endif

@@ -1,4 +1,8 @@
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "MarkdownTextStorage")
@@ -98,10 +102,24 @@ final class MarkdownTextStorage: NSTextStorage {
         super.processEditing()
     }
 
+    // MARK: - Platform-specific font sizes
+
+    #if os(iOS)
+    private static let bodySize: CGFloat = 17
+    private static let heading1Size: CGFloat = 28
+    private static let heading2Size: CGFloat = 22
+    private static let heading3Size: CGFloat = 18
+    #elseif os(macOS)
+    private static let bodySize: CGFloat = 14
+    private static let heading1Size: CGFloat = 24
+    private static let heading2Size: CGFloat = 18
+    private static let heading3Size: CGFloat = 15
+    #endif
+
     // MARK: - Body style (all static, allocated once)
 
-    static let bodyFont = UIFont.systemFont(ofSize: 17, weight: .regular)
-    static let bodyColor = UIColor.label
+    static let bodyFont = PlatformFont.systemFont(ofSize: bodySize, weight: .regular)
+    static let bodyColor = PlatformColor.label
 
     private static let cachedBodyParagraphStyle: NSParagraphStyle = {
         let style = NSMutableParagraphStyle()
@@ -300,8 +318,8 @@ final class MarkdownTextStorage: NSTextStorage {
         fmStyle.minimumLineHeight = 0.1
         fmStyle.maximumLineHeight = 0.1
         backing.addAttributes([
-            .font: UIFont.systemFont(ofSize: 0.1),
-            .foregroundColor: UIColor.clear,
+            .font: PlatformFont.systemFont(ofSize: 0.1),
+            .foregroundColor: PlatformColor.clear,
             .paragraphStyle: fmStyle
         ], range: range)
     }
@@ -330,10 +348,10 @@ final class MarkdownTextStorage: NSTextStorage {
 
     // MARK: - Heading styles (cached per level)
 
-    private static let headingFonts: [Int: UIFont] = [
-        1: UIFont.systemFont(ofSize: 28, weight: .bold),
-        2: UIFont.systemFont(ofSize: 22, weight: .bold),
-        3: UIFont.systemFont(ofSize: 18, weight: .semibold)
+    private static let headingFonts: [Int: PlatformFont] = [
+        1: PlatformFont.systemFont(ofSize: heading1Size, weight: .bold),
+        2: PlatformFont.systemFont(ofSize: heading2Size, weight: .bold),
+        3: PlatformFont.systemFont(ofSize: heading3Size, weight: .semibold)
     ]
 
     private func applyHeading(level: Int, range: NSRange, isTitle: Bool = false) {
@@ -359,11 +377,11 @@ final class MarkdownTextStorage: NSTextStorage {
             let prefixRange = NSRange(location: range.location, length: prefixLen)
             let isActive = activeLine.map { $0.location == range.location } ?? false
             if isActive {
-                backing.addAttribute(.foregroundColor, value: UIColor.tertiaryLabel, range: prefixRange)
+                backing.addAttribute(.foregroundColor, value: PlatformColor.tertiaryLabel, range: prefixRange)
             } else {
                 backing.addAttributes([
-                    .font: UIFont.systemFont(ofSize: 0.1),
-                    .foregroundColor: UIColor.clear
+                    .font: PlatformFont.systemFont(ofSize: 0.1),
+                    .foregroundColor: PlatformColor.clear
                 ], range: prefixRange)
             }
         }
@@ -386,13 +404,13 @@ final class MarkdownTextStorage: NSTextStorage {
         let prefixStr = nsText.substring(with: NSRange(location: range.location, length: prefixLength))
         let leadingSpaceCount = prefixStr.prefix(while: { $0 == " " || $0 == "\t" }).count
         if leadingSpaceCount > 0 {
-            backing.addAttribute(.foregroundColor, value: UIColor.clear, range: NSRange(location: range.location, length: leadingSpaceCount))
+            backing.addAttribute(.foregroundColor, value: PlatformColor.clear, range: NSRange(location: range.location, length: leadingSpaceCount))
         }
 
         // Dim the bullet marker character (- or *) instead of replacing it.
         // Text mutations during processEditing crash the layout manager.
         let markerRange = NSRange(location: range.location + leadingSpaceCount, length: 1)
-        backing.addAttribute(.foregroundColor, value: UIColor.tertiaryLabel, range: markerRange)
+        backing.addAttribute(.foregroundColor, value: PlatformColor.tertiaryLabel, range: markerRange)
     }
 
     private func applyOrderedList(range: NSRange, prefixLength: Int, level: Int) {
@@ -419,8 +437,8 @@ final class MarkdownTextStorage: NSTextStorage {
         Self.boldRegex.enumerateMatches(in: str, range: range) { match, _, _ in
             guard let match else { return }
             let matchRange = match.range
-            let currentFont = self.backing.attribute(.font, at: matchRange.location, effectiveRange: nil) as? UIFont ?? Self.bodyFont
-            let boldFont = UIFont.systemFont(ofSize: currentFont.pointSize, weight: .bold)
+            let currentFont = self.backing.attribute(.font, at: matchRange.location, effectiveRange: nil) as? PlatformFont ?? Self.bodyFont
+            let boldFont = PlatformFont.systemFont(ofSize: currentFont.pointSize, weight: .bold)
             self.backing.addAttribute(.font, value: boldFont, range: matchRange)
             self.dimDelimiters(matchRange: matchRange, delimiterLength: 2)
         }
@@ -428,20 +446,25 @@ final class MarkdownTextStorage: NSTextStorage {
         Self.italicRegex.enumerateMatches(in: str, range: range) { match, _, _ in
             guard let match else { return }
             let matchRange = match.range
-            let currentFont = self.backing.attribute(.font, at: matchRange.location, effectiveRange: nil) as? UIFont ?? Self.bodyFont
+            let currentFont = self.backing.attribute(.font, at: matchRange.location, effectiveRange: nil) as? PlatformFont ?? Self.bodyFont
+            #if os(iOS)
             let descriptor = currentFont.fontDescriptor.withSymbolicTraits(.traitItalic) ?? currentFont.fontDescriptor
-            let italicFont = UIFont(descriptor: descriptor, size: currentFont.pointSize)
+            let italicFont = PlatformFont(descriptor: descriptor, size: currentFont.pointSize)
+            #elseif os(macOS)
+            let descriptor = currentFont.fontDescriptor.withSymbolicTraits(.italic)
+            let italicFont = PlatformFont(descriptor: descriptor, size: currentFont.pointSize) ?? currentFont
+            #endif
             self.backing.addAttribute(.font, value: italicFont, range: matchRange)
             self.dimDelimiters(matchRange: matchRange, delimiterLength: 1)
         }
 
         Self.codeRegex.enumerateMatches(in: str, range: range) { match, _, _ in
             guard let match else { return }
-            let monoFont = UIFont.monospacedSystemFont(ofSize: Self.bodyFont.pointSize - 1, weight: .regular)
+            let monoFont = PlatformFont.monospacedSystemFont(ofSize: Self.bodySize - 1, weight: .regular)
             self.backing.addAttributes([
                 .font: monoFont,
-                .foregroundColor: UIColor.secondaryLabel,
-                .backgroundColor: UIColor.secondarySystemFill
+                .foregroundColor: PlatformColor.secondaryLabel,
+                .backgroundColor: PlatformColor.secondarySystemFill
             ], range: match.range)
         }
     }
@@ -449,8 +472,8 @@ final class MarkdownTextStorage: NSTextStorage {
     private func dimDelimiters(matchRange: NSRange, delimiterLength: Int) {
         let startDelim = NSRange(location: matchRange.location, length: delimiterLength)
         let endDelim = NSRange(location: matchRange.location + matchRange.length - delimiterLength, length: delimiterLength)
-        backing.addAttribute(.foregroundColor, value: UIColor.tertiaryLabel, range: startDelim)
-        backing.addAttribute(.foregroundColor, value: UIColor.tertiaryLabel, range: endDelim)
+        backing.addAttribute(.foregroundColor, value: PlatformColor.tertiaryLabel, range: startDelim)
+        backing.addAttribute(.foregroundColor, value: PlatformColor.tertiaryLabel, range: endDelim)
     }
 
     // MARK: - Load / Export

@@ -46,7 +46,9 @@ struct NoteEditorScreen: View {
             }
         }
         .navigationTitle(MarkdownNote.titleFrom(content))
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .task {
             guard !hasLoaded else { return }
             await loadNoteContent()

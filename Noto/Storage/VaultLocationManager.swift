@@ -13,6 +13,7 @@ final class VaultLocationManager {
 
     private static let bookmarkKey = "vaultBookmarkData"
     private static let isLocalKey = "vaultIsLocal"
+    private static let isDirectKey = "vaultIsDirect"
 
     init() {
         resolveVault()
@@ -39,7 +40,12 @@ final class VaultLocationManager {
 
         do {
             var isStale = false
-            let url = try URL(resolvingBookmarkData: bookmarkData, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale)
+            #if os(macOS)
+            let resolveOptions: URL.BookmarkResolutionOptions = [.withSecurityScope]
+            #else
+            let resolveOptions: URL.BookmarkResolutionOptions = []
+            #endif
+            let url = try URL(resolvingBookmarkData: bookmarkData, options: resolveOptions, relativeTo: nil, bookmarkDataIsStale: &isStale)
 
             if isStale {
                 // Re-save the bookmark
@@ -50,11 +56,12 @@ final class VaultLocationManager {
             }
 
             _ = url.startAccessingSecurityScopedResource()
-            let notoURL = url.appendingPathComponent("Noto")
-            ensureDirectoryExists(notoURL)
-            vaultURL = notoURL
+            let isDirect = UserDefaults.standard.bool(forKey: Self.isDirectKey)
+            let resolvedURL = isDirect ? url : url.appendingPathComponent("Noto")
+            ensureDirectoryExists(resolvedURL)
+            vaultURL = resolvedURL
             isVaultConfigured = true
-            logger.info("Resolved vault bookmark at \(notoURL.path)")
+            logger.info("Resolved vault bookmark at \(resolvedURL.path)")
         } catch {
             logger.error("Failed to resolve vault bookmark: \(error)")
             isVaultConfigured = false
@@ -71,9 +78,22 @@ final class VaultLocationManager {
         ensureDirectoryExists(notoURL)
         saveBookmark(for: parentURL)
         UserDefaults.standard.set(false, forKey: Self.isLocalKey)
+        UserDefaults.standard.set(false, forKey: Self.isDirectKey)
         vaultURL = notoURL
         isVaultConfigured = true
         logger.info("Vault set to \(notoURL.path)")
+    }
+
+    /// Set vault directly to the chosen folder (no `/Noto` subfolder).
+    /// Use this when pointing at an existing folder of markdown files.
+    func setVault(directURL url: URL) {
+        _ = url.startAccessingSecurityScopedResource()
+        saveBookmark(for: url)
+        UserDefaults.standard.set(false, forKey: Self.isLocalKey)
+        UserDefaults.standard.set(true, forKey: Self.isDirectKey)
+        vaultURL = url
+        isVaultConfigured = true
+        logger.info("Vault set directly to \(url.path)")
     }
 
     /// Set vault to local app sandbox Documents/Noto.
@@ -87,11 +107,26 @@ final class VaultLocationManager {
         logger.info("Vault set to local: \(localURL.path)")
     }
 
+    /// Resets vault configuration, returning the user to the setup screen.
+    func resetVault() {
+        vaultURL = nil
+        isVaultConfigured = false
+        UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
+        UserDefaults.standard.removeObject(forKey: Self.isLocalKey)
+        UserDefaults.standard.removeObject(forKey: Self.isDirectKey)
+        logger.info("Vault configuration reset")
+    }
+
     // MARK: - Helpers
 
     private func saveBookmark(for url: URL) {
         do {
-            let data = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+            #if os(macOS)
+            let bookmarkOptions: URL.BookmarkCreationOptions = [.withSecurityScope]
+            #else
+            let bookmarkOptions: URL.BookmarkCreationOptions = []
+            #endif
+            let data = try url.bookmarkData(options: bookmarkOptions, includingResourceValuesForKeys: nil, relativeTo: nil)
             UserDefaults.standard.set(data, forKey: Self.bookmarkKey)
         } catch {
             logger.error("Failed to save vault bookmark: \(error)")

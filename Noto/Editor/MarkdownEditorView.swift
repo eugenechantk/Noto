@@ -1,8 +1,49 @@
 import SwiftUI
-import UIKit
 import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "MarkdownEditorView")
+
+// MARK: - Shared helper
+
+/// Returns the character index after the frontmatter + "# " prefix.
+/// Everything before this index is protected from editing.
+func protectedRangeEnd(in text: String) -> Int {
+    var offset = 0
+
+    // Skip frontmatter
+    if text.hasPrefix("---") {
+        if let closeRange = text.range(of: "\n---\n", range: text.index(text.startIndex, offsetBy: 3)..<text.endIndex) {
+            offset = text.distance(from: text.startIndex, to: closeRange.upperBound)
+        } else if let closeRange = text.range(of: "\n---", range: text.index(text.startIndex, offsetBy: 3)..<text.endIndex) {
+            offset = text.distance(from: text.startIndex, to: closeRange.upperBound)
+            let remaining = text[closeRange.upperBound...]
+            if remaining.hasPrefix("\n") {
+                offset += 1
+            }
+        }
+    }
+
+    // Skip leading newlines after frontmatter
+    let afterFM = text.dropFirst(offset)
+    for ch in afterFM {
+        if ch == "\n" { offset += 1 } else { break }
+    }
+
+    // Protect "# " prefix
+    let remaining = text.dropFirst(offset)
+    if remaining.hasPrefix("# ") {
+        offset += 2
+    } else if remaining.hasPrefix("#") {
+        offset += 1
+    }
+
+    return offset
+}
+
+// MARK: - iOS
+
+#if os(iOS)
+import UIKit
 
 /// UITextView subclass that fixes caret height to match the text line height,
 /// excluding paragraph spacing that would otherwise make the caret too tall.
@@ -26,9 +67,6 @@ private class NotoTextView: UITextView {
         if rect.size.height > targetHeight {
             let spacingBefore = paragraphStyle?.paragraphSpacingBefore ?? 0
 
-            // Only offset by spacingBefore on the first line of the paragraph.
-            // On wrapped lines (second line of a heading, etc.), the spacing
-            // is not present, so shifting down would misalign the caret.
             let nsText = (storage.string as NSString)
             let paraRange = nsText.paragraphRange(for: NSRange(location: charOffset, length: 0))
             let isFirstLine = (charOffset == paraRange.location) || isOnFirstVisualLine(charOffset: charOffset, paragraphStart: paraRange.location)
@@ -42,7 +80,6 @@ private class NotoTextView: UITextView {
         return rect
     }
 
-    /// Checks if charOffset is on the first visual (rendered) line of a paragraph.
     private func isOnFirstVisualLine(charOffset: Int, paragraphStart: Int) -> Bool {
         guard let layoutManager = self.layoutManager as? NSLayoutManager else { return true }
         let glyphIndex = layoutManager.glyphIndexForCharacter(at: charOffset)
@@ -54,22 +91,18 @@ private class NotoTextView: UITextView {
 }
 
 /// Transparent input accessory view that floats over content.
-/// Passes through touches outside the pill so the text view remains interactive.
 private class TransparentAccessoryView: UIView {
     override func didMoveToSuperview() {
         super.didMoveToSuperview()
-        // Remove the opaque background UIKit adds to inputAccessoryView's parent
         superview?.backgroundColor = .clear
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        // Keep parent transparent after any layout pass
         superview?.backgroundColor = .clear
     }
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        // Only intercept touches that land on a button; pass through the rest
         let hit = super.hitTest(point, with: event)
         return hit == self ? nil : hit
     }
@@ -86,7 +119,6 @@ struct MarkdownEditorView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> UITextView {
-        // Build TextKit 1 stack
         let textStorage = MarkdownTextStorage()
         let layoutManager = NSLayoutManager()
         textStorage.addLayoutManager(layoutManager)
@@ -107,13 +139,11 @@ struct MarkdownEditorView: UIViewRepresentable {
         textView.delegate = context.coordinator
         textView.inputAccessoryView = context.coordinator.makeKeyboardToolbar(for: textView)
 
-        // Load initial content
         textStorage.load(markdown: text)
 
         context.coordinator.textStorage = textStorage
         context.coordinator.textView = textView
 
-        // Auto-focus for new notes — place cursor at end of content
         if autoFocus {
             DispatchQueue.main.async {
                 textView.becomeFirstResponder()
@@ -127,8 +157,6 @@ struct MarkdownEditorView: UIViewRepresentable {
 
     func updateUIView(_ textView: UITextView, context: Context) {
         guard let textStorage = context.coordinator.textStorage else { return }
-        // Only update if the source of truth changed externally (not from our own save).
-        // Skip if the coordinator is the source of the change.
         guard !context.coordinator.isUpdatingText else { return }
         if textStorage.markdownContent() != text {
             let selectedRange = textView.selectedRange
@@ -146,7 +174,6 @@ struct MarkdownEditorView: UIViewRepresentable {
         weak var textView: UITextView?
         private var keyboardObservers: [Any] = []
         private var saveWorkItem: DispatchWorkItem?
-        /// Guards against re-entrant updateUIView calls when we set the text binding.
         var isUpdatingText = false
 
         init(text: Binding<String>, onTextChange: ((String) -> Void)?) {
@@ -196,11 +223,8 @@ struct MarkdownEditorView: UIViewRepresentable {
 
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
             let fullText = textView.text ?? ""
+            let protectedEnd = protectedRangeEnd(in: fullText)
 
-            // Find the protected zone: frontmatter + "# " prefix
-            let protectedEnd = Self.protectedRangeEnd(in: fullText)
-
-            // Block edits in the protected zone
             if range.location < protectedEnd {
                 return false
             }
@@ -211,36 +235,26 @@ struct MarkdownEditorView: UIViewRepresentable {
                 let lineRange = nsText.lineRange(for: NSRange(location: range.location, length: 0))
                 let line = nsText.substring(with: lineRange)
 
-                // Match bullet: optional leading spaces + (- or * or •) + space
                 if let match = line.range(of: #"^(\s*[*\-•] )"#, options: .regularExpression) {
                     let prefix = String(line[match])
-
-                    // If the line is ONLY the bullet prefix (empty bullet), remove it instead of continuing
                     let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
                     if content.isEmpty {
-                        // Delete the empty bullet line content, leave just the newline
                         let prefixNSRange = NSRange(location: lineRange.location, length: prefix.count)
                         textView.selectedRange = prefixNSRange
                         textView.insertText("")
                         return false
                     }
-
-                    // Insert newline + same prefix
                     textView.insertText("\n" + prefix)
                     return false
                 }
 
-                // Match ordered list: optional leading spaces + digits + ". "
                 if let match = line.range(of: #"^(\s*)\d+\. "#, options: .regularExpression) {
                     let leadingSpaces = String(line.prefix(while: { $0 == " " || $0 == "\t" }))
-                    // Extract the number and increment it
                     let stripped = line.drop(while: { $0 == " " || $0 == "\t" })
                     if let dotIndex = stripped.firstIndex(of: ".") {
                         let numStr = String(stripped[stripped.startIndex..<dotIndex])
                         if let num = Int(numStr) {
                             let prefix = "\(leadingSpaces)\(num + 1). "
-
-                            // If empty ordered list item, remove it
                             let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
                             if content.isEmpty {
                                 let matchLen = line.distance(from: line.startIndex, to: match.upperBound)
@@ -249,7 +263,6 @@ struct MarkdownEditorView: UIViewRepresentable {
                                 textView.insertText("")
                                 return false
                             }
-
                             textView.insertText("\n" + prefix)
                             return false
                         }
@@ -258,42 +271,6 @@ struct MarkdownEditorView: UIViewRepresentable {
             }
 
             return true
-        }
-
-        /// Returns the character index after the frontmatter + "# " prefix.
-        /// Everything before this index is protected from editing.
-        private static func protectedRangeEnd(in text: String) -> Int {
-            var offset = 0
-
-            // Skip frontmatter
-            if text.hasPrefix("---") {
-                if let closeRange = text.range(of: "\n---\n", range: text.index(text.startIndex, offsetBy: 3)..<text.endIndex) {
-                    offset = text.distance(from: text.startIndex, to: closeRange.upperBound)
-                } else if let closeRange = text.range(of: "\n---", range: text.index(text.startIndex, offsetBy: 3)..<text.endIndex) {
-                    offset = text.distance(from: text.startIndex, to: closeRange.upperBound)
-                    // Skip trailing newline if present
-                    let remaining = text[closeRange.upperBound...]
-                    if remaining.hasPrefix("\n") {
-                        offset += 1
-                    }
-                }
-            }
-
-            // Skip leading newlines after frontmatter
-            let afterFM = text.dropFirst(offset)
-            for ch in afterFM {
-                if ch == "\n" { offset += 1 } else { break }
-            }
-
-            // Protect "# " prefix
-            let remaining = text.dropFirst(offset)
-            if remaining.hasPrefix("# ") {
-                offset += 2
-            } else if remaining.hasPrefix("#") {
-                offset += 1
-            }
-
-            return offset
         }
 
         // MARK: - Keyboard Toolbar
@@ -310,7 +287,6 @@ struct MarkdownEditorView: UIViewRepresentable {
             wrapper.backgroundColor = .clear
             wrapper.autoresizingMask = .flexibleWidth
 
-            // Compact pill — Liquid Glass effect
             let glassEffect = UIGlassEffect()
             glassEffect.isInteractive = true
             let pill = UIVisualEffectView(effect: glassEffect)
@@ -343,16 +319,12 @@ struct MarkdownEditorView: UIViewRepresentable {
             pill.contentView.addSubview(stack)
 
             NSLayoutConstraint.activate([
-                // Pill anchored to trailing edge with bottom margin
                 pill.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor, constant: -12),
                 pill.topAnchor.constraint(equalTo: wrapper.topAnchor),
                 pill.heightAnchor.constraint(equalToConstant: pillHeight),
-
-                // Stack inside pill contentView with horizontal padding
                 stack.leadingAnchor.constraint(equalTo: pill.contentView.leadingAnchor, constant: pillPadding),
                 stack.trailingAnchor.constraint(equalTo: pill.contentView.trailingAnchor, constant: -pillPadding),
                 stack.centerYAnchor.constraint(equalTo: pill.contentView.centerYAnchor),
-
                 outdentButton.widthAnchor.constraint(equalToConstant: buttonSize),
                 outdentButton.heightAnchor.constraint(equalToConstant: buttonSize),
                 indentButton.widthAnchor.constraint(equalToConstant: buttonSize),
@@ -369,11 +341,9 @@ struct MarkdownEditorView: UIViewRepresentable {
             guard cursorPos <= nsText.length else { return }
 
             let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
-            // Insert 2 spaces at the start of the line
             let insertRange = NSRange(location: lineRange.location, length: 0)
             textView.selectedRange = insertRange
             textView.insertText("  ")
-            // Restore cursor position (shifted right by 2)
             textView.selectedRange = NSRange(location: cursorPos + 2, length: 0)
         }
 
@@ -386,7 +356,6 @@ struct MarkdownEditorView: UIViewRepresentable {
             let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
             let line = nsText.substring(with: lineRange)
 
-            // Count leading spaces (remove up to 2)
             let leadingSpaces = line.prefix(while: { $0 == " " }).count
             let spacesToRemove = min(leadingSpaces, 2)
             guard spacesToRemove > 0 else { return }
@@ -394,24 +363,21 @@ struct MarkdownEditorView: UIViewRepresentable {
             let removeRange = NSRange(location: lineRange.location, length: spacesToRemove)
             textView.selectedRange = removeRange
             textView.insertText("")
-            // Restore cursor position (shifted left, clamped to line start)
             let newCursor = max(cursorPos - spacesToRemove, lineRange.location)
             textView.selectedRange = NSRange(location: newCursor, length: 0)
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             let fullText = textView.text ?? ""
-            let protectedEnd = Self.protectedRangeEnd(in: fullText)
+            let protectedEnd = protectedRangeEnd(in: fullText)
             let selection = textView.selectedRange
 
-            // Clamp cursor/selection to stay at or after the protected zone
             if selection.location < protectedEnd {
                 let newLocation = protectedEnd
                 let newLength = max(0, selection.length - (protectedEnd - selection.location))
                 textView.selectedRange = NSRange(location: newLocation, length: newLength)
             }
 
-            // Update active line so heading prefix shows/hides based on cursor position
             let nsText = fullText as NSString
             let cursorPos = textView.selectedRange.location
             if cursorPos <= nsText.length {
@@ -428,7 +394,6 @@ struct MarkdownEditorView: UIViewRepresentable {
             onTextChange?(content)
         }
 
-        /// Flushes any pending debounced save immediately. Call before navigating away.
         func flushPendingSave() {
             saveWorkItem?.cancel()
             guard let content = textStorage?.markdownContent() else { return }
@@ -439,3 +404,170 @@ struct MarkdownEditorView: UIViewRepresentable {
         }
     }
 }
+
+// MARK: - macOS
+
+#elseif os(macOS)
+import AppKit
+
+/// SwiftUI wrapper around NSTextView with MarkdownTextStorage for live markdown rendering.
+struct MarkdownEditorView: NSViewRepresentable {
+    @Binding var text: String
+    var autoFocus: Bool = false
+    var onTextChange: ((String) -> Void)?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, onTextChange: onTextChange)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let textStorage = MarkdownTextStorage()
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
+
+        let container = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+        container.widthTracksTextView = true
+        layoutManager.addTextContainer(container)
+
+        let textView = NSTextView(frame: .zero, textContainer: container)
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.backgroundColor = .textBackgroundColor
+        textView.textContainerInset = NSSize(width: 12, height: 16)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.delegate = context.coordinator
+        textView.setAccessibilityIdentifier("note_editor")
+
+        textStorage.load(markdown: text)
+
+        context.coordinator.textStorage = textStorage
+        context.coordinator.textView = textView
+
+        let scrollView = NSScrollView()
+        scrollView.documentView = textView
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.drawsBackground = false
+
+        if autoFocus {
+            DispatchQueue.main.async {
+                textView.window?.makeFirstResponder(textView)
+                textView.setSelectedRange(NSRange(location: textStorage.length, length: 0))
+            }
+        }
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textStorage = context.coordinator.textStorage,
+              let textView = context.coordinator.textView else { return }
+        guard !context.coordinator.isUpdatingText else { return }
+        if textStorage.markdownContent() != text {
+            let selectedRange = textView.selectedRange()
+            textStorage.load(markdown: text)
+            if selectedRange.location + selectedRange.length <= textStorage.length {
+                textView.setSelectedRange(selectedRange)
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        @Binding var text: String
+        var onTextChange: ((String) -> Void)?
+        weak var textStorage: MarkdownTextStorage?
+        weak var textView: NSTextView?
+        var isUpdatingText = false
+
+        init(text: Binding<String>, onTextChange: ((String) -> Void)?) {
+            _text = text
+            self.onTextChange = onTextChange
+        }
+
+        func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
+            let fullText = textView.string
+            let protectedEnd = protectedRangeEnd(in: fullText)
+
+            if affectedCharRange.location < protectedEnd {
+                return false
+            }
+
+            // Auto-continue bullet/ordered lists on Enter
+            if let replacement = replacementString, replacement == "\n" {
+                let nsText = fullText as NSString
+                let lineRange = nsText.lineRange(for: NSRange(location: affectedCharRange.location, length: 0))
+                let line = nsText.substring(with: lineRange)
+
+                if let match = line.range(of: #"^(\s*[*\-•] )"#, options: .regularExpression) {
+                    let prefix = String(line[match])
+                    let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if content.isEmpty {
+                        let prefixNSRange = NSRange(location: lineRange.location, length: prefix.count)
+                        textView.setSelectedRange(prefixNSRange)
+                        textView.insertText("", replacementRange: prefixNSRange)
+                        return false
+                    }
+                    textView.insertText("\n" + prefix, replacementRange: affectedCharRange)
+                    return false
+                }
+
+                if let match = line.range(of: #"^(\s*)\d+\. "#, options: .regularExpression) {
+                    let leadingSpaces = String(line.prefix(while: { $0 == " " || $0 == "\t" }))
+                    let stripped = line.drop(while: { $0 == " " || $0 == "\t" })
+                    if let dotIndex = stripped.firstIndex(of: ".") {
+                        let numStr = String(stripped[stripped.startIndex..<dotIndex])
+                        if let num = Int(numStr) {
+                            let prefix = "\(leadingSpaces)\(num + 1). "
+                            let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                            if content.isEmpty {
+                                let matchLen = line.distance(from: line.startIndex, to: match.upperBound)
+                                let prefixNSRange = NSRange(location: lineRange.location, length: matchLen)
+                                textView.insertText("", replacementRange: prefixNSRange)
+                                return false
+                            }
+                            textView.insertText("\n" + prefix, replacementRange: affectedCharRange)
+                            return false
+                        }
+                    }
+                }
+            }
+
+            return true
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView else { return }
+            let fullText = textView.string
+            let protectedEnd = protectedRangeEnd(in: fullText)
+            let selection = textView.selectedRange()
+
+            if selection.location < protectedEnd {
+                let newLocation = protectedEnd
+                let newLength = max(0, selection.length - (protectedEnd - selection.location))
+                textView.setSelectedRange(NSRange(location: newLocation, length: newLength))
+            }
+
+            let nsText = fullText as NSString
+            let cursorPos = textView.selectedRange().location
+            if cursorPos <= nsText.length {
+                let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
+                textStorage?.setActiveLine(lineRange)
+            }
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let content = textStorage?.markdownContent() else { return }
+            isUpdatingText = true
+            self.text = content
+            isUpdatingText = false
+            onTextChange?(content)
+        }
+    }
+}
+#endif

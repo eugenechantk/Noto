@@ -12,14 +12,29 @@ enum NoteRoute: Hashable {
     case todayNote
 }
 
-/// Root entry point — wraps FolderContentView in a NavigationStack.
+// MARK: - Root View
+
+/// Root entry point — NavigationStack on iOS, NavigationSplitView on macOS.
 struct NoteListView: View {
     var store: MarkdownNoteStore
     var locationManager: VaultLocationManager?
     var fileWatcher: VaultFileWatcher?
+
+    #if os(iOS)
     @State private var path = NavigationPath()
+    #endif
+
+    #if os(macOS)
+    @State private var selectedNote: MarkdownNote?
+    @State private var selectedNoteStore: MarkdownNoteStore?
+    @State private var showSettings = false
+    @State private var hasRestoredSelection = false
+
+    private static let lastOpenedNoteKey = "lastOpenedNoteURL"
+    #endif
 
     var body: some View {
+        #if os(iOS)
         NavigationStack(path: $path) {
             FolderContentView(
                 store: store,
@@ -55,10 +70,93 @@ struct NoteListView: View {
                 }
             }
         }
+        #elseif os(macOS)
+        NavigationSplitView {
+            SidebarView(
+                rootStore: store,
+                fileWatcher: fileWatcher,
+                selectedNote: $selectedNote,
+                selectedNoteStore: $selectedNoteStore
+            )
+        } detail: {
+            if let selectedNote, let selectedNoteStore {
+                NoteEditorScreen(
+                    store: selectedNoteStore,
+                    note: selectedNote,
+                    fileWatcher: fileWatcher
+                )
+                .id(selectedNote.id)
+            } else {
+                Text("Select a note")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: openTodayNote) {
+                    Label("Today", systemImage: "calendar")
+                }
+                .accessibilityIdentifier("today_button")
+            }
+            if locationManager != nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: { showSettings = true }) {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                    .accessibilityIdentifier("settings_button")
+                }
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            if let locationManager {
+                SettingsView(locationManager: locationManager)
+                    .frame(minWidth: 400, minHeight: 200)
+            }
+        }
+        .onChange(of: selectedNote?.fileURL) { _, newURL in
+            // Persist the selected note's file path
+            if let path = newURL?.path {
+                UserDefaults.standard.set(path, forKey: Self.lastOpenedNoteKey)
+            }
+        }
+        .onAppear {
+            guard !hasRestoredSelection else { return }
+            hasRestoredSelection = true
+            restoreOrOpenToday()
+        }
+        #endif
     }
+
+    #if os(macOS)
+    private func openTodayNote() {
+        let (todayStore, todayNote) = store.todayNote()
+        selectedNoteStore = todayStore
+        selectedNote = todayNote
+    }
+
+    private func restoreOrOpenToday() {
+        // Try to restore the last opened note
+        if let savedPath = UserDefaults.standard.string(forKey: Self.lastOpenedNoteKey) {
+            let fileURL = URL(fileURLWithPath: savedPath)
+            if FileManager.default.fileExists(atPath: savedPath) {
+                let dirURL = fileURL.deletingLastPathComponent()
+                let noteStore = MarkdownNoteStore(directoryURL: dirURL, vaultRootURL: store.vaultRootURL)
+                if let note = noteStore.notes.first(where: { $0.fileURL.path == savedPath }) {
+                    selectedNoteStore = noteStore
+                    selectedNote = note
+                    return
+                }
+            }
+        }
+        // Default to today's note
+        openTodayNote()
+    }
+    #endif
 }
 
-/// Resolves and displays today's note. Separated to avoid computing todayNote() at route creation time.
+/// Resolves and displays today's note (iOS only — macOS opens inline).
 private struct TodayNoteDestination: View {
     var store: MarkdownNoteStore
     var fileWatcher: VaultFileWatcher?
@@ -78,6 +176,220 @@ private struct TodayNoteDestination: View {
     }
 }
 
+// MARK: - macOS Sidebar
+
+#if os(macOS)
+/// Sidebar with Finder-style folder navigation.
+/// - Clicking a folder drills into it (replaces sidebar content with that folder's items)
+/// - Back button goes up one level
+/// - Clicking a note opens it in the detail pane
+struct SidebarView: View {
+    var rootStore: MarkdownNoteStore
+    var fileWatcher: VaultFileWatcher?
+    @Binding var selectedNote: MarkdownNote?
+    @Binding var selectedNoteStore: MarkdownNoteStore?
+
+    /// Stack of (store, title) for folder navigation. Empty = showing root.
+    @State private var folderStack: [(store: MarkdownNoteStore, title: String)] = []
+    @State private var showNewFolderAlert = false
+    @State private var newFolderName = ""
+
+    private var currentStore: MarkdownNoteStore {
+        folderStack.last?.store ?? rootStore
+    }
+
+    private var currentTitle: String {
+        folderStack.last?.title ?? "Notes"
+    }
+
+    private var canGoBack: Bool {
+        !folderStack.isEmpty
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Back button row inside the sidebar
+            if canGoBack {
+                HStack {
+                    Button(action: goBack) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.caption.weight(.semibold))
+                            Text(folderStack.count > 1 ? folderStack[folderStack.count - 2].title : "Notes")
+                                .font(.subheadline)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("back_button")
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+            }
+
+            List {
+                ForEach(currentStore.items) { (item: DirectoryItem) in
+                    sidebarRow(for: item)
+                }
+            }
+            .contextMenu {
+                Button(action: createNote) {
+                    Label("New Note", systemImage: "doc.badge.plus")
+                }
+                Button(action: { showNewFolderAlert = true }) {
+                    Label("New Folder", systemImage: "folder.badge.plus")
+                }
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationTitle(currentTitle)
+        .alert("New Folder", isPresented: $showNewFolderAlert) {
+            TextField("Folder name", text: $newFolderName)
+            Button("Create") {
+                let name = newFolderName.trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty {
+                    _ = currentStore.createFolder(name: name)
+                }
+                newFolderName = ""
+            }
+            Button("Cancel", role: .cancel) { newFolderName = "" }
+        }
+        .onAppear {
+            rootStore.loadItems()
+        }
+    }
+
+    @ViewBuilder
+    private func sidebarRow(for item: DirectoryItem) -> some View {
+        switch item {
+        case .folder(let folder):
+            SidebarFolderRow(
+                folder: folder,
+                rootStore: rootStore,
+                fileWatcher: fileWatcher,
+                selectedNote: $selectedNote,
+                selectedNoteStore: $selectedNoteStore,
+                onNavigate: {
+                    let subStore = MarkdownNoteStore(
+                        directoryURL: folder.folderURL,
+                        vaultRootURL: rootStore.vaultRootURL
+                    )
+                    folderStack.append((store: subStore, title: folder.name))
+                },
+                onDelete: {
+                    currentStore.deleteFolder(folder)
+                }
+            )
+        case .note(let note):
+            Button {
+                selectedNote = note
+                selectedNoteStore = currentStore
+            } label: {
+                Label(note.title, systemImage: "doc.text")
+            }
+            .buttonStyle(.plain)
+            .listRowBackground(selectedNote?.id == note.id ? Color.accentColor.opacity(0.2) : nil)
+            .contextMenu {
+                Button(role: .destructive) {
+                    if note.id == selectedNote?.id {
+                        selectedNote = nil
+                        selectedNoteStore = nil
+                    }
+                    currentStore.deleteNote(note)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private func goBack() {
+        folderStack.removeLast()
+    }
+
+    private func createNote() {
+        let note = currentStore.createNote()
+        selectedNote = note
+        selectedNoteStore = currentStore
+    }
+
+}
+
+/// A folder row with a disclosure triangle (expand in-place) and a clickable label (navigate into).
+private struct SidebarFolderRow: View {
+    let folder: NotoFolder
+    let rootStore: MarkdownNoteStore
+    var fileWatcher: VaultFileWatcher?
+    @Binding var selectedNote: MarkdownNote?
+    @Binding var selectedNoteStore: MarkdownNoteStore?
+    var onNavigate: () -> Void
+    var onDelete: () -> Void
+
+    @State private var isExpanded = false
+    @State private var childStore: MarkdownNoteStore?
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            if let childStore {
+                ForEach(childStore.items) { (childItem: DirectoryItem) in
+                    switch childItem {
+                    case .folder(let subfolder):
+                        SidebarFolderRow(
+                            folder: subfolder,
+                            rootStore: rootStore,
+                            fileWatcher: fileWatcher,
+                            selectedNote: $selectedNote,
+                            selectedNoteStore: $selectedNoteStore,
+                            onNavigate: {
+                                let subStore = MarkdownNoteStore(
+                                    directoryURL: subfolder.folderURL,
+                                    vaultRootURL: rootStore.vaultRootURL
+                                )
+                                // Navigate: push parent folder first, then this subfolder
+                                onNavigate()
+                            },
+                            onDelete: {
+                                childStore.deleteFolder(subfolder)
+                            }
+                        )
+                    case .note(let note):
+                        Button {
+                            selectedNote = note
+                            selectedNoteStore = childStore
+                        } label: {
+                            Label(note.title, systemImage: "doc.text")
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(selectedNote?.id == note.id ? Color.accentColor.opacity(0.2) : nil)
+                    }
+                }
+            }
+        } label: {
+            Button(action: onNavigate) {
+                Label(folder.name, systemImage: "folder.fill")
+            }
+            .buttonStyle(.plain)
+        }
+        .contextMenu {
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .onChange(of: isExpanded) { _, expanded in
+            if expanded, childStore == nil {
+                childStore = MarkdownNoteStore(
+                    directoryURL: folder.folderURL,
+                    vaultRootURL: rootStore.vaultRootURL
+                )
+            }
+        }
+    }
+}
+#endif
+
+// MARK: - iOS Folder Content View
+
+#if os(iOS)
 /// Reusable view that shows the contents of a directory (folders + notes).
 struct FolderContentView: View {
     var store: MarkdownNoteStore
@@ -131,7 +443,6 @@ struct FolderContentView: View {
                     Button(action: { onTodayTap?() }) {
                         Label("Today", systemImage: "calendar")
                     }
-                    .buttonStyle(.glass)
                     .accessibilityIdentifier("today_button")
                 }
             }
@@ -141,7 +452,6 @@ struct FolderContentView: View {
                         Button(action: onSettingsTap) {
                             Image(systemName: "gearshape")
                         }
-                        .buttonStyle(.glass)
                         .accessibilityIdentifier("settings_button")
                     }
                     Menu {
@@ -157,7 +467,6 @@ struct FolderContentView: View {
                         Image(systemName: "plus")
                             .accessibilityLabel("Add")
                     }
-                    .buttonStyle(.glass)
                     .accessibilityIdentifier("add_menu")
                 }
             }
@@ -204,6 +513,9 @@ struct FolderContentView: View {
         }
     }
 }
+#endif
+
+// MARK: - Row Views
 
 struct FolderRow: View {
     let folder: NotoFolder

@@ -163,17 +163,11 @@ final class MarkdownNoteStore {
                 let id = UUID(uuid: UUID.nameToUUID(url.path))
                 loaded.append(.folder(NotoFolder(id: id, folderURL: url, name: name, modifiedDate: modDate)))
             } else if url.pathExtension == "md" {
-                let title: String
-                let noteId: UUID
-                if let data = CoordinatedFileManager.readPrefix(from: url, maxBytes: 1024),
-                   let snippet = String(data: data, encoding: .utf8) {
-                    title = MarkdownNote.titleFrom(snippet)
-                    noteId = MarkdownNote.idFromFrontmatter(snippet)
-                        ?? UUID(uuid: UUID.nameToUUID(url.path))
-                } else {
-                    title = "Untitled"
-                    noteId = UUID(uuid: UUID.nameToUUID(url.path))
-                }
+                // Derive title from filename for fast listing — no file I/O needed.
+                // Full content (frontmatter ID, etc.) is read when the note is opened.
+                let stem = url.deletingPathExtension().lastPathComponent
+                let title = stem.isEmpty ? "Untitled" : stem
+                let noteId = UUID(uuid: UUID.nameToUUID(url.path))
 
                 loaded.append(.note(MarkdownNote(id: noteId, fileURL: url, title: title, modifiedDate: modDate)))
             }
