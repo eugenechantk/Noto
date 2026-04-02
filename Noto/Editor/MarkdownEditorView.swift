@@ -45,20 +45,100 @@ func protectedRangeEnd(in text: String) -> Int {
 #if os(iOS)
 import UIKit
 
+func effectiveCaretFont(from attributes: [NSAttributedString.Key: Any]) -> UIFont? {
+    guard let font = attributes[.font] as? UIFont else { return nil }
+    return font.pointSize < 1 ? MarkdownTextStorage.bodyFont : font
+}
+
+func effectiveCaretFont(at characterOffset: Int, in storage: NSTextStorage) -> UIFont? {
+    guard storage.length > 0 else { return nil }
+    guard characterOffset >= 0, characterOffset <= storage.length else { return nil }
+    let attributeOffset = min(characterOffset, storage.length - 1)
+    let attrs = storage.attributes(at: attributeOffset, effectiveRange: nil)
+    return effectiveCaretFont(from: attrs)
+}
+
+private class CheckboxOverlayView: UIView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit == self ? nil : hit
+    }
+}
+
 /// UITextView subclass that fixes caret height to match the text line height,
 /// excluding paragraph spacing that would otherwise make the caret too tall.
 private class NotoTextView: UITextView {
+    var onCheckboxTap: ((Int) -> Void)?
+    private let checkboxOverlayView = CheckboxOverlayView()
+
+    override init(frame: CGRect, textContainer: NSTextContainer?) {
+        super.init(frame: frame, textContainer: textContainer)
+        configureCheckboxOverlay()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureCheckboxOverlay()
+    }
+
+    private func configureCheckboxOverlay() {
+        checkboxOverlayView.backgroundColor = .clear
+        checkboxOverlayView.isUserInteractionEnabled = true
+        addSubview(checkboxOverlayView)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        checkboxOverlayView.frame = bounds
+        refreshTodoCheckboxButtons()
+    }
+
+    func refreshTodoCheckboxButtons() {
+        checkboxOverlayView.subviews.forEach { $0.removeFromSuperview() }
+
+        guard let markdownLayoutManager = layoutManager as? MarkdownLayoutManager else { return }
+        let textOrigin = CGPoint(
+            x: textContainerInset.left - contentOffset.x,
+            y: textContainerInset.top - contentOffset.y
+        )
+        let fullRange = NSRange(location: 0, length: textStorage.length)
+        textStorage.enumerateAttribute(MarkdownTextStorage.todoCheckboxKey, in: fullRange, options: []) { value, attrRange, _ in
+            guard let isChecked = value as? Bool else { return }
+            guard let checkboxRect = markdownLayoutManager.todoCheckboxRect(
+                forCharacterRange: attrRange,
+                in: self.textContainer,
+                origin: textOrigin
+            ) else { return }
+
+            let button = UIButton(type: .custom)
+            button.frame = checkboxRect.insetBy(dx: -8, dy: -8)
+            button.backgroundColor = .clear
+            button.tag = attrRange.location
+            button.accessibilityIdentifier = "todo_checkbox_\(attrRange.location)"
+            button.accessibilityLabel = isChecked ? "Checked todo item" : "Unchecked todo item"
+            button.accessibilityTraits = isChecked ? [.button, .selected] : [.button]
+            button.addTarget(self, action: #selector(todoCheckboxButtonTapped(_:)), for: .touchUpInside)
+            checkboxOverlayView.addSubview(button)
+        }
+    }
+
+        @objc private func todoCheckboxButtonTapped(_ sender: UIButton) {
+            let wasFirstResponder = isFirstResponder
+            onCheckboxTap?(sender.tag)
+            if !wasFirstResponder, let markdownStorage = textStorage as? MarkdownTextStorage {
+                markdownStorage.setActiveLine(nil, cursorPosition: nil)
+                setNeedsLayout()
+            }
+        }
+
     override func caretRect(for position: UITextPosition) -> CGRect {
         var rect = super.caretRect(for: position)
 
         let charOffset = self.offset(from: beginningOfDocument, to: position)
         let storage = self.textStorage
-        guard charOffset >= 0, charOffset < storage.length else {
-            return rect
-        }
-
-        let attrs = storage.attributes(at: min(charOffset, storage.length - 1), effectiveRange: nil)
-        guard let font = attrs[.font] as? UIFont else { return rect }
+        guard let font = effectiveCaretFont(at: charOffset, in: storage) else { return rect }
+        let attributeOffset = min(max(charOffset, 0), storage.length - 1)
+        let attrs = storage.attributes(at: attributeOffset, effectiveRange: nil)
 
         let paragraphStyle = attrs[.paragraphStyle] as? NSParagraphStyle
         let lineSpacing = paragraphStyle?.lineSpacing ?? 0
@@ -74,6 +154,8 @@ private class NotoTextView: UITextView {
             if isFirstLine {
                 rect.origin.y += spacingBefore
             }
+            rect.size.height = targetHeight
+        } else if rect.size.height < targetHeight {
             rect.size.height = targetHeight
         }
 
@@ -120,7 +202,7 @@ struct MarkdownEditorView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> UITextView {
         let textStorage = MarkdownTextStorage()
-        let layoutManager = NSLayoutManager()
+        let layoutManager = MarkdownLayoutManager()
         textStorage.addLayoutManager(layoutManager)
 
         let container = NSTextContainer(size: .zero)
@@ -143,6 +225,10 @@ struct MarkdownEditorView: UIViewRepresentable {
 
         context.coordinator.textStorage = textStorage
         context.coordinator.textView = textView
+        textView.onCheckboxTap = { [weak coordinator = context.coordinator] charIndex in
+            coordinator?.handleCheckboxTap(at: charIndex)
+        }
+        textView.setNeedsLayout()
 
         if autoFocus {
             DispatchQueue.main.async {
@@ -188,6 +274,14 @@ struct MarkdownEditorView: UIViewRepresentable {
         private func programmaticInsert(_ text: String, in textView: UITextView) {
             isInsertingProgrammatically = true
             textView.insertText(text)
+            isInsertingProgrammatically = false
+        }
+
+        /// Replaces text at a range without triggering auto-continue logic.
+        private func programmaticInsert(at range: NSRange, replacement: String, in textView: UITextView) {
+            isInsertingProgrammatically = true
+            textView.selectedRange = range
+            textView.insertText(replacement)
             isInsertingProgrammatically = false
         }
 
@@ -266,53 +360,19 @@ struct MarkdownEditorView: UIViewRepresentable {
                 let lineRange = nsText.lineRange(for: NSRange(location: range.location, length: 0))
                 guard lineRange.length > 0, NSMaxRange(lineRange) <= nsText.length else { return true }
                 let line = nsText.substring(with: lineRange)
-
-                // Match todo: - [ ] or - [x] — continue as unchecked todo
-                if let match = line.range(of: #"^(\s*[*\-•] \[[ x]\] )"#, options: .regularExpression) {
-                    let leadingSpaces = String(line.prefix(while: { $0 == " " || $0 == "\t" }))
-                    let todoPrefix = leadingSpaces + "- [ ] "
-
-                    let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if content.isEmpty {
-                        let prefixLen = line.distance(from: line.startIndex, to: match.upperBound)
-                        deferredReplace(range: NSRange(location: lineRange.location, length: prefixLen), with: "", in: textView)
-                        return false
-                    }
-                    deferredReplace(range: range, with: "\n" + todoPrefix, in: textView)
+                switch MarkdownEditingCommands.lineBreakAction(for: line) {
+                case .none:
+                    break
+                case .insert(let insertion):
+                    deferredReplace(range: range, with: insertion, in: textView)
                     return false
-                }
-
-                // Match bullet: optional leading spaces + (- or * or •) + space
-                if let match = line.range(of: #"^(\s*[*\-•] )"#, options: .regularExpression) {
-                    let prefix = String(line[match])
-
-                    let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if content.isEmpty {
-                        deferredReplace(range: NSRange(location: lineRange.location, length: prefix.count), with: "", in: textView)
-                        return false
-                    }
-                    deferredReplace(range: range, with: "\n" + prefix, in: textView)
+                case .removeCurrentLinePrefix(let prefixLength):
+                    deferredReplace(
+                        range: NSRange(location: lineRange.location, length: prefixLength),
+                        with: "",
+                        in: textView
+                    )
                     return false
-                }
-
-                if let match = line.range(of: #"^(\s*)\d+\. "#, options: .regularExpression) {
-                    let leadingSpaces = String(line.prefix(while: { $0 == " " || $0 == "\t" }))
-                    let stripped = line.drop(while: { $0 == " " || $0 == "\t" })
-                    if let dotIndex = stripped.firstIndex(of: ".") {
-                        let numStr = String(stripped[stripped.startIndex..<dotIndex])
-                        if let num = Int(numStr) {
-                            let prefix = "\(leadingSpaces)\(num + 1). "
-
-                            let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                            if content.isEmpty {
-                                let matchLen = line.distance(from: line.startIndex, to: match.upperBound)
-                                deferredReplace(range: NSRange(location: lineRange.location, length: matchLen), with: "", in: textView)
-                                return false
-                            }
-                            deferredReplace(range: range, with: "\n" + prefix, in: textView)
-                            return false
-                        }
-                    }
                 }
             }
 
@@ -396,9 +456,9 @@ struct MarkdownEditorView: UIViewRepresentable {
             guard cursorPos <= nsText.length else { return }
 
             let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
-            let insertRange = NSRange(location: lineRange.location, length: 0)
-            textView.selectedRange = insertRange
-            self.programmaticInsert("  ", in: textView)
+            let line = nsText.substring(with: lineRange)
+            let transformed = MarkdownEditingCommands.indentedLine(line)
+            self.programmaticInsert(at: lineRange, replacement: transformed, in: textView)
             textView.selectedRange = NSRange(location: cursorPos + 2, length: 0)
         }
 
@@ -410,15 +470,12 @@ struct MarkdownEditorView: UIViewRepresentable {
 
             let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
             let line = nsText.substring(with: lineRange)
+            let transformed = MarkdownEditingCommands.outdentedLine(line)
+            guard transformed != line else { return }
 
-            let leadingSpaces = line.prefix(while: { $0 == " " }).count
-            let spacesToRemove = min(leadingSpaces, 2)
-            guard spacesToRemove > 0 else { return }
-
-            let removeRange = NSRange(location: lineRange.location, length: spacesToRemove)
-            textView.selectedRange = removeRange
-            self.programmaticInsert("", in: textView)
-            let newCursor = max(cursorPos - spacesToRemove, lineRange.location)
+            let delta = transformed.count - line.count
+            self.programmaticInsert(at: lineRange, replacement: transformed, in: textView)
+            let newCursor = max(cursorPos + delta, lineRange.location)
             textView.selectedRange = NSRange(location: newCursor, length: 0)
         }
 
@@ -430,28 +487,28 @@ struct MarkdownEditorView: UIViewRepresentable {
 
             let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
             let line = nsText.substring(with: lineRange)
+            let transformed = TodoMarkdown.toolbarToggledLine(line)
+            let delta = transformed.count - line.count
+            self.programmaticInsert(at: lineRange, replacement: transformed, in: textView)
+            let newCursor = max(lineRange.location, min(cursorPos + delta, lineRange.location + transformed.count))
+            textView.selectedRange = NSRange(location: newCursor, length: 0)
+            textView.setNeedsLayout()
+        }
 
-            if line.contains("- [x] ") || line.contains("* [x] ") {
-                // Checked → unchecked
-                let checkRange = (line as NSString).range(of: "[x]")
-                guard checkRange.location != NSNotFound else { return }
-                let absRange = NSRange(location: lineRange.location + checkRange.location, length: 3)
-                textView.selectedRange = absRange
-                self.programmaticInsert("[ ]", in: textView)
-            } else if line.contains("- [ ] ") || line.contains("* [ ] ") {
-                // Unchecked → checked
-                let checkRange = (line as NSString).range(of: "[ ]")
-                guard checkRange.location != NSNotFound else { return }
-                let absRange = NSRange(location: lineRange.location + checkRange.location, length: 3)
-                textView.selectedRange = absRange
-                self.programmaticInsert("[x]", in: textView)
-            } else {
-                // Plain line → add todo prefix
-                let insertPos = lineRange.location
-                textView.selectedRange = NSRange(location: insertPos, length: 0)
-                self.programmaticInsert("- [ ] ", in: textView)
-                textView.selectedRange = NSRange(location: cursorPos + 6, length: 0)
-            }
+        func handleCheckboxTap(at charIndex: Int) {
+            guard let textView else { return }
+            let nsText = textView.text as NSString
+            let lineRange = nsText.lineRange(for: NSRange(location: charIndex, length: 0))
+            let line = nsText.substring(with: lineRange)
+            let transformed = TodoMarkdown.checkboxToggledLine(line)
+            guard transformed != line else { return }
+
+            let selection = textView.selectedRange
+            let delta = transformed.count - line.count
+            self.programmaticInsert(at: lineRange, replacement: transformed, in: textView)
+            let newLocation = max(lineRange.location, min(selection.location + delta, lineRange.location + transformed.count))
+            textView.selectedRange = NSRange(location: newLocation, length: selection.length)
+            textView.setNeedsLayout()
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
@@ -472,16 +529,23 @@ struct MarkdownEditorView: UIViewRepresentable {
             let cursorPos = textView.selectedRange.location
             if cursorPos <= nsText.length {
                 let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
-                textStorage?.setActiveLine(lineRange)
+                textStorage?.setActiveLine(lineRange, cursorPosition: cursorPos)
             }
+            textView.setNeedsLayout()
         }
 
         func textViewDidChange(_ textView: UITextView) {
+            let nsText = (textView.text ?? "") as NSString
+            let cursorPos = min(textView.selectedRange.location, nsText.length)
+            let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
+            textStorage?.render(activeLine: lineRange, cursorPosition: cursorPos)
+
             guard let content = textStorage?.markdownContent() else { return }
             isUpdatingText = true
             self.text = content
             isUpdatingText = false
             onTextChange?(content)
+            textView.setNeedsLayout()
         }
 
         func flushPendingSave() {
@@ -512,7 +576,7 @@ struct MarkdownEditorView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let textStorage = MarkdownTextStorage()
-        let layoutManager = NSLayoutManager()
+        let layoutManager = MarkdownLayoutManager()
         textStorage.addLayoutManager(layoutManager)
 
         let container = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
@@ -593,38 +657,16 @@ struct MarkdownEditorView: NSViewRepresentable {
                 let nsText = fullText as NSString
                 let lineRange = nsText.lineRange(for: NSRange(location: affectedCharRange.location, length: 0))
                 let line = nsText.substring(with: lineRange)
-
-                if let match = line.range(of: #"^(\s*[*\-•] )"#, options: .regularExpression) {
-                    let prefix = String(line[match])
-                    let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if content.isEmpty {
-                        let prefixNSRange = NSRange(location: lineRange.location, length: prefix.count)
-                        textView.setSelectedRange(prefixNSRange)
-                        textView.insertText("", replacementRange: prefixNSRange)
-                        return false
-                    }
-                    textView.insertText("\n" + prefix, replacementRange: affectedCharRange)
+                switch MarkdownEditingCommands.lineBreakAction(for: line) {
+                case .none:
+                    break
+                case .insert(let insertion):
+                    textView.insertText(insertion, replacementRange: affectedCharRange)
                     return false
-                }
-
-                if let match = line.range(of: #"^(\s*)\d+\. "#, options: .regularExpression) {
-                    let leadingSpaces = String(line.prefix(while: { $0 == " " || $0 == "\t" }))
-                    let stripped = line.drop(while: { $0 == " " || $0 == "\t" })
-                    if let dotIndex = stripped.firstIndex(of: ".") {
-                        let numStr = String(stripped[stripped.startIndex..<dotIndex])
-                        if let num = Int(numStr) {
-                            let prefix = "\(leadingSpaces)\(num + 1). "
-                            let content = String(line[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                            if content.isEmpty {
-                                let matchLen = line.distance(from: line.startIndex, to: match.upperBound)
-                                let prefixNSRange = NSRange(location: lineRange.location, length: matchLen)
-                                textView.insertText("", replacementRange: prefixNSRange)
-                                return false
-                            }
-                            textView.insertText("\n" + prefix, replacementRange: affectedCharRange)
-                            return false
-                        }
-                    }
+                case .removeCurrentLinePrefix(let prefixLength):
+                    let prefixRange = NSRange(location: lineRange.location, length: prefixLength)
+                    textView.insertText("", replacementRange: prefixRange)
+                    return false
                 }
             }
 
@@ -647,11 +689,18 @@ struct MarkdownEditorView: NSViewRepresentable {
             let cursorPos = textView.selectedRange().location
             if cursorPos <= nsText.length {
                 let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
-                textStorage?.setActiveLine(lineRange)
+                textStorage?.setActiveLine(lineRange, cursorPosition: cursorPos)
             }
         }
 
         func textDidChange(_ notification: Notification) {
+            if let textView {
+                let nsText = textView.string as NSString
+                let cursorPos = min(textView.selectedRange().location, nsText.length)
+                let lineRange = nsText.lineRange(for: NSRange(location: cursorPos, length: 0))
+                textStorage?.render(activeLine: lineRange, cursorPosition: cursorPos)
+            }
+
             guard let content = textStorage?.markdownContent() else { return }
             isUpdatingText = true
             self.text = content

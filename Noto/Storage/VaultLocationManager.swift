@@ -14,8 +14,13 @@ final class VaultLocationManager {
     private static let bookmarkKey = "vaultBookmarkData"
     private static let isLocalKey = "vaultIsLocal"
     private static let isDirectKey = "vaultIsDirect"
+    private static let forceLocalVaultArgument = "-notoUseLocalVault"
 
     init() {
+        if Self.shouldForceLocalVaultFromLaunchArguments {
+            setLocalVault()
+            return
+        }
         resolveVault()
     }
 
@@ -131,6 +136,17 @@ final class VaultLocationManager {
         } catch {
             logger.error("Failed to save vault bookmark: \(error)")
         }
+    }
+
+    private static var shouldForceLocalVaultFromLaunchArguments: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: forceLocalVaultArgument) else {
+            return false
+        }
+
+        let valueIndex = arguments.index(after: index)
+        guard valueIndex < arguments.endIndex else { return true }
+        return (arguments[valueIndex] as NSString).boolValue
     }
 
     static func localVaultURL() -> URL {

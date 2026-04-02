@@ -7,12 +7,14 @@ import UIKit
 
 typealias PlatformFont = UIFont
 typealias PlatformColor = UIColor
+typealias PlatformImage = UIImage
 
 #elseif os(macOS)
 import AppKit
 
 typealias PlatformFont = NSFont
 typealias PlatformColor = NSColor
+typealias PlatformImage = NSImage
 
 extension NSColor {
     /// Bridges UIColor.label → NSColor.labelColor
