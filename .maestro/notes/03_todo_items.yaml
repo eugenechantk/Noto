@@ -1,0 +1,58 @@
+appId: com.eugenechan.Noto
+name: "Todo items via markdown and toolbar"
+tags:
+  - notes
+  - editor
+  - todo
+---
+- stopApp: com.eugenechan.Noto
+- launchApp:
+    appId: com.eugenechan.Noto
+    clearState: true
+    arguments:
+      notoUseLocalVault: "true"
+- extendedWaitUntil:
+    visible:
+      id: "note_list"
+    timeout: 10000
+
+- tapOn:
+    id: "add_menu"
+- tapOn: "New Note"
+- tapOn:
+    id: "note_editor"
+- waitForAnimationToEnd
+
+- inputText: "Todo Toolbar Note"
+- pressKey: Enter
+- pressKey: Enter
+
+# Convert a plain line into a todo item in place.
+- inputText: "Plain task"
+- tapOn:
+    id: "todoButton"
+
+# Convert the todo item back into a plain line in place.
+- tapOn:
+    id: "todoButton"
+
+# Direct markdown entry should remain accepted for unchecked + checked todos.
+- pressKey: Enter
+- inputText: "- [ ] Typed unchecked task"
+- pressKey: Enter
+- pressKey: Enter
+- inputText: "- [x] Typed checked task"
+
+- tapOn:
+    id: "back_button"
+- extendedWaitUntil:
+    visible:
+      id: "note_list"
+    timeout: 5000
+
+- assertVisible: "Todo Toolbar Note"
+- tapOn: "Todo Toolbar Note"
+- extendedWaitUntil:
+    visible:
+      id: "note_editor"
+    timeout: 5000

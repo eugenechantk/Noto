@@ -1,0 +1,86 @@
+appId: com.eugenechan.Noto
+name: "Markdown editor rewrite canonical"
+tags:
+  - notes
+  - editor
+  - canonical
+---
+- stopApp: com.eugenechan.Noto
+- launchApp:
+    appId: com.eugenechan.Noto
+    clearState: true
+    arguments:
+      notoUseLocalVault: "true"
+- extendedWaitUntil:
+    visible:
+      id: "note_list"
+    timeout: 10000
+
+- tapOn:
+    id: "add_menu"
+- tapOn: "New Note"
+- tapOn:
+    id: "note_editor"
+- waitForAnimationToEnd
+
+- inputText: "Markdown Rewrite Canonical"
+- assertVisible: "Markdown Rewrite Canonical"
+- pressKey: Enter
+- pressKey: Enter
+
+# Headings + paragraph rendering
+- inputText: "## Heading Alpha"
+- pressKey: Enter
+- pressKey: Enter
+- inputText: "Body paragraph after heading."
+- pressKey: Enter
+- pressKey: Enter
+
+# Bullets + indent/outdent
+- inputText: "- Parent bullet"
+- pressKey: Enter
+- tapOn:
+    id: "indentButton"
+- inputText: "Nested bullet"
+- pressKey: Enter
+- tapOn:
+    id: "outdentButton"
+- inputText: "- Sibling bullet"
+- pressKey: Enter
+- pressKey: Enter
+
+# Ordered list auto-continue
+- inputText: "1. Ordered item"
+- pressKey: Enter
+- inputText: "Second ordered item"
+- pressKey: Enter
+- pressKey: Enter
+
+# Toolbar todo toggle + todo auto-continue
+- inputText: "Toolbar todo item"
+- tapOn:
+    id: "todoButton"
+- pressKey: Enter
+- inputText: "Follow-up todo item"
+- pressKey: Enter
+- pressKey: Enter
+
+# Direct markdown todo entry including checked state
+- inputText: "- [ ] Typed unchecked task"
+- pressKey: Enter
+- pressKey: Enter
+- inputText: "- [x] Typed checked task"
+
+- tapOn:
+    id: "back_button"
+- extendedWaitUntil:
+    visible:
+      id: "note_list"
+    timeout: 5000
+
+- assertVisible: "Markdown Rewrite Canonical"
+- tapOn: "Markdown Rewrite Canonical"
+- extendedWaitUntil:
+    visible:
+      id: "note_editor"
+    timeout: 5000
