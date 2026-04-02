@@ -4,6 +4,7 @@
 /// - `testDeletingHeadingContentDoesNotRestyleFollowingParagraph`
 /// - `testDeletingTodoContentDoesNotLeakCheckboxMetadataToFollowingParagraph`
 /// - `testChangingActiveLineRecomputesVisibilityWithoutStaleState`
+/// - `testEmptyTodoBeforeHeadingKeepsHeadingVerticalOffsetStable`
 
 import Testing
 import UIKit
@@ -22,7 +23,7 @@ struct MarkdownEditingRegressionTests {
         storage.render(activeLine: lineRange(containing: "# Headin", in: storage))
 
         let bodyOffset = offset(of: "Body", in: storage)!
-        #expect(font(in: storage, at: bodyOffset)?.pointSize == MarkdownTextStorage.bodyFont.pointSize)
+        #expect(font(in: storage, at: bodyOffset)?.pointSize == MarkdownEditorTheme.bodyFont.pointSize)
         #expect(paragraphStyle(in: storage, at: bodyOffset)?.paragraphSpacing == 6)
         #expect(foregroundColor(in: storage, at: bodyOffset) == UIColor.label)
     }
@@ -38,7 +39,7 @@ struct MarkdownEditingRegressionTests {
 
         let paragraphOffset = offset(of: "Plain", in: storage)!
         #expect(todoCheckbox(in: storage, at: paragraphOffset) == nil)
-        #expect(font(in: storage, at: paragraphOffset)?.pointSize == MarkdownTextStorage.bodyFont.pointSize)
+        #expect(font(in: storage, at: paragraphOffset)?.pointSize == MarkdownEditorTheme.bodyFont.pointSize)
         #expect(foregroundColor(in: storage, at: paragraphOffset) == UIColor.label)
     }
 
@@ -55,5 +56,25 @@ struct MarkdownEditingRegressionTests {
         storage.setActiveLine(todoLine, cursorPosition: todoLine.location + 2)
         #expect(foregroundColor(in: storage, at: headingLine.location) == UIColor.clear)
         #expect(foregroundColor(in: storage, at: todoLine.location) == UIColor.tertiaryLabel)
+    }
+
+    @Test("Empty todo before heading keeps heading vertical offset stable")
+    func testEmptyTodoBeforeHeadingKeepsHeadingVerticalOffsetStable() {
+        let emptyHarness = makeHarness("- [ ] \n## Heading")
+        let filledHarness = makeHarness("- [ ] Task\n## Heading")
+
+        let emptyHeadingOffset = offset(of: "Heading", in: emptyHarness.storage)!
+        let filledHeadingOffset = offset(of: "Heading", in: filledHarness.storage)!
+
+        let emptyTodoOffset = offset(of: "- [ ]", in: emptyHarness.storage)!
+        let emptyTodoRect = lineFragmentRect(in: emptyHarness, at: emptyTodoOffset)
+        let emptyHeadingRect = lineFragmentRect(in: emptyHarness, at: emptyHeadingOffset)
+        let filledHeadingRect = lineFragmentRect(in: filledHarness, at: filledHeadingOffset)
+
+        #expect(emptyTodoRect != nil)
+        #expect(emptyTodoRect?.height ?? 0 >= MarkdownEditorTheme.bodyFont.lineHeight)
+        #expect(emptyHeadingRect != nil)
+        #expect(filledHeadingRect != nil)
+        #expect(abs((emptyHeadingRect?.minY ?? 0) - (filledHeadingRect?.minY ?? 0)) < 1.0)
     }
 }

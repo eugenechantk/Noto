@@ -20,10 +20,10 @@ final class MarkdownLayoutManager: NSLayoutManager {
         let paragraphStyle = textStorage?.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle
         let contentIndent = paragraphStyle?.firstLineHeadIndent ?? 0
 
-        let size = MarkdownTextStorage.checkboxSize
+        let size = MarkdownTodoCheckboxStyle.size
         return CGRect(
-            x: origin.x + contentIndent - size - MarkdownTextStorage.checkboxSpacing,
-            y: origin.y + lineRect.origin.y + (MarkdownTextStorage.bodyFont.lineHeight - size) / 2,
+            x: origin.x + contentIndent - size - MarkdownTodoCheckboxStyle.spacing,
+            y: origin.y + lineRect.origin.y + (MarkdownEditorTheme.bodyFont.lineHeight - size) / 2,
             width: size,
             height: size
         )
@@ -36,7 +36,7 @@ final class MarkdownLayoutManager: NSLayoutManager {
               let textContainer = textContainers.first else { return }
 
         let charRange = characterRange(forGlyphRange: glyphsToShow, actualGlyphRange: nil)
-        textStorage.enumerateAttribute(MarkdownTextStorage.todoCheckboxKey, in: charRange, options: []) { value, attrRange, _ in
+        textStorage.enumerateAttribute(MarkdownTodoCheckboxStyle.attributeKey, in: charRange, options: []) { value, attrRange, _ in
             guard let isChecked = value as? Bool else { return }
             guard let drawRect = self.todoCheckboxRect(
                 forCharacterRange: attrRange,
@@ -44,7 +44,7 @@ final class MarkdownLayoutManager: NSLayoutManager {
                 origin: origin
             ) else { return }
 
-            let image = isChecked ? MarkdownTextStorage.checkedCircleImage : MarkdownTextStorage.uncheckedCircleImage
+            let image = isChecked ? MarkdownTodoCheckboxStyle.checkedImage : MarkdownTodoCheckboxStyle.uncheckedImage
             #if os(iOS)
             image.draw(in: drawRect)
             #elseif os(macOS)

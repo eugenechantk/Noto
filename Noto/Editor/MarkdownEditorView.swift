@@ -47,7 +47,7 @@ import UIKit
 
 func effectiveCaretFont(from attributes: [NSAttributedString.Key: Any]) -> UIFont? {
     guard let font = attributes[.font] as? UIFont else { return nil }
-    return font.pointSize < 1 ? MarkdownTextStorage.bodyFont : font
+    return font.pointSize < 1 ? MarkdownEditorTheme.bodyFont : font
 }
 
 func effectiveCaretFont(at characterOffset: Int, in storage: NSTextStorage) -> UIFont? {
@@ -102,7 +102,7 @@ private class NotoTextView: UITextView {
             y: textContainerInset.top - contentOffset.y
         )
         let fullRange = NSRange(location: 0, length: textStorage.length)
-        textStorage.enumerateAttribute(MarkdownTextStorage.todoCheckboxKey, in: fullRange, options: []) { value, attrRange, _ in
+        textStorage.enumerateAttribute(MarkdownTodoCheckboxStyle.attributeKey, in: fullRange, options: []) { value, attrRange, _ in
             guard let isChecked = value as? Bool else { return }
             guard let checkboxRect = markdownLayoutManager.todoCheckboxRect(
                 forCharacterRange: attrRange,

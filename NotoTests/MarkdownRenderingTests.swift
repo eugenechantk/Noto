@@ -45,8 +45,8 @@ struct MarkdownRenderingTests {
         let nestedOffset = offset(of: "- Nested", in: storage)!
         let orderedOffset = offset(of: "1. Ordered", in: storage)!
 
-        let bulletWidth = ("- " as NSString).size(withAttributes: [.font: MarkdownTextStorage.bodyFont]).width
-        let orderedWidth = ("1. " as NSString).size(withAttributes: [.font: MarkdownTextStorage.bodyFont]).width
+        let bulletWidth = ("- " as NSString).size(withAttributes: [.font: MarkdownEditorTheme.bodyFont]).width
+        let orderedWidth = ("1. " as NSString).size(withAttributes: [.font: MarkdownEditorTheme.bodyFont]).width
 
         #expect(paragraphStyle(in: storage, at: topOffset)?.firstLineHeadIndent == 12)
         #expect(paragraphStyle(in: storage, at: topOffset)?.headIndent == 12 + bulletWidth)
@@ -71,13 +71,13 @@ struct MarkdownRenderingTests {
         let prefixOffset = 0
 
         #expect(foregroundColor(in: storage, at: prefixOffset) == UIColor.clear)
-        #expect(font(in: storage, at: prefixOffset)?.pointSize == CGFloat(0.1))
+        #expect(font(in: storage, at: prefixOffset)?.pointSize == MarkdownEditorTheme.bodyFont.pointSize)
         #expect(todoCheckbox(in: storage, at: prefixOffset) == false)
 
         let rect = todoCheckboxRect(in: harness, at: prefixOffset)
         #expect(rect != nil)
-        #expect(rect?.width == MarkdownTextStorage.checkboxSize)
-        #expect(rect?.height == MarkdownTextStorage.checkboxSize)
+        #expect(rect?.width == MarkdownTodoCheckboxStyle.size)
+        #expect(rect?.height == MarkdownTodoCheckboxStyle.size)
     }
 
     @Test("Todo prefix only shows when cursor is inside prefix")

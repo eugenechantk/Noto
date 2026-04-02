@@ -57,7 +57,7 @@ func lineRange(containing substring: String, in storage: MarkdownTextStorage) ->
 
 func todoCheckbox(in storage: MarkdownTextStorage, at offset: Int) -> Bool? {
     guard offset < storage.length else { return nil }
-    return storage.attribute(MarkdownTextStorage.todoCheckboxKey, at: offset, effectiveRange: nil) as? Bool
+    return storage.attribute(MarkdownTodoCheckboxStyle.attributeKey, at: offset, effectiveRange: nil) as? Bool
 }
 
 func todoCheckboxRect(in harness: MarkdownEditorTestHarness, at offset: Int) -> CGRect? {
@@ -66,4 +66,11 @@ func todoCheckboxRect(in harness: MarkdownEditorTestHarness, at offset: Int) -> 
         forCharacterRange: NSRange(location: offset, length: 1),
         in: harness.container
     )
+}
+
+func lineFragmentRect(in harness: MarkdownEditorTestHarness, at offset: Int) -> CGRect? {
+    guard offset < harness.storage.length else { return nil }
+    harness.layoutManager.glyphRange(for: harness.container)
+    let glyphIndex = harness.layoutManager.glyphIndexForCharacter(at: offset)
+    return harness.layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
 }

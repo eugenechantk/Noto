@@ -1,7 +1,7 @@
 /// # Test Index
 ///
 /// ## Caret Rendering
-/// - `testEffectiveCaretFontFallsBackToBodyFontForHiddenTodoPrefix`
+/// - `testEffectiveCaretFontUsesBodyFontForInactiveTodoPrefix`
 /// - `testEffectiveCaretFontKeepsVisibleFontForRegularText`
 /// - `testEffectiveCaretFontUsesBodyFontAtEndOfFormattedEmptyTodo`
 
@@ -12,12 +12,14 @@ import UIKit
 @Suite("Markdown Editor View")
 struct MarkdownEditorViewTests {
 
-    @Test("Effective caret font falls back to body font for hidden todo prefix")
-    func testEffectiveCaretFontFallsBackToBodyFontForHiddenTodoPrefix() {
-        let hiddenFont = UIFont.systemFont(ofSize: 0.1)
-        let resolved = effectiveCaretFont(from: [.font: hiddenFont])
+    @Test("Effective caret font uses body font for inactive todo prefix")
+    func testEffectiveCaretFontUsesBodyFontForInactiveTodoPrefix() {
+        let storage = MarkdownTextStorage()
+        storage.load(markdown: "- [ ] Task")
 
-        #expect(resolved?.pointSize == MarkdownTextStorage.bodyFont.pointSize)
+        let resolved = effectiveCaretFont(at: 0, in: storage)
+
+        #expect(resolved?.pointSize == MarkdownEditorTheme.bodyFont.pointSize)
     }
 
     @Test("Effective caret font keeps visible font for regular text")
@@ -36,7 +38,7 @@ struct MarkdownEditorViewTests {
         let trailingPrefixFont = storage.attribute(.font, at: storage.length - 1, effectiveRange: nil) as? UIFont
         let resolved = effectiveCaretFont(at: storage.length, in: storage)
 
-        #expect(trailingPrefixFont?.pointSize == 0.1)
-        #expect(resolved?.pointSize == MarkdownTextStorage.bodyFont.pointSize)
+        #expect(trailingPrefixFont?.pointSize == MarkdownEditorTheme.bodyFont.pointSize)
+        #expect(resolved?.pointSize == MarkdownEditorTheme.bodyFont.pointSize)
     }
 }

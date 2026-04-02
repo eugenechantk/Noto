@@ -12,3 +12,5 @@
   `1)` the actions taken, and
   `2)` the files changed, grouped as created, edited, or deleted when applicable.
 - Keep that completion report concise and factual. If no files changed, say so.
+- When the user reports a bug or asks for a code change, do the work directly unless blocked by a real ambiguity or a destructive tradeoff that requires confirmation.
+- Do not ask for permission to make routine code changes, tests, or verification runs when the user has already asked for the problem to be solved.

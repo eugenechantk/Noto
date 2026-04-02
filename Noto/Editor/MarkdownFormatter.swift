@@ -11,11 +11,11 @@ struct MarkdownFormatter {
     private static let codeRegex = try! NSRegularExpression(pattern: #"`([^`]+)`"#)
 
     private static let bulletTextWidth: CGFloat = {
-        ("- " as NSString).size(withAttributes: [.font: MarkdownTextStorage.bodyFont]).width
+        ("- " as NSString).size(withAttributes: [.font: MarkdownEditorTheme.bodyFont]).width
     }()
 
     func makeAttributedString(markdown: String, activeLine: NSRange?, cursorPosition: Int?) -> NSMutableAttributedString {
-        let attributed = NSMutableAttributedString(string: markdown, attributes: MarkdownTextStorage.bodyAttributes)
+        let attributed = NSMutableAttributedString(string: markdown, attributes: MarkdownEditorTheme.bodyAttributes)
         guard attributed.length > 0 else { return attributed }
 
         let nsText = attributed.mutableString
@@ -68,6 +68,7 @@ struct MarkdownFormatter {
         } else if let todoMatch = TodoMarkdown.match(in: line) {
             let level = (todoMatch.indentation.count / 2) + 1
             applyTodo(
+                line: line,
                 range: range,
                 prefixLength: todoMatch.prefixLength,
                 level: level,
@@ -96,7 +97,7 @@ struct MarkdownFormatter {
         activeLine: NSRange?,
         attributed: NSMutableAttributedString
     ) {
-        let font = MarkdownTextStorage.headingFonts[level] ?? MarkdownTextStorage.bodyFont
+        let font = MarkdownEditorTheme.headingFonts[level] ?? MarkdownEditorTheme.bodyFont
 
         let style = NSMutableParagraphStyle()
         style.lineSpacing = 4
@@ -119,14 +120,17 @@ struct MarkdownFormatter {
         if activeLine?.location == range.location {
             attributed.addAttribute(.foregroundColor, value: PlatformColor.tertiaryLabel, range: prefixRange)
         } else {
-            attributed.addAttributes([
-                .font: PlatformFont.systemFont(ofSize: 0.1),
-                .foregroundColor: PlatformColor.clear
-            ], range: prefixRange)
+            let prefix = String(repeating: "#", count: level) + " "
+            let prefixWidth = (prefix as NSString).size(withAttributes: [.font: font]).width
+            style.firstLineHeadIndent = -prefixWidth
+            style.headIndent = 0
+            attributed.addAttribute(.paragraphStyle, value: style, range: range)
+            attributed.addAttribute(.foregroundColor, value: PlatformColor.clear, range: prefixRange)
         }
     }
 
     private func applyTodo(
+        line: String,
         range: NSRange,
         prefixLength: Int,
         level: Int,
@@ -135,7 +139,7 @@ struct MarkdownFormatter {
         cursorPosition: Int?,
         attributed: NSMutableAttributedString
     ) {
-        let levelIndent = MarkdownTextStorage.indentPerLevel * CGFloat(level)
+        let levelIndent = MarkdownEditorTheme.indentPerLevel * CGFloat(level)
         let prefixRange = NSRange(location: range.location, length: min(prefixLength, range.length))
         let cursorInPrefix: Bool = {
             guard let activeLine, activeLine.location == range.location else { return false }
@@ -152,15 +156,14 @@ struct MarkdownFormatter {
             attributed.addAttribute(.paragraphStyle, value: style, range: range)
             attributed.addAttribute(.foregroundColor, value: PlatformColor.tertiaryLabel, range: prefixRange)
         } else {
-            let textIndent = levelIndent + MarkdownTextStorage.checkboxSize + MarkdownTextStorage.checkboxSpacing
-            style.firstLineHeadIndent = textIndent
+            let prefixText = String(line.prefix(prefixLength))
+            let prefixWidth = (prefixText as NSString).size(withAttributes: [.font: MarkdownEditorTheme.bodyFont]).width
+            let textIndent = levelIndent + MarkdownTodoCheckboxStyle.size + MarkdownTodoCheckboxStyle.spacing
+            style.firstLineHeadIndent = textIndent - prefixWidth
             style.headIndent = textIndent
             attributed.addAttribute(.paragraphStyle, value: style, range: range)
-            attributed.addAttributes([
-                .font: PlatformFont.systemFont(ofSize: 0.1),
-                .foregroundColor: PlatformColor.clear
-            ], range: prefixRange)
-            attributed.addAttribute(MarkdownTextStorage.todoCheckboxKey, value: isChecked, range: prefixRange)
+            attributed.addAttribute(.foregroundColor, value: PlatformColor.clear, range: prefixRange)
+            attributed.addAttribute(MarkdownTodoCheckboxStyle.attributeKey, value: isChecked, range: prefixRange)
         }
 
         let contentRange = NSRange(
@@ -186,7 +189,7 @@ struct MarkdownFormatter {
         attributed: NSMutableAttributedString,
         nsText: NSMutableString
     ) {
-        let levelIndent = MarkdownTextStorage.indentPerLevel * CGFloat(level)
+        let levelIndent = MarkdownEditorTheme.indentPerLevel * CGFloat(level)
 
         let style = NSMutableParagraphStyle()
         style.lineSpacing = 4
@@ -212,10 +215,10 @@ struct MarkdownFormatter {
         attributed: NSMutableAttributedString,
         nsText: NSMutableString
     ) {
-        let levelIndent = MarkdownTextStorage.indentPerLevel * CGFloat(level)
+        let levelIndent = MarkdownEditorTheme.indentPerLevel * CGFloat(level)
         let prefixString = nsText.substring(with: NSRange(location: range.location, length: prefixLength))
         let visiblePrefix = String(prefixString.drop(while: { $0 == " " || $0 == "\t" }))
-        let prefixWidth = (visiblePrefix as NSString).size(withAttributes: [.font: MarkdownTextStorage.bodyFont]).width
+        let prefixWidth = (visiblePrefix as NSString).size(withAttributes: [.font: MarkdownEditorTheme.bodyFont]).width
 
         let style = NSMutableParagraphStyle()
         style.lineSpacing = 4
@@ -235,7 +238,7 @@ struct MarkdownFormatter {
         Self.boldRegex.enumerateMatches(in: string, range: range) { match, _, _ in
             guard let match else { return }
             let matchRange = match.range
-            let currentFont = attributed.attribute(.font, at: matchRange.location, effectiveRange: nil) as? PlatformFont ?? MarkdownTextStorage.bodyFont
+            let currentFont = attributed.attribute(.font, at: matchRange.location, effectiveRange: nil) as? PlatformFont ?? MarkdownEditorTheme.bodyFont
             let boldFont = PlatformFont.systemFont(ofSize: currentFont.pointSize, weight: .bold)
             attributed.addAttribute(.font, value: boldFont, range: matchRange)
             dimDelimiters(matchRange: matchRange, delimiterLength: 2, attributed: attributed)
@@ -244,7 +247,7 @@ struct MarkdownFormatter {
         Self.italicRegex.enumerateMatches(in: string, range: range) { match, _, _ in
             guard let match else { return }
             let matchRange = match.range
-            let currentFont = attributed.attribute(.font, at: matchRange.location, effectiveRange: nil) as? PlatformFont ?? MarkdownTextStorage.bodyFont
+            let currentFont = attributed.attribute(.font, at: matchRange.location, effectiveRange: nil) as? PlatformFont ?? MarkdownEditorTheme.bodyFont
             #if os(iOS)
             let descriptor = currentFont.fontDescriptor.withSymbolicTraits(.traitItalic) ?? currentFont.fontDescriptor
             let italicFont = PlatformFont(descriptor: descriptor, size: currentFont.pointSize)
@@ -258,7 +261,7 @@ struct MarkdownFormatter {
 
         Self.codeRegex.enumerateMatches(in: string, range: range) { match, _, _ in
             guard let match else { return }
-            let monoFont = PlatformFont.monospacedSystemFont(ofSize: MarkdownTextStorage.bodySize - 1, weight: .regular)
+            let monoFont = PlatformFont.monospacedSystemFont(ofSize: MarkdownEditorTheme.bodySize - 1, weight: .regular)
             attributed.addAttributes([
                 .font: monoFont,
                 .foregroundColor: PlatformColor.secondaryLabel,
