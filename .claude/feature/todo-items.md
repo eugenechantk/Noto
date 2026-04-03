@@ -62,6 +62,10 @@ Current code inspection shows partial todo support already exists in:
 - `Noto/Editor/MarkdownLayoutManager.swift`
 - `NotoTests/MarkdownTextStorageTests.swift`
 
+Current live editor path also needs parity in:
+- `Noto/Editor/BlockEditorView.swift`
+  - the active block editor now owns the floating toolbar todo action for iOS note editing
+
 Likely work areas:
 - add shared todo-markdown transform helpers so toolbar behavior and checkbox toggling are testable without driving UIKit directly
 - change toolbar behavior from simple prefix insertion/removal to in-place line conversion that preserves indentation and existing text

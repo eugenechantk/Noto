@@ -1,6 +1,62 @@
 # Personal Notetaking Universal Apple App
 
-This is a universal apple application for my outline-based note-taking flow
+This is a universal apple application for my markdown based note taking app
+
+## Current editor architecture
+
+The live editor path is a markdown-native block editor on iOS. At the app level, `NotoApp` creates a vault-scoped `MarkdownNoteStore` plus a `VaultFileWatcher`, and `NoteEditorScreen` loads one note's full markdown content into a single `String` state called `content`. The screen passes that binding into `BlockEditorView`, and debounces save and rename operations back through `MarkdownNoteStore`. The store is the persistence boundary: it reads and writes `.md` files, manages YAML frontmatter timestamps, derives titles from markdown content, and renames files to match note titles when appropriate.
+
+### Active runtime path
+
+The current live editor is `BlockEditorView`, not the older `MarkdownEditorView` TextKit path. `BlockEditorView` is a `UIViewControllerRepresentable` wrapper around `BlockEditorViewController`. The controller owns a `BlockDocument`, which is an array of `Block` values, one block per markdown line. Each `Block` stores the full markdown text for that line, including prefixes such as `# `, `- `, or `- [ ] `. Structure is inferred from text; `BlockType.detect(from:)` derives whether a row is a paragraph, heading, todo, bullet, ordered list, or frontmatter block. That means markdown stays the source of truth, and semantics come from parsing prefixes rather than from a separate rich-text model.
+
+Each visible row in the editor is a `BlockCell` with its own `UITextView`. The controller renders the document through a `UITableView`, tracks the focused row and cursor offset, and handles structural editing operations at the document layer. Pressing Return calls `BlockDocument.split(blockIndex:atOffset:)`, which splits the current markdown line into two blocks and auto-continues list prefixes when needed. Pressing Backspace at the start of a row calls `mergeWithPrevious(blockIndex:)`, which joins the current block into the previous block. Tapping a todo checkbox or the keyboard toolbar todo button mutates the underlying markdown using `TodoMarkdown` helpers and then re-renders the affected row.
+
+### Load, edit, and save flow
+
+The load path is:
+
+1. Disk file -> `MarkdownNoteStore.readContent(of:)`
+2. Raw markdown string -> `NoteEditorScreen.content`
+3. `BlockEditorViewController.loadMarkdown(_:)`
+4. `BlockParser.parse(...)` -> `[Block]`
+5. `[Block]` stored in `BlockDocument`
+
+Frontmatter is preserved as a single hidden `frontmatter` block, while the remaining note body is split by newline into one block per line. The editor never stores a separate rich document format.
+
+While editing, each block cell updates only its own markdown text. The controller then serializes the full `BlockDocument` back into a single markdown string using `BlockSerializer.serialize(...)` and pushes it through the SwiftUI binding. `NoteEditorScreen` debounces persistence: a short task writes updated content through `saveContent`, and a longer task renames the file through `renameFileIfNeeded`. On disappear, it performs a final save and rename pass.
+
+The save path is:
+
+1. Block row edit -> update one `Block.text`
+2. `BlockDocument` -> `BlockSerializer.serialize(...)`
+3. Serialized markdown -> SwiftUI binding
+4. `MarkdownNoteStore.saveContent(...)`
+5. Store updates frontmatter timestamp and writes the `.md` file
+
+### Rendering and formatting
+
+Rendering is separate from the document model. `BlockType.renderSpec(for:)` converts semantic block type into a declarative `BlockRenderSpec`, which describes typography, spacing, indentation, prefix visibility, checkbox state, and content styling. `BlockRenderer.render(...)` then converts the block's raw markdown into an attributed string for display.
+
+This is how the editor can:
+
+- hide or dim heading prefixes while preserving the underlying `# `
+- replace todo markdown prefixes with a checkbox accessory
+- render focused bullet and ordered-list markers without exposing raw markdown prefixes
+- apply checked-state strikethrough and dimming for completed todos
+- apply inline markdown styling for bold, italic, and code spans
+
+The important separation is:
+
+- document structure comes from markdown prefixes in `Block.text`
+- block-level presentation comes from `BlockRenderSpec`
+- inline markdown formatting is applied after block styling in the renderer
+
+During typing, the editor avoids fully restyling the row on every keystroke. Instead, it updates the block text immediately and mainly re-applies focused or unfocused styling on configuration and focus transitions. This keeps keyboard behavior and row focus stable.
+
+### Older editor still in tree
+
+There is also an older `MarkdownEditorView` architecture still in the repo. That version uses a single `UITextView` backed by `MarkdownTextStorage`, `MarkdownFormatter`, and `MarkdownLayoutManager`. Architecturally, that editor is a single-buffer text editor with markdown-aware attributed rendering layered on top. The current live block editor is different: it is row-structured first, markdown serialization second.
 
 ## Feature set (running)
 

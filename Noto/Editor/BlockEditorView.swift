@@ -229,13 +229,8 @@ extension BlockEditorViewController: BlockCellDelegate {
     func blockCell(_ cell: BlockCell, didToggleCheckboxAtIndex index: Int) {
         guard index < document.blocks.count else { return }
         let block = document.blocks[index]
-        // Toggle [ ] ↔ [x]
-        var text = block.text
-        if text.contains("- [ ] ") {
-            text = text.replacingOccurrences(of: "- [ ] ", with: "- [x] ")
-        } else if text.contains("- [x] ") {
-            text = text.replacingOccurrences(of: "- [x] ", with: "- [ ] ")
-        }
+        let text = TodoMarkdown.checkboxToggledLine(block.text)
+        guard text != block.text else { return }
         document.blocks[index] = Block(id: block.id, text: text)
         tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
         notifyTextChanged()
@@ -255,6 +250,24 @@ protocol BlockCellDelegate: AnyObject {
 
 // MARK: - BlockCell
 
+/// Transparent input accessory view that floats over content.
+private class TransparentAccessoryView: UIView {
+    override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        superview?.backgroundColor = .clear
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        superview?.backgroundColor = .clear
+    }
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit == self ? nil : hit
+    }
+}
+
 /// UITextView subclass that notifies on backspace at position 0.
 private class BlockTextView: UITextView {
     var onDeleteBackwardAtStart: (() -> Void)?
@@ -273,11 +286,15 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
 
     private let blockTextView = BlockTextView()
     private let checkboxButton = UIButton(type: .custom)
+    private let listMarkerLabel = UILabel()
     fileprivate var blockIndex: Int = 0
     private weak var cellDelegate: BlockCellDelegate?
     private var isConfiguring = false
     private var textLeadingConstraint: NSLayoutConstraint!
+    private var checkboxLeadingConstraint: NSLayoutConstraint!
     private var checkboxTopConstraint: NSLayoutConstraint!
+    private var markerLeadingConstraint: NSLayoutConstraint!
+    private var markerTopConstraint: NSLayoutConstraint!
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -300,6 +317,7 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
         blockTextView.backgroundColor = .clear
         blockTextView.delegate = self
         blockTextView.font = UIFont.systemFont(ofSize: 17)
+        blockTextView.inputAccessoryView = makeKeyboardToolbar()
         blockTextView.translatesAutoresizingMaskIntoConstraints = false
         blockTextView.onDeleteBackwardAtStart = { [weak self] in
             guard let self else { return }
@@ -310,17 +328,31 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
         checkboxButton.translatesAutoresizingMaskIntoConstraints = false
         checkboxButton.addTarget(self, action: #selector(checkboxTapped), for: .touchUpInside)
 
+        listMarkerLabel.isHidden = true
+        listMarkerLabel.translatesAutoresizingMaskIntoConstraints = false
+        listMarkerLabel.textColor = .tertiaryLabel
+        listMarkerLabel.textAlignment = .left
+        listMarkerLabel.setContentHuggingPriority(.required, for: .horizontal)
+        listMarkerLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
         contentView.addSubview(checkboxButton)
+        contentView.addSubview(listMarkerLabel)
         contentView.addSubview(blockTextView)
 
         textLeadingConstraint = blockTextView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor)
+        checkboxLeadingConstraint = checkboxButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Self.checkboxLeading)
         checkboxTopConstraint = checkboxButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4)
+        markerLeadingConstraint = listMarkerLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Self.checkboxLeading)
+        markerTopConstraint = listMarkerLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4)
 
         NSLayoutConstraint.activate([
-            checkboxButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Self.checkboxLeading),
+            checkboxLeadingConstraint,
             checkboxButton.widthAnchor.constraint(equalToConstant: Self.checkboxSize),
             checkboxButton.heightAnchor.constraint(equalToConstant: Self.checkboxSize),
             checkboxTopConstraint,
+
+            markerLeadingConstraint,
+            markerTopConstraint,
 
             blockTextView.topAnchor.constraint(equalTo: contentView.topAnchor),
             blockTextView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
@@ -330,6 +362,84 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
     }
 
     private var currentBlock: Block?
+
+    private func makeKeyboardToolbar() -> UIView {
+        let pillHeight: CGFloat = 40
+        let bottomMargin: CGFloat = 8
+        let barHeight: CGFloat = pillHeight + bottomMargin
+        let pillPadding: CGFloat = 12
+        let buttonSize: CGFloat = 36
+
+        let wrapper = TransparentAccessoryView(frame: CGRect(x: 0, y: 0, width: 400, height: barHeight))
+        wrapper.backgroundColor = .clear
+        wrapper.autoresizingMask = .flexibleWidth
+
+        let glassEffect = UIGlassEffect()
+        glassEffect.isInteractive = true
+        let pill = UIVisualEffectView(effect: glassEffect)
+        pill.layer.cornerRadius = pillHeight / 2
+        pill.clipsToBounds = true
+        pill.translatesAutoresizingMaskIntoConstraints = false
+        wrapper.addSubview(pill)
+
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
+        let todoButton = UIButton(type: .system)
+        todoButton.setImage(UIImage(systemName: "checklist", withConfiguration: symbolConfig), for: .normal)
+        todoButton.tintColor = .white
+        todoButton.addTarget(self, action: #selector(todoTapped), for: .touchUpInside)
+        todoButton.accessibilityLabel = "Todo"
+        todoButton.accessibilityIdentifier = "todoButton"
+        todoButton.translatesAutoresizingMaskIntoConstraints = false
+        pill.contentView.addSubview(todoButton)
+
+        NSLayoutConstraint.activate([
+            pill.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor, constant: -12),
+            pill.topAnchor.constraint(equalTo: wrapper.topAnchor),
+            pill.heightAnchor.constraint(equalToConstant: pillHeight),
+            todoButton.leadingAnchor.constraint(equalTo: pill.contentView.leadingAnchor, constant: pillPadding),
+            todoButton.trailingAnchor.constraint(equalTo: pill.contentView.trailingAnchor, constant: -pillPadding),
+            todoButton.centerYAnchor.constraint(equalTo: pill.contentView.centerYAnchor),
+            todoButton.widthAnchor.constraint(equalToConstant: buttonSize),
+            todoButton.heightAnchor.constraint(equalToConstant: buttonSize),
+        ])
+
+        return wrapper
+    }
+
+    private func replaceTextPreservingSelection(_ text: String, delta: Int) {
+        let selection = blockTextView.selectedRange
+        let safeLocation = max(0, min(selection.location + delta, text.count))
+        let safeLength = min(selection.length, max(0, text.count - safeLocation))
+
+        currentBlock = currentBlock.map { Block(id: $0.id, text: text) }
+
+        isConfiguring = true
+        blockTextView.text = text
+        if let updatedBlock = currentBlock {
+            updateStyling(for: updatedBlock)
+            applyTypingAttributes(for: updatedBlock)
+        }
+        blockTextView.selectedRange = NSRange(location: safeLocation, length: safeLength)
+        isConfiguring = false
+
+        cellDelegate?.blockCell(self, didChangeText: text, atIndex: blockIndex)
+
+        if let tableView = superview as? UITableView {
+            UIView.performWithoutAnimation {
+                tableView.beginUpdates()
+                tableView.endUpdates()
+            }
+        }
+    }
+
+    @objc private func todoTapped() {
+        let existingText = blockTextView.text ?? ""
+        let transformed = TodoMarkdown.toolbarToggledLine(existingText)
+        guard transformed != existingText else { return }
+
+        let delta = transformed.count - existingText.count
+        replaceTextPreservingSelection(transformed, delta: delta)
+    }
 
     func configure(with block: Block, delegate: BlockCellDelegate, index: Int) {
         isConfiguring = true
@@ -363,21 +473,23 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
         let text = block.text
         self.currentBlock = block
         let spec = type.renderSpec(for: text)
+        let isCurrentlyEditing = blockTextView.isFirstResponder
+        let prefixDisplay = isCurrentlyEditing ? (spec.prefixDisplayWhenFocused ?? spec.prefixDisplay) : spec.prefixDisplay
 
         // Hide frontmatter blocks entirely
         if type == .frontmatter {
             blockTextView.isHidden = true
             checkboxButton.isHidden = true
+            listMarkerLabel.isHidden = true
             return
         }
         blockTextView.isHidden = false
 
         // Build attributed string from spec
-        let isFocused = blockTextView.isFirstResponder
-        let attributed = BlockRenderer.render(text: text, spec: spec, isFocused: isFocused)
+        let attributed = BlockRenderer.render(text: text, spec: spec, isFocused: isCurrentlyEditing)
         let savedSelection = blockTextView.selectedRange
         blockTextView.attributedText = attributed
-        if isFocused && savedSelection.location + savedSelection.length <= attributed.length {
+        if isCurrentlyEditing && savedSelection.location + savedSelection.length <= attributed.length {
             blockTextView.selectedRange = savedSelection
         }
 
@@ -391,9 +503,15 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
             right: 12
         )
 
-        // Checkbox from spec — only show when not editing (prefix is stripped)
-        let isCurrentlyEditing = blockTextView.isFirstResponder
-        let showCheckbox = spec.showsCheckbox && !isCurrentlyEditing
+        let font = UIFont.systemFont(ofSize: spec.fontSize, weight: spec.fontWeight)
+        let textTopInset = blockTextView.textContainerInset.top
+        let accessoryLineCenter = textTopInset + font.lineHeight / 2
+        let indentationOffset = CGFloat(spec.indentLevel) * 12
+
+        // Keep the structured todo marker visible whenever the markdown prefix
+        // is visually hidden, including while the row is focused.
+        let showCheckbox = spec.showsCheckbox && (prefixDisplay == .hidden || prefixDisplay == .stripped)
+        checkboxLeadingConstraint.constant = Self.checkboxLeading + indentationOffset
         if showCheckbox {
             checkboxButton.isHidden = false
             let imageName = spec.isChecked ? "checkmark.circle.fill" : "circle"
@@ -401,19 +519,41 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
             let config = UIImage.SymbolConfiguration(pointSize: Self.checkboxSize - 4, weight: .regular)
             checkboxButton.setImage(UIImage(systemName: imageName, withConfiguration: config), for: .normal)
             checkboxButton.tintColor = color
-            // Vertically align checkbox with the first line of text
-            let textTopInset = blockTextView.textContainerInset.top
-            let font = UIFont.systemFont(ofSize: spec.fontSize, weight: spec.fontWeight)
-            let lineCenter = textTopInset + font.lineHeight / 2
-            checkboxTopConstraint.constant = lineCenter - Self.checkboxSize / 2
+            checkboxTopConstraint.constant = accessoryLineCenter - Self.checkboxSize / 2
         } else {
             checkboxButton.isHidden = true
         }
 
-        // When editing a todo, show prefix text instead of checkbox — reset leading
+        // Focused bullets and ordered lists keep their visual marker instead of
+        // exposing raw markdown prefixes after pressing Return.
+        if let markerText = focusedListMarkerText(for: block, prefixDisplay: prefixDisplay) {
+            listMarkerLabel.isHidden = false
+            listMarkerLabel.text = markerText
+            listMarkerLabel.font = font
+            listMarkerLabel.textColor = .tertiaryLabel
+            markerLeadingConstraint.constant = Self.checkboxLeading + indentationOffset
+            markerTopConstraint.constant = accessoryLineCenter - font.lineHeight / 2
+        } else {
+            listMarkerLabel.isHidden = true
+        }
+
+        // When editing a todo, keep the content aligned after the hidden prefix.
         if spec.showsCheckbox && isCurrentlyEditing {
             textLeadingConstraint.constant = 0
             blockTextView.textContainerInset.left = 12
+        }
+    }
+
+    private func focusedListMarkerText(for block: Block, prefixDisplay: BlockRenderSpec.PrefixDisplay) -> String? {
+        guard blockTextView.isFirstResponder, prefixDisplay == .hidden else { return nil }
+
+        switch block.blockType {
+        case .bullet:
+            return "\u{2022}"
+        case .orderedList(let number, _):
+            return "\(number)."
+        default:
+            return nil
         }
     }
 
@@ -445,11 +585,11 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
         applyTypingAttributes(for: block)
         let spec = block.blockType.renderSpec(for: block.text)
 
-        // If prefix was stripped (heading), switch to full markdown with prefix visible
+        // If the block normally strips its prefix, restyle in the focused state
+        // and place the caret after the underlying markdown prefix.
         if spec.prefixDisplay == .stripped && spec.prefixLength > 0 {
             isConfiguring = true
-            let attributed = BlockRenderer.render(text: block.text, spec: spec, isFocused: true)
-            blockTextView.attributedText = attributed
+            updateStyling(for: block)
             // Place cursor after the prefix
             if let pos = textView.position(from: textView.beginningOfDocument, offset: spec.prefixLength) {
                 textView.selectedTextRange = textView.textRange(from: pos, to: pos)
@@ -579,7 +719,7 @@ extension BlockType {
         case .todo(let checked, let indent):
             spec.prefixLength = prefixLength(of: text, pattern: #"^(\s*- \[[ x]\] )"#)
             spec.prefixDisplay = .stripped  // hide prefix, checkbox replaces it
-            spec.prefixDisplayWhenFocused = .dimmed  // show when editing
+            spec.prefixDisplayWhenFocused = .hidden
             spec.showsCheckbox = true
             spec.isChecked = checked
             spec.indentLevel = indent
@@ -595,6 +735,7 @@ extension BlockType {
         case .bullet(let indent):
             spec.prefixLength = prefixLength(of: text, pattern: #"^(\s*[*\-•] )"#)
             spec.prefixDisplay = .dimmed
+            spec.prefixDisplayWhenFocused = .hidden
             spec.indentLevel = indent
             spec.leadingOffset = CGFloat(indent) * 12
             spec.spacingBefore = 4
@@ -603,6 +744,7 @@ extension BlockType {
         case .orderedList(_, let indent):
             spec.prefixLength = prefixLength(of: text, pattern: #"^(\s*\d+\. )"#)
             spec.prefixDisplay = .dimmed
+            spec.prefixDisplayWhenFocused = .hidden
             spec.indentLevel = indent
             spec.leadingOffset = CGFloat(indent) * 12
             spec.spacingBefore = 4
