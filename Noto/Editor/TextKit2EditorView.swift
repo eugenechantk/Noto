@@ -262,8 +262,8 @@ private enum MarkdownParagraphStyler {
 // MARK: - MarkdownParagraph
 
 /// Custom NSTextParagraph carrying markdown block-kind metadata.
-/// Returned by the NSTextContentStorageDelegate so that the
-/// NSTextLayoutManagerDelegate can read the kind when creating fragments.
+/// The content-storage delegate returns these so each paragraph in the
+/// element tree knows its semantic type.
 final class MarkdownParagraph: NSTextParagraph {
     let blockKind: MarkdownBlockKind
 
@@ -276,65 +276,15 @@ final class MarkdownParagraph: NSTextParagraph {
     required init?(coder: NSCoder) { fatalError() }
 }
 
-// MARK: - MarkdownLayoutFragment
-
-/// Custom NSTextLayoutFragment that carries block-kind metadata and
-/// can draw per-block accessories (e.g., heading separator lines).
-final class MarkdownLayoutFragment: NSTextLayoutFragment {
-    let blockKind: MarkdownBlockKind
-
-    init(textElement: NSTextElement, range: NSTextRange?, blockKind: MarkdownBlockKind) {
-        self.blockKind = blockKind
-        super.init(textElement: textElement, range: range)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func draw(at point: CGPoint, in context: CGContext) {
-        // Draw a subtle background behind frontmatter lines
-        if case .frontmatter = blockKind {
-            context.saveGState()
-            context.setFillColor(MarkdownTheme.codeBgColor.cgColor)
-            let bg = CGRect(x: point.x, y: point.y,
-                            width: renderingSurfaceBounds.width,
-                            height: renderingSurfaceBounds.height)
-            context.fill(bg)
-            context.restoreGState()
-        }
-
-        super.draw(at: point, in: context)
-
-        // Draw a thin separator under H1 headings
-        if case .heading(1) = blockKind {
-            context.saveGState()
-            context.setStrokeColor(MarkdownTheme.prefixColor.cgColor)
-            context.setLineWidth(0.5)
-            let y = point.y + renderingSurfaceBounds.height - 1
-            context.move(to: CGPoint(x: point.x, y: y))
-            context.addLine(to: CGPoint(x: point.x + renderingSurfaceBounds.width, y: y))
-            context.strokePath()
-            context.restoreGState()
-        }
-    }
-}
-
 // MARK: - MarkdownTextDelegate
 
 /// The heart of the TextKit 2 integration.
 ///
-/// - **NSTextContentStorageDelegate**: Intercepts paragraph creation.
-///   For each paragraph the content storage builds, we return a styled
-///   `MarkdownParagraph` with the correct fonts, colors, and indentation.
-///   Only the *changed* paragraph is re-styled — not the whole document.
-///
-/// - **NSTextLayoutManagerDelegate**: Intercepts layout-fragment creation.
-///   For each paragraph being laid out, we return a `MarkdownLayoutFragment`
-///   that can draw custom accessories (heading separators, frontmatter bg).
-///   Only *visible* fragments are created — off-screen content is skipped.
-final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSTextLayoutManagerDelegate {
-
-    // MARK: NSTextContentStorageDelegate
+/// Implements **NSTextContentStorageDelegate** to intercept paragraph creation.
+/// For each paragraph the content storage builds, we return a styled
+/// `MarkdownParagraph` with the correct fonts, colors, and indentation.
+/// Only the *changed* paragraph is re-styled — not the whole document.
+final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate {
 
     func textContentStorage(
         _ textContentStorage: NSTextContentStorage,
@@ -371,21 +321,6 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
         }
 
         return MarkdownParagraph(attributedString: result, blockKind: kind)
-    }
-
-    // MARK: NSTextLayoutManagerDelegate
-
-    func textLayoutManager(
-        _ textLayoutManager: NSTextLayoutManager,
-        textLayoutFragmentFor location: NSTextLocation,
-        in textElement: NSTextElement
-    ) -> NSTextLayoutFragment {
-        let kind = (textElement as? MarkdownParagraph)?.blockKind ?? .paragraph
-        return MarkdownLayoutFragment(
-            textElement: textElement,
-            range: textElement.elementRange,
-            blockKind: kind
-        )
     }
 
     // MARK: Frontmatter Detection
@@ -475,7 +410,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         if let layoutManager = textView.textLayoutManager,
            let contentStorage = layoutManager.textContentManager as? NSTextContentStorage {
             contentStorage.delegate = markdownDelegate
-            layoutManager.delegate = markdownDelegate
         } else {
             logger.warning("TextKit 2 not available — falling back to unstyled editing")
         }
@@ -597,9 +531,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate {
         layoutManager.textContainer = container
         contentStorage.addTextLayoutManager(layoutManager)
 
-        // Set our delegates on the stack
+        // Set our delegate on the content storage
         contentStorage.delegate = markdownDelegate
-        layoutManager.delegate = markdownDelegate
 
         // Create NSTextView backed by the TextKit 2 container
         textView = NSTextView(frame: .zero, textContainer: container)
