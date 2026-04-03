@@ -17,5 +17,29 @@ struct TextKit2EditorLifecycleTests {
 
         #expect(controller.textView.text == "# Title\nBody")
     }
+
+    @Test("Frontmatter range covers the YAML metadata block only")
+    func detectsFrontmatterRange() throws {
+        let markdown = """
+        ---
+        id: abc
+        updated: 2026-04-04
+        ---
+        # Title
+        Body
+        """
+
+        let range = try #require(MarkdownFrontmatter.range(in: markdown))
+        let nsMarkdown = markdown as NSString
+
+        #expect(nsMarkdown.substring(with: range) == """
+        ---
+        id: abc
+        updated: 2026-04-04
+        ---
+        """)
+        #expect(MarkdownFrontmatter.contains(position: 0, in: markdown))
+        #expect(!MarkdownFrontmatter.contains(position: range.location + range.length + 1, in: markdown))
+    }
 }
 #endif

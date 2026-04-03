@@ -81,6 +81,29 @@ enum MarkdownBlockKind: Equatable {
     }
 }
 
+// MARK: - MarkdownFrontmatter
+
+enum MarkdownFrontmatter {
+    static func range(in fullText: String) -> NSRange? {
+        guard fullText.hasPrefix("---\n") || fullText.hasPrefix("---\r\n") else { return nil }
+
+        let searchStart = fullText.index(fullText.startIndex, offsetBy: min(4, fullText.count))
+        guard searchStart < fullText.endIndex,
+              let closeRange = fullText.range(of: "\n---", range: searchStart..<fullText.endIndex) else {
+            return nil
+        }
+
+        let location = 0
+        let length = fullText.distance(from: fullText.startIndex, to: closeRange.upperBound)
+        return NSRange(location: location, length: length)
+    }
+
+    static func contains(position: Int, in fullText: String) -> Bool {
+        guard let range = range(in: fullText) else { return false }
+        return NSLocationInRange(position, range)
+    }
+}
+
 // MARK: - MarkdownTheme
 
 /// Centralized font and color constants for markdown rendering.
@@ -276,6 +299,28 @@ final class MarkdownParagraph: NSTextParagraph {
     required init?(coder: NSCoder) { fatalError() }
 }
 
+// MARK: - HiddenFrontmatterLayoutFragment
+
+final class HiddenFrontmatterLayoutFragment: NSTextLayoutFragment {
+    override var layoutFragmentFrame: CGRect {
+        CGRect(origin: super.layoutFragmentFrame.origin, size: .zero)
+    }
+
+    override var renderingSurfaceBounds: CGRect {
+        .zero
+    }
+
+    #if os(iOS)
+    override func draw(at point: CGPoint, in context: CGContext) {
+        // Frontmatter remains in the text storage but produces no visible output.
+    }
+    #elseif os(macOS)
+    override func draw(at point: CGPoint, in context: CGContext) {
+        // Frontmatter remains in the text storage but produces no visible output.
+    }
+    #endif
+}
+
 // MARK: - MarkdownTextDelegate
 
 /// The heart of the TextKit 2 integration.
@@ -284,7 +329,7 @@ final class MarkdownParagraph: NSTextParagraph {
 /// For each paragraph the content storage builds, we return a styled
 /// `MarkdownParagraph` with the correct fonts, colors, and indentation.
 /// Only the *changed* paragraph is re-styled — not the whole document.
-final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate {
+final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSTextLayoutManagerDelegate {
 
     func textContentStorage(
         _ textContentStorage: NSTextContentStorage,
@@ -300,7 +345,7 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate {
 
         // Detect kind — frontmatter needs position-aware detection
         let kind: MarkdownBlockKind
-        if isFrontmatter(at: range.location, in: textStorage.string) {
+        if MarkdownFrontmatter.contains(position: range.location, in: textStorage.string) {
             kind = .frontmatter
         } else {
             kind = MarkdownBlockKind.detect(from: text)
@@ -323,20 +368,17 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate {
         return MarkdownParagraph(attributedString: result, blockKind: kind)
     }
 
-    // MARK: Frontmatter Detection
-
-    /// Returns true if the character at `position` falls within a YAML
-    /// frontmatter block (the region between the opening `---\n` and
-    /// the closing `\n---`).
-    private func isFrontmatter(at position: Int, in fullText: String) -> Bool {
-        guard fullText.hasPrefix("---\n") || fullText.hasPrefix("---\r\n") else { return false }
-        let searchStart = fullText.index(fullText.startIndex, offsetBy: min(4, fullText.count))
-        guard searchStart < fullText.endIndex,
-              let closeRange = fullText.range(of: "\n---", range: searchStart..<fullText.endIndex) else {
-            return false
+    func textLayoutManager(
+        _ textLayoutManager: NSTextLayoutManager,
+        textLayoutFragmentFor location: any NSTextLocation,
+        in textElement: NSTextElement
+    ) -> NSTextLayoutFragment {
+        guard let paragraph = textElement as? MarkdownParagraph,
+              paragraph.blockKind == .frontmatter else {
+            return NSTextLayoutFragment(textElement: textElement, range: nil)
         }
-        let fmEnd = fullText.distance(from: fullText.startIndex, to: closeRange.upperBound)
-        return position < fmEnd
+
+        return HiddenFrontmatterLayoutFragment(textElement: textElement, range: nil)
     }
 }
 
@@ -411,6 +453,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         if let layoutManager = textView.textLayoutManager,
            let contentStorage = layoutManager.textContentManager as? NSTextContentStorage {
             contentStorage.delegate = markdownDelegate
+            layoutManager.delegate = markdownDelegate
         } else {
             logger.warning("TextKit 2 not available — falling back to unstyled editing")
         }
@@ -547,6 +590,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate {
 
         // Set our delegate on the content storage
         contentStorage.delegate = markdownDelegate
+        layoutManager.delegate = markdownDelegate
 
         // Create NSTextView backed by the TextKit 2 container
         textView = NSTextView(frame: .zero, textContainer: container)
