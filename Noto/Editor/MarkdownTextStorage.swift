@@ -36,6 +36,15 @@ final class MarkdownTextStorage: NSTextStorage {
         super.processEditing()
     }
 
+    /// Disable TextKit 1's automatic attribute fixing.
+    /// MarkdownFormatter handles all attributes. Without this override,
+    /// super.processEditing() calls fixAttributes which extends \n attributes
+    /// to the next paragraph, causing style bleeding (e.g., todo paragraph
+    /// style overwriting heading paragraphSpacingBefore).
+    override func fixAttributes(in range: NSRange) {
+        // No-op: MarkdownFormatter is the sole authority on attributes.
+    }
+
     // MARK: - Load / Export
 
     func load(markdown: String) {

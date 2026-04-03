@@ -77,4 +77,14 @@ struct MarkdownEditingRegressionTests {
         #expect(filledHeadingRect != nil)
         #expect(abs((emptyHeadingRect?.minY ?? 0) - (filledHeadingRect?.minY ?? 0)) < 1.0)
     }
+
+    @Test("Empty todo before heading does not remove heading paragraphSpacingBefore")
+    func testEmptyTodoDoesNotRemoveHeadingSpacingBefore() {
+        let harness = makeHarness("- [ ] Task\n- [ ] \n## Heading")
+        let storage = harness.storage
+
+        let headingOffset = offset(of: "## Heading", in: storage)!
+        let style = paragraphStyle(in: storage, at: headingOffset)
+        #expect(style?.paragraphSpacingBefore == 20, "H2 heading should have paragraphSpacingBefore=20 but got \(style?.paragraphSpacingBefore ?? -1)")
+    }
 }

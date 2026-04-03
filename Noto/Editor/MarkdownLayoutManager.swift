@@ -23,7 +23,7 @@ final class MarkdownLayoutManager: NSLayoutManager {
         let size = MarkdownTodoCheckboxStyle.size
         return CGRect(
             x: origin.x + contentIndent - size - MarkdownTodoCheckboxStyle.spacing,
-            y: origin.y + lineRect.origin.y + (MarkdownEditorTheme.bodyFont.lineHeight - size) / 2,
+            y: origin.y + lineRect.origin.y + (editorBodyLineHeight - size) / 2,
             width: size,
             height: size
         )
@@ -52,4 +52,12 @@ final class MarkdownLayoutManager: NSLayoutManager {
             #endif
         }
     }
+}
+
+private var editorBodyLineHeight: CGFloat {
+    #if os(iOS)
+    MarkdownEditorTheme.bodyFont.lineHeight
+    #elseif os(macOS)
+    MarkdownEditorTheme.bodyFont.ascender - MarkdownEditorTheme.bodyFont.descender + MarkdownEditorTheme.bodyFont.leading
+    #endif
 }

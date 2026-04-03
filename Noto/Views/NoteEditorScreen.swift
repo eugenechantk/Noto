@@ -41,7 +41,7 @@ struct NoteEditorScreen: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                MarkdownEditorView(text: $content, autoFocus: isNew) { _ in
+                BlockEditorView(text: $content, autoFocus: isNew) { _ in
                     scheduleSave()
                     scheduleRename()
                 }
