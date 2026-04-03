@@ -41,7 +41,7 @@ struct NoteEditorScreen: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                BlockEditorView(text: $content, autoFocus: isNew) { _ in
+                TextKit2EditorView(text: $content, autoFocus: isNew) { _ in
                     scheduleSave()
                     scheduleRename()
                 }
