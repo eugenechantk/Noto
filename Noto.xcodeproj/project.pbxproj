@@ -44,11 +44,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		5DE568DE2F8018DA00EC8657 /* NotoUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = NotoUITests;
-			sourceTree = "<group>";
-		};
 		5DE568F52F80191200EC8657 /* NotoMacOSUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = NotoMacOSUITests;
@@ -67,11 +62,6 @@
 		5DF5FB112F0EC373008EDC76 /* NotoTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = NotoTests;
-			sourceTree = "<group>";
-		};
-		A10000010000000000000002 /* NotoUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = NotoUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -116,8 +106,6 @@
 				5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */,
 				5DF5FB002F0EC372008EDC76 /* Noto */,
 				5DF5FB112F0EC373008EDC76 /* NotoTests */,
-				A10000010000000000000002 /* NotoUITests */,
-				5DE568DE2F8018DA00EC8657 /* NotoUITests */,
 				5DE568F52F80191200EC8657 /* NotoMacOSUITests */,
 				5DE569042F80191F00EC8657 /* NotoiOSUITests */,
 				5DF5FAFF2F0EC372008EDC76 /* Products */,
