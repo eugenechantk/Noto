@@ -27,6 +27,7 @@ struct NoteListView: View {
     #if os(macOS)
     @State private var selectedNote: MarkdownNote?
     @State private var selectedNoteStore: MarkdownNoteStore?
+    @State private var selectedNoteIsNew = false
     @State private var showSettings = false
     @State private var hasRestoredSelection = false
 
@@ -76,13 +77,15 @@ struct NoteListView: View {
                 rootStore: store,
                 fileWatcher: fileWatcher,
                 selectedNote: $selectedNote,
-                selectedNoteStore: $selectedNoteStore
+                selectedNoteStore: $selectedNoteStore,
+                selectedIsNew: $selectedNoteIsNew
             )
         } detail: {
             if let selectedNote, let selectedNoteStore {
                 NoteEditorScreen(
                     store: selectedNoteStore,
                     note: selectedNote,
+                    isNew: selectedNoteIsNew,
                     fileWatcher: fileWatcher
                 )
                 .id(selectedNote.id)
@@ -134,6 +137,7 @@ struct NoteListView: View {
         let (todayStore, todayNote) = store.todayNote()
         selectedNoteStore = todayStore
         selectedNote = todayNote
+        selectedNoteIsNew = false
     }
 
     private func restoreOrOpenToday() {
@@ -146,6 +150,7 @@ struct NoteListView: View {
                 if let note = noteStore.notes.first(where: { $0.fileURL.path == savedPath }) {
                     selectedNoteStore = noteStore
                     selectedNote = note
+                    selectedNoteIsNew = false
                     return
                 }
             }
@@ -188,6 +193,7 @@ struct SidebarView: View {
     var fileWatcher: VaultFileWatcher?
     @Binding var selectedNote: MarkdownNote?
     @Binding var selectedNoteStore: MarkdownNoteStore?
+    @Binding var selectedIsNew: Bool
 
     /// Stack of (store, title) for folder navigation. Empty = showing root.
     @State private var folderStack: [(store: MarkdownNoteStore, title: String)] = []
@@ -208,9 +214,8 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Back button row inside the sidebar
-            if canGoBack {
-                HStack {
+            HStack(spacing: 8) {
+                if canGoBack {
                     Button(action: goBack) {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.left")
@@ -221,11 +226,20 @@ struct SidebarView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("back_button")
-                    Spacer()
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+
+                Spacer()
+
+                Button(action: createNote) {
+                    Label("New Note", systemImage: "plus")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("new_note_button")
+                .accessibilityLabel("New Note")
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
 
             List {
                 ForEach(currentStore.items) { (item: DirectoryItem) in
@@ -269,6 +283,7 @@ struct SidebarView: View {
                 fileWatcher: fileWatcher,
                 selectedNote: $selectedNote,
                 selectedNoteStore: $selectedNoteStore,
+                selectedIsNew: $selectedIsNew,
                 onNavigate: {
                     let subStore = MarkdownNoteStore(
                         directoryURL: folder.folderURL,
@@ -284,6 +299,7 @@ struct SidebarView: View {
             Button {
                 selectedNote = note
                 selectedNoteStore = currentStore
+                selectedIsNew = false
             } label: {
                 Label(note.title, systemImage: "doc.text")
             }
@@ -311,6 +327,7 @@ struct SidebarView: View {
         let note = currentStore.createNote()
         selectedNote = note
         selectedNoteStore = currentStore
+        selectedIsNew = true
     }
 
 }
@@ -322,6 +339,7 @@ private struct SidebarFolderRow: View {
     var fileWatcher: VaultFileWatcher?
     @Binding var selectedNote: MarkdownNote?
     @Binding var selectedNoteStore: MarkdownNoteStore?
+    @Binding var selectedIsNew: Bool
     var onNavigate: () -> Void
     var onDelete: () -> Void
 
@@ -340,6 +358,7 @@ private struct SidebarFolderRow: View {
                             fileWatcher: fileWatcher,
                             selectedNote: $selectedNote,
                             selectedNoteStore: $selectedNoteStore,
+                            selectedIsNew: $selectedIsNew,
                             onNavigate: {
                                 let subStore = MarkdownNoteStore(
                                     directoryURL: subfolder.folderURL,
@@ -356,6 +375,7 @@ private struct SidebarFolderRow: View {
                         Button {
                             selectedNote = note
                             selectedNoteStore = childStore
+                            selectedIsNew = false
                         } label: {
                             Label(note.title, systemImage: "doc.text")
                         }
@@ -463,18 +483,19 @@ struct FolderContentView: View {
                         }
                         .accessibilityIdentifier("settings_button")
                     }
+                    Button(action: createNote) {
+                        Image(systemName: "doc.badge.plus")
+                            .accessibilityLabel("New Note")
+                    }
+                    .accessibilityIdentifier("new_note_button")
                     Menu {
-                        Button(action: createNote) {
-                            Label("New Note", systemImage: "doc.badge.plus")
-                        }
-                        .accessibilityIdentifier("new_note_button")
                         Button(action: { showNewFolderAlert = true }) {
                             Label("New Folder", systemImage: "folder.badge.plus")
                         }
                         .accessibilityIdentifier("new_folder_button")
                     } label: {
                         Image(systemName: "plus")
-                            .accessibilityLabel("Add")
+                            .accessibilityLabel("More")
                     }
                     .accessibilityIdentifier("add_menu")
                 }

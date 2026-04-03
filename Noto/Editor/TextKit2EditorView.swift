@@ -398,6 +398,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
     var coordinator: TextKit2EditorCoordinator?
     private(set) var textView: UITextView!
     private let markdownDelegate = MarkdownTextDelegate()
+    private var pendingText: String?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -431,17 +432,29 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
             textView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             textView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
+
+        if let pendingText {
+            applyText(pendingText)
+            self.pendingText = nil
+        }
     }
 
     func loadText(_ markdown: String) {
+        guard isViewLoaded, textView != nil else {
+            pendingText = markdown
+            return
+        }
+        applyText(markdown)
+    }
+
+    private func applyText(_ markdown: String) {
         textView.text = markdown
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in
                 guard let tv = self?.textView else { return }
                 tv.becomeFirstResponder()
-                if let end = tv.endOfDocument {
-                    tv.selectedTextRange = tv.textRange(from: end, to: end)
-                }
+                let end = tv.endOfDocument
+                tv.selectedTextRange = tv.textRange(from: end, to: end)
             }
         }
     }
@@ -513,6 +526,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate {
     private(set) var textView: NSTextView!
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
+    private var pendingText: String?
 
     override func loadView() {
         view = NSView()
@@ -552,7 +566,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate {
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
         textView.delegate = self
-        textView.accessibilityIdentifier = "note_editor"
+        textView.setAccessibilityIdentifier("note_editor")
 
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
@@ -567,9 +581,22 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate {
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
+
+        if let pendingText {
+            applyText(pendingText)
+            self.pendingText = nil
+        }
     }
 
     func loadText(_ markdown: String) {
+        guard isViewLoaded, textView != nil else {
+            pendingText = markdown
+            return
+        }
+        applyText(markdown)
+    }
+
+    private func applyText(_ markdown: String) {
         textView.string = markdown
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in

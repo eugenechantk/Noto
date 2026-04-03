@@ -39,7 +39,7 @@
       </MacroExpansion>
       <TestPlans>
          <TestPlanReference
-            reference = "container:Noto.xctestplan"
+            reference = "container:Noto-iOS.xctestplan"
             default = "YES">
          </TestPlanReference>
       </TestPlans>
@@ -52,6 +52,17 @@
                BlueprintIdentifier = "5DF5FB0D2F0EC373008EDC76"
                BuildableName = "NotoTests.xctest"
                BlueprintName = "NotoTests"
+               ReferencedContainer = "container:Noto.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "5DE569022F80191F00EC8657"
+               BuildableName = "NotoiOSUITests.xctest"
+               BlueprintName = "NotoiOSUITests"
                ReferencedContainer = "container:Noto.xcodeproj">
             </BuildableReference>
          </TestableReference>

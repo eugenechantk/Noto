@@ -12,6 +12,20 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		5DE568FA2F80191200EC8657 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5DF5FAF62F0EC372008EDC76 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5DF5FAFD2F0EC372008EDC76;
+			remoteInfo = Noto;
+		};
+		5DE569092F80191F00EC8657 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5DF5FAF62F0EC372008EDC76 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5DF5FAFD2F0EC372008EDC76;
+			remoteInfo = Noto;
+		};
 		5DF5FB0F2F0EC373008EDC76 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5DF5FAF62F0EC372008EDC76 /* Project object */;
@@ -22,11 +36,29 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = file; path = Noto.xctestplan; sourceTree = "<group>"; };
+		5DE568F42F80191200EC8657 /* NotoMacOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoMacOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5DE569032F80191F00EC8657 /* NotoiOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoiOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5DF5FAFE2F0EC372008EDC76 /* Noto.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Noto.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		5DE568DE2F8018DA00EC8657 /* NotoUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NotoUITests;
+			sourceTree = "<group>";
+		};
+		5DE568F52F80191200EC8657 /* NotoMacOSUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NotoMacOSUITests;
+			sourceTree = "<group>";
+		};
+		5DE569042F80191F00EC8657 /* NotoiOSUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NotoiOSUITests;
+			sourceTree = "<group>";
+		};
 		5DF5FB002F0EC372008EDC76 /* Noto */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Noto;
@@ -37,9 +69,28 @@
 			path = NotoTests;
 			sourceTree = "<group>";
 		};
+		A10000010000000000000002 /* NotoUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NotoUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		5DE568F12F80191200EC8657 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5DE569002F80191F00EC8657 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5DF5FAFB2F0EC372008EDC76 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -62,8 +113,13 @@
 		5DF5FAF52F0EC372008EDC76 = {
 			isa = PBXGroup;
 			children = (
+				5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */,
 				5DF5FB002F0EC372008EDC76 /* Noto */,
 				5DF5FB112F0EC373008EDC76 /* NotoTests */,
+				A10000010000000000000002 /* NotoUITests */,
+				5DE568DE2F8018DA00EC8657 /* NotoUITests */,
+				5DE568F52F80191200EC8657 /* NotoMacOSUITests */,
+				5DE569042F80191F00EC8657 /* NotoiOSUITests */,
 				5DF5FAFF2F0EC372008EDC76 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -73,6 +129,8 @@
 			children = (
 				5DF5FAFE2F0EC372008EDC76 /* Noto.app */,
 				5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */,
+				5DE568F42F80191200EC8657 /* NotoMacOSUITests.xctest */,
+				5DE569032F80191F00EC8657 /* NotoiOSUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -80,6 +138,52 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		5DE568F32F80191200EC8657 /* NotoMacOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5DE568FC2F80191200EC8657 /* Build configuration list for PBXNativeTarget "NotoMacOSUITests" */;
+			buildPhases = (
+				5DE568F02F80191200EC8657 /* Sources */,
+				5DE568F12F80191200EC8657 /* Frameworks */,
+				5DE568F22F80191200EC8657 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5DE568FB2F80191200EC8657 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5DE568F52F80191200EC8657 /* NotoMacOSUITests */,
+			);
+			name = NotoMacOSUITests;
+			packageProductDependencies = (
+			);
+			productName = NotoMacOSUITests;
+			productReference = 5DE568F42F80191200EC8657 /* NotoMacOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		5DE569022F80191F00EC8657 /* NotoiOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5DE5690B2F80191F00EC8657 /* Build configuration list for PBXNativeTarget "NotoiOSUITests" */;
+			buildPhases = (
+				5DE568FF2F80191F00EC8657 /* Sources */,
+				5DE569002F80191F00EC8657 /* Frameworks */,
+				5DE569012F80191F00EC8657 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5DE5690A2F80191F00EC8657 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5DE569042F80191F00EC8657 /* NotoiOSUITests */,
+			);
+			name = NotoiOSUITests;
+			packageProductDependencies = (
+			);
+			productName = NotoiOSUITests;
+			productReference = 5DE569032F80191F00EC8657 /* NotoiOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		5DF5FAFD2F0EC372008EDC76 /* Noto */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5DF5FB222F0EC373008EDC76 /* Build configuration list for PBXNativeTarget "Noto" */;
@@ -134,9 +238,17 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1640;
+				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
+					5DE568F32F80191200EC8657 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = 5DF5FAFD2F0EC372008EDC76;
+					};
+					5DE569022F80191F00EC8657 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = 5DF5FAFD2F0EC372008EDC76;
+					};
 					5DF5FAFD2F0EC372008EDC76 = {
 						CreatedOnToolsVersion = 16.4;
 					};
@@ -165,11 +277,27 @@
 			targets = (
 				5DF5FAFD2F0EC372008EDC76 /* Noto */,
 				5DF5FB0D2F0EC373008EDC76 /* NotoTests */,
+				5DE568F32F80191200EC8657 /* NotoMacOSUITests */,
+				5DE569022F80191F00EC8657 /* NotoiOSUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		5DE568F22F80191200EC8657 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5DE569012F80191F00EC8657 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5DF5FAFC2F0EC372008EDC76 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -187,6 +315,20 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		5DE568F02F80191200EC8657 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5DE568FF2F80191F00EC8657 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5DF5FAFA2F0EC372008EDC76 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -204,6 +346,16 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		5DE568FB2F80191200EC8657 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5DF5FAFD2F0EC372008EDC76 /* Noto */;
+			targetProxy = 5DE568FA2F80191200EC8657 /* PBXContainerItemProxy */;
+		};
+		5DE5690A2F80191F00EC8657 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5DF5FAFD2F0EC372008EDC76 /* Noto */;
+			targetProxy = 5DE569092F80191F00EC8657 /* PBXContainerItemProxy */;
+		};
 		5DF5FB102F0EC373008EDC76 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 5DF5FAFD2F0EC372008EDC76 /* Noto */;
@@ -212,6 +364,93 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		5DE568FD2F80191200EC8657 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.NotoMacOSUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Noto;
+			};
+			name = Debug;
+		};
+		5DE568FE2F80191200EC8657 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.NotoMacOSUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Noto;
+			};
+			name = Release;
+		};
+		5DE5690C2F80191F00EC8657 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.NotoiOSUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Noto;
+			};
+			name = Debug;
+		};
+		5DE5690D2F80191F00EC8657 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.NotoiOSUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Noto;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		5DF5FB202F0EC373008EDC76 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -342,11 +581,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Noto;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
@@ -384,11 +623,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Noto;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
@@ -461,6 +700,24 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		5DE568FC2F80191200EC8657 /* Build configuration list for PBXNativeTarget "NotoMacOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5DE568FD2F80191200EC8657 /* Debug */,
+				5DE568FE2F80191200EC8657 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5DE5690B2F80191F00EC8657 /* Build configuration list for PBXNativeTarget "NotoiOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5DE5690C2F80191F00EC8657 /* Debug */,
+				5DE5690D2F80191F00EC8657 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		5DF5FAF92F0EC372008EDC76 /* Build configuration list for PBXProject "Noto" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

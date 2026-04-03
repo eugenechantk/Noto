@@ -20,3 +20,8 @@ Secrets.swift
 
 .flowdeck/
 .gstack/
+
+# Local macOS Appium tooling
+.codex/appium/
+scripts/appium_mac_*.sh
+scripts/appium_mac_*.mjs

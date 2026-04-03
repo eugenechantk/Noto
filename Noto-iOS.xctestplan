@@ -1,0 +1,38 @@
+{
+  "configurations" : [
+    {
+      "id" : "E5B77841-6047-4D15-9A98-7D6FA684B0EB",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Noto.xcodeproj",
+      "identifier" : "5DF5FAFD2F0EC372008EDC76",
+      "name" : "Noto"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Noto.xcodeproj",
+        "identifier" : "5DF5FB0D2F0EC373008EDC76",
+        "name" : "NotoTests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Noto.xcodeproj",
+        "identifier" : "5DE569022F80191F00EC8657",
+        "name" : "NotoiOSUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

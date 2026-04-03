@@ -15,8 +15,12 @@ final class VaultLocationManager {
     private static let isLocalKey = "vaultIsLocal"
     private static let isDirectKey = "vaultIsDirect"
     private static let forceLocalVaultArgument = "-notoUseLocalVault"
+    private static let resetStateArgument = "-notoResetState"
 
     init() {
+        if Self.shouldResetStateFromLaunchArguments {
+            resetStateForUITesting()
+        }
         if Self.shouldForceLocalVaultFromLaunchArguments {
             setLocalVault()
             return
@@ -149,6 +153,17 @@ final class VaultLocationManager {
         return (arguments[valueIndex] as NSString).boolValue
     }
 
+    private static var shouldResetStateFromLaunchArguments: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: resetStateArgument) else {
+            return false
+        }
+
+        let valueIndex = arguments.index(after: index)
+        guard valueIndex < arguments.endIndex else { return true }
+        return (arguments[valueIndex] as NSString).boolValue
+    }
+
     static func localVaultURL() -> URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         return docs.appendingPathComponent("Noto")
@@ -158,6 +173,17 @@ final class VaultLocationManager {
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
             try? fm.createDirectory(at: url, withIntermediateDirectories: true)
+        }
+    }
+
+    private func resetStateForUITesting() {
+        if let bundleIdentifier = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleIdentifier)
+        }
+
+        let localURL = Self.localVaultURL()
+        if FileManager.default.fileExists(atPath: localURL.path) {
+            try? FileManager.default.removeItem(at: localURL)
         }
     }
 }
