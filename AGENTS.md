@@ -16,3 +16,5 @@
 - Do not ask for permission to make routine code changes, tests, or verification runs when the user has already asked for the problem to be solved.
 - For macOS external-vault save/delete bugs, do not assume the editor is at fault first. Check sandbox entitlements, security-scoped bookmark resolution, and actual write errors before changing editor code.
 - For multi-window note behavior, distinguish same-process window sync from external filesystem sync. Same-app windows should use the in-process sync path; `VaultFileWatcher` is only the fallback for external changes.
+- For iOS iCloud note-open failures, do not assume the file is missing just because iCloud metadata says it needs download. Check whether the file is actually readable first.
+- For iCloud-backed notes in general, prefer real filesystem outcomes over inferred metadata: actual write success on macOS, actual read success on iOS.

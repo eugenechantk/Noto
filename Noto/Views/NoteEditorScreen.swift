@@ -171,28 +171,46 @@ struct NoteEditorScreen: View {
     }
 
     private func loadNoteContent() async {
-        if CoordinatedFileManager.isDownloaded(at: note.fileURL) {
-            DebugTrace.record("editor load note=\(note.fileURL.lastPathComponent)")
-            applyLoadedContent(store.readContent(of: note))
+        downloadFailed = false
+        isDownloading = false
+
+        // In security-scoped iCloud folders, the ubiquitous download status can
+        // be stale or misleading. If the file is already readable, prefer the
+        // actual coordinated read over the metadata gate and open immediately.
+        if let readableContent = CoordinatedFileManager.readString(from: note.fileURL) {
+            DebugTrace.record("editor load readable note=\(note.fileURL.lastPathComponent)")
+            applyLoadedContent(readableContent)
             hasLoaded = true
-        } else {
-            isDownloading = true
-            CoordinatedFileManager.startDownloading(at: note.fileURL)
-            // Poll until downloaded, with timeout
-            let deadline = Date().addingTimeInterval(30)
-            while !CoordinatedFileManager.isDownloaded(at: note.fileURL) {
-                if Date() > deadline {
-                    downloadFailed = true
-                    isDownloading = false
-                    return
-                }
-                try? await Task.sleep(for: .milliseconds(500))
-                if Task.isCancelled { return }
-            }
-            applyLoadedContent(store.readContent(of: note))
-            hasLoaded = true
-            isDownloading = false
+            return
         }
+
+        guard !CoordinatedFileManager.isDownloaded(at: note.fileURL) else {
+            DebugTrace.record("editor load unreadable-current note=\(note.fileURL.lastPathComponent)")
+            downloadFailed = true
+            return
+        }
+
+        isDownloading = true
+        CoordinatedFileManager.startDownloading(at: note.fileURL)
+        let deadline = Date().addingTimeInterval(30)
+
+        while Date() <= deadline {
+            if Task.isCancelled { return }
+
+            if let readableContent = CoordinatedFileManager.readString(from: note.fileURL) {
+                DebugTrace.record("editor load downloaded note=\(note.fileURL.lastPathComponent)")
+                applyLoadedContent(readableContent)
+                hasLoaded = true
+                isDownloading = false
+                return
+            }
+
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+
+        DebugTrace.record("editor load download-timeout note=\(note.fileURL.lastPathComponent)")
+        downloadFailed = true
+        isDownloading = false
     }
 
     private func handleEditorChange(_ newText: String) {

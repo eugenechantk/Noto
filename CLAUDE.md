@@ -101,6 +101,13 @@ Two macOS rules matter for current app behavior:
    - Use `VaultFileWatcher` for true external changes: iCloud, Finder, or another process.
    - Do not rely on the debounced file watcher alone for same-process editor sync.
 
+3. **iOS iCloud note loading should trust real readability over metadata.**
+   - Do not gate note opening only on `ubiquitousItemDownloadingStatus`.
+   - Try a coordinated read first.
+   - If the file is already readable, open it immediately.
+   - Only use the iCloud download flow when the file is genuinely unreadable.
+   - Root-level notes can fail differently from notes in subfolders if the app over-trusts metadata instead of actual file access.
+
 ### Packages (`Packages/`)
 
 Business logic extracted into local Swift packages, independently testable via CLI.

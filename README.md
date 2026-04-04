@@ -21,6 +21,19 @@ Key rules:
 
 The symptom for this bug class is: notes load, typing works visually, but saves/deletes fail with `NSCocoaErrorDomain Code=513`.
 
+### iOS iCloud note loading
+
+On iOS, the main iCloud failure mode is different. The app can misclassify a note as "needs download" even when the file is already present and readable.
+
+Rules:
+
+- do not gate note opening purely on `ubiquitousItemDownloadingStatus`
+- try a real coordinated read first
+- if the file is readable, open it immediately
+- only enter the iCloud download loop if the file is genuinely unreadable
+
+This matters because iCloud metadata can lag or be misleading for already-available files, especially at the root of the vault. The app should trust real readability over metadata.
+
 ### Multi-window note sync
 
 The macOS app has two different sync paths:
@@ -37,6 +50,19 @@ Current behavior:
 - if the other window is dirty, it keeps local edits and shows a small conflict state instead of overwriting the editor
 
 That means multi-window sync is immediate for clean windows, while still protecting unsaved local edits.
+
+## iCloud read/write policy
+
+Across both platforms, the app treats filesystem reality as more important than inferred cloud state.
+
+- On macOS, the critical question is: `can this vault actually be written?`
+- On iOS, the critical question is: `can this note actually be read right now?`
+
+So the rule is:
+
+- trust actual write success on macOS
+- trust actual read success on iOS
+- use iCloud metadata as a hint, not as the primary source of truth
 
 ### Active runtime path
 

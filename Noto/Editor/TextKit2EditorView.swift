@@ -412,6 +412,7 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
             let nlAttrs: [NSAttributedString.Key: Any] = [
                 .font: MarkdownTheme.font(for: kind),
                 .foregroundColor: MarkdownTheme.bodyColor,
+                .paragraphStyle: MarkdownParagraphStyler.paragraphStyle(for: kind),
             ]
             result.append(NSAttributedString(string: "\n", attributes: nlAttrs))
         }
