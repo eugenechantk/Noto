@@ -468,6 +468,10 @@ final class TextKit2EditorCoordinator {
     func finishApplyingEditorText() {
         isApplyingEditorText = false
     }
+
+    func typingAttributes(for documentText: String, selectionLocation: Int) -> [NSAttributedString.Key: Any] {
+        MarkdownTypingAttributes.attributes(for: documentText, selectionLocation: selectionLocation)
+    }
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -560,6 +564,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         coordinator?.beginApplyingEditorText(markdown)
         textView.text = markdown
         coordinator?.finishApplyingEditorText()
+        updateTypingAttributes()
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in
                 guard let tv = self?.textView else { return }
@@ -584,11 +589,19 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         coordinator?.publishEditorText(textView.text ?? "")
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        coordinator?.publishEditorText(textView.text ?? "")
+    }
+
     /// Sets typing attributes to match the current paragraph's block kind,
     /// so newly typed characters inherit the correct font immediately
     /// (before the content-storage delegate re-styles the paragraph).
     private func updateTypingAttributes() {
-        textView.typingAttributes = MarkdownTypingAttributes.attributes(
+        textView.typingAttributes = coordinator?.typingAttributes(
+            for: textView.text ?? "",
+            selectionLocation: textView.selectedRange.location
+        ) ?? MarkdownTypingAttributes.attributes(
             for: textView.text ?? "",
             selectionLocation: textView.selectedRange.location
         )
@@ -628,24 +641,9 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     }
 }
 
-final class TextKit2BackedTextView: NSTextView {
-    var onStringChange: ((String) -> Void)?
-
-    override func didChangeText() {
-        super.didChangeText()
-        onStringChange?(string)
-    }
-
-    override func resignFirstResponder() -> Bool {
-        let result = super.resignFirstResponder()
-        onStringChange?(string)
-        return result
-    }
-}
-
 final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, NSTextStorageDelegate {
     var coordinator: TextKit2EditorCoordinator?
-    private(set) var textView: TextKit2BackedTextView!
+    private(set) var textView: NSTextView!
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
@@ -672,7 +670,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         layoutManager.delegate = markdownDelegate
 
         // Create NSTextView backed by the TextKit 2 container
-        textView = TextKit2BackedTextView(frame: .zero, textContainer: container)
+        textView = NSTextView(frame: .zero, textContainer: container)
         textView.minSize = .zero
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.allowsUndo = true
@@ -695,9 +693,6 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         textView.delegate = self
         textView.textStorage?.delegate = self
         textView.setAccessibilityIdentifier("note_editor")
-        textView.onStringChange = { [weak self] newText in
-            self?.coordinator?.publishEditorText(newText)
-        }
 
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
@@ -731,6 +726,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         coordinator?.beginApplyingEditorText(markdown)
         textView.string = markdown
         coordinator?.finishApplyingEditorText()
+        updateTypingAttributes()
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in
                 guard let tv = self?.textView else { return }
@@ -765,7 +761,10 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     }
 
     private func updateTypingAttributes() {
-        textView.typingAttributes = MarkdownTypingAttributes.attributes(
+        textView.typingAttributes = coordinator?.typingAttributes(
+            for: textView.string,
+            selectionLocation: textView.selectedRange().location
+        ) ?? MarkdownTypingAttributes.attributes(
             for: textView.string,
             selectionLocation: textView.selectedRange().location
         )
@@ -773,6 +772,11 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     private func flushTextToBinding() {
         coordinator?.publishEditorText(textView.textStorage?.string ?? textView.string)
+    }
+
+    override func viewWillDisappear() {
+        super.viewWillDisappear()
+        flushTextToBinding()
     }
 }
 

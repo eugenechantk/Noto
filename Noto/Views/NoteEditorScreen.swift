@@ -139,11 +139,7 @@ struct NoteEditorScreen: View {
 
     private func handleEditorChange(_ newText: String) {
         guard !isDeleting else { return }
-        content = newText
-        latestEditorText = newText
-        note = store.updateTitleFromContent(newText, for: note)
-        note = store.saveContent(newText, for: note)
-        scheduleRename()
+        applyEditorText(newText, scheduleRename: true)
     }
 
     private func scheduleRename() {
@@ -159,12 +155,13 @@ struct NoteEditorScreen: View {
     private func applyLoadedContent(_ text: String) {
         content = text
         latestEditorText = text
+        note = store.updateTitleFromContent(text, for: note)
     }
 
     private func persistFinalSnapshotIfNeeded() {
         let isExternallyDeleting = externallyDeletingNoteID?.wrappedValue == note.id
         guard !isDownloading, !downloadFailed, !isDeleting, !isExternallyDeleting else { return }
-        note = store.saveContent(latestEditorText, for: note)
+        persistEditorText(latestEditorText)
         note = store.renameFileIfNeeded(for: note)
     }
 
@@ -178,5 +175,19 @@ struct NoteEditorScreen: View {
         }
         onDelete?()
         dismiss()
+    }
+
+    private func applyEditorText(_ newText: String, scheduleRename shouldScheduleRename: Bool) {
+        latestEditorText = newText
+        content = newText
+        persistEditorText(newText)
+        if shouldScheduleRename {
+            scheduleRename()
+        }
+    }
+
+    private func persistEditorText(_ text: String) {
+        note = store.updateTitleFromContent(text, for: note)
+        note = store.saveContent(text, for: note)
     }
 }
