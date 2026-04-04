@@ -13,12 +13,16 @@ struct NoteEditorScreen: View {
     @State private var note: MarkdownNote
     @State private var content: String = ""
     @State private var latestEditorText: String = ""
+    @State private var lastPersistedText: String = ""
     @State private var hasLoaded = false
     @State private var isDownloading = false
     @State private var downloadFailed = false
     @State private var renameTask: Task<Void, Never>?
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
+    @State private var hasPendingLocalEdits = false
+    @State private var editorSessionID = UUID()
+    @State private var pendingRemoteSnapshot: NoteSyncSnapshot?
 
     init(
         store: MarkdownNoteStore,
@@ -54,7 +58,12 @@ struct NoteEditorScreen: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                TextKit2EditorView(text: $content, autoFocus: isNew, onTextChange: handleEditorChange)
+                VStack(spacing: 0) {
+                    if pendingRemoteSnapshot != nil {
+                        remoteUpdateBanner
+                    }
+                    TextKit2EditorView(text: $content, autoFocus: isNew, onTextChange: handleEditorChange)
+                }
             }
         }
         .navigationTitle(MarkdownNote.titleFrom(content))
@@ -94,6 +103,10 @@ struct NoteEditorScreen: View {
         .onChange(of: fileWatcher?.changeCount) { _, _ in
             reloadIfChangedExternally()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { notification in
+            guard let snapshot = notification.object as? NoteSyncSnapshot else { return }
+            handleRemoteSnapshot(snapshot)
+        }
         .confirmationDialog("Delete this note?", isPresented: $showDeleteConfirmation) {
             Button("Delete Note", role: .destructive) {
                 deleteCurrentNote()
@@ -102,19 +115,64 @@ struct NoteEditorScreen: View {
         }
     }
 
+    @ViewBuilder
+    private var remoteUpdateBanner: some View {
+        HStack(spacing: 12) {
+            Label("Updated in another window", systemImage: "arrow.triangle.2.circlepath")
+                .font(.subheadline.weight(.medium))
+            Spacer()
+            Button("Keep Mine") {
+                pendingRemoteSnapshot = nil
+            }
+            Button("Reload") {
+                guard let snapshot = pendingRemoteSnapshot else { return }
+                applyRemoteSnapshot(snapshot)
+            }
+            .keyboardShortcut("r", modifiers: [.command, .shift])
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.thinMaterial)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+    }
+
     /// Reloads the editor content if the file was changed externally (e.g. iCloud sync).
+    /// Compares note bodies (stripped frontmatter) to avoid self-triggered reloads
+    /// caused by our own saves updating the `updated:` timestamp.
     private func reloadIfChangedExternally() {
         guard hasLoaded, !isDownloading else { return }
-        let diskContent = store.readContent(of: note)
-        if diskContent != content && !diskContent.isEmpty {
-            content = diskContent
-            latestEditorText = diskContent
-            logger.info("Reloaded note from disk after external change")
+        if let changedURL = fileWatcher?.lastChangedFileURL, changedURL != note.fileURL {
+            DebugTrace.record("editor reload skipped other-file changed=\(changedURL.lastPathComponent) note=\(note.fileURL.lastPathComponent)")
+            return
         }
+        if hasPendingLocalEdits {
+            logger.info("Skipped external reload because local edits are pending")
+            DebugTrace.record("editor reload skipped pending-edits note=\(note.fileURL.lastPathComponent)")
+            return
+        }
+        let diskContent = store.readContent(of: note)
+        guard !diskContent.isEmpty else { return }
+
+        // Compare bodies only — our own saves update the frontmatter timestamp,
+        // which would cause a false-positive mismatch on the full content string.
+        let diskBody = MarkdownNote.stripFrontmatter(diskContent)
+        let editorBody = MarkdownNote.stripFrontmatter(content)
+        guard diskBody != editorBody else {
+            DebugTrace.record("editor reload skipped same-body note=\(note.fileURL.lastPathComponent)")
+            return
+        }
+
+        DebugTrace.record("editor reloaded-from-disk note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(diskContent))")
+        pendingRemoteSnapshot = nil
+        applyLoadedContent(diskContent)
+        logger.info("Reloaded note from disk after external change")
     }
 
     private func loadNoteContent() async {
         if CoordinatedFileManager.isDownloaded(at: note.fileURL) {
+            DebugTrace.record("editor load note=\(note.fileURL.lastPathComponent)")
             applyLoadedContent(store.readContent(of: note))
             hasLoaded = true
         } else {
@@ -139,6 +197,7 @@ struct NoteEditorScreen: View {
 
     private func handleEditorChange(_ newText: String) {
         guard !isDeleting else { return }
+        DebugTrace.record("editor handle change note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(newText))")
         applyEditorText(newText, scheduleRename: true)
     }
 
@@ -153,14 +212,19 @@ struct NoteEditorScreen: View {
     }
 
     private func applyLoadedContent(_ text: String) {
+        DebugTrace.record("editor apply loaded note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(text))")
         content = text
         latestEditorText = text
+        lastPersistedText = text
+        hasPendingLocalEdits = false
         note = store.updateTitleFromContent(text, for: note)
     }
 
     private func persistFinalSnapshotIfNeeded() {
         let isExternallyDeleting = externallyDeletingNoteID?.wrappedValue == note.id
         guard !isDownloading, !downloadFailed, !isDeleting, !isExternallyDeleting else { return }
+        guard hasPendingLocalEdits || latestEditorText != lastPersistedText else { return }
+        DebugTrace.record("editor final persist note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(latestEditorText))")
         persistEditorText(latestEditorText)
         note = store.renameFileIfNeeded(for: note)
     }
@@ -180,6 +244,8 @@ struct NoteEditorScreen: View {
     private func applyEditorText(_ newText: String, scheduleRename shouldScheduleRename: Bool) {
         latestEditorText = newText
         content = newText
+        hasPendingLocalEdits = true
+        DebugTrace.record("editor apply text note=\(note.fileURL.lastPathComponent) scheduleRename=\(shouldScheduleRename)")
         persistEditorText(newText)
         if shouldScheduleRename {
             scheduleRename()
@@ -187,7 +253,47 @@ struct NoteEditorScreen: View {
     }
 
     private func persistEditorText(_ text: String) {
+        DebugTrace.record("editor persist start note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(text))")
         note = store.updateTitleFromContent(text, for: note)
-        note = store.saveContent(text, for: note)
+        let saveResult = store.saveContent(text, for: note)
+        note = saveResult.note
+        if saveResult.didWrite {
+            lastPersistedText = text
+            hasPendingLocalEdits = false
+            pendingRemoteSnapshot = nil
+            NoteSyncCenter.publish(
+                NoteSyncSnapshot(
+                    noteID: note.id,
+                    fileURL: note.fileURL,
+                    text: text,
+                    sourceEditorID: editorSessionID,
+                    savedAt: Date()
+                )
+            )
+        }
+        DebugTrace.record("editor persist end note=\(note.fileURL.lastPathComponent)")
+    }
+
+    private func handleRemoteSnapshot(_ snapshot: NoteSyncSnapshot) {
+        guard hasLoaded, !isDownloading, !downloadFailed else { return }
+        guard snapshot.sourceEditorID != editorSessionID else { return }
+        guard snapshot.fileURL == note.fileURL else { return }
+        guard snapshot.text != content else { return }
+
+        if hasPendingLocalEdits {
+            if pendingRemoteSnapshot?.savedAt ?? .distantPast <= snapshot.savedAt {
+                pendingRemoteSnapshot = snapshot
+            }
+            DebugTrace.record("editor remote pending-conflict note=\(note.fileURL.lastPathComponent)")
+            return
+        }
+
+        applyRemoteSnapshot(snapshot)
+    }
+
+    private func applyRemoteSnapshot(_ snapshot: NoteSyncSnapshot) {
+        DebugTrace.record("editor remote applied note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(snapshot.text))")
+        pendingRemoteSnapshot = nil
+        applyLoadedContent(snapshot.text)
     }
 }

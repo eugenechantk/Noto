@@ -115,6 +115,11 @@ enum DirectoryItem: Identifiable, Hashable {
 @MainActor
 @Observable
 final class MarkdownNoteStore {
+    struct SaveResult {
+        let note: MarkdownNote
+        let didWrite: Bool
+    }
+
     private(set) var items: [DirectoryItem] = []
 
     let directoryURL: URL
@@ -199,7 +204,9 @@ final class MarkdownNoteStore {
     }
 
     func readContent(of note: MarkdownNote) -> String {
-        CoordinatedFileManager.readString(from: note.fileURL) ?? ""
+        let content = CoordinatedFileManager.readString(from: note.fileURL) ?? ""
+        DebugTrace.record("store read note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(content))")
+        return content
     }
 
     func createNote() -> MarkdownNote {
@@ -239,21 +246,26 @@ final class MarkdownNoteStore {
     /// Saves content immediately (writes file + updates list title). Does NOT rename.
     /// Only writes to disk and updates the `updated` timestamp if the content body has actually changed.
     @discardableResult
-    func saveContent(_ content: String, for note: MarkdownNote) -> MarkdownNote {
+    func saveContent(_ content: String, for note: MarkdownNote) -> SaveResult {
         // Check if the body (non-frontmatter) content actually changed
         let existingContent = CoordinatedFileManager.readString(from: note.fileURL) ?? ""
         let existingBody = MarkdownNote.stripFrontmatter(existingContent)
         let newBody = MarkdownNote.stripFrontmatter(content)
 
+        DebugTrace.record("store save begin note=\(note.fileURL.lastPathComponent) existingBodyLen=\(existingBody.count) newBodyLen=\(newBody.count)")
+
         guard existingBody != newBody else {
             // No body change — don't write, don't update timestamp, don't touch items
-            return note
+            DebugTrace.record("store save skipped unchanged note=\(note.fileURL.lastPathComponent)")
+            return SaveResult(note: note, didWrite: false)
         }
 
         let contentToSave = MarkdownNote.updateTimestamp(in: content)
-        guard CoordinatedFileManager.writeString(contentToSave, to: note.fileURL) else {
+        let writeSucceeded = CoordinatedFileManager.writeString(contentToSave, to: note.fileURL)
+        DebugTrace.record("store write result note=\(note.fileURL.lastPathComponent) success=\(writeSucceeded)")
+        guard writeSucceeded else {
             logger.error("Failed to save note \(note.fileURL.lastPathComponent)")
-            return note
+            return SaveResult(note: note, didWrite: false)
         }
 
         let newTitle = MarkdownNote.titleFrom(content)
@@ -270,7 +282,8 @@ final class MarkdownNoteStore {
             items.insert(.note(updated), at: folderCount)
         }
 
-        return updated
+        DebugTrace.record("store save end note=\(updated.fileURL.lastPathComponent) title=\(updated.title)")
+        return SaveResult(note: updated, didWrite: true)
     }
 
     /// Renames the file to match the note title. Returns updated note with new fileURL.

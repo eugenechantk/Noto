@@ -43,6 +43,8 @@ struct NotoApp: App {
     #endif
 
     init() {
+        DebugTrace.reset()
+        DebugTrace.record("app init bundle=\(Bundle.main.bundleIdentifier ?? "unknown")")
         NSSetUncaughtExceptionHandler { exception in
             let reason = exception.reason ?? "unknown"
             let stack = exception.callStackSymbols.prefix(10).joined(separator: "\n")

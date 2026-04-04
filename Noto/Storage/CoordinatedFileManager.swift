@@ -50,19 +50,29 @@ enum CoordinatedFileManager {
     static func writeString(_ content: String, to url: URL) -> Bool {
         var success = false
         var coordinationError: NSError?
+        var writeErrorDescription: String?
         let coordinator = NSFileCoordinator()
 
         coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { coordinatedURL in
             do {
-                try content.write(to: coordinatedURL, atomically: true, encoding: .utf8)
+                // Write non-atomically: atomic writes create a temp file in the same
+                // directory, which fails under macOS sandbox for security-scoped
+                // iCloud Drive folders (NSPOSIXErrorDomain Code=1 "Operation not permitted").
+                // NSFileCoordinator already provides safe write coordination.
+                try content.write(to: coordinatedURL, atomically: false, encoding: .utf8)
                 success = true
             } catch {
                 logger.error("Write failed for \(url.lastPathComponent): \(error)")
+                writeErrorDescription = String(describing: error)
             }
         }
 
         if let error = coordinationError {
             logger.error("Coordinated write failed for \(url.lastPathComponent): \(error)")
+            DebugTrace.record("coord write coordinationError file=\(url.lastPathComponent) error=\(String(describing: error))")
+        }
+        if let writeErrorDescription {
+            DebugTrace.record("coord write writeError file=\(url.lastPathComponent) error=\(writeErrorDescription)")
         }
         return success
     }

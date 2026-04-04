@@ -14,3 +14,5 @@
 - Keep that completion report concise and factual. If no files changed, say so.
 - When the user reports a bug or asks for a code change, do the work directly unless blocked by a real ambiguity or a destructive tradeoff that requires confirmation.
 - Do not ask for permission to make routine code changes, tests, or verification runs when the user has already asked for the problem to be solved.
+- For macOS external-vault save/delete bugs, do not assume the editor is at fault first. Check sandbox entitlements, security-scoped bookmark resolution, and actual write errors before changing editor code.
+- For multi-window note behavior, distinguish same-process window sync from external filesystem sync. Same-app windows should use the in-process sync path; `VaultFileWatcher` is only the fallback for external changes.

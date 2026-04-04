@@ -85,6 +85,22 @@ Noto/
     SettingsView             # App settings
 ```
 
+### macOS-specific runtime rules
+
+Two macOS rules matter for current app behavior:
+
+1. **External vault access is a sandbox permission problem first, not an editor problem first.**
+   - If the app can open notes but cannot save/delete them, check for `NSCocoaErrorDomain Code=513`.
+   - The app must have `com.apple.security.files.user-selected.read-write`.
+   - The saved security-scoped bookmark is the real access token.
+   - Do not silently reopen an external vault from a remembered raw path if writability cannot be re-established.
+   - If the bookmark/token is broken, force a clean folder re-pick.
+
+2. **Same-app multi-window sync is separate from filesystem sync.**
+   - Use the in-process note sync path for one window updating another window in the same running app.
+   - Use `VaultFileWatcher` for true external changes: iCloud, Finder, or another process.
+   - Do not rely on the debounced file watcher alone for same-process editor sync.
+
 ### Packages (`Packages/`)
 
 Business logic extracted into local Swift packages, independently testable via CLI.

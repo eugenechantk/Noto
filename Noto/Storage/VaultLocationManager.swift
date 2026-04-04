@@ -44,51 +44,80 @@ final class VaultLocationManager {
             vaultURL = localURL
             isVaultConfigured = true
             logger.info("Using local vault at \(localURL.path)")
+            DebugTrace.record("vault resolve local \(localURL.path)")
             return
         }
 
-        if let directVaultURL = resolvedDirectVaultURL() {
-            ensureDirectoryExists(directVaultURL)
-            vaultURL = directVaultURL
-            isVaultConfigured = true
-            logger.info("Using saved direct vault at \(directVaultURL.path)")
-            return
-        }
+        // For sandboxed macOS builds, the bookmark is the real access token.
+        // Do not prefer a remembered raw path over the bookmark, or we reopen
+        // the right folder without the write permission required to save.
+        if let bookmarkData = UserDefaults.standard.data(forKey: Self.bookmarkKey) {
+            do {
+                var isStale = false
+                #if os(macOS)
+                let resolveOptions: URL.BookmarkResolutionOptions = [.withSecurityScope]
+                #else
+                let resolveOptions: URL.BookmarkResolutionOptions = []
+                #endif
+                let url = try URL(
+                    resolvingBookmarkData: bookmarkData,
+                    options: resolveOptions,
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
 
-        // Try resolving a security-scoped bookmark
-        guard let bookmarkData = UserDefaults.standard.data(forKey: Self.bookmarkKey) else {
-            isVaultConfigured = false
-            return
-        }
+                let didStartAccessing = url.startAccessingSecurityScopedResource()
+                logger.info("Started security-scoped access: \(didStartAccessing, privacy: .public) for \(url.path)")
+                DebugTrace.record("vault bookmark path=\(url.path) startAccess=\(didStartAccessing) stale=\(isStale)")
 
-        do {
-            var isStale = false
-            #if os(macOS)
-            let resolveOptions: URL.BookmarkResolutionOptions = [.withSecurityScope]
-            #else
-            let resolveOptions: URL.BookmarkResolutionOptions = []
-            #endif
-            let url = try URL(resolvingBookmarkData: bookmarkData, options: resolveOptions, relativeTo: nil, bookmarkDataIsStale: &isStale)
-
-            if isStale {
-                // Re-save the bookmark
-                if url.startAccessingSecurityScopedResource() {
-                    saveBookmark(for: url)
-                    url.stopAccessingSecurityScopedResource()
+                guard didStartAccessing else {
+                    logger.error("Failed to start security-scoped access for \(url.path)")
+                    DebugTrace.record("vault bookmark access denied \(url.path)")
+                    clearSavedExternalVaultState()
+                    isVaultConfigured = false
+                    return
                 }
-            }
 
-            _ = url.startAccessingSecurityScopedResource()
-            let isDirect = UserDefaults.standard.bool(forKey: Self.isDirectKey)
-            let resolvedURL = isDirect ? url : url.appendingPathComponent("Noto")
-            ensureDirectoryExists(resolvedURL)
-            vaultURL = resolvedURL
-            isVaultConfigured = true
-            logger.info("Resolved vault bookmark at \(resolvedURL.path)")
-        } catch {
-            logger.error("Failed to resolve vault bookmark: \(error)")
-            isVaultConfigured = false
+                if isStale, didStartAccessing {
+                    saveBookmark(for: url)
+                    DebugTrace.record("vault bookmark refreshed \(url.path)")
+                }
+
+                let isDirect = UserDefaults.standard.bool(forKey: Self.isDirectKey)
+                let resolvedURL = isDirect ? url : url.appendingPathComponent("Noto")
+                ensureDirectoryExists(resolvedURL)
+
+                guard validateWriteAccess(to: resolvedURL) else {
+                    logger.error("Resolved vault is not writable at \(resolvedURL.path)")
+                    DebugTrace.record("vault bookmark not writable \(resolvedURL.path)")
+                    url.stopAccessingSecurityScopedResource()
+                    clearSavedExternalVaultState()
+                    isVaultConfigured = false
+                    return
+                }
+
+                vaultURL = resolvedURL
+                isVaultConfigured = true
+                logger.info("Resolved vault bookmark at \(resolvedURL.path)")
+                DebugTrace.record("vault resolved bookmark target=\(resolvedURL.path) isDirect=\(isDirect)")
+                return
+            } catch {
+                logger.error("Failed to resolve vault bookmark: \(error)")
+                DebugTrace.record("vault bookmark resolve failed \(String(describing: error))")
+            }
         }
+
+        // For external macOS vaults, a raw remembered path without an active
+        // bookmark is not sufficient to regain write access. Force the user to
+        // re-pick the folder instead of opening a read-only vault silently.
+        if resolvedDirectVaultURL() != nil {
+            logger.error("Saved direct vault path exists but no valid bookmark access is available")
+            DebugTrace.record("vault direct path present without valid bookmark; forcing re-pick")
+            clearSavedExternalVaultState()
+        }
+
+        isVaultConfigured = false
+        DebugTrace.record("vault unresolved")
     }
 
     // MARK: - Set vault location
@@ -99,6 +128,15 @@ final class VaultLocationManager {
         _ = parentURL.startAccessingSecurityScopedResource()
         let notoURL = parentURL.appendingPathComponent("Noto")
         ensureDirectoryExists(notoURL)
+
+        guard validateWriteAccess(to: notoURL) else {
+            logger.error("Picked parent vault is not writable at \(notoURL.path)")
+            DebugTrace.record("vault set parent denied \(notoURL.path)")
+            clearSavedExternalVaultState()
+            isVaultConfigured = false
+            return
+        }
+
         saveBookmark(for: parentURL)
         UserDefaults.standard.set(false, forKey: Self.isLocalKey)
         UserDefaults.standard.set(false, forKey: Self.isDirectKey)
@@ -106,12 +144,22 @@ final class VaultLocationManager {
         vaultURL = notoURL
         isVaultConfigured = true
         logger.info("Vault set to \(notoURL.path)")
+        DebugTrace.record("vault set parent \(notoURL.path)")
     }
 
     /// Set vault directly to the chosen folder (no `/Noto` subfolder).
     /// Use this when pointing at an existing folder of markdown files.
     func setVault(directURL url: URL) {
         _ = url.startAccessingSecurityScopedResource()
+
+        guard validateWriteAccess(to: url) else {
+            logger.error("Picked direct vault is not writable at \(url.path)")
+            DebugTrace.record("vault set direct denied \(url.path)")
+            clearSavedExternalVaultState()
+            isVaultConfigured = false
+            return
+        }
+
         saveBookmark(for: url)
         UserDefaults.standard.set(false, forKey: Self.isLocalKey)
         UserDefaults.standard.set(true, forKey: Self.isDirectKey)
@@ -119,6 +167,7 @@ final class VaultLocationManager {
         vaultURL = url
         isVaultConfigured = true
         logger.info("Vault set directly to \(url.path)")
+        DebugTrace.record("vault set direct \(url.path)")
     }
 
     /// Set vault to local app sandbox Documents/Noto.
@@ -126,11 +175,13 @@ final class VaultLocationManager {
         let localURL = Self.localVaultURL()
         ensureDirectoryExists(localURL)
         UserDefaults.standard.set(true, forKey: Self.isLocalKey)
+        UserDefaults.standard.set(false, forKey: Self.isDirectKey)
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
         UserDefaults.standard.removeObject(forKey: Self.directPathKey)
         vaultURL = localURL
         isVaultConfigured = true
         logger.info("Vault set to local: \(localURL.path)")
+        DebugTrace.record("vault set local \(localURL.path)")
     }
 
     /// Resets vault configuration, returning the user to the setup screen.
@@ -217,6 +268,28 @@ final class VaultLocationManager {
         }
 
         return directURL
+    }
+
+    private func clearSavedExternalVaultState() {
+        UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
+        UserDefaults.standard.removeObject(forKey: Self.isDirectKey)
+        UserDefaults.standard.removeObject(forKey: Self.directPathKey)
+        vaultURL = nil
+    }
+
+    private func validateWriteAccess(to url: URL) -> Bool {
+        let probeURL = url.appendingPathComponent(".noto-write-probe-\(UUID().uuidString)")
+
+        do {
+            try Data("probe".utf8).write(to: probeURL, options: .atomic)
+            try? FileManager.default.removeItem(at: probeURL)
+            DebugTrace.record("vault writable ok \(url.path)")
+            return true
+        } catch {
+            DebugTrace.record("vault writable denied \(url.path) error=\(String(describing: error))")
+            try? FileManager.default.removeItem(at: probeURL)
+            return false
+        }
     }
 
     private func resetStateForUITesting() {

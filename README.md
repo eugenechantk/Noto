@@ -6,6 +6,38 @@ This is a universal apple application for my markdown based note taking app
 
 The live editor path is a markdown-native block editor on iOS. At the app level, `NotoApp` creates a vault-scoped `MarkdownNoteStore` plus a `VaultFileWatcher`, and `NoteEditorScreen` loads one note's full markdown content into a single `String` state called `content`. The screen passes that binding into `BlockEditorView`, and debounces save and rename operations back through `MarkdownNoteStore`. The store is the persistence boundary: it reads and writes `.md` files, manages YAML frontmatter timestamps, derives titles from markdown content, and renames files to match note titles when appropriate.
 
+## macOS runtime notes
+
+### External vault / iCloud write access
+
+On macOS, an external vault can appear to load correctly while still being non-writable. The real failure mode is not a TextKit bug; it is sandbox permission failure on the user-picked folder.
+
+Key rules:
+
+- The app must use `com.apple.security.files.user-selected.read-write`, not read-only.
+- The saved security-scoped bookmark is the real permission token. A remembered raw path is not enough to regain write access after relaunch.
+- The app should validate writability when resolving or setting an external vault.
+- If the vault is not writable, the app should clear the broken saved state and force the user to re-pick the folder instead of silently opening a read-only vault.
+
+The symptom for this bug class is: notes load, typing works visually, but saves/deletes fail with `NSCocoaErrorDomain Code=513`.
+
+### Multi-window note sync
+
+The macOS app has two different sync paths:
+
+- `NoteSyncCenter`: same-process, window-to-window sync inside the running app
+- `VaultFileWatcher`: external filesystem/iCloud/Finder changes
+
+This split is intentional. Same-app windows should not wait on the debounced file watcher to notice changes made by another window.
+
+Current behavior:
+
+- after a successful save, the editor publishes a note snapshot through `NoteSyncCenter`
+- another window showing the same note applies that snapshot immediately if it has no local edits
+- if the other window is dirty, it keeps local edits and shows a small conflict state instead of overwriting the editor
+
+That means multi-window sync is immediate for clean windows, while still protecting unsaved local edits.
+
 ### Active runtime path
 
 The current live editor is `BlockEditorView`, not the older `MarkdownEditorView` TextKit path. `BlockEditorView` is a `UIViewControllerRepresentable` wrapper around `BlockEditorViewController`. The controller owns a `BlockDocument`, which is an array of `Block` values, one block per markdown line. Each `Block` stores the full markdown text for that line, including prefixes such as `# `, `- `, or `- [ ] `. Structure is inferred from text; `BlockType.detect(from:)` derives whether a row is a paragraph, heading, todo, bullet, ordered list, or frontmatter block. That means markdown stays the source of truth, and semantics come from parsing prefixes rather than from a separate rich-text model.

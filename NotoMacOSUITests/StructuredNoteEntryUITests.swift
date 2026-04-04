@@ -91,6 +91,12 @@ It continues on a second line.
 
         let renamedFirstNoteURL = waitForMarkdownFile(named: title, in: vaultURL, timeout: 10) ?? firstNoteURL
         XCTAssertTrue(waitForFileToContain(appendedText, fileURL: renamedFirstNoteURL, timeout: 10), "Switching notes should keep the first note's saved content on disk")
+
+        let firstNoteRow = app.buttons["note_\(title)"]
+        XCTAssertTrue(firstNoteRow.waitForExistence(timeout: 10), "The renamed first note should appear in the sidebar")
+        firstNoteRow.click()
+
+        XCTAssertTrue(waitForEditorToContain(appendedText), "Returning to the first note should show the saved line in the editor")
     }
 
     @MainActor
@@ -139,6 +145,9 @@ It continues on a second line.
         appendTextToEndOfEditor("Second note", editor: secondEditor)
 
         XCTAssertTrue(waitForFileToContain(appendedText, fileURL: existingNoteURL, timeout: 10), "Switching notes should keep the appended line in the existing file on disk")
+
+        noteRow.click()
+        XCTAssertTrue(waitForEditorToContain(appendedText), "Returning to the existing note should show the appended line in the editor")
     }
 
     @MainActor

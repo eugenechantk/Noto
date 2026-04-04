@@ -453,6 +453,7 @@ final class TextKit2EditorCoordinator {
     func publishEditorText(_ newText: String) {
         guard !isApplyingEditorText else { return }
         guard newText != lastPublishedText else { return }
+        DebugTrace.record("editor publish \(DebugTrace.textSummary(newText))")
         isUpdatingText = true
         text = newText
         lastPublishedText = newText
@@ -739,6 +740,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     // MARK: NSTextViewDelegate
 
     func textDidChange(_ notification: Notification) {
+        DebugTrace.record("mac textDidChange")
         flushTextToBinding()
     }
 
@@ -747,6 +749,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     }
 
     func textDidEndEditing(_ notification: Notification) {
+        DebugTrace.record("mac textDidEndEditing")
         flushTextToBinding()
     }
 
@@ -757,6 +760,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         changeInLength delta: Int
     ) {
         guard editedMask.contains(.editedCharacters) else { return }
+        DebugTrace.record("mac textStorage didProcessEditing range=\(editedRange.location):\(editedRange.length) delta=\(delta) \(DebugTrace.textSummary(textStorage.string))")
         coordinator?.publishEditorText(textStorage.string)
     }
 
@@ -771,6 +775,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     }
 
     private func flushTextToBinding() {
+        DebugTrace.record("mac flushTextToBinding \(DebugTrace.textSummary(textView.textStorage?.string ?? textView.string))")
         coordinator?.publishEditorText(textView.textStorage?.string ?? textView.string)
     }
 
