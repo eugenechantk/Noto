@@ -7,19 +7,32 @@ struct NoteEditorScreen: View {
     var store: MarkdownNoteStore
     var isNew: Bool = false
     var fileWatcher: VaultFileWatcher?
+    var onDelete: (() -> Void)? = nil
+    private var externallyDeletingNoteID: Binding<UUID?>?
 
     @State private var note: MarkdownNote
     @State private var content: String = ""
+    @State private var latestEditorText: String = ""
     @State private var hasLoaded = false
     @State private var isDownloading = false
     @State private var downloadFailed = false
-    @State private var saveTask: Task<Void, Never>?
     @State private var renameTask: Task<Void, Never>?
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
 
-    init(store: MarkdownNoteStore, note: MarkdownNote, isNew: Bool = false, fileWatcher: VaultFileWatcher? = nil) {
+    init(
+        store: MarkdownNoteStore,
+        note: MarkdownNote,
+        isNew: Bool = false,
+        fileWatcher: VaultFileWatcher? = nil,
+        onDelete: (() -> Void)? = nil,
+        externallyDeletingNoteID: Binding<UUID?>? = nil
+    ) {
         self.store = store
         self.isNew = isNew
         self.fileWatcher = fileWatcher
+        self.onDelete = onDelete
+        self.externallyDeletingNoteID = externallyDeletingNoteID
         _note = State(initialValue: note)
     }
 
@@ -41,10 +54,7 @@ struct NoteEditorScreen: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                TextKit2EditorView(text: $content, autoFocus: isNew) { _ in
-                    scheduleSave()
-                    scheduleRename()
-                }
+                TextKit2EditorView(text: $content, autoFocus: isNew, onTextChange: handleEditorChange)
             }
         }
         .navigationTitle(MarkdownNote.titleFrom(content))
@@ -59,21 +69,36 @@ struct NoteEditorScreen: View {
                 .accessibilityIdentifier("back_button")
             }
         }
+        #elseif os(macOS)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(role: .destructive, action: { showDeleteConfirmation = true }) {
+                    Label("Delete Note", systemImage: "trash")
+                }
+                .accessibilityIdentifier("delete_note_button")
+                .keyboardShortcut(.delete, modifiers: [.command])
+            }
+        }
         #endif
         .task {
             guard !hasLoaded else { return }
             await loadNoteContent()
         }
         .onDisappear {
-            saveTask?.cancel()
             renameTask?.cancel()
-            if !isDownloading && !downloadFailed {
-                note = store.saveContent(content, for: note)
-                note = store.renameFileIfNeeded(for: note)
+            persistFinalSnapshotIfNeeded()
+            if externallyDeletingNoteID?.wrappedValue == note.id {
+                externallyDeletingNoteID?.wrappedValue = nil
             }
         }
         .onChange(of: fileWatcher?.changeCount) { _, _ in
             reloadIfChangedExternally()
+        }
+        .confirmationDialog("Delete this note?", isPresented: $showDeleteConfirmation) {
+            Button("Delete Note", role: .destructive) {
+                deleteCurrentNote()
+            }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
@@ -83,13 +108,14 @@ struct NoteEditorScreen: View {
         let diskContent = store.readContent(of: note)
         if diskContent != content && !diskContent.isEmpty {
             content = diskContent
+            latestEditorText = diskContent
             logger.info("Reloaded note from disk after external change")
         }
     }
 
     private func loadNoteContent() async {
         if CoordinatedFileManager.isDownloaded(at: note.fileURL) {
-            content = store.readContent(of: note)
+            applyLoadedContent(store.readContent(of: note))
             hasLoaded = true
         } else {
             isDownloading = true
@@ -105,27 +131,52 @@ struct NoteEditorScreen: View {
                 try? await Task.sleep(for: .milliseconds(500))
                 if Task.isCancelled { return }
             }
-            content = store.readContent(of: note)
+            applyLoadedContent(store.readContent(of: note))
             hasLoaded = true
             isDownloading = false
         }
     }
 
-    private func scheduleSave() {
-        saveTask?.cancel()
-        saveTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            note = store.saveContent(content, for: note)
-        }
+    private func handleEditorChange(_ newText: String) {
+        guard !isDeleting else { return }
+        content = newText
+        latestEditorText = newText
+        note = store.updateTitleFromContent(newText, for: note)
+        note = store.saveContent(newText, for: note)
+        scheduleRename()
     }
 
     private func scheduleRename() {
+        guard !isDeleting else { return }
         renameTask?.cancel()
         renameTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, !isDeleting else { return }
             note = store.renameFileIfNeeded(for: note)
         }
+    }
+
+    private func applyLoadedContent(_ text: String) {
+        content = text
+        latestEditorText = text
+    }
+
+    private func persistFinalSnapshotIfNeeded() {
+        let isExternallyDeleting = externallyDeletingNoteID?.wrappedValue == note.id
+        guard !isDownloading, !downloadFailed, !isDeleting, !isExternallyDeleting else { return }
+        note = store.saveContent(latestEditorText, for: note)
+        note = store.renameFileIfNeeded(for: note)
+    }
+
+    private func deleteCurrentNote() {
+        renameTask?.cancel()
+        isDeleting = true
+        let noteToDelete = note
+        guard store.deleteNote(noteToDelete) else {
+            isDeleting = false
+            return
+        }
+        onDelete?()
+        dismiss()
     }
 }

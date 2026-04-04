@@ -28,6 +28,7 @@ struct NoteListView: View {
     @State private var selectedNote: MarkdownNote?
     @State private var selectedNoteStore: MarkdownNoteStore?
     @State private var selectedNoteIsNew = false
+    @State private var externallyDeletingNoteID: UUID?
     @State private var showSettings = false
     @State private var hasRestoredSelection = false
 
@@ -78,7 +79,8 @@ struct NoteListView: View {
                 fileWatcher: fileWatcher,
                 selectedNote: $selectedNote,
                 selectedNoteStore: $selectedNoteStore,
-                selectedIsNew: $selectedNoteIsNew
+                selectedIsNew: $selectedNoteIsNew,
+                externallyDeletingNoteID: $externallyDeletingNoteID
             )
         } detail: {
             if let selectedNote, let selectedNoteStore {
@@ -86,7 +88,13 @@ struct NoteListView: View {
                     store: selectedNoteStore,
                     note: selectedNote,
                     isNew: selectedNoteIsNew,
-                    fileWatcher: fileWatcher
+                    fileWatcher: fileWatcher,
+                    onDelete: {
+                        self.selectedNote = nil
+                        self.selectedNoteStore = nil
+                        self.selectedNoteIsNew = false
+                    },
+                    externallyDeletingNoteID: $externallyDeletingNoteID
                 )
                 .id(selectedNote.id)
             } else {
@@ -194,6 +202,7 @@ struct SidebarView: View {
     @Binding var selectedNote: MarkdownNote?
     @Binding var selectedNoteStore: MarkdownNoteStore?
     @Binding var selectedIsNew: Bool
+    @Binding var externallyDeletingNoteID: UUID?
 
     /// Stack of (store, title) for folder navigation. Empty = showing root.
     @State private var folderStack: [(store: MarkdownNoteStore, title: String)] = []
@@ -284,6 +293,7 @@ struct SidebarView: View {
                 selectedNote: $selectedNote,
                 selectedNoteStore: $selectedNoteStore,
                 selectedIsNew: $selectedIsNew,
+                externallyDeletingNoteID: $externallyDeletingNoteID,
                 onNavigate: {
                     let subStore = MarkdownNoteStore(
                         directoryURL: folder.folderURL,
@@ -304,12 +314,15 @@ struct SidebarView: View {
                 Label(note.title, systemImage: "doc.text")
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("note_\(note.title)")
             .listRowBackground(selectedNote?.id == note.id ? Color.accentColor.opacity(0.2) : nil)
             .contextMenu {
                 Button(role: .destructive) {
+                    externallyDeletingNoteID = note.id
                     if note.id == selectedNote?.id {
                         selectedNote = nil
                         selectedNoteStore = nil
+                        selectedIsNew = false
                     }
                     currentStore.deleteNote(note)
                 } label: {
@@ -340,6 +353,7 @@ private struct SidebarFolderRow: View {
     @Binding var selectedNote: MarkdownNote?
     @Binding var selectedNoteStore: MarkdownNoteStore?
     @Binding var selectedIsNew: Bool
+    @Binding var externallyDeletingNoteID: UUID?
     var onNavigate: () -> Void
     var onDelete: () -> Void
 
@@ -359,6 +373,7 @@ private struct SidebarFolderRow: View {
                             selectedNote: $selectedNote,
                             selectedNoteStore: $selectedNoteStore,
                             selectedIsNew: $selectedIsNew,
+                            externallyDeletingNoteID: $externallyDeletingNoteID,
                             onNavigate: {
                                 let subStore = MarkdownNoteStore(
                                     directoryURL: subfolder.folderURL,
@@ -380,7 +395,21 @@ private struct SidebarFolderRow: View {
                             Label(note.title, systemImage: "doc.text")
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("note_\(note.title)")
                         .listRowBackground(selectedNote?.id == note.id ? Color.accentColor.opacity(0.2) : nil)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                externallyDeletingNoteID = note.id
+                                if note.id == selectedNote?.id {
+                                    selectedNote = nil
+                                    selectedNoteStore = nil
+                                    selectedIsNew = false
+                                }
+                                childStore.deleteNote(note)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
                 }
             }

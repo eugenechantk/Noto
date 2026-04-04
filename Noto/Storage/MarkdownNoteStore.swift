@@ -217,6 +217,25 @@ final class MarkdownNoteStore {
         return note
     }
 
+    @discardableResult
+    func updateTitleFromContent(_ content: String, for note: MarkdownNote) -> MarkdownNote {
+        let newTitle = MarkdownNote.titleFrom(content)
+        guard newTitle != note.title else { return note }
+
+        let updated = MarkdownNote(
+            id: note.id,
+            fileURL: note.fileURL,
+            title: newTitle,
+            modifiedDate: note.modifiedDate
+        )
+
+        if let idx = items.firstIndex(where: { $0.id == note.id }) {
+            items[idx] = .note(updated)
+        }
+
+        return updated
+    }
+
     /// Saves content immediately (writes file + updates list title). Does NOT rename.
     /// Only writes to disk and updates the `updated` timestamp if the content body has actually changed.
     @discardableResult
@@ -305,12 +324,15 @@ final class MarkdownNoteStore {
         return sanitized
     }
 
-    func deleteNote(_ note: MarkdownNote) {
-        if CoordinatedFileManager.delete(at: note.fileURL) {
+    @discardableResult
+    func deleteNote(_ note: MarkdownNote) -> Bool {
+        if CoordinatedFileManager.delete(at: note.fileURL) || deleteWithoutCoordination(note.fileURL) {
             items.removeAll { $0.id == note.id }
-        } else {
-            logger.error("Failed to delete note \(note.fileURL.lastPathComponent)")
+            return true
         }
+
+        logger.error("Failed to delete note \(note.fileURL.lastPathComponent)")
+        return false
     }
 
     // MARK: - Move
@@ -518,6 +540,20 @@ final class MarkdownNoteStore {
         switch item {
         case .folder(let f): deleteFolder(f)
         case .note(let n): deleteNote(n)
+        }
+    }
+}
+
+private extension MarkdownNoteStore {
+    func deleteWithoutCoordination(_ url: URL) -> Bool {
+        guard FileManager.default.fileExists(atPath: url.path) else { return true }
+
+        do {
+            try FileManager.default.removeItem(at: url)
+            return true
+        } catch {
+            logger.error("Fallback delete failed for \(url.lastPathComponent): \(error)")
+            return false
         }
     }
 }

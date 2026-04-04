@@ -148,34 +148,68 @@ private enum MarkdownParagraphStyler {
     static let italicRegex = try! NSRegularExpression(pattern: #"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)"#)
     static let codeRegex = try! NSRegularExpression(pattern: #"`([^`]+)`"#)
 
-    static func style(text: String, kind: MarkdownBlockKind) -> NSAttributedString {
-        let attributed = NSMutableAttributedString(string: text)
-        let fullRange = NSRange(location: 0, length: attributed.length)
-        guard fullRange.length > 0 else {
-            attributed.addAttributes([.font: MarkdownTheme.bodyFont, .foregroundColor: MarkdownTheme.bodyColor], range: fullRange)
-            return attributed
-        }
-
+    static func paragraphStyle(for kind: MarkdownBlockKind) -> NSParagraphStyle {
         let paraStyle = NSMutableParagraphStyle()
         paraStyle.lineSpacing = 4
 
         switch kind {
         case .heading(let level):
-            let font = MarkdownTheme.font(for: kind)
             let spacing: CGFloat = level == 1 ? 16 : level == 2 ? 12 : 8
             paraStyle.paragraphSpacingBefore = spacing
             paraStyle.paragraphSpacing = spacing * 0.4
+
+        case .todo(_, let indent):
+            let indentPt = CGFloat(indent) * 16
+            paraStyle.firstLineHeadIndent = indentPt
+            paraStyle.headIndent = indentPt + 24
+            paraStyle.paragraphSpacingBefore = 4
+
+        case .bullet(let indent):
+            let indentPt = CGFloat(indent) * 16
+            paraStyle.firstLineHeadIndent = indentPt
+            paraStyle.headIndent = indentPt + 16
+            paraStyle.paragraphSpacingBefore = 4
+
+        case .orderedList(_, let indent):
+            let indentPt = CGFloat(indent) * 16
+            paraStyle.firstLineHeadIndent = indentPt
+            paraStyle.headIndent = indentPt + 24
+            paraStyle.paragraphSpacingBefore = 4
+
+        case .frontmatter:
+            break
+
+        case .paragraph:
+            paraStyle.paragraphSpacingBefore = 6
+        }
+
+        return paraStyle
+    }
+
+    static func style(text: String, kind: MarkdownBlockKind) -> NSAttributedString {
+        let attributed = NSMutableAttributedString(string: text)
+        let fullRange = NSRange(location: 0, length: attributed.length)
+        guard fullRange.length > 0 else {
+            attributed.addAttributes([
+                .font: MarkdownTheme.font(for: kind),
+                .foregroundColor: kind == .frontmatter ? MarkdownTheme.prefixColor : MarkdownTheme.bodyColor,
+                .paragraphStyle: paragraphStyle(for: kind),
+            ], range: fullRange)
+            return attributed
+        }
+
+        let paraStyle = paragraphStyle(for: kind)
+
+        switch kind {
+        case .heading:
+            let font = MarkdownTheme.font(for: kind)
             attributed.addAttributes([
                 .font: font,
                 .foregroundColor: MarkdownTheme.bodyColor,
                 .paragraphStyle: paraStyle,
             ], range: fullRange)
 
-        case .todo(let checked, let indent):
-            let indentPt = CGFloat(indent) * 16
-            paraStyle.firstLineHeadIndent = indentPt
-            paraStyle.headIndent = indentPt + 24
-            paraStyle.paragraphSpacingBefore = 4
+        case .todo(let checked, _):
             attributed.addAttributes([
                 .font: MarkdownTheme.bodyFont,
                 .foregroundColor: checked ? MarkdownTheme.checkedColor : MarkdownTheme.bodyColor,
@@ -189,22 +223,14 @@ private enum MarkdownParagraphStyler {
                 }
             }
 
-        case .bullet(let indent):
-            let indentPt = CGFloat(indent) * 16
-            paraStyle.firstLineHeadIndent = indentPt
-            paraStyle.headIndent = indentPt + 16
-            paraStyle.paragraphSpacingBefore = 4
+        case .bullet:
             attributed.addAttributes([
                 .font: MarkdownTheme.bodyFont,
                 .foregroundColor: MarkdownTheme.bodyColor,
                 .paragraphStyle: paraStyle,
             ], range: fullRange)
 
-        case .orderedList(_, let indent):
-            let indentPt = CGFloat(indent) * 16
-            paraStyle.firstLineHeadIndent = indentPt
-            paraStyle.headIndent = indentPt + 24
-            paraStyle.paragraphSpacingBefore = 4
+        case .orderedList:
             attributed.addAttributes([
                 .font: MarkdownTheme.bodyFont,
                 .foregroundColor: MarkdownTheme.bodyColor,
@@ -220,7 +246,6 @@ private enum MarkdownParagraphStyler {
             return attributed // No inline formatting for frontmatter
 
         case .paragraph:
-            paraStyle.paragraphSpacingBefore = 6
             attributed.addAttributes([
                 .font: MarkdownTheme.bodyFont,
                 .foregroundColor: MarkdownTheme.bodyColor,
@@ -279,6 +304,32 @@ private enum MarkdownParagraphStyler {
             attributed.addAttribute(.foregroundColor, value: MarkdownTheme.codeColor, range: r)
             attributed.addAttribute(.backgroundColor, value: MarkdownTheme.codeBgColor, range: r)
         }
+    }
+}
+
+// MARK: - MarkdownTypingAttributes
+
+private enum MarkdownTypingAttributes {
+    static func attributes(for documentText: String, selectionLocation: Int) -> [NSAttributedString.Key: Any] {
+        let nsText = documentText as NSString
+        guard selectionLocation <= nsText.length else {
+            return baseAttributes(for: .paragraph)
+        }
+
+        let paragraphRange = nsText.paragraphRange(for: NSRange(location: selectionLocation, length: 0))
+        var paragraphText = nsText.substring(with: paragraphRange)
+        if paragraphText.hasSuffix("\n") {
+            paragraphText = String(paragraphText.dropLast())
+        }
+        return baseAttributes(for: MarkdownBlockKind.detect(from: paragraphText))
+    }
+
+    private static func baseAttributes(for kind: MarkdownBlockKind) -> [NSAttributedString.Key: Any] {
+        [
+            .font: MarkdownTheme.font(for: kind),
+            .foregroundColor: MarkdownTheme.bodyColor,
+            .paragraphStyle: MarkdownParagraphStyler.paragraphStyle(for: kind),
+        ]
     }
 }
 
@@ -389,18 +440,33 @@ final class TextKit2EditorCoordinator {
     var onTextChange: ((String) -> Void)?
     var isUpdatingText = false
     let autoFocus: Bool
+    private(set) var isApplyingEditorText = false
+    private(set) var lastPublishedText: String
 
     init(text: Binding<String>, onTextChange: ((String) -> Void)?, autoFocus: Bool) {
         _text = text
         self.onTextChange = onTextChange
         self.autoFocus = autoFocus
+        self.lastPublishedText = text.wrappedValue
     }
 
-    func textDidChange(_ newText: String) {
+    func publishEditorText(_ newText: String) {
+        guard !isApplyingEditorText else { return }
+        guard newText != lastPublishedText else { return }
         isUpdatingText = true
         text = newText
+        lastPublishedText = newText
         isUpdatingText = false
         onTextChange?(newText)
+    }
+
+    func beginApplyingEditorText(_ text: String) {
+        isApplyingEditorText = true
+        lastPublishedText = text
+    }
+
+    func finishApplyingEditorText() {
+        isApplyingEditorText = false
     }
 }
 
@@ -491,7 +557,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
     }
 
     private func applyText(_ markdown: String) {
+        coordinator?.beginApplyingEditorText(markdown)
         textView.text = markdown
+        coordinator?.finishApplyingEditorText()
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in
                 guard let tv = self?.textView else { return }
@@ -505,29 +573,25 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
     // MARK: UITextViewDelegate
 
     func textViewDidChange(_ textView: UITextView) {
-        coordinator?.textDidChange(textView.text ?? "")
+        coordinator?.publishEditorText(textView.text ?? "")
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
         updateTypingAttributes()
     }
 
+    func textViewDidEndEditing(_ textView: UITextView) {
+        coordinator?.publishEditorText(textView.text ?? "")
+    }
+
     /// Sets typing attributes to match the current paragraph's block kind,
     /// so newly typed characters inherit the correct font immediately
     /// (before the content-storage delegate re-styles the paragraph).
     private func updateTypingAttributes() {
-        let text = textView.text ?? ""
-        let cursor = textView.selectedRange.location
-        let nsText = text as NSString
-        guard cursor <= nsText.length else { return }
-        let paraRange = nsText.paragraphRange(for: NSRange(location: cursor, length: 0))
-        var paraText = nsText.substring(with: paraRange)
-        if paraText.hasSuffix("\n") { paraText = String(paraText.dropLast()) }
-        let kind = MarkdownBlockKind.detect(from: paraText)
-        textView.typingAttributes = [
-            .font: MarkdownTheme.font(for: kind),
-            .foregroundColor: MarkdownTheme.bodyColor,
-        ]
+        textView.typingAttributes = MarkdownTypingAttributes.attributes(
+            for: textView.text ?? "",
+            selectionLocation: textView.selectedRange.location
+        )
     }
 }
 
@@ -564,9 +628,24 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     }
 }
 
-final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate {
+final class TextKit2BackedTextView: NSTextView {
+    var onStringChange: ((String) -> Void)?
+
+    override func didChangeText() {
+        super.didChangeText()
+        onStringChange?(string)
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let result = super.resignFirstResponder()
+        onStringChange?(string)
+        return result
+    }
+}
+
+final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, NSTextStorageDelegate {
     var coordinator: TextKit2EditorCoordinator?
-    private(set) var textView: NSTextView!
+    private(set) var textView: TextKit2BackedTextView!
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
@@ -593,7 +672,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate {
         layoutManager.delegate = markdownDelegate
 
         // Create NSTextView backed by the TextKit 2 container
-        textView = NSTextView(frame: .zero, textContainer: container)
+        textView = TextKit2BackedTextView(frame: .zero, textContainer: container)
+        textView.minSize = .zero
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.allowsUndo = true
         textView.isEditable = true
         textView.isSelectable = true
@@ -609,8 +690,14 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate {
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.heightTracksTextView = false
         textView.delegate = self
+        textView.textStorage?.delegate = self
         textView.setAccessibilityIdentifier("note_editor")
+        textView.onStringChange = { [weak self] newText in
+            self?.coordinator?.publishEditorText(newText)
+        }
 
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
@@ -641,7 +728,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func applyText(_ markdown: String) {
+        coordinator?.beginApplyingEditorText(markdown)
         textView.string = markdown
+        coordinator?.finishApplyingEditorText()
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in
                 guard let tv = self?.textView else { return }
@@ -654,26 +743,36 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate {
     // MARK: NSTextViewDelegate
 
     func textDidChange(_ notification: Notification) {
-        coordinator?.textDidChange(textView.string)
+        flushTextToBinding()
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
         updateTypingAttributes()
     }
 
+    func textDidEndEditing(_ notification: Notification) {
+        flushTextToBinding()
+    }
+
+    func textStorage(
+        _ textStorage: NSTextStorage,
+        didProcessEditing editedMask: NSTextStorageEditActions,
+        range editedRange: NSRange,
+        changeInLength delta: Int
+    ) {
+        guard editedMask.contains(.editedCharacters) else { return }
+        coordinator?.publishEditorText(textStorage.string)
+    }
+
     private func updateTypingAttributes() {
-        let text = textView.string
-        let cursor = textView.selectedRange().location
-        let nsText = text as NSString
-        guard cursor <= nsText.length else { return }
-        let paraRange = nsText.paragraphRange(for: NSRange(location: cursor, length: 0))
-        var paraText = nsText.substring(with: paraRange)
-        if paraText.hasSuffix("\n") { paraText = String(paraText.dropLast()) }
-        let kind = MarkdownBlockKind.detect(from: paraText)
-        textView.typingAttributes = [
-            .font: MarkdownTheme.font(for: kind),
-            .foregroundColor: MarkdownTheme.bodyColor,
-        ]
+        textView.typingAttributes = MarkdownTypingAttributes.attributes(
+            for: textView.string,
+            selectionLocation: textView.selectedRange().location
+        )
+    }
+
+    private func flushTextToBinding() {
+        coordinator?.publishEditorText(textView.textStorage?.string ?? textView.string)
     }
 }
 

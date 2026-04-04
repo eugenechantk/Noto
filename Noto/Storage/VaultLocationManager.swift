@@ -14,12 +14,18 @@ final class VaultLocationManager {
     private static let bookmarkKey = "vaultBookmarkData"
     private static let isLocalKey = "vaultIsLocal"
     private static let isDirectKey = "vaultIsDirect"
+    private static let directPathKey = "vaultDirectPath"
     private static let forceLocalVaultArgument = "-notoUseLocalVault"
+    private static let forceDirectVaultPathArgument = "-notoDirectVaultPath"
     private static let resetStateArgument = "-notoResetState"
 
     init() {
         if Self.shouldResetStateFromLaunchArguments {
             resetStateForUITesting()
+        }
+        if let forcedDirectVaultPath = Self.forcedDirectVaultPathFromLaunchArguments {
+            setVaultForUITesting(toDirectPath: forcedDirectVaultPath)
+            return
         }
         if Self.shouldForceLocalVaultFromLaunchArguments {
             setLocalVault()
@@ -38,6 +44,14 @@ final class VaultLocationManager {
             vaultURL = localURL
             isVaultConfigured = true
             logger.info("Using local vault at \(localURL.path)")
+            return
+        }
+
+        if let directVaultURL = resolvedDirectVaultURL() {
+            ensureDirectoryExists(directVaultURL)
+            vaultURL = directVaultURL
+            isVaultConfigured = true
+            logger.info("Using saved direct vault at \(directVaultURL.path)")
             return
         }
 
@@ -88,6 +102,7 @@ final class VaultLocationManager {
         saveBookmark(for: parentURL)
         UserDefaults.standard.set(false, forKey: Self.isLocalKey)
         UserDefaults.standard.set(false, forKey: Self.isDirectKey)
+        UserDefaults.standard.set(notoURL.path, forKey: Self.directPathKey)
         vaultURL = notoURL
         isVaultConfigured = true
         logger.info("Vault set to \(notoURL.path)")
@@ -100,6 +115,7 @@ final class VaultLocationManager {
         saveBookmark(for: url)
         UserDefaults.standard.set(false, forKey: Self.isLocalKey)
         UserDefaults.standard.set(true, forKey: Self.isDirectKey)
+        UserDefaults.standard.set(url.path, forKey: Self.directPathKey)
         vaultURL = url
         isVaultConfigured = true
         logger.info("Vault set directly to \(url.path)")
@@ -111,6 +127,7 @@ final class VaultLocationManager {
         ensureDirectoryExists(localURL)
         UserDefaults.standard.set(true, forKey: Self.isLocalKey)
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
+        UserDefaults.standard.removeObject(forKey: Self.directPathKey)
         vaultURL = localURL
         isVaultConfigured = true
         logger.info("Vault set to local: \(localURL.path)")
@@ -123,6 +140,7 @@ final class VaultLocationManager {
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
         UserDefaults.standard.removeObject(forKey: Self.isLocalKey)
         UserDefaults.standard.removeObject(forKey: Self.isDirectKey)
+        UserDefaults.standard.removeObject(forKey: Self.directPathKey)
         logger.info("Vault configuration reset")
     }
 
@@ -164,6 +182,17 @@ final class VaultLocationManager {
         return (arguments[valueIndex] as NSString).boolValue
     }
 
+    private static var forcedDirectVaultPathFromLaunchArguments: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: forceDirectVaultPathArgument) else {
+            return nil
+        }
+
+        let valueIndex = arguments.index(after: index)
+        guard valueIndex < arguments.endIndex else { return nil }
+        return arguments[valueIndex]
+    }
+
     static func localVaultURL() -> URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         return docs.appendingPathComponent("Noto")
@@ -176,6 +205,20 @@ final class VaultLocationManager {
         }
     }
 
+    private func resolvedDirectVaultURL() -> URL? {
+        guard let path = UserDefaults.standard.string(forKey: Self.directPathKey), !path.isEmpty else {
+            return nil
+        }
+
+        let directURL = URL(fileURLWithPath: path, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directURL.path) else {
+            UserDefaults.standard.removeObject(forKey: Self.directPathKey)
+            return nil
+        }
+
+        return directURL
+    }
+
     private func resetStateForUITesting() {
         if let bundleIdentifier = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: bundleIdentifier)
@@ -185,5 +228,17 @@ final class VaultLocationManager {
         if FileManager.default.fileExists(atPath: localURL.path) {
             try? FileManager.default.removeItem(at: localURL)
         }
+    }
+
+    private func setVaultForUITesting(toDirectPath path: String) {
+        let url = URL(fileURLWithPath: path, isDirectory: true)
+        ensureDirectoryExists(url)
+        UserDefaults.standard.set(false, forKey: Self.isLocalKey)
+        UserDefaults.standard.set(true, forKey: Self.isDirectKey)
+        UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
+        UserDefaults.standard.set(url.path, forKey: Self.directPathKey)
+        vaultURL = url
+        isVaultConfigured = true
+        logger.info("Using UI-test direct vault at \(url.path)")
     }
 }
