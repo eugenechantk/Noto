@@ -8,6 +8,7 @@ struct NoteEditorScreen: View {
     var isNew: Bool = false
     var fileWatcher: VaultFileWatcher?
     var onDelete: (() -> Void)? = nil
+    var showsInlineBackButton = true
     private var externallyDeletingNoteID: Binding<UUID?>?
 
     @State private var session: NoteEditorSession
@@ -19,13 +20,15 @@ struct NoteEditorScreen: View {
         isNew: Bool = false,
         fileWatcher: VaultFileWatcher? = nil,
         onDelete: (() -> Void)? = nil,
-        externallyDeletingNoteID: Binding<UUID?>? = nil
+        externallyDeletingNoteID: Binding<UUID?>? = nil,
+        showsInlineBackButton: Bool = true
     ) {
         self.store = store
         self.isNew = isNew
         self.fileWatcher = fileWatcher
         self.onDelete = onDelete
         self.externallyDeletingNoteID = externallyDeletingNoteID
+        self.showsInlineBackButton = showsInlineBackButton
         _session = State(initialValue: NoteEditorSession(store: store, note: note, isNew: isNew))
     }
 
@@ -61,11 +64,13 @@ struct NoteEditorScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: { dismiss() }) {
-                    Image(systemName: "chevron.left")
+            if showsInlineBackButton {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                    }
+                    .accessibilityIdentifier("back_button")
                 }
-                .accessibilityIdentifier("back_button")
             }
         }
         #elseif os(macOS)
