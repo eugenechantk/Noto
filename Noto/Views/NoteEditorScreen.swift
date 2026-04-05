@@ -75,6 +75,14 @@ struct NoteEditorScreen: View {
         }
         #elseif os(macOS)
         .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button(action: { NoteEditorCommands.requestToggleStrikethrough() }) {
+                    Label("Strikethrough", systemImage: "strikethrough")
+                }
+                .accessibilityIdentifier("toggle_strikethrough_button")
+                .keyboardShortcut("x", modifiers: [.command, .shift])
+                .help("Strikethrough (Shift-Command-X)")
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button(role: .destructive, action: { showDeleteConfirmation = true }) {
                     Label("Delete Note", systemImage: "trash")
