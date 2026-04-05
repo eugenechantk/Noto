@@ -118,7 +118,7 @@ struct NoteCRUDTests {
         let content = MarkdownNote.makeFrontmatter(id: note.id) + "# My Title\nBody text"
         let updated = store.saveContent(content, for: note)
 
-        #expect(updated.title == "My Title")
+        #expect(updated.note.title == "My Title")
 
         let saved = try String(contentsOf: note.fileURL, encoding: .utf8)
         #expect(saved.contains("My Title"))
@@ -317,7 +317,7 @@ struct FileRenameTests {
 
         var note = store.createNote()
         let content = MarkdownNote.makeFrontmatter(id: note.id) + "# My Custom Title"
-        note = store.saveContent(content, for: note)
+        note = store.saveContent(content, for: note).note
         let renamed = store.renameFileIfNeeded(for: note)
 
         #expect(renamed.fileURL.lastPathComponent == "My Custom Title.md")
@@ -716,7 +716,7 @@ struct TimestampBehaviorTests {
         Thread.sleep(forTimeInterval: 1.1)
 
         let returned = store.saveContent(content, for: note)
-        #expect(returned.modifiedDate == originalDate, "modifiedDate should not change when content is unchanged")
+        #expect(returned.note.modifiedDate == originalDate, "modifiedDate should not change when content is unchanged")
     }
 }
 
