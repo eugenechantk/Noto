@@ -47,6 +47,28 @@ struct TodoMarkdown {
         return indentation + "- [ ] " + content + ending
     }
 
+    static func toolbarContentStart(in line: String) -> Int {
+        let (core, _) = splitLineEnding(in: line)
+        if let match = match(in: core) {
+            return match.prefixLength
+        }
+
+        let indentation = core.prefix(while: { $0 == " " || $0 == "\t" }).count
+        let rest = String(core.dropFirst(indentation))
+        return indentation + nonTodoPrefixLength(in: rest)
+    }
+
+    static func toolbarToggledContentStart(in line: String) -> Int {
+        let (core, _) = splitLineEnding(in: line)
+        let indentation = core.prefix(while: { $0 == " " || $0 == "\t" }).count
+
+        if match(in: core) != nil {
+            return indentation
+        }
+
+        return indentation + 6
+    }
+
     static func checkboxToggledLine(_ line: String) -> String {
         let (core, ending) = splitLineEnding(in: line)
         guard let match = match(in: core) else { return line }
@@ -56,8 +78,14 @@ struct TodoMarkdown {
     }
 
     private static func contentAfterNonTodoPrefix(in line: String) -> String {
+        let prefixLength = nonTodoPrefixLength(in: line)
+        guard prefixLength > 0 else { return line }
+        return String(line.dropFirst(prefixLength))
+    }
+
+    private static func nonTodoPrefixLength(in line: String) -> Int {
         if line.hasPrefix("- ") || line.hasPrefix("* ") || line.hasPrefix("• ") {
-            return String(line.dropFirst(2))
+            return 2
         }
 
         var digits = ""
@@ -70,11 +98,11 @@ struct TodoMarkdown {
         if !digits.isEmpty, index < line.endIndex, line[index] == "." {
             let afterDot = line.index(after: index)
             if afterDot < line.endIndex, line[afterDot] == " " {
-                return String(line[line.index(after: afterDot)...])
+                return digits.count + 2
             }
         }
 
-        return line
+        return 0
     }
 
     private static func splitLineEnding(in line: String) -> (core: String, ending: String) {

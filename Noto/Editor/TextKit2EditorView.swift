@@ -9,6 +9,14 @@ import AppKit
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "TextKit2Editor")
 
+enum NoteEditorCommands {
+    static let toggleStrikethrough = Notification.Name("NoteEditorCommands.toggleStrikethrough")
+
+    static func requestToggleStrikethrough() {
+        NotificationCenter.default.post(name: toggleStrikethrough, object: nil)
+    }
+}
+
 // MARK: - Platform Aliases
 
 #if os(iOS)
@@ -146,6 +154,7 @@ private enum MarkdownTheme {
 private enum MarkdownParagraphStyler {
     static let boldRegex = try! NSRegularExpression(pattern: #"\*\*(.+?)\*\*"#)
     static let italicRegex = try! NSRegularExpression(pattern: #"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)"#)
+    static let strikethroughRegex = try! NSRegularExpression(pattern: #"~~(.+?)~~"#)
     static let codeRegex = try! NSRegularExpression(pattern: #"`([^`]+)`"#)
 
     static func paragraphStyle(for kind: MarkdownBlockKind) -> NSParagraphStyle {
@@ -295,6 +304,19 @@ private enum MarkdownParagraphStyler {
                                     range: NSRange(location: r.location, length: 1))
             attributed.addAttribute(.foregroundColor, value: MarkdownTheme.prefixColor,
                                     range: NSRange(location: r.location + r.length - 1, length: 1))
+        }
+
+        // Strikethrough: ~~text~~
+        strikethroughRegex.enumerateMatches(in: string, range: fullRange) { match, _, _ in
+            guard let r = match?.range, r.length >= 4 else { return }
+            let contentRange = NSRange(location: r.location + 2, length: r.length - 4)
+            if contentRange.length > 0 {
+                attributed.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: contentRange)
+            }
+            attributed.addAttribute(.foregroundColor, value: MarkdownTheme.prefixColor,
+                                    range: NSRange(location: r.location, length: 2))
+            attributed.addAttribute(.foregroundColor, value: MarkdownTheme.prefixColor,
+                                    range: NSRange(location: r.location + r.length - 2, length: 2))
         }
 
         // Code: `text`
@@ -482,6 +504,12 @@ final class TextKit2EditorCoordinator {
 
 #if os(iOS)
 
+private final class EditorAccessoryView: UIView {
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: 48)
+    }
+}
+
 struct TextKit2EditorView: UIViewControllerRepresentable {
     @Binding var text: String
     var autoFocus: Bool = false
@@ -536,6 +564,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         textView.textContainerInset = UIEdgeInsets(top: 16, left: 12, bottom: 16, right: 12)
         textView.keyboardDismissMode = .interactive
         textView.alwaysBounceVertical = true
+        textView.inputAccessoryView = makeInputAccessoryView()
         textView.accessibilityIdentifier = "note_editor"
         textView.delegate = self
         textView.translatesAutoresizingMaskIntoConstraints = false
@@ -575,6 +604,129 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
                 tv.selectedTextRange = tv.textRange(from: end, to: end)
             }
         }
+    }
+
+    private func makeInputAccessoryView() -> UIView {
+        let toolbar = EditorAccessoryView(frame: CGRect(x: 0, y: 0, width: 0, height: 48))
+        toolbar.backgroundColor = .secondarySystemBackground
+        toolbar.accessibilityIdentifier = "note_editor_toolbar"
+
+        let stackView = UIStackView(arrangedSubviews: [
+            makeToolbarButton(
+                systemName: "checklist",
+                accessibilityIdentifier: "toggle_todo_button",
+                accessibilityLabel: "Toggle Todo",
+                action: #selector(toggleTodoForSelectedLines)
+            ),
+            makeToolbarButton(
+                systemName: "increase.indent",
+                accessibilityIdentifier: "indent_button",
+                accessibilityLabel: "Indent",
+                action: #selector(indentSelectedLines)
+            ),
+            makeToolbarButton(
+                systemName: "decrease.indent",
+                accessibilityIdentifier: "outdent_button",
+                accessibilityLabel: "Outdent",
+                action: #selector(outdentSelectedLines)
+            ),
+            makeToolbarButton(
+                systemName: "strikethrough",
+                accessibilityIdentifier: "toggle_strikethrough_button",
+                accessibilityLabel: "Strikethrough",
+                action: #selector(toggleSelectedStrikethrough)
+            ),
+        ])
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .horizontal
+        stackView.alignment = .center
+        stackView.spacing = 16
+
+        toolbar.addSubview(stackView)
+        NSLayoutConstraint.activate([
+            stackView.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -16),
+            stackView.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+        ])
+
+        return toolbar
+    }
+
+    private func makeToolbarButton(
+        systemName: String,
+        accessibilityIdentifier: String,
+        accessibilityLabel: String,
+        action: Selector
+    ) -> UIButton {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setImage(UIImage(systemName: systemName), for: .normal)
+        button.tintColor = .label
+        button.accessibilityIdentifier = accessibilityIdentifier
+        button.accessibilityLabel = accessibilityLabel
+        button.addTarget(self, action: action, for: .touchUpInside)
+        button.addTarget(self, action: action, for: .primaryActionTriggered)
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: 28),
+            button.heightAnchor.constraint(equalToConstant: 28),
+        ])
+        return button
+    }
+
+    @objc
+    private func toggleTodoForSelectedLines() {
+        guard let transform = BlockEditingCommands.toggledTodoLines(
+            in: textView.text ?? "",
+            selection: textView.selectedRange
+        ) else {
+            return
+        }
+
+        applySelectionTransform(transform)
+    }
+
+    @objc
+    private func indentSelectedLines() {
+        guard let transform = BlockEditingCommands.indentedLines(
+            in: textView.text ?? "",
+            selection: textView.selectedRange
+        ) else {
+            return
+        }
+
+        applySelectionTransform(transform)
+    }
+
+    @objc
+    private func outdentSelectedLines() {
+        guard let transform = BlockEditingCommands.outdentedLines(
+            in: textView.text ?? "",
+            selection: textView.selectedRange
+        ) else {
+            return
+        }
+
+        applySelectionTransform(transform)
+    }
+
+    @objc
+    private func toggleSelectedStrikethrough() {
+        guard let transform = BlockEditingCommands.toggledStrikethrough(
+            in: textView.text ?? "",
+            selection: textView.selectedRange
+        ) else {
+            return
+        }
+
+        applySelectionTransform(transform)
+    }
+
+    private func applySelectionTransform(_ transform: TextSelectionTransform) {
+        coordinator?.beginApplyingEditorText(transform.text)
+        textView.text = transform.text
+        coordinator?.finishApplyingEditorText()
+        textView.selectedRange = transform.selection
+        updateTypingAttributes()
+        coordinator?.publishEditorText(transform.text)
     }
 
     // MARK: UITextViewDelegate
@@ -649,6 +801,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
+    private var strikethroughObserver: NSObjectProtocol?
 
     override func loadView() {
         view = NSView()
@@ -713,6 +866,14 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         if let pendingText {
             applyText(pendingText)
             self.pendingText = nil
+        }
+
+        strikethroughObserver = NotificationCenter.default.addObserver(
+            forName: NoteEditorCommands.toggleStrikethrough,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleStrikethroughCommand()
         }
     }
 
@@ -780,9 +941,32 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         coordinator?.publishEditorText(textView.textStorage?.string ?? textView.string)
     }
 
+    private func handleStrikethroughCommand() {
+        guard textView.window?.firstResponder === textView else { return }
+        guard let transform = BlockEditingCommands.toggledStrikethrough(
+            in: textView.string,
+            selection: textView.selectedRange()
+        ) else {
+            return
+        }
+
+        coordinator?.beginApplyingEditorText(transform.text)
+        textView.string = transform.text
+        coordinator?.finishApplyingEditorText()
+        textView.setSelectedRange(transform.selection)
+        updateTypingAttributes()
+        coordinator?.publishEditorText(transform.text)
+    }
+
     override func viewWillDisappear() {
         super.viewWillDisappear()
         flushTextToBinding()
+    }
+
+    deinit {
+        if let strikethroughObserver {
+            NotificationCenter.default.removeObserver(strikethroughObserver)
+        }
     }
 }
 
