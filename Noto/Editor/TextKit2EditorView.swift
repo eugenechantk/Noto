@@ -116,7 +116,11 @@ enum MarkdownFrontmatter {
 
 /// Centralized font and color constants for markdown rendering.
 private enum MarkdownTheme {
+    #if os(iOS)
     static let bodyFont = PlatformFont.systemFont(ofSize: 17, weight: .regular)
+    #elseif os(macOS)
+    static let bodyFont = PlatformFont.systemFont(ofSize: 15, weight: .regular)
+    #endif
     static let h1Font = PlatformFont.systemFont(ofSize: 28, weight: .bold)
     static let h2Font = PlatformFont.systemFont(ofSize: 22, weight: .bold)
     static let h3Font = PlatformFont.systemFont(ofSize: 18, weight: .semibold)
@@ -561,7 +565,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         textView.font = MarkdownTheme.bodyFont
         textView.textColor = MarkdownTheme.bodyColor
         textView.backgroundColor = .systemBackground
-        textView.textContainerInset = UIEdgeInsets(top: 16, left: 12, bottom: 16, right: 12)
+        textView.textContainerInset = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
         textView.keyboardDismissMode = .interactive
         textView.alwaysBounceVertical = true
         textView.inputAccessoryView = makeInputAccessoryView()
@@ -839,7 +843,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         textView.font = MarkdownTheme.bodyFont
         textView.textColor = MarkdownTheme.bodyColor
         textView.backgroundColor = .textBackgroundColor
-        textView.textContainerInset = NSSize(width: 12, height: 16)
+        textView.textContainerInset = NSSize(width: 16, height: 16)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
