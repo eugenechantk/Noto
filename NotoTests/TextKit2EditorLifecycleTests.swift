@@ -18,6 +18,17 @@ struct TextKit2EditorLifecycleTests {
         #expect(controller.textView.text == "# Title\nBody")
     }
 
+    @MainActor
+    @Test("Editor keeps extra bottom scroll clearance above the keyboard")
+    func editorKeepsExtraBottomScrollClearanceAboveKeyboard() {
+        let controller = TextKit2EditorViewController()
+
+        controller.loadViewIfNeeded()
+
+        #expect(controller.textView.contentInset.bottom == 72)
+        #expect(controller.textView.verticalScrollIndicatorInsets.bottom == 72)
+    }
+
     @Test("Frontmatter range covers the YAML metadata block only")
     func detectsFrontmatterRange() throws {
         let markdown = """
