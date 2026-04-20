@@ -748,6 +748,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
     private var todoCheckboxButtons: [UIButton] = []
+    private var keyboardObserverTokens: [NSObjectProtocol] = []
+    private var keyboardFrameInScreen: CGRect?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -790,8 +792,23 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         }
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        startKeyboardObservation()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        stopKeyboardObservation()
+    }
+
+    deinit {
+        stopKeyboardObservation()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        updateKeyboardAvoidanceInsets()
         refreshTodoCheckboxes()
     }
 
@@ -910,7 +927,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         button.accessibilityIdentifier = accessibilityIdentifier
         button.accessibilityLabel = accessibilityLabel
         button.addTarget(self, action: action, for: .touchUpInside)
-        button.addTarget(self, action: action, for: .primaryActionTriggered)
         NSLayoutConstraint.activate([
             button.widthAnchor.constraint(equalToConstant: 28),
             button.heightAnchor.constraint(equalToConstant: 28),
@@ -1004,6 +1020,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
 
     func textViewDidChange(_ textView: UITextView) {
         coordinator?.publishEditorText(textView.text ?? "")
+        scrollSelectionAboveKeyboard()
         scheduleTodoCheckboxRefresh()
     }
 
@@ -1019,6 +1036,80 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         coordinator?.publishEditorText(textView.text ?? "")
+    }
+
+    private func startKeyboardObservation() {
+        guard keyboardObserverTokens.isEmpty else { return }
+
+        let center = NotificationCenter.default
+        keyboardObserverTokens.append(center.addObserver(
+            forName: UIResponder.keyboardWillChangeFrameNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleKeyboardFrameChange(notification)
+        })
+        keyboardObserverTokens.append(center.addObserver(
+            forName: UIResponder.keyboardWillHideNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleKeyboardHide(notification)
+        })
+    }
+
+    private func stopKeyboardObservation() {
+        let center = NotificationCenter.default
+        keyboardObserverTokens.forEach { center.removeObserver($0) }
+        keyboardObserverTokens.removeAll()
+        keyboardFrameInScreen = nil
+    }
+
+    private func handleKeyboardFrameChange(_ notification: Notification) {
+        keyboardFrameInScreen = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+        animateKeyboardAvoidance(using: notification)
+    }
+
+    private func handleKeyboardHide(_ notification: Notification) {
+        keyboardFrameInScreen = nil
+        animateKeyboardAvoidance(using: notification)
+    }
+
+    private func animateKeyboardAvoidance(using notification: Notification) {
+        let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+        let curveRawValue = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? Int
+            ?? UIView.AnimationCurve.easeInOut.rawValue
+        let options = UIView.AnimationOptions(rawValue: UInt(curveRawValue << 16))
+
+        UIView.animate(withDuration: duration, delay: 0, options: options) { [weak self] in
+            self?.updateKeyboardAvoidanceInsets()
+            self?.view.layoutIfNeeded()
+        } completion: { [weak self] _ in
+            self?.scrollSelectionAboveKeyboard()
+        }
+    }
+
+    private func updateKeyboardAvoidanceInsets() {
+        guard isViewLoaded, textView != nil else { return }
+
+        let overlap = keyboardFrameInScreen.map { keyboardFrame -> CGFloat in
+            let keyboardFrameInView = view.convert(keyboardFrame, from: nil)
+            guard keyboardFrameInView.intersects(view.bounds) else { return 0 }
+            return max(0, view.bounds.maxY - keyboardFrameInView.minY)
+        } ?? 0
+        let accessoryHeight = overlap > 0 ? (textView.inputAccessoryView?.bounds.height ?? 0) : 0
+        let bottomInset = overlap + accessoryHeight
+
+        textView.contentInset.bottom = bottomInset
+        textView.verticalScrollIndicatorInsets.bottom = bottomInset
+    }
+
+    private func scrollSelectionAboveKeyboard() {
+        guard textView.isFirstResponder else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.textView != nil else { return }
+            self.textView.scrollRangeToVisible(self.textView.selectedRange)
+        }
     }
 
     /// Sets typing attributes to match the current paragraph's block kind,

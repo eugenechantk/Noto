@@ -134,9 +134,10 @@ final class NoteEditorSession {
 
     func persistFinalSnapshotIfNeeded(isExternallyDeleting: Bool) {
         guard !isDownloading, !downloadFailed, !isDeleting, !isExternallyDeleting else { return }
-        guard hasPendingLocalEdits || latestEditorText != lastPersistedText else { return }
-        DebugTrace.record("editor final persist note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(latestEditorText))")
-        persistEditorText(latestEditorText)
+        if hasPendingLocalEdits || latestEditorText != lastPersistedText {
+            DebugTrace.record("editor final persist note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(latestEditorText))")
+            persistEditorText(latestEditorText)
+        }
         note = store.renameFileIfNeeded(for: note)
     }
 
