@@ -15,9 +15,10 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Vault Location")
                             .font(.body)
+                            .foregroundStyle(AppTheme.primaryText)
                         Text(displayPath)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppTheme.secondaryText)
                             .lineLimit(2)
                     }
                     Spacer()
@@ -32,6 +33,10 @@ struct SettingsView: View {
                 Text("Changing your vault returns you to the welcome screen where you can create or open a different vault.")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.background)
+        .foregroundStyle(AppTheme.primaryText)
+        .tint(AppTheme.primaryText)
         .navigationTitle("Settings")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

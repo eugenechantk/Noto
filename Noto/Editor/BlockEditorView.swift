@@ -252,14 +252,31 @@ protocol BlockCellDelegate: AnyObject {
 
 /// Transparent input accessory view that floats over content.
 private class TransparentAccessoryView: UIView {
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isOpaque = false
+        backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
     override func didMoveToSuperview() {
         super.didMoveToSuperview()
-        superview?.backgroundColor = .clear
+        clearAccessoryChrome()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        superview?.backgroundColor = .clear
+        clearAccessoryChrome()
+    }
+
+    private func clearAccessoryChrome() {
+        var view = superview
+        while let currentView = view, currentView !== window {
+            currentView.isOpaque = false
+            currentView.backgroundColor = .clear
+            view = currentView.superview
+        }
     }
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
@@ -295,6 +312,7 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
     private var checkboxTopConstraint: NSLayoutConstraint!
     private var markerLeadingConstraint: NSLayoutConstraint!
     private var markerTopConstraint: NSLayoutConstraint!
+    private var markerWidthConstraint: NSLayoutConstraint!
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -303,8 +321,11 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private static let checkboxSize: CGFloat = 28
+    private static let checkboxSize = MarkdownVisualSpec.todoControlSize
     private static let checkboxLeading: CGFloat = 12
+    private static let listIndentStep = MarkdownVisualSpec.listIndentStep
+    private static let listMarkerColumnWidth: CGFloat = 14
+    private static let listMarkerTextGap = MarkdownVisualSpec.listMarkerTextGap
 
     private func setup() {
         selectionStyle = .none
@@ -344,6 +365,7 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
         checkboxTopConstraint = checkboxButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4)
         markerLeadingConstraint = listMarkerLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Self.checkboxLeading)
         markerTopConstraint = listMarkerLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4)
+        markerWidthConstraint = listMarkerLabel.widthAnchor.constraint(equalToConstant: Self.listMarkerColumnWidth)
 
         NSLayoutConstraint.activate([
             checkboxLeadingConstraint,
@@ -353,6 +375,7 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
 
             markerLeadingConstraint,
             markerTopConstraint,
+            markerWidthConstraint,
 
             blockTextView.topAnchor.constraint(equalTo: contentView.topAnchor),
             blockTextView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
@@ -377,7 +400,12 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
         let glassEffect = UIGlassEffect()
         glassEffect.isInteractive = true
         let pill = UIVisualEffectView(effect: glassEffect)
+        pill.backgroundColor = .clear
+        pill.contentView.backgroundColor = .clear
         pill.layer.cornerRadius = pillHeight / 2
+        pill.layer.cornerCurve = .continuous
+        pill.layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
+        pill.layer.borderWidth = 0.5
         pill.clipsToBounds = true
         pill.translatesAutoresizingMaskIntoConstraints = false
         wrapper.addSubview(pill)
@@ -457,10 +485,7 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
     private func applyTypingAttributes(for block: Block) {
         let spec = block.blockType.renderSpec(for: block.text)
         let font = UIFont.systemFont(ofSize: spec.fontSize, weight: spec.fontWeight)
-        let paraStyle = NSMutableParagraphStyle()
-        paraStyle.lineSpacing = spec.lineSpacing
-        paraStyle.paragraphSpacingBefore = spec.spacingBefore
-        paraStyle.paragraphSpacing = spec.spacingAfter
+        let paraStyle = BlockRenderer.paragraphStyle(for: block.text, spec: spec)
         blockTextView.typingAttributes = [
             .font: font,
             .foregroundColor: spec.contentColor ?? spec.textColor,
@@ -495,7 +520,16 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
 
         // Layout from spec
         textLeadingConstraint.constant = spec.leadingOffset
-        let leftInset: CGFloat = spec.showsCheckbox ? 0 : 12
+        let font = UIFont.systemFont(ofSize: spec.fontSize, weight: spec.fontWeight)
+        let markerText = visualListMarkerText(for: block)
+        let prefixWidth = BlockRenderer.prefixWidth(for: text, spec: spec, font: font)
+        let listContentInset = markerText.map { visualListContentInset(markerText: $0, font: font) }
+        let leftInset: CGFloat
+        if let listContentInset {
+            leftInset = max(0, listContentInset - prefixWidth)
+        } else {
+            leftInset = spec.showsCheckbox ? 0 : 12
+        }
         blockTextView.textContainerInset = UIEdgeInsets(
             top: spec.spacingBefore + 2,
             left: leftInset,
@@ -503,10 +537,9 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
             right: 12
         )
 
-        let font = UIFont.systemFont(ofSize: spec.fontSize, weight: spec.fontWeight)
         let textTopInset = blockTextView.textContainerInset.top
         let accessoryLineCenter = textTopInset + font.lineHeight / 2
-        let indentationOffset = CGFloat(spec.indentLevel) * 12
+        let indentationOffset = MarkdownVisualSpec.listLeadingOffset(for: spec.indentLevel)
 
         // Keep the structured todo marker visible whenever the markdown prefix
         // is visually hidden, including while the row is focused.
@@ -516,7 +549,7 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
             checkboxButton.isHidden = false
             let imageName = spec.isChecked ? "checkmark.circle.fill" : "circle"
             let color: UIColor = spec.isChecked ? .systemGreen : .systemGray2
-            let config = UIImage.SymbolConfiguration(pointSize: Self.checkboxSize - 4, weight: .regular)
+            let config = UIImage.SymbolConfiguration(pointSize: MarkdownVisualSpec.todoSymbolSize, weight: .regular)
             checkboxButton.setImage(UIImage(systemName: imageName, withConfiguration: config), for: .normal)
             checkboxButton.tintColor = color
             checkboxTopConstraint.constant = accessoryLineCenter - Self.checkboxSize / 2
@@ -524,14 +557,15 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
             checkboxButton.isHidden = true
         }
 
-        // Focused bullets and ordered lists keep their visual marker instead of
-        // exposing raw markdown prefixes after pressing Return.
-        if let markerText = focusedListMarkerText(for: block, prefixDisplay: prefixDisplay) {
+        // List rows use an external marker so the markdown prefix can remain in
+        // the backing text while wrapped visual lines align with the content.
+        if let markerText, prefixDisplay == .hidden {
             listMarkerLabel.isHidden = false
             listMarkerLabel.text = markerText
-            listMarkerLabel.font = font
-            listMarkerLabel.textColor = .tertiaryLabel
+            listMarkerLabel.font = markerFont(for: block, textFont: font)
+            listMarkerLabel.textColor = .secondaryLabel
             markerLeadingConstraint.constant = Self.checkboxLeading + indentationOffset
+            markerWidthConstraint.constant = markerColumnWidth(markerText: markerText, font: font)
             markerTopConstraint.constant = accessoryLineCenter - font.lineHeight / 2
         } else {
             listMarkerLabel.isHidden = true
@@ -544,17 +578,35 @@ final class BlockCell: UITableViewCell, UITextViewDelegate {
         }
     }
 
-    private func focusedListMarkerText(for block: Block, prefixDisplay: BlockRenderSpec.PrefixDisplay) -> String? {
-        guard blockTextView.isFirstResponder, prefixDisplay == .hidden else { return nil }
-
+    private func visualListMarkerText(for block: Block) -> String? {
         switch block.blockType {
         case .bullet:
-            return "\u{2022}"
+            return "-"
         case .orderedList(let number, _):
             return "\(number)."
         default:
             return nil
         }
+    }
+
+    private func markerFont(for block: Block, textFont: UIFont) -> UIFont {
+        switch block.blockType {
+        case .bullet:
+            return UIFont.systemFont(ofSize: textFont.pointSize + 1, weight: .semibold)
+        case .orderedList:
+            return UIFont.systemFont(ofSize: textFont.pointSize, weight: .medium)
+        default:
+            return textFont
+        }
+    }
+
+    private func markerColumnWidth(markerText: String, font: UIFont) -> CGFloat {
+        let markerWidth = (markerText as NSString).size(withAttributes: [.font: font]).width
+        return max(Self.listMarkerColumnWidth, ceil(markerWidth))
+    }
+
+    private func visualListContentInset(markerText: String, font: UIFont) -> CGFloat {
+        Self.checkboxLeading + markerColumnWidth(markerText: markerText, font: font) + Self.listMarkerTextGap
     }
 
     /// Update the text view's text without restyling (keeps keyboard alive).
@@ -681,6 +733,7 @@ struct BlockRenderSpec {
     // MARK: Layout
     var leadingOffset: CGFloat = 0
     var indentLevel: Int = 0
+    var alignsWrappedLinesToContent: Bool = false
 
     // MARK: Checkbox
     var showsCheckbox: Bool = false
@@ -723,8 +776,8 @@ extension BlockType {
             spec.showsCheckbox = true
             spec.isChecked = checked
             spec.indentLevel = indent
-            // checkbox (12 leading + 28 size + 4 gap) = 44
-            spec.leadingOffset = 44 + CGFloat(indent) * 12
+            spec.alignsWrappedLinesToContent = true
+            spec.leadingOffset = MarkdownVisualSpec.todoTextStartOffset + MarkdownVisualSpec.listLeadingOffset(for: indent)
             spec.spacingBefore = 4
             spec.spacingAfter = 4
             if checked {
@@ -734,19 +787,21 @@ extension BlockType {
 
         case .bullet(let indent):
             spec.prefixLength = prefixLength(of: text, pattern: #"^(\s*[*\-•] )"#)
-            spec.prefixDisplay = .dimmed
+            spec.prefixDisplay = .hidden
             spec.prefixDisplayWhenFocused = .hidden
             spec.indentLevel = indent
-            spec.leadingOffset = CGFloat(indent) * 12
+            spec.alignsWrappedLinesToContent = true
+            spec.leadingOffset = MarkdownVisualSpec.listLeadingOffset(for: indent)
             spec.spacingBefore = 4
             spec.spacingAfter = 4
 
         case .orderedList(_, let indent):
             spec.prefixLength = prefixLength(of: text, pattern: #"^(\s*\d+\. )"#)
-            spec.prefixDisplay = .dimmed
+            spec.prefixDisplay = .hidden
             spec.prefixDisplayWhenFocused = .hidden
             spec.indentLevel = indent
-            spec.leadingOffset = CGFloat(indent) * 12
+            spec.alignsWrappedLinesToContent = true
+            spec.leadingOffset = MarkdownVisualSpec.listLeadingOffset(for: indent)
             spec.spacingBefore = 4
             spec.spacingAfter = 4
 
@@ -778,6 +833,28 @@ enum BlockRenderer {
         return buildAttributed(displayText: text, spec: spec, prefixLength: spec.prefixLength, prefixDisplay: prefixDisplay, isFocused: isFocused)
     }
 
+    static func paragraphStyle(for text: String, spec: BlockRenderSpec, prefixLength: Int? = nil) -> NSMutableParagraphStyle {
+        let paraStyle = NSMutableParagraphStyle()
+        paraStyle.lineSpacing = spec.lineSpacing
+        paraStyle.paragraphSpacingBefore = spec.spacingBefore
+        paraStyle.paragraphSpacing = spec.spacingAfter
+
+        guard spec.alignsWrappedLinesToContent else { return paraStyle }
+
+        let font = UIFont.systemFont(ofSize: spec.fontSize, weight: spec.fontWeight)
+        paraStyle.headIndent = prefixWidth(for: text, spec: spec, font: font, prefixLength: prefixLength)
+        return paraStyle
+    }
+
+    static func prefixWidth(for text: String, spec: BlockRenderSpec, font: UIFont, prefixLength: Int? = nil) -> CGFloat {
+        let effectivePrefixLength = prefixLength ?? spec.prefixLength
+        guard effectivePrefixLength > 0 else { return 0 }
+        let safePrefixLength = min(effectivePrefixLength, text.count)
+        guard safePrefixLength > 0 else { return 0 }
+        let prefix = String(text.prefix(safePrefixLength))
+        return ceil((prefix as NSString).size(withAttributes: [.font: font]).width)
+    }
+
     private static func buildAttributed(
         displayText: String,
         spec: BlockRenderSpec,
@@ -786,10 +863,7 @@ enum BlockRenderer {
         isFocused: Bool
     ) -> NSAttributedString {
         let font = UIFont.systemFont(ofSize: spec.fontSize, weight: spec.fontWeight)
-        let paraStyle = NSMutableParagraphStyle()
-        paraStyle.lineSpacing = spec.lineSpacing
-        paraStyle.paragraphSpacingBefore = spec.spacingBefore
-        paraStyle.paragraphSpacing = spec.spacingAfter
+        let paraStyle = paragraphStyle(for: displayText, spec: spec, prefixLength: prefixLength)
 
         let attributed = NSMutableAttributedString(string: displayText, attributes: [
             .font: font,

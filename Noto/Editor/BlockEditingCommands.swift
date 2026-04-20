@@ -11,6 +11,45 @@ struct TextSelectionTransform: Equatable {
     let selection: NSRange
 }
 
+struct TextReplacement: Equatable {
+    let range: NSRange
+    let replacement: String
+}
+
+enum TextEditDiff {
+    static func singleReplacement(from oldText: String, to newText: String) -> TextReplacement? {
+        guard oldText != newText else { return nil }
+
+        let old = oldText as NSString
+        let new = newText as NSString
+        let oldLength = old.length
+        let newLength = new.length
+
+        var prefixLength = 0
+        while prefixLength < oldLength,
+              prefixLength < newLength,
+              old.character(at: prefixLength) == new.character(at: prefixLength) {
+            prefixLength += 1
+        }
+
+        var suffixLength = 0
+        while suffixLength < oldLength - prefixLength,
+              suffixLength < newLength - prefixLength,
+              old.character(at: oldLength - suffixLength - 1) == new.character(at: newLength - suffixLength - 1) {
+            suffixLength += 1
+        }
+
+        let replacedLength = oldLength - prefixLength - suffixLength
+        let insertedLength = newLength - prefixLength - suffixLength
+        let replacement = new.substring(with: NSRange(location: prefixLength, length: insertedLength))
+
+        return TextReplacement(
+            range: NSRange(location: prefixLength, length: replacedLength),
+            replacement: replacement
+        )
+    }
+}
+
 struct BlockEditingCommands {
     static func indentedLine(_ line: String) -> String {
         let (core, ending) = splitLineEnding(in: line)
@@ -94,6 +133,49 @@ struct BlockEditingCommands {
         )
     }
 
+    static func continuedListLineBreak(in text: String, selection: NSRange) -> TextSelectionTransform? {
+        let nsText = text as NSString
+        guard selection.location != NSNotFound, selection.length == 0 else { return nil }
+
+        let safeLocation = max(0, min(selection.location, nsText.length))
+        let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: 0))
+        let lineTextRange = lineTextRange(from: lineRange, in: nsText)
+        let lineText = nsText.substring(with: lineTextRange)
+        let offsetInLine = max(0, min(safeLocation - lineRange.location, lineTextRange.length))
+
+        let type = Block(text: lineText).blockType
+        guard type.isList,
+              let prefix = type.prefix,
+              let continuationPrefix = type.continuationPrefix else {
+            return nil
+        }
+
+        let prefixLength = prefix.utf16.count
+        guard offsetInLine >= prefixLength else { return nil }
+
+        let content = type.content(of: lineText).trimmingCharacters(in: .whitespaces)
+        if content.isEmpty && offsetInLine >= lineTextRange.length {
+            let updatedText = nsText.replacingCharacters(
+                in: NSRange(location: lineRange.location, length: min(prefixLength, lineTextRange.length)),
+                with: ""
+            )
+            return TextSelectionTransform(
+                text: updatedText,
+                selection: NSRange(location: lineRange.location, length: 0)
+            )
+        }
+
+        let insertedText = "\n" + continuationPrefix
+        let updatedText = nsText.replacingCharacters(
+            in: NSRange(location: safeLocation, length: 0),
+            with: insertedText
+        )
+        return TextSelectionTransform(
+            text: updatedText,
+            selection: NSRange(location: safeLocation + insertedText.utf16.count, length: 0)
+        )
+    }
+
     private static func splitLineEnding(in line: String) -> (core: String, ending: String) {
         if line.hasSuffix("\r\n") {
             return (String(line.dropLast(2)), "\r\n")
@@ -102,6 +184,19 @@ struct BlockEditingCommands {
             return (String(line.dropLast()), "\n")
         }
         return (line, "")
+    }
+
+    private static func lineTextRange(from lineRange: NSRange, in text: NSString) -> NSRange {
+        guard lineRange.length > 0 else { return lineRange }
+
+        let lastCharacterRange = NSRange(location: NSMaxRange(lineRange) - 1, length: 1)
+        guard lastCharacterRange.location >= 0,
+              NSMaxRange(lastCharacterRange) <= text.length,
+              text.substring(with: lastCharacterRange) == "\n" else {
+            return lineRange
+        }
+
+        return NSRange(location: lineRange.location, length: lineRange.length - 1)
     }
 
     private static func transformedSelectedLines(

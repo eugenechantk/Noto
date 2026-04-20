@@ -47,7 +47,8 @@ enum MarkdownBlockKind: Equatable {
         if stripped.hasPrefix("- [ ] ") || stripped == "- [ ]" {
             return .todo(checked: false, indent: indent)
         }
-        if stripped.hasPrefix("- [x] ") || stripped == "- [x]" {
+        if stripped.hasPrefix("- [x] ") || stripped == "- [x]" ||
+            stripped.hasPrefix("- [X] ") || stripped == "- [X]" {
             return .todo(checked: true, indent: indent)
         }
         if indent == 0 {
@@ -76,9 +77,14 @@ enum MarkdownBlockKind: Equatable {
         let stripped = String(text.dropFirst(indentCount))
         switch self {
         case .heading(let level): return level + 1
-        case .todo(let checked, _):
-            let marker = checked ? "- [x] " : "- [ ] "
-            return indentCount + (stripped.hasPrefix(marker) ? marker.count : 0)
+        case .todo:
+            if stripped.hasPrefix("- [ ] ") || stripped.hasPrefix("- [x] ") || stripped.hasPrefix("- [X] ") {
+                return indentCount + 6
+            }
+            if stripped == "- [ ]" || stripped == "- [x]" || stripped == "- [X]" {
+                return indentCount + 5
+            }
+            return 0
         case .bullet:
             return indentCount + (stripped.hasPrefix("- ") || stripped.hasPrefix("* ") || stripped.hasPrefix("• ") ? 2 : 0)
         case .orderedList(let number, _):
@@ -114,30 +120,77 @@ enum MarkdownFrontmatter {
 
 // MARK: - MarkdownTheme
 
-/// Centralized font and color constants for markdown rendering.
+/// Declarative visual contract for markdown rendering. Platform adapters below
+/// translate these values into UIKit/AppKit fonts, colors, and controls.
+enum MarkdownVisualSpec {
+    enum FontWeight {
+        case regular
+        case medium
+        case semibold
+        case bold
+    }
+
+    struct Font {
+        let pointSize: CGFloat
+        let weight: FontWeight
+        var isMonospaced = false
+    }
+
+    static let bodyFont = Font(pointSize: 17, weight: .regular)
+    static let h1Font = Font(pointSize: 28, weight: .bold)
+    static let h2Font = Font(pointSize: 22, weight: .bold)
+    static let h3Font = Font(pointSize: 18, weight: .semibold)
+    static let codeFont = Font(pointSize: 16, weight: .regular, isMonospaced: true)
+
+    static let listBaseIndent: CGFloat = 12
+    static let listIndentStep: CGFloat = 4
+    static let listMarkerTextGap: CGFloat = 8
+    static let todoPrefixVisualWidth: CGFloat = 2
+    static let todoTextStartOffset: CGFloat = 28
+    static let todoControlSize: CGFloat = 28
+    static let todoSymbolSize: CGFloat = 18
+    static let todoControlLeadingInset: CGFloat = 2
+    static let todoControlImageLeadingInset: CGFloat = 5
+
+    static func listLeadingOffset(for indentLevel: Int) -> CGFloat {
+        listBaseIndent + CGFloat(indentLevel) * listIndentStep
+    }
+
+    static func font(for kind: MarkdownBlockKind) -> Font {
+        switch kind {
+        case .heading(1): return h1Font
+        case .heading(2): return h2Font
+        case .heading(3): return h3Font
+        default: return bodyFont
+        }
+    }
+}
+
+/// Platform adapter for markdown rendering.
 private enum MarkdownTheme {
-    #if os(iOS)
-    static let bodyFont = PlatformFont.systemFont(ofSize: 17, weight: .regular)
-    #elseif os(macOS)
-    static let bodyFont = PlatformFont.systemFont(ofSize: 15, weight: .regular)
-    #endif
-    static let h1Font = PlatformFont.systemFont(ofSize: 28, weight: .bold)
-    static let h2Font = PlatformFont.systemFont(ofSize: 22, weight: .bold)
-    static let h3Font = PlatformFont.systemFont(ofSize: 18, weight: .semibold)
-    static let codeFont = PlatformFont.monospacedSystemFont(ofSize: 16, weight: .regular)
+    static let bodyFont = platformFont(MarkdownVisualSpec.bodyFont)
+    static let h1Font = platformFont(MarkdownVisualSpec.h1Font)
+    static let h2Font = platformFont(MarkdownVisualSpec.h2Font)
+    static let h3Font = platformFont(MarkdownVisualSpec.h3Font)
+    static let codeFont = platformFont(MarkdownVisualSpec.codeFont)
+    static let listBaseIndent = MarkdownVisualSpec.listBaseIndent
+    static let listIndentStep = MarkdownVisualSpec.listIndentStep
+    static let listMarkerTextGap = MarkdownVisualSpec.listMarkerTextGap
+    static let todoPrefixVisualWidth = MarkdownVisualSpec.todoPrefixVisualWidth
+    static let todoTextStartOffset = MarkdownVisualSpec.todoTextStartOffset
 
     #if os(iOS)
-    static let bodyColor: PlatformColor = .label
-    static let prefixColor: PlatformColor = .tertiaryLabel
-    static let checkedColor: PlatformColor = .secondaryLabel
-    static let codeColor: PlatformColor = .secondaryLabel
-    static let codeBgColor: PlatformColor = .secondarySystemFill
+    static let bodyColor: PlatformColor = AppTheme.uiPrimaryText
+    static let prefixColor: PlatformColor = AppTheme.uiMutedText
+    static let checkedColor: PlatformColor = AppTheme.uiSecondaryText
+    static let codeColor: PlatformColor = AppTheme.uiSecondaryText
+    static let codeBgColor: PlatformColor = AppTheme.uiCodeBackground
     #elseif os(macOS)
-    static let bodyColor: PlatformColor = .labelColor
-    static let prefixColor: PlatformColor = .tertiaryLabelColor
-    static let checkedColor: PlatformColor = .secondaryLabelColor
-    static let codeColor: PlatformColor = .secondaryLabelColor
-    static let codeBgColor: PlatformColor = .quaternaryLabelColor
+    static let bodyColor: PlatformColor = AppTheme.nsPrimaryText
+    static let prefixColor: PlatformColor = AppTheme.nsMutedText
+    static let checkedColor: PlatformColor = AppTheme.nsSecondaryText
+    static let codeColor: PlatformColor = AppTheme.nsSecondaryText
+    static let codeBgColor: PlatformColor = AppTheme.nsCodeBackground
     #endif
 
     static func font(for kind: MarkdownBlockKind) -> PlatformFont {
@@ -148,6 +201,38 @@ private enum MarkdownTheme {
         default: return bodyFont
         }
     }
+
+    static func listLeadingOffset(for indentLevel: Int) -> CGFloat {
+        MarkdownVisualSpec.listLeadingOffset(for: indentLevel)
+    }
+
+    static func platformFont(_ spec: MarkdownVisualSpec.Font) -> PlatformFont {
+        if spec.isMonospaced {
+            return PlatformFont.monospacedSystemFont(ofSize: spec.pointSize, weight: platformWeight(spec.weight))
+        }
+
+        return PlatformFont.systemFont(ofSize: spec.pointSize, weight: platformWeight(spec.weight))
+    }
+
+    #if os(iOS)
+    private static func platformWeight(_ weight: MarkdownVisualSpec.FontWeight) -> UIFont.Weight {
+        switch weight {
+        case .regular: return .regular
+        case .medium: return .medium
+        case .semibold: return .semibold
+        case .bold: return .bold
+        }
+    }
+    #elseif os(macOS)
+    private static func platformWeight(_ weight: MarkdownVisualSpec.FontWeight) -> NSFont.Weight {
+        switch weight {
+        case .regular: return .regular
+        case .medium: return .medium
+        case .semibold: return .semibold
+        case .bold: return .bold
+        }
+    }
+    #endif
 }
 
 // MARK: - MarkdownParagraphStyler
@@ -155,13 +240,13 @@ private enum MarkdownTheme {
 /// Builds an NSAttributedString for a single markdown paragraph.
 /// Called by the NSTextContentStorageDelegate — only the changed paragraph
 /// gets re-styled, not the entire document.
-private enum MarkdownParagraphStyler {
+enum MarkdownParagraphStyler {
     static let boldRegex = try! NSRegularExpression(pattern: #"\*\*(.+?)\*\*"#)
     static let italicRegex = try! NSRegularExpression(pattern: #"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)"#)
     static let strikethroughRegex = try! NSRegularExpression(pattern: #"~~(.+?)~~"#)
     static let codeRegex = try! NSRegularExpression(pattern: #"`([^`]+)`"#)
 
-    static func paragraphStyle(for kind: MarkdownBlockKind) -> NSParagraphStyle {
+    static func paragraphStyle(for kind: MarkdownBlockKind, text: String = "") -> NSParagraphStyle {
         let paraStyle = NSMutableParagraphStyle()
         paraStyle.lineSpacing = 4
 
@@ -172,21 +257,24 @@ private enum MarkdownParagraphStyler {
             paraStyle.paragraphSpacing = spacing * 0.4
 
         case .todo(_, let indent):
-            let indentPt = CGFloat(indent) * 16
-            paraStyle.firstLineHeadIndent = indentPt
-            paraStyle.headIndent = indentPt + 24
+            let indentPt = MarkdownTheme.listLeadingOffset(for: indent)
+            let contentIndent = listContentIndent(for: kind, text: text)
+            paraStyle.firstLineHeadIndent = indentPt + contentIndent - MarkdownTheme.todoPrefixVisualWidth
+            paraStyle.headIndent = indentPt + contentIndent
             paraStyle.paragraphSpacingBefore = 4
 
         case .bullet(let indent):
-            let indentPt = CGFloat(indent) * 16
+            let indentPt = MarkdownTheme.listLeadingOffset(for: indent)
+            let contentIndent = listContentIndent(for: kind, text: text)
             paraStyle.firstLineHeadIndent = indentPt
-            paraStyle.headIndent = indentPt + 16
+            paraStyle.headIndent = indentPt + contentIndent
             paraStyle.paragraphSpacingBefore = 4
 
         case .orderedList(_, let indent):
-            let indentPt = CGFloat(indent) * 16
+            let indentPt = MarkdownTheme.listLeadingOffset(for: indent)
+            let contentIndent = listContentIndent(for: kind, text: text)
             paraStyle.firstLineHeadIndent = indentPt
-            paraStyle.headIndent = indentPt + 24
+            paraStyle.headIndent = indentPt + contentIndent
             paraStyle.paragraphSpacingBefore = 4
 
         case .frontmatter:
@@ -199,6 +287,20 @@ private enum MarkdownParagraphStyler {
         return paraStyle
     }
 
+    static func listContentIndent(for kind: MarkdownBlockKind, text: String) -> CGFloat {
+        if case .todo = kind {
+            return MarkdownTheme.todoTextStartOffset
+        }
+
+        let prefixLength = kind.prefixLength(in: text)
+        guard prefixLength > 0 else { return 0 }
+
+        let prefix = String(text.prefix(prefixLength))
+        let font = MarkdownTheme.font(for: kind)
+        let prefixWidth = ceil((prefix as NSString).size(withAttributes: [.font: font]).width)
+        return prefixWidth
+    }
+
     static func style(text: String, kind: MarkdownBlockKind) -> NSAttributedString {
         let attributed = NSMutableAttributedString(string: text)
         let fullRange = NSRange(location: 0, length: attributed.length)
@@ -206,12 +308,12 @@ private enum MarkdownParagraphStyler {
             attributed.addAttributes([
                 .font: MarkdownTheme.font(for: kind),
                 .foregroundColor: kind == .frontmatter ? MarkdownTheme.prefixColor : MarkdownTheme.bodyColor,
-                .paragraphStyle: paragraphStyle(for: kind),
+                .paragraphStyle: paragraphStyle(for: kind, text: text),
             ], range: fullRange)
             return attributed
         }
 
-        let paraStyle = paragraphStyle(for: kind)
+        let paraStyle = paragraphStyle(for: kind, text: text)
 
         switch kind {
         case .heading:
@@ -266,17 +368,60 @@ private enum MarkdownParagraphStyler {
             ], range: fullRange)
         }
 
-        // Dim prefix characters
+        // Dim prefix characters. Todo prefixes stay in the backing markdown but
+        // are hidden because an interactive circle is overlaid in their place.
         let pfxLen = kind.prefixLength(in: text)
         if pfxLen > 0 && pfxLen <= fullRange.length {
-            attributed.addAttribute(.foregroundColor, value: MarkdownTheme.prefixColor,
+            let prefixColor: PlatformColor
+            if case .todo = kind {
+                prefixColor = .clear
+                attributed.addAttribute(
+                    .font,
+                    value: PlatformFont.systemFont(ofSize: MarkdownTheme.todoPrefixVisualWidth, weight: .regular),
+                    range: NSRange(location: 0, length: pfxLen)
+                )
+            } else {
+                prefixColor = MarkdownTheme.prefixColor
+            }
+            attributed.addAttribute(.foregroundColor, value: prefixColor,
                                     range: NSRange(location: 0, length: pfxLen))
+            applyListPrefixStyling(to: attributed, kind: kind, prefixLength: pfxLen)
         }
 
         // Inline formatting
         applyInlineStyles(to: attributed, baseFont: MarkdownTheme.font(for: kind))
 
         return attributed
+    }
+
+    private static func applyListPrefixStyling(
+        to attributed: NSMutableAttributedString,
+        kind: MarkdownBlockKind,
+        prefixLength: Int
+    ) {
+        let markerRange: NSRange
+        switch kind {
+        case .bullet(let indent):
+            markerRange = NSRange(location: indent * 2, length: 1)
+        case .orderedList(let number, let indent):
+            markerRange = NSRange(location: indent * 2, length: "\(number).".count)
+        case .todo(_, let indent):
+            markerRange = NSRange(location: indent * 2, length: 5)
+        default:
+            return
+        }
+
+        if markerRange.location + markerRange.length <= attributed.length {
+            if case .todo = kind {
+                attributed.addAttribute(.foregroundColor, value: PlatformColor.clear, range: markerRange)
+            } else {
+                attributed.addAttributes([
+                    .foregroundColor: MarkdownTheme.checkedColor,
+                    .font: PlatformFont.systemFont(ofSize: MarkdownTheme.bodyFont.pointSize, weight: .semibold),
+                ], range: markerRange)
+            }
+        }
+
     }
 
     private static func applyInlineStyles(to attributed: NSMutableAttributedString, baseFont: PlatformFont) {
@@ -339,7 +484,7 @@ private enum MarkdownTypingAttributes {
     static func attributes(for documentText: String, selectionLocation: Int) -> [NSAttributedString.Key: Any] {
         let nsText = documentText as NSString
         guard selectionLocation <= nsText.length else {
-            return baseAttributes(for: .paragraph)
+            return baseAttributes(for: .paragraph, text: "")
         }
 
         let paragraphRange = nsText.paragraphRange(for: NSRange(location: selectionLocation, length: 0))
@@ -347,14 +492,14 @@ private enum MarkdownTypingAttributes {
         if paragraphText.hasSuffix("\n") {
             paragraphText = String(paragraphText.dropLast())
         }
-        return baseAttributes(for: MarkdownBlockKind.detect(from: paragraphText))
+        return baseAttributes(for: MarkdownBlockKind.detect(from: paragraphText), text: paragraphText)
     }
 
-    private static func baseAttributes(for kind: MarkdownBlockKind) -> [NSAttributedString.Key: Any] {
+    private static func baseAttributes(for kind: MarkdownBlockKind, text: String) -> [NSAttributedString.Key: Any] {
         [
             .font: MarkdownTheme.font(for: kind),
             .foregroundColor: MarkdownTheme.bodyColor,
-            .paragraphStyle: MarkdownParagraphStyler.paragraphStyle(for: kind),
+            .paragraphStyle: MarkdownParagraphStyler.paragraphStyle(for: kind, text: text),
         ]
     }
 }
@@ -438,7 +583,7 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
             let nlAttrs: [NSAttributedString.Key: Any] = [
                 .font: MarkdownTheme.font(for: kind),
                 .foregroundColor: MarkdownTheme.bodyColor,
-                .paragraphStyle: MarkdownParagraphStyler.paragraphStyle(for: kind),
+                .paragraphStyle: MarkdownParagraphStyler.paragraphStyle(for: kind, text: text),
             ]
             result.append(NSAttributedString(string: "\n", attributes: nlAttrs))
         }
@@ -497,8 +642,38 @@ final class TextKit2EditorCoordinator {
         isApplyingEditorText = false
     }
 
+    func commitAppliedEditorText(_ newText: String) {
+        isApplyingEditorText = false
+        guard newText != text else {
+            lastPublishedText = newText
+            return
+        }
+
+        DebugTrace.record("editor commit applied \(DebugTrace.textSummary(newText))")
+        isUpdatingText = true
+        text = newText
+        lastPublishedText = newText
+        isUpdatingText = false
+        onTextChange?(newText)
+    }
+
     func typingAttributes(for documentText: String, selectionLocation: Int) -> [NSAttributedString.Key: Any] {
         MarkdownTypingAttributes.attributes(for: documentText, selectionLocation: selectionLocation)
+    }
+}
+
+enum MarkdownLineRanges {
+    static func visibleLineRange(from paragraphRange: NSRange, in text: NSString) -> NSRange {
+        var length = paragraphRange.length
+        while length > 0 {
+            let lastLocation = paragraphRange.location + length - 1
+            guard let scalar = UnicodeScalar(text.character(at: lastLocation)),
+                  CharacterSet.newlines.contains(scalar) else {
+                break
+            }
+            length -= 1
+        }
+        return NSRange(location: paragraphRange.location, length: length)
     }
 }
 
@@ -509,8 +684,35 @@ final class TextKit2EditorCoordinator {
 #if os(iOS)
 
 private final class EditorAccessoryView: UIView {
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isOpaque = false
+        backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
     override var intrinsicContentSize: CGSize {
-        CGSize(width: UIView.noIntrinsicMetric, height: 48)
+        CGSize(width: UIView.noIntrinsicMetric, height: 56)
+    }
+
+    override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        clearAccessoryChrome()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        clearAccessoryChrome()
+    }
+
+    private func clearAccessoryChrome() {
+        var view = superview
+        while let currentView = view, currentView !== window {
+            currentView.isOpaque = false
+            currentView.backgroundColor = .clear
+            view = currentView.superview
+        }
     }
 }
 
@@ -545,10 +747,11 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
     private(set) var textView: UITextView!
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
+    private var todoCheckboxButtons: [UIButton] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = AppTheme.uiBackground
 
         // UITextView uses TextKit 2 by default on iOS 16+.
         // We hook into its existing stack via delegates.
@@ -564,7 +767,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
 
         textView.font = MarkdownTheme.bodyFont
         textView.textColor = MarkdownTheme.bodyColor
-        textView.backgroundColor = .systemBackground
+        textView.backgroundColor = AppTheme.uiBackground
         textView.textContainerInset = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
         textView.keyboardDismissMode = .interactive
         textView.alwaysBounceVertical = true
@@ -587,6 +790,28 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         }
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        refreshTodoCheckboxes()
+    }
+
+    override var keyCommands: [UIKeyCommand]? {
+        [
+            UIKeyCommand(
+                input: "\t",
+                modifierFlags: [],
+                action: #selector(indentSelectedLines),
+                discoverabilityTitle: "Indent"
+            ),
+            UIKeyCommand(
+                input: "\t",
+                modifierFlags: [.shift],
+                action: #selector(outdentSelectedLines),
+                discoverabilityTitle: "Outdent"
+            ),
+        ]
+    }
+
     func loadText(_ markdown: String) {
         guard isViewLoaded, textView != nil else {
             pendingText = markdown
@@ -606,14 +831,25 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
                 tv.becomeFirstResponder()
                 let end = tv.endOfDocument
                 tv.selectedTextRange = tv.textRange(from: end, to: end)
+                self?.refreshTodoCheckboxes()
             }
         }
+        scheduleTodoCheckboxRefresh()
     }
 
     private func makeInputAccessoryView() -> UIView {
-        let toolbar = EditorAccessoryView(frame: CGRect(x: 0, y: 0, width: 0, height: 48))
-        toolbar.backgroundColor = .secondarySystemBackground
+        let toolbar = EditorAccessoryView(frame: CGRect(x: 0, y: 0, width: 0, height: 56))
+        toolbar.backgroundColor = .clear
         toolbar.accessibilityIdentifier = "note_editor_toolbar"
+
+        let glassEffect = UIGlassEffect()
+        glassEffect.isInteractive = true
+        let pill = UIVisualEffectView(effect: glassEffect)
+        pill.backgroundColor = .clear
+        pill.layer.cornerRadius = 22
+        pill.layer.cornerCurve = .continuous
+        pill.clipsToBounds = true
+        pill.translatesAutoresizingMaskIntoConstraints = false
 
         let stackView = UIStackView(arrangedSubviews: [
             makeToolbarButton(
@@ -646,10 +882,16 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         stackView.alignment = .center
         stackView.spacing = 16
 
-        toolbar.addSubview(stackView)
+        toolbar.addSubview(pill)
+        pill.contentView.addSubview(stackView)
         NSLayoutConstraint.activate([
-            stackView.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -16),
-            stackView.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+            pill.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -12),
+            pill.topAnchor.constraint(equalTo: toolbar.topAnchor, constant: 4),
+            pill.heightAnchor.constraint(equalToConstant: 44),
+
+            stackView.leadingAnchor.constraint(equalTo: pill.contentView.leadingAnchor, constant: 14),
+            stackView.trailingAnchor.constraint(equalTo: pill.contentView.trailingAnchor, constant: -14),
+            stackView.centerYAnchor.constraint(equalTo: pill.contentView.centerYAnchor),
         ])
 
         return toolbar
@@ -664,7 +906,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
         button.setImage(UIImage(systemName: systemName), for: .normal)
-        button.tintColor = .label
+        button.tintColor = AppTheme.uiPrimaryText
         button.accessibilityIdentifier = accessibilityIdentifier
         button.accessibilityLabel = accessibilityLabel
         button.addTarget(self, action: action, for: .touchUpInside)
@@ -725,22 +967,49 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
     }
 
     private func applySelectionTransform(_ transform: TextSelectionTransform) {
+        let currentText = textView.text ?? ""
+        guard let replacement = TextEditDiff.singleReplacement(from: currentText, to: transform.text) else {
+            textView.selectedRange = transform.selection
+            return
+        }
+
         coordinator?.beginApplyingEditorText(transform.text)
-        textView.text = transform.text
-        coordinator?.finishApplyingEditorText()
+        if let start = textView.position(from: textView.beginningOfDocument, offset: replacement.range.location),
+           let end = textView.position(from: start, offset: replacement.range.length),
+           let textRange = textView.textRange(from: start, to: end) {
+            textView.replace(textRange, withText: replacement.replacement)
+        } else {
+            textView.text = transform.text
+        }
         textView.selectedRange = transform.selection
         updateTypingAttributes()
-        coordinator?.publishEditorText(transform.text)
+        coordinator?.commitAppliedEditorText(transform.text)
+        scheduleTodoCheckboxRefresh()
     }
 
     // MARK: UITextViewDelegate
 
+    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+        guard text == "\n",
+              let transform = BlockEditingCommands.continuedListLineBreak(
+                in: textView.text ?? "",
+                selection: range
+              ) else {
+            return true
+        }
+
+        applySelectionTransform(transform)
+        return false
+    }
+
     func textViewDidChange(_ textView: UITextView) {
         coordinator?.publishEditorText(textView.text ?? "")
+        scheduleTodoCheckboxRefresh()
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
         updateTypingAttributes()
+        scheduleTodoCheckboxRefresh()
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {
@@ -764,6 +1033,123 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
             selectionLocation: textView.selectedRange.location
         )
     }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        refreshTodoCheckboxes()
+    }
+
+    private func scheduleTodoCheckboxRefresh() {
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshTodoCheckboxes()
+        }
+    }
+
+    private func refreshTodoCheckboxes() {
+        guard isViewLoaded, textView != nil else { return }
+
+        todoCheckboxButtons.forEach { $0.removeFromSuperview() }
+        todoCheckboxButtons.removeAll()
+
+        let nsText = (textView.text ?? "") as NSString
+        guard nsText.length > 0 else { return }
+
+        textView.layoutIfNeeded()
+
+        var paragraphLocation = 0
+        while paragraphLocation < nsText.length {
+            let paragraphRange = nsText.paragraphRange(for: NSRange(location: paragraphLocation, length: 0))
+            let lineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
+            let lineText = nsText.substring(with: lineRange)
+            let kind = MarkdownBlockKind.detect(from: lineText)
+
+            if case .todo(let checked, let indent) = kind {
+                addTodoCheckbox(
+                    checked: checked,
+                    indent: indent,
+                    paragraphLocation: paragraphRange.location,
+                    lineText: lineText
+                )
+            }
+
+            let nextLocation = NSMaxRange(paragraphRange)
+            guard nextLocation > paragraphLocation else { break }
+            paragraphLocation = nextLocation
+        }
+    }
+
+    private func addTodoCheckbox(
+        checked: Bool,
+        indent: Int,
+        paragraphLocation: Int,
+        lineText: String
+    ) {
+        let prefixLength = MarkdownBlockKind.detect(from: lineText).prefixLength(in: lineText)
+        let contentLocation = paragraphLocation + prefixLength
+        guard let contentPosition = textView.position(from: textView.beginningOfDocument, offset: contentLocation) else {
+            return
+        }
+
+        let caretRect = textView.caretRect(for: contentPosition)
+        guard !caretRect.isNull,
+              caretRect.origin.x.isFinite,
+              caretRect.origin.y.isFinite,
+              caretRect.size.width.isFinite,
+              caretRect.size.height.isFinite else {
+            return
+        }
+
+        let buttonSize = MarkdownVisualSpec.todoControlSize
+        let symbolSize = MarkdownVisualSpec.todoSymbolSize
+        let contentLeading = caretRect.minX
+        let indentLeading = textView.textContainerInset.left + MarkdownTheme.listLeadingOffset(for: indent)
+        let buttonLeading = max(0, indentLeading - MarkdownVisualSpec.todoControlLeadingInset)
+        let buttonWidth = max(buttonSize, contentLeading - buttonLeading - 2)
+        let centerY = caretRect.midY
+
+        let button = UIButton(type: .system)
+        let imageName = checked ? "checkmark.circle.fill" : "circle"
+        let config = UIImage.SymbolConfiguration(pointSize: symbolSize, weight: .regular)
+        button.setImage(UIImage(systemName: imageName, withConfiguration: config), for: .normal)
+        button.tintColor = checked ? AppTheme.uiSecondaryText : AppTheme.uiMutedText
+        button.backgroundColor = textView.backgroundColor ?? AppTheme.uiBackground
+        button.contentHorizontalAlignment = .left
+        button.imageEdgeInsets = UIEdgeInsets(top: 0, left: MarkdownVisualSpec.todoControlImageLeadingInset, bottom: 0, right: 0)
+        button.tag = paragraphLocation
+        button.accessibilityIdentifier = "todo_checkbox_\(paragraphLocation)"
+        button.accessibilityLabel = checked ? "Mark todo incomplete" : "Mark todo complete"
+        button.frame = CGRect(
+            x: buttonLeading,
+            y: centerY - buttonSize / 2,
+            width: buttonWidth,
+            height: buttonSize
+        )
+        button.addTarget(self, action: #selector(todoCheckboxTapped(_:)), for: .touchUpInside)
+
+        textView.addSubview(button)
+        todoCheckboxButtons.append(button)
+    }
+
+    @objc
+    private func todoCheckboxTapped(_ sender: UIButton) {
+        toggleTodoCheckbox(atParagraphLocation: sender.tag)
+    }
+
+    private func toggleTodoCheckbox(atParagraphLocation paragraphLocation: Int) {
+        let nsText = (textView.text ?? "") as NSString
+        guard paragraphLocation >= 0, paragraphLocation < nsText.length else { return }
+
+        let paragraphRange = nsText.paragraphRange(for: NSRange(location: paragraphLocation, length: 0))
+        let lineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
+        let lineText = nsText.substring(with: lineRange)
+        let toggledLine = TodoMarkdown.checkboxToggledLine(lineText)
+        guard toggledLine != lineText else { return }
+
+        let updatedText = nsText.replacingCharacters(in: lineRange, with: toggledLine)
+        let selectedRange = textView.selectedRange
+        applySelectionTransform(TextSelectionTransform(text: updatedText, selection: selectedRange))
+        textView.becomeFirstResponder()
+    }
+
 }
 
 #endif
@@ -805,6 +1191,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
+    private var todoCheckboxButtons: [NSButton] = []
     private var strikethroughObserver: NSObjectProtocol?
 
     override func loadView() {
@@ -842,7 +1229,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         textView.isAutomaticTextReplacementEnabled = false
         textView.font = MarkdownTheme.bodyFont
         textView.textColor = MarkdownTheme.bodyColor
-        textView.backgroundColor = .textBackgroundColor
+        textView.backgroundColor = AppTheme.nsBackground
         textView.textContainerInset = NSSize(width: 16, height: 16)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
@@ -881,6 +1268,11 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
     }
 
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        refreshTodoCheckboxes()
+    }
+
     func loadText(_ markdown: String) {
         guard isViewLoaded, textView != nil else {
             pendingText = markdown
@@ -899,8 +1291,10 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
                 guard let tv = self?.textView else { return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: tv.string.count, length: 0))
+                self?.refreshTodoCheckboxes()
             }
         }
+        scheduleTodoCheckboxRefresh()
     }
 
     // MARK: NSTextViewDelegate
@@ -908,10 +1302,12 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     func textDidChange(_ notification: Notification) {
         DebugTrace.record("mac textDidChange")
         flushTextToBinding()
+        scheduleTodoCheckboxRefresh()
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
         updateTypingAttributes()
+        scheduleTodoCheckboxRefresh()
     }
 
     func textDidEndEditing(_ notification: Notification) {
@@ -954,12 +1350,215 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             return
         }
 
+        applySelectionTransform(transform)
+    }
+
+    private func handleIndentCommand() {
+        guard textView.window?.firstResponder === textView else { return }
+        guard let transform = BlockEditingCommands.indentedLines(
+            in: textView.string,
+            selection: textView.selectedRange()
+        ) else {
+            return
+        }
+
+        applySelectionTransform(transform)
+    }
+
+    private func handleOutdentCommand() {
+        guard textView.window?.firstResponder === textView else { return }
+        guard let transform = BlockEditingCommands.outdentedLines(
+            in: textView.string,
+            selection: textView.selectedRange()
+        ) else {
+            return
+        }
+
+        applySelectionTransform(transform)
+    }
+
+    private func applySelectionTransform(_ transform: TextSelectionTransform) {
+        guard let replacement = TextEditDiff.singleReplacement(from: textView.string, to: transform.text) else {
+            textView.setSelectedRange(transform.selection)
+            return
+        }
+
+        let visibleOrigin = scrollView.contentView.bounds.origin
         coordinator?.beginApplyingEditorText(transform.text)
-        textView.string = transform.text
-        coordinator?.finishApplyingEditorText()
+        if textView.shouldChangeText(in: replacement.range, replacementString: replacement.replacement) {
+            textView.textStorage?.replaceCharacters(in: replacement.range, with: replacement.replacement)
+            textView.didChangeText()
+        } else {
+            textView.string = transform.text
+        }
         textView.setSelectedRange(transform.selection)
+        restoreVisibleOrigin(visibleOrigin)
         updateTypingAttributes()
-        coordinator?.publishEditorText(transform.text)
+        coordinator?.commitAppliedEditorText(transform.text)
+        scheduleTodoCheckboxRefresh()
+    }
+
+    func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        if commandSelector == #selector(NSResponder.insertTab(_:)) {
+            handleIndentCommand()
+            return true
+        }
+
+        if commandSelector == #selector(NSResponder.insertBacktab(_:)) {
+            handleOutdentCommand()
+            return true
+        }
+
+        return false
+    }
+
+    private func scheduleTodoCheckboxRefresh() {
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshTodoCheckboxes()
+        }
+    }
+
+    private func refreshTodoCheckboxes() {
+        guard isViewLoaded, textView != nil else { return }
+
+        todoCheckboxButtons.forEach { $0.removeFromSuperview() }
+        todoCheckboxButtons.removeAll()
+
+        let nsText = textView.string as NSString
+        guard nsText.length > 0 else { return }
+
+        textView.layoutSubtreeIfNeeded()
+
+        var paragraphLocation = 0
+        while paragraphLocation < nsText.length {
+            let paragraphRange = nsText.paragraphRange(for: NSRange(location: paragraphLocation, length: 0))
+            let lineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
+            let lineText = nsText.substring(with: lineRange)
+            let kind = MarkdownBlockKind.detect(from: lineText)
+
+            if case .todo(let checked, let indent) = kind {
+                addTodoCheckbox(
+                    checked: checked,
+                    indent: indent,
+                    paragraphLocation: paragraphRange.location,
+                    lineText: lineText
+                )
+            }
+
+            let nextLocation = NSMaxRange(paragraphRange)
+            guard nextLocation > paragraphLocation else { break }
+            paragraphLocation = nextLocation
+        }
+    }
+
+    private func addTodoCheckbox(
+        checked: Bool,
+        indent: Int,
+        paragraphLocation: Int,
+        lineText: String
+    ) {
+        let prefixLength = MarkdownBlockKind.detect(from: lineText).prefixLength(in: lineText)
+        let contentLocation = paragraphLocation + prefixLength
+        let screenRect = textView.firstRect(
+            forCharacterRange: NSRange(location: contentLocation, length: 0),
+            actualRange: nil
+        )
+
+        guard let window = textView.window,
+              !screenRect.isNull,
+              screenRect.origin.x.isFinite,
+              screenRect.origin.y.isFinite,
+              screenRect.size.width.isFinite,
+              screenRect.size.height.isFinite else {
+            return
+        }
+
+        let windowRect = window.convertFromScreen(screenRect)
+        let caretRect = textView.convert(windowRect, from: nil)
+        guard !caretRect.isNull,
+              caretRect.origin.x.isFinite,
+              caretRect.origin.y.isFinite,
+              caretRect.size.width.isFinite,
+              caretRect.size.height.isFinite else {
+            return
+        }
+
+        let buttonSize = MarkdownVisualSpec.todoControlSize
+        let symbolSize = MarkdownVisualSpec.todoSymbolSize
+        let contentLeading = caretRect.minX
+        let indentLeading = textView.textContainerInset.width + MarkdownTheme.listLeadingOffset(for: indent)
+        let buttonLeading = max(0, indentLeading - MarkdownVisualSpec.todoControlLeadingInset)
+        let buttonWidth = max(buttonSize, contentLeading - buttonLeading - 2)
+        let centerY = caretRect.midY
+
+        let button = NSButton()
+        button.isBordered = false
+        button.setButtonType(.momentaryChange)
+        button.bezelStyle = .shadowlessSquare
+        button.imagePosition = .imageOnly
+        button.image = NSImage(
+            systemSymbolName: checked ? "checkmark.circle.fill" : "circle",
+            accessibilityDescription: nil
+        )
+        button.contentTintColor = checked ? AppTheme.nsSecondaryText : AppTheme.nsMutedText
+        button.target = self
+        button.action = #selector(todoCheckboxTapped(_:))
+        button.tag = paragraphLocation
+        button.setAccessibilityIdentifier("todo_checkbox_\(paragraphLocation)")
+        button.setAccessibilityLabel(checked ? "Mark todo incomplete" : "Mark todo complete")
+        button.wantsLayer = true
+        button.layer?.backgroundColor = (textView.backgroundColor ?? AppTheme.nsBackground).cgColor
+        button.imageScaling = .scaleProportionallyDown
+        button.frame = NSRect(
+            x: buttonLeading,
+            y: centerY - buttonSize / 2,
+            width: buttonWidth,
+            height: buttonSize
+        )
+
+        textView.addSubview(button)
+        todoCheckboxButtons.append(button)
+    }
+
+    @objc
+    private func todoCheckboxTapped(_ sender: NSButton) {
+        toggleTodoCheckbox(atParagraphLocation: sender.tag)
+    }
+
+    private func toggleTodoCheckbox(atParagraphLocation paragraphLocation: Int) {
+        let nsText = textView.string as NSString
+        guard paragraphLocation >= 0, paragraphLocation < nsText.length else { return }
+
+        let paragraphRange = nsText.paragraphRange(for: NSRange(location: paragraphLocation, length: 0))
+        let lineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
+        let lineText = nsText.substring(with: lineRange)
+        let toggledLine = TodoMarkdown.checkboxToggledLine(lineText)
+        guard toggledLine != lineText else { return }
+
+        let updatedText = nsText.replacingCharacters(in: lineRange, with: toggledLine)
+        let selectedRange = textView.selectedRange()
+        let adjustedSelection = NSRange(
+            location: min(selectedRange.location, (updatedText as NSString).length),
+            length: min(selectedRange.length, max(0, (updatedText as NSString).length - selectedRange.location))
+        )
+        applySelectionTransform(TextSelectionTransform(text: updatedText, selection: adjustedSelection))
+    }
+
+    private func restoreVisibleOrigin(_ origin: NSPoint) {
+        scrollView.layoutSubtreeIfNeeded()
+        textView.layoutSubtreeIfNeeded()
+
+        let clipView = scrollView.contentView
+        let documentSize = scrollView.documentView?.bounds.size ?? .zero
+        let maxX = max(0, documentSize.width - clipView.bounds.width)
+        let maxY = max(0, documentSize.height - clipView.bounds.height)
+        let clampedOrigin = NSPoint(
+            x: min(max(origin.x, 0), maxX),
+            y: min(max(origin.y, 0), maxY)
+        )
+
+        clipView.scroll(to: clampedOrigin)
+        scrollView.reflectScrolledClipView(clipView)
     }
 
     override func viewWillDisappear() {

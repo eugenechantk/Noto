@@ -43,7 +43,8 @@ enum BlockType: Equatable {
         if stripped.hasPrefix("- [ ] ") || stripped == "- [ ]" {
             return .todo(checked: false, indent: indent)
         }
-        if stripped.hasPrefix("- [x] ") || stripped == "- [x]" {
+        if stripped.hasPrefix("- [x] ") || stripped == "- [x]" ||
+            stripped.hasPrefix("- [X] ") || stripped == "- [X]" {
             return .todo(checked: true, indent: indent)
         }
 
@@ -104,6 +105,10 @@ enum BlockType: Equatable {
 
     /// The content portion of the block text (after the prefix).
     func content(of text: String) -> String {
+        if case .todo = self, let match = TodoMarkdown.match(in: text) {
+            return match.content
+        }
+
         guard let pfx = prefix else { return text }
         let indentCount = text.prefix(while: { $0 == " " }).count
         let stripped = String(text.dropFirst(indentCount))

@@ -67,58 +67,93 @@ Per Apple HIG ([Sidebars](https://developer.apple.com/design/human-interface-gui
 Order from top to bottom:
 
 1. **Note title** — large, bold, wraps to three lines. Looks like ~28pt / SF Pro Display Bold / primaryText color. Acts as the page heading.
-2. **Tag row** — below the title, a single muted line "Add tag here" in mutedText (~#525252). This is a **placeholder for a tag-input control**, not body text.
-3. **Body paragraph** — "What is this that is going to help me do this…" in secondaryText at ~15pt regular.
-4. **Horizontal rule** — a thin 1pt separator (matches `AppTheme.separator`).
-5. **Heading 2** — "This is heading 2", ~22pt bold, primaryText.
-6. **Bulleted list** — outer bullet at ~14pt with 8pt space before bullet glyph and nested children indented further. Bullet glyph is a small filled dot (·/•), not a hyphen.
-7. **Heading 3** — "This is heading 3", ~17pt bold.
-8. **Body paragraph** — same style as (3).
-9. **Word + character counter (status line)** — pinned to the **bottom-right of the editor pane**, rendered in muted gray. Two labels separated by a gap: `"32 words"` then `"1,234 characters"`. Font is small (~11–12pt), muted color (same `mutedText` family as the "Add tag here" placeholder), right-aligned with ~24pt trailing padding and ~16pt bottom padding. It floats over the editor content (the editor scrolls beneath it) and is always visible — not a modal status bar.
+2. **Body paragraph** — "What is this that is going to help me do this…" in secondaryText at ~15pt regular.
+3. **Horizontal rule** — a thin 1pt separator (matches `AppTheme.separator`).
+4. **Heading 2** — "This is heading 2", ~22pt bold, primaryText.
+5. **Bulleted list** — outer bullet at ~14pt with 8pt space before bullet glyph and nested children indented further. Bullet glyph is a small filled dot (·/•), not a hyphen.
+6. **Heading 3** — "This is heading 3", ~17pt bold.
+7. **Body paragraph** — same style as (2).
+8. **Word + character counter (status line)** — pinned to the **bottom-right of the editor pane**, rendered in muted gray. Two labels separated by a gap: `"32 words"` then `"1,234 characters"`. Font is small (~11–12pt), muted color (`mutedText`), right-aligned with ~24pt trailing padding and ~16pt bottom padding. It floats over the editor content (the editor scrolls beneath it) and is always visible — not a modal status bar.
 
 Padding: body content starts ~32pt below the window top and is left-aligned with ~56pt left padding. The editor has **one** status element — the counter overlay at bottom-right.
 
-### 1.5 Typography scale — mapped to Apple HIG macOS text styles
+### 1.5 Typography scale — Apple HIG semantic text styles per platform
 
-Reference: [Apple HIG — Typography Specifications](https://developer.apple.com/design/human-interface-guidelines/typography#Specifications).
+Reference: [Apple HIG — Typography Specifications](https://developer.apple.com/design/human-interface-guidelines/typography#Specifications). Values below are verbatim from the live HIG (fetched 2026-04-20).
 
-Using Apple's **semantic text styles** (not raw point sizes) is mandatory for two reasons:
-1. **Dynamic Type.** macOS users can change system text size in System Settings → Accessibility → Display. Only apps that use `NSFont.preferredFont(forTextStyle:)` / SwiftUI `.font(.title)` respect that preference. Hard-coded `Font.system(size: 22)` breaks accessibility.
-2. **Line height.** Apple's styles bake in the correct leading per size (e.g., Body 13/16pt). Matching that by hand is error-prone.
+Using Apple's **semantic text styles** (not raw point sizes) is mandatory:
+1. **Cross-platform rendering** — `.font(.largeTitle)` auto-resolves to 26pt on macOS and 34pt on iPadOS. SwiftUI handles the platform switch; we don't branch.
+2. **Dynamic Type (iOS/iPadOS)** — users adjust text size in Settings; only `preferredFont(forTextStyle:)` / SwiftUI `.font(.title)` respect it. Hard-coded `Font.system(size: 22)` breaks accessibility.
+3. **Line height** — Apple bakes the correct leading into each style. Matching by hand is error-prone.
 
-**macOS HIG text-style reference** (for context; values are maintained by Apple):
+#### macOS built-in text styles (verbatim from HIG)
 
-| Style         | SwiftUI         | AppKit `.textStyle` | Default size | Default line height |
-| ------------- | --------------- | ------------------- | ------------ | ------------------- |
-| Large Title   | `.largeTitle`   | `.largeTitle`       | 26pt         | 32pt                |
-| Title 1       | `.title`        | `.title1`           | 22pt         | 26pt                |
-| Title 2       | `.title2`       | `.title2`           | 17pt         | 22pt                |
-| Title 3       | `.title3`       | `.title3`           | 15pt         | 20pt                |
-| Headline      | `.headline`     | `.headline`         | 13pt Semibold| 16pt                |
-| Body          | `.body`         | `.body`             | 13pt         | 16pt                |
-| Callout       | `.callout`      | `.callout`          | 12pt         | 15pt                |
-| Subheadline   | `.subheadline`  | `.subheadline`      | 11pt         | 14pt                |
-| Footnote      | `.footnote`     | `.footnote`         | 10pt         | 13pt                |
-| Caption 1     | `.caption`      | `.caption1`         | 10pt         | 13pt                |
-| Caption 2     | `.caption2`     | `.caption2`         | 10pt Medium  | 13pt                |
+| Style         | SwiftUI         | AppKit `.textStyle` | Size | Line height | Default weight | Emphasized weight |
+| ------------- | --------------- | ------------------- | ---- | ----------- | -------------- | ----------------- |
+| Large Title   | `.largeTitle`   | `.largeTitle`       | 26   | 32          | Regular        | Bold              |
+| Title 1       | `.title`        | `.title1`           | 22   | 26          | Regular        | Bold              |
+| Title 2       | `.title2`       | `.title2`           | 17   | 22          | Regular        | Bold              |
+| Title 3       | `.title3`       | `.title3`           | 15   | 20          | Regular        | Semibold          |
+| Headline      | `.headline`     | `.headline`         | 13   | 16          | Bold           | Heavy             |
+| Body          | `.body`         | `.body`             | 13   | 16          | Regular        | Semibold          |
+| Callout       | `.callout`      | `.callout`          | 12   | 15          | Regular        | Semibold          |
+| Subheadline   | `.subheadline`  | `.subheadline`      | 11   | 14          | Regular        | Semibold          |
+| Footnote      | `.footnote`     | `.footnote`         | 10   | 13          | Regular        | Semibold          |
+| Caption 1     | `.caption`      | `.caption1`         | 10   | 13          | Regular        | Medium            |
+| Caption 2     | `.caption2`     | `.caption2`         | 10   | 13          | Medium         | Semibold          |
 
-Font is **SF Pro** (system default). macOS automatically picks SF Pro Display for ≥20pt and SF Pro Text for smaller — no manual selection needed.
+**macOS does not support Dynamic Type** per HIG — these sizes are fixed. macOS does honor System Settings → Appearance → Text Size as a bucketed preference, but there's no sliding scale.
 
-**Noto's semantic mapping** — every visual element in the mockup gets an HIG style plus (optional) weight override + color token:
+#### iOS / iPadOS Dynamic Type — Large (default size, what most users see)
 
-| Role in Noto UI              | HIG style      | Weight override | Color token      | Where it appears                    |
-| ---------------------------- | -------------- | --------------- | ---------------- | ----------------------------------- |
-| Note title                   | `.largeTitle`  | `.bold`         | `primaryText`    | Top of editor pane                  |
-| H1 (`#`)                     | `.title`       | `.bold`         | `primaryText`    | Markdown heading level 1            |
-| H2 (`##`)                    | `.title`       | `.bold`         | `primaryText`    | "This is heading 2" in mockup       |
-| H3 (`###`)                   | `.title2`      | `.bold`         | `primaryText`    | "This is heading 3" in mockup       |
-| H4 (`####`)                  | `.title3`      | `.semibold`     | `primaryText`    | Deeper markdown headings            |
-| Body paragraph               | `.body`        | default         | `secondaryText`  | Editor body, bulleted lists         |
-| Sidebar row label            | `.body`        | default         | `secondaryText`  | Folder/note names in sidebar        |
-| Search placeholder           | `.body`        | default         | `mutedText`      | Sidebar search field                |
-| Tag placeholder / chip       | `.callout`     | default         | `mutedText`      | "Add tag here"                      |
-| Word/char counter            | `.caption`     | default         | `mutedText`      | Bottom-right of editor pane         |
-| Window title ("Noto")        | system default | default         | primary          | Titlebar — handled by system        |
+| Style         | SwiftUI         | UIKit `.textStyle` | Size | Leading | Default weight | Emphasized weight |
+| ------------- | --------------- | ------------------ | ---- | ------- | -------------- | ----------------- |
+| Large Title   | `.largeTitle`   | `.largeTitle`      | 34   | 41      | Regular        | Bold              |
+| Title 1       | `.title`        | `.title1`          | 28   | 34      | Regular        | Bold              |
+| Title 2       | `.title2`       | `.title2`          | 22   | 28      | Regular        | Bold              |
+| Title 3       | `.title3`       | `.title3`          | 20   | 25      | Regular        | Semibold          |
+| Headline      | `.headline`     | `.headline`        | 17   | 22      | Semibold       | Semibold          |
+| Body          | `.body`         | `.body`            | 17   | 22      | Regular        | Semibold          |
+| Callout       | `.callout`      | `.callout`         | 16   | 21      | Regular        | Semibold          |
+| Subheadline   | `.subheadline`  | `.subheadline`     | 15   | 20      | Regular        | Semibold          |
+| Footnote      | `.footnote`     | `.footnote`        | 13   | 18      | Regular        | Semibold          |
+| Caption 1     | `.caption`      | `.caption1`        | 12   | 16      | Regular        | Semibold          |
+| Caption 2     | `.caption2`     | `.caption2`        | 11   | 13      | Regular        | Semibold          |
+
+**iOS/iPadOS supports Dynamic Type** — every size scales across 7 user-selectable levels (xSmall → xxxLarge) plus 5 accessibility levels (AX1 → AX5). The table above is the "Large" default. At xSmall the Large Title drops to 31pt; at xxxLarge it grows to 40pt; at AX5 it reaches 58pt. See the live HIG for the full matrix.
+
+#### Cross-platform delta — why the iPad title looks bigger than Mac
+
+For the same semantic role, iPadOS sizes are roughly **25–35% larger than macOS**:
+
+| Role              | macOS | iPadOS | Delta  |
+| ----------------- | ----- | ------ | ------ |
+| Large Title       | 26pt  | 34pt   | +31%   |
+| Title 1           | 22pt  | 28pt   | +27%   |
+| Title 2           | 17pt  | 22pt   | +29%   |
+| Body              | 13pt  | 17pt   | +31%   |
+| Caption 1         | 10pt  | 12pt   | +20%   |
+
+This is **intentional** per Apple HIG — touch interfaces sit farther from the eye and use-contexts vary. We honor it. The note title in Noto will appear larger and "chunkier" on iPad than on Mac; that's the correct platform-native look. Do not fight this by hard-coding sizes.
+
+Font is **SF Pro** on both platforms (system default). The OS automatically picks SF Pro Display at ≥20pt and SF Pro Text at smaller — no manual selection needed.
+
+**Noto's semantic mapping** — every visual element in the mockup gets an HIG style plus (optional) weight override + color token. Column "mac / iPad size" shows the resulting rendered size on each platform so we know what to expect visually:
+
+| Role in Noto UI              | HIG style      | Weight override | Color token      | mac / iPad size | Where it appears                    |
+| ---------------------------- | -------------- | --------------- | ---------------- | --------------- | ----------------------------------- |
+| Note title                   | `.largeTitle`  | `.bold`         | `primaryText`    | 26 / 34pt       | Top of editor pane                  |
+| H1 (`#`)                     | `.title`       | `.bold`         | `primaryText`    | 22 / 28pt       | Markdown heading level 1            |
+| H2 (`##`)                    | `.title`       | `.bold`         | `primaryText`    | 22 / 28pt       | "This is heading 2" in mockup       |
+| H3 (`###`)                   | `.title2`      | `.bold`         | `primaryText`    | 17 / 22pt       | "This is heading 3" in mockup       |
+| H4 (`####`)                  | `.title3`      | `.semibold`     | `primaryText`    | 15 / 20pt       | Deeper markdown headings            |
+| Body paragraph               | `.body`        | default         | `secondaryText`  | 13 / 17pt       | Editor body, bulleted lists         |
+| Sidebar row label            | `.body`        | default         | `secondaryText`  | 13 / 17pt       | Folder/note names in sidebar        |
+| Search placeholder           | `.body`        | default         | `mutedText`      | 13 / 17pt       | Sidebar search field                |
+| Word/char counter            | `.caption`     | default         | `mutedText`      | 10 / 12pt       | Bottom-right of editor pane         |
+| Window title ("Noto")        | system default | default         | primary          | system          | Titlebar — handled by system        |
+
+Sizes shown are the **Large (default)** iPadOS values. When iPad users pick a different Dynamic Type size, every row above scales proportionally — which is the whole point of using semantic styles.
 
 > **Mockup calibration note.** The mockup's note title reads closer to ~28pt, which is slightly larger than HIG's Large Title (26pt). Two options: (a) accept 26pt Bold via `.largeTitle.bold()` for HIG compliance, or (b) use a named custom size like `.system(size: 28, weight: .bold)` for the exact visual. **Recommend (a)** — the 2pt difference is imperceptible and accessibility + Dynamic Type are worth the trade. Same logic for "H2" in mockup (~22pt) → `.title` (22pt). The mockup's H3 (~17pt) → `.title2` (17pt). All three map cleanly.
 
@@ -133,7 +168,6 @@ enum TypeScale {
     static let h4: Font            = .title3.weight(.semibold)
     static let body: Font          = .body
     static let sidebarLabel: Font  = .body
-    static let tagLabel: Font      = .callout
     static let counter: Font       = .caption
 }
 ```
@@ -177,12 +211,11 @@ Editor-side (TextKit 2) needs AppKit equivalents — `NSFont.preferredFont(forTe
 | 5 | Folder icons | Same `folder.fill` for closed/open | Three states: closed folder, open folder (has expanded kids), note doc |
 | 6 | Disclosure chevrons | Present via `DisclosureGroup` | Hidden — no chevrons; click row to toggle, icon change communicates state |
 | 7 | Editor title | Title is derived from first line of markdown, rendered inside the TextKit editor | Title is a distinct, large-bold visual element at the top of the detail view |
-| 8 | Tags | **No tag concept exists** in model or UI | New feature: tag frontmatter field, tag chip row with "Add tag" placeholder |
-| 9 | Horizontal rule | Markdown `---` may or may not be rendered as a styled divider — needs verification | Must render as a 1pt separator line |
-| 10 | Nested bullets | Block editor supports `bullet(indent: Int)`; visual indent driven by NSParagraphStyle | Verify visual matches mockup — indent unit and bullet glyph |
-| 11 | Typography | Uses SwiftUI defaults + editor-side typography | Audit and lock down a scale: title/h2/h3/body sizes as above |
-| 12 | Search | No implementation | Functional filter across all note titles & folder names (minimum), full-text later |
-| 13 | Word/char counter | Not present | Live "N words  N characters" overlay pinned to editor's bottom-right |
+| 8 | Horizontal rule | Markdown `---` may or may not be rendered as a styled divider — needs verification | Must render as a 1pt separator line |
+| 9 | Nested bullets | Block editor supports `bullet(indent: Int)`; visual indent driven by NSParagraphStyle | Verify visual matches mockup — indent unit and bullet glyph |
+| 10 | Typography | Uses SwiftUI defaults + editor-side typography | Audit and lock down a scale: title/h2/h3/body sizes as above |
+| 11 | Search | No implementation | Functional filter across all note titles & folder names (minimum), full-text later |
+| 12 | Word/char counter | Not present | Live "N words  N characters" overlay pinned to editor's bottom-right |
 
 ---
 
@@ -200,8 +233,7 @@ The redesign targets **two presentations of one layout**: macOS windowed and iPa
 | ---------------------------- | --------------------------------------------------- | -------------------------------------- |
 | Sidebar tree + search        | `Noto/Views/Shared/NotoSidebarView.swift`           | Branches on `horizontalSizeClass` for row height only |
 | `SidebarNode` model + loader | `Packages/NotoVault/…/SidebarTreeLoader.swift`      | Pure logic, platform-agnostic          |
-| Editor + title rendering     | `Noto/Editor/TextKit2EditorView.swift`              | Already has iOS/macOS internal branches |
-| `TagInputView`               | `Noto/Views/Shared/TagInputView.swift`              | SwiftUI only, no platform APIs         |
+| Editor + title rendering     | `Noto/Editor/TextKit2EditorView.swift` (**reused as-is**) | Already has iOS/macOS internal branches — no rewrite |
 | `EditorStatusOverlay`        | `Noto/Views/Shared/EditorStatusOverlay.swift`       | SwiftUI only                           |
 | `AppTheme.TypeScale`         | `Noto/Support/AppTheme.swift`                       | Apple semantic text styles — identical on both |
 | `WordCounter` logic          | `Packages/NotoVault/…/WordCounter.swift`            | Pure, cross-platform                   |
@@ -263,7 +295,7 @@ The redesign targets **two presentations of one layout**: macOS windowed and iPa
 - Manual iPadOS: `flowdeck run --device "iPad Pro (13-inch) (M4)"` → confirm nav bar matches mockup, sidebar toggle present, no toolbar clutter.
 - Automated: `.claude/features/mac-ui-redesign.md` feature doc lists the chrome invariants as success criteria.
 
-### Phase 2 — Sidebar redesign (floating + tree + search, no tags yet)
+### Phase 2 — Sidebar redesign (floating + tree + search)
 
 **Goal:** Sidebar looks and behaves like the mockup; content flows beneath it per HIG.
 
@@ -291,56 +323,32 @@ The redesign targets **two presentations of one layout**: macOS windowed and iPa
 - Unit tests: search filter keeps ancestors in result.
 - UI: manual screenshot comparison.
 
-### Phase 3 — Editor shell: title + tags + horizontal rule
+### Phase 3 — Editor shell: word/character counter overlay
 
-**Goal:** Detail pane matches the mockup's layout — title → tag row → divider → body.
+**Goal:** Add the only new editor shell element: a live word/character counter pinned to the bottom-right of the editor pane.
 
-This is the biggest behavioral change and deserves a short feature doc before coding.
+This phase intentionally does **not** add tags, frontmatter fields, a separate title field, or extra editor chrome.
 
-#### Decision fork: where does the title live?
+#### Reuse principle — no new editor view
 
-Two options, both valid. Recommend **Option A**.
+**We do not build a new Mac/iPad editor.** The existing `TextKit2EditorView` already handles both iOS and macOS via internal `#if` branches (text engine, first-responder handling, iCloud download flow, re-entrancy guards). It continues to be the single editor on every platform.
 
-- **Option A — Title is the first block, rendered large inside the TextKit editor.** Add a rule in `TextKit2EditorView` / `MarkdownTextStorage`: if the first block is an H1 (or untyped), render it at title size (28pt bold). This keeps the "markdown file is the source of truth" principle intact — the title is just the file's first heading. All AI-agent edits continue to work.
-  - Pros: no model split; no separate text fields; keeps editor behavior uniform; search/frontmatter logic unchanged.
-  - Cons: must teach the editor to treat first block specially; slightly tricky if users delete the first line.
+What Phase 3 touches:
 
-- **Option B — Title is a separate `TextField` above the editor, synced with frontmatter `title:` key.** Cleaner visual control; harder model (have to reconcile frontmatter title vs filename vs first line). Not recommended given the existing filesystem-first architecture.
+| What | Where | Kind of change |
+| ---- | ----- | -------------- |
+| Word/character counter | New SwiftUI overlay, composed by `NoteEditorScreen` | **New outside-the-editor overlay** |
+| Word-count logic | `Packages/NotoVault/…/WordCounter.swift` | **Pure logic** — strips frontmatter and counts body text |
 
-**Recommendation: A.** Document the rule in the feature doc.
+Everything else in `TextKit2EditorView`, `BlockEditorView+macOS.swift`, `NoteEditorSession`, and the block model stays as-is. `NoteEditorScreen` remains the single cross-platform host — it wraps the existing editor with the counter overlay only. Platform branches (if any) live there, not in the editor itself.
 
-#### Tag row
-
-- Extend YAML frontmatter schema with `tags: [string]`. Update `Frontmatter` parser/serializer in `NotoVault` to round-trip the list.
-- Add a `TagInputView` component below the title, above the editor:
-  - Renders existing tags as rounded chips (e.g., `Text(tag).padding(.horizontal, 8).background(.capsule)`).
-  - Appends an inline `TextField` with placeholder "Add tag" (mockup says "Add tag here" — match copy). On return/comma, commit the tag.
-  - All-empty state: shows only the muted "Add tag here" placeholder.
-- Host `TagInputView` in `NoteEditorScreen` above `TextKit2EditorView`. Bind to `session.tags`; debounce writes to disk like the existing content write path.
-
-#### Horizontal rule rendering
-
-- In `MarkdownTextStorage` (or wherever block styling happens), map a line of `---` / `***` to a paragraph with a 1pt bottom border drawn by a custom `NSTextAttachment` or a paragraph-style divider. Lightweight approach: render `---` as an empty line whose paragraph style draws a thin rule via a custom attribute rendered in a `NSLayoutManager` drawing hook. Alternative: use an `NSTextAttachment` with a thin-rectangle image.
-- Fallback: if too costly in scope, render `---` as a muted full-width character (Unicode U+2014 repeated). Not as clean but ships faster.
-
-**Tests:**
-
-- `Frontmatter` round-trip with tags.
-- `TagInputView` unit test (add, remove, commit on comma).
-- `MarkdownTextStorage` styling test: first block renders at title attributes; `---` renders as rule.
-- Visual verification in simulator: title wraps correctly for long titles; tag chips stack; divider renders.
-
-### Phase 3.5 — Word/character counter overlay
-
-**Goal:** Live counter pinned to bottom-right of the editor pane, matching the mockup.
-
-**Changes:**
+#### Counter overlay
 
 - New `EditorStatusOverlay.swift`: a small `HStack` with two `Text` labels separated by ~16pt spacing. Muted color (`AppTheme.mutedText`), 11–12pt font, localized number formatting (NumberFormatter with grouping → `1,234`).
 - Place it in `NoteEditorScreen` as an `.overlay(alignment: .bottomTrailing)` on the editor body, with `.padding(.trailing, 24).padding(.bottom, 16)`. Because it's an overlay, the editor's scroll content flows beneath it.
 - Counter source: compute from `session.content` (the source of truth). Words = split on whitespace/newlines, drop empties, count; characters = `content.count` (Swift grapheme clusters — user-visible count).
   - **Exclude frontmatter** from the count. Parse content minus the `---\n...\n---` prefix before counting.
-  - **Exclude the title block** from the word count? Open question — recommend **including it** since mockup's 32/1,234 suggests it's a straight body count, and the title is still text the user wrote. Decide when coding.
+  - Include the title block in the count, because the title is still user-authored markdown text.
 - Debounce: the counter can update on every keystroke (cheap); no throttling needed for documents under ~100k chars. If profiling shows hitches, debounce at 150ms.
 - Accessibility: `.accessibilityElement(children: .combine)` with label `"32 words, 1,234 characters"`.
 
@@ -351,7 +359,7 @@ Two options, both valid. Recommend **Option A**.
 - Accessibility: VoiceOver reads the combined label.
 
 **Files:**
-- New: `Noto/Views/Mac/EditorStatusOverlay.swift`
+- New: `Noto/Views/Shared/EditorStatusOverlay.swift`
 - New: `Packages/NotoVault/Sources/NotoVault/WordCounter.swift` (pure logic → package per the "no UI in packages" rule)
 - `Noto/Views/NoteEditorScreen.swift` — add the `.overlay`.
 
@@ -362,22 +370,21 @@ Two options, both valid. Recommend **Option A**.
 - Tune padding: editor horizontal padding to ~56pt on macOS; increase top padding of first block to ~32pt.
 - Verify bullet glyph matches mockup (· dot, not hyphen). Adjust in the bullet-block renderer.
 - Add selected-row styling for sidebar (subtle `primaryText.opacity(0.08)` pill). Mockup doesn't show one, but we need _some_ affordance — keep it subtle.
-- **Verify Dynamic Type on both platforms:**
-  - macOS: System Settings → Accessibility → Display → change text size → confirm sidebar, editor, title, and counter all scale.
-  - iPadOS: Settings → Display & Brightness → Text Size (and the Larger Text accessibility setting) → same verification.
-  - Anything that doesn't scale is still using a raw size — fix.
-- **Verify touch targets on iPadOS:** every sidebar row and the tag-input field should be ≥44pt tall. Use Accessibility Inspector or manual measurement.
+- **Verify Dynamic Type on iPadOS (macOS doesn't support it per HIG):**
+  - iPadOS: Settings → Display & Brightness → Text Size → drag the slider across all 7 standard levels; then enable *Larger Accessibility Text Sizes* and test AX1–AX5. Confirm sidebar, editor body, note title, and word counter all scale. Anything that stays fixed is still using a raw size — fix.
+  - macOS: no Dynamic Type slider to test, but verify layouts still look right at the default sizes and that System Settings → Appearance → Text Size (the bucketed preference) is respected on controls that use `NSFont.preferredFont(forTextStyle:)`.
+- **Verify touch targets on iPadOS:** every sidebar row should be ≥44pt tall. Use Accessibility Inspector or manual measurement.
 
 ### Phase 5 — Search feature (can be deferred)
 
-- Phase 2 already filters by name. True content search (FTS5, like v1's `NotoFTS5` archive) is a bigger lift — defer until tags and window are shipped. When we pick it up, revive the v1 FTS5 package into a new `NotoSearch` Swift package per the "packages for non-UI logic" rule.
+- Phase 2 already filters by name. True content search (FTS5, like v1's `NotoFTS5` archive) is a bigger lift — defer until the shell redesign is shipped. When we pick it up, revive the v1 FTS5 package into a new `NotoSearch` Swift package per the "packages for non-UI logic" rule.
 
 ---
 
 ## 4. Risk & sequencing
 
 - **Lowest risk / highest payoff first:** Phase 1 (chrome) and Phase 2 (sidebar) change zero file-format behavior. Land them, dogfood, iterate.
-- **Medium risk:** Phase 3 touches the editor storage and frontmatter. Write the feature doc + tests before coding. Keep iPhone (compact) visuals identical — this phase only changes macOS + iPad-regular rendering.
+- **Low-to-medium risk:** Phase 3 adds an editor overlay and pure counter logic. It does not change file format, frontmatter, title behavior, or editor storage.
 - **Low risk:** Phase 4 is pure visual polish.
 - **Deferrable:** Phase 5 search is a real product feature; mockup only shows the pill.
 
@@ -398,14 +405,7 @@ Each phase should go through `/ios-development` with its own feature doc under `
 - New: `Noto/Views/Shared/NotoSplitView.swift` (composes sidebar + editor + `.backgroundExtensionEffect()`)
 - `Noto/Views/NoteListView.swift` — route macOS + iOS-regular to `NotoSplitView`; iPhone + iPad-compact remain on existing drill-in.
 
-### Phase 3 (editor shell)
-- `Packages/NotoVault/Sources/NotoVault/Frontmatter.swift` — add `tags` round-trip.
-- New: `Noto/Views/Shared/TagInputView.swift`
-- `Noto/Editor/NoteEditorSession.swift` — expose `tags` binding, debounce writes.
-- `Noto/Views/NoteEditorScreen.swift` — compose title + tags + editor; apply `.backgroundExtensionEffect()`.
-- `Noto/Editor/MarkdownTextStorage.swift` (or `TextKit2EditorView.swift` / `Block.swift`) — title-size first block, hr rendering.
-
-### Phase 3.5 (counter overlay)
+### Phase 3 (editor shell counter overlay — reuse existing `TextKit2EditorView`, no rewrite)
 - New: `Packages/NotoVault/Sources/NotoVault/WordCounter.swift`
 - New: `Noto/Views/Shared/EditorStatusOverlay.swift`
 - `Noto/Views/NoteEditorScreen.swift` — add bottom-right overlay.
@@ -418,7 +418,4 @@ Each phase should go through `/ios-development` with its own feature doc under `
 
 ## 6. Open questions to resolve before Phase 3
 
-1. Tag storage: list of strings in frontmatter, or inline `#hashtags` scanned from body? (Recommend frontmatter — explicit, easier to index.)
-2. Title behavior when user deletes the first heading line: auto-recreate, or let file become title-less? (Recommend: file keeps its filename as fallback title; first line is rendered big only if it's an H1 or untyped text.)
-3. Horizontal rule: NSTextAttachment (clean, complex) vs rendered dashes (easy, ugly)? (Recommend: TextAttachment — worth the 1 day.)
-4. Sidebar toggle keyboard shortcut: standard `⌘⌥S`? (Yes — matches Mail/Notes.)
+1. Sidebar toggle keyboard shortcut: standard `⌘⌥S`? (Yes — matches Mail/Notes.)

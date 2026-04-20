@@ -344,7 +344,8 @@ final class BlockRowView: NSView, NSTextViewDelegate, BlockRowKeyboardDelegate {
     fileprivate var blockIndex = 0
 
     private static let accessoryLeading: CGFloat = 12
-    private static let checkboxSize: CGFloat = 18
+    private static let checkboxSize = MarkdownVisualSpec.todoControlSize
+    private static let listIndentStep = MarkdownVisualSpec.listIndentStep
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -471,8 +472,9 @@ final class BlockRowView: NSView, NSTextViewDelegate, BlockRowKeyboardDelegate {
         textLeadingConstraint.constant = spec.leadingOffset
         textView.textContainerInset = NSSize(width: 12, height: Self.verticalInset)
 
-        checkboxLeadingConstraint.constant = Self.accessoryLeading + CGFloat(spec.indentLevel) * 12
-        markerLeadingConstraint.constant = Self.accessoryLeading + CGFloat(spec.indentLevel) * 12
+        let indentationOffset = MarkdownVisualSpec.listLeadingOffset(for: spec.indentLevel)
+        checkboxLeadingConstraint.constant = Self.accessoryLeading + indentationOffset
+        markerLeadingConstraint.constant = Self.accessoryLeading + indentationOffset
 
         if spec.showsCheckbox {
             checkboxButton.isHidden = false
@@ -497,7 +499,7 @@ final class BlockRowView: NSView, NSTextViewDelegate, BlockRowKeyboardDelegate {
     private func markerText(for block: Block) -> String? {
         switch block.blockType {
         case .bullet:
-            return "\u{2022}"
+            return "-"
         case .orderedList(let number, _):
             return "\(number)."
         default:

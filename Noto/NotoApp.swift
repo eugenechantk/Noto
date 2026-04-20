@@ -1,8 +1,16 @@
 import SwiftUI
 import os.log
 
+#if os(iOS)
+import UIKit
+#endif
+
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NotoApp")
 
+enum NotoAppCommands {
+    static let openToday = Notification.Name("NotoAppCommands.openToday")
+    static let openSettings = Notification.Name("NotoAppCommands.openSettings")
+}
 
 #if os(macOS)
 /// Hides the app instead of closing the window when the user clicks the red X.
@@ -45,6 +53,9 @@ struct NotoApp: App {
     init() {
         DebugTrace.reset()
         DebugTrace.record("app init bundle=\(Bundle.main.bundleIdentifier ?? "unknown")")
+        #if os(iOS)
+        Self.configureNavigationBarAppearance()
+        #endif
         NSSetUncaughtExceptionHandler { exception in
             let reason = exception.reason ?? "unknown"
             let stack = exception.callStackSymbols.prefix(10).joined(separator: "\n")
@@ -67,10 +78,52 @@ struct NotoApp: App {
                 VaultSetupView(locationManager: locationManager)
             }
         }
+        .environment(\.colorScheme, .dark)
+        .commands {
+            CommandMenu("Noto") {
+                Button("Today") {
+                    NotificationCenter.default.post(name: NotoAppCommands.openToday, object: nil)
+                }
+                .keyboardShortcut("t", modifiers: [.command])
+
+                #if os(iOS)
+                Button("Settings") {
+                    NotificationCenter.default.post(name: NotoAppCommands.openSettings, object: nil)
+                }
+                .keyboardShortcut(",", modifiers: [.command])
+                #endif
+            }
+        }
         #if os(macOS)
         .defaultSize(width: 800, height: 600)
+        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified)
+        #endif
+
+        #if os(macOS)
+        Settings {
+            SettingsView(locationManager: locationManager)
+                .frame(minWidth: 400, minHeight: 200)
+                .environment(\.colorScheme, .dark)
+                .background(AppTheme.background)
+                .foregroundStyle(AppTheme.primaryText)
+                .tint(AppTheme.primaryText)
+        }
         #endif
     }
+
+    #if os(iOS)
+    private static func configureNavigationBarAppearance() {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.titleTextAttributes = [.foregroundColor: AppTheme.uiPrimaryText]
+        appearance.largeTitleTextAttributes = [.foregroundColor: AppTheme.uiPrimaryText]
+
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+    }
+    #endif
 }
 
 /// Wrapper that owns the MarkdownNoteStore for a given vault URL.
@@ -89,6 +142,9 @@ struct MainAppView: View {
 
     var body: some View {
         NoteListView(store: store, locationManager: locationManager, fileWatcher: fileWatcher)
+            .background(AppTheme.background)
+            .foregroundStyle(AppTheme.primaryText)
+            .tint(AppTheme.primaryText)
             .onAppear {
                 fileWatcher.watch(directory: vaultURL)
             }

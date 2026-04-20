@@ -18,6 +18,35 @@ struct TextKit2EditorLifecycleTests {
         #expect(controller.textView.text == "# Title\nBody")
     }
 
+    @MainActor
+    @Test("Editor action transforms participate in native undo and redo")
+    func editorActionTransformsRegisterUndoAndRedo() {
+        let controller = TextKit2EditorViewController()
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.loadViewIfNeeded()
+        controller.loadText("- Item")
+        controller.textView.selectedRange = NSRange(location: 0, length: 0)
+        controller.textView.becomeFirstResponder()
+
+        let didSendAction = UIApplication.shared.sendAction(
+            NSSelectorFromString("indentSelectedLines"),
+            to: controller,
+            from: nil,
+            for: nil
+        )
+
+        #expect(didSendAction)
+        #expect(controller.textView.text == "  - Item")
+
+        controller.textView.undoManager?.undo()
+        #expect(controller.textView.text == "- Item")
+
+        controller.textView.undoManager?.redo()
+        #expect(controller.textView.text == "  - Item")
+    }
+
     @Test("Frontmatter range covers the YAML metadata block only")
     func detectsFrontmatterRange() throws {
         let markdown = """

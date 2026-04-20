@@ -25,10 +25,10 @@ struct TodoMarkdown {
         if rest == "- [ ]" {
             return Match(indentation: indentation, prefix: "- [ ]", isChecked: false, content: "")
         }
-        if rest.hasPrefix("- [x] ") {
+        if rest.hasPrefix("- [x] ") || rest.hasPrefix("- [X] ") {
             return Match(indentation: indentation, prefix: "- [x] ", isChecked: true, content: String(rest.dropFirst(6)))
         }
-        if rest == "- [x]" {
+        if rest == "- [x]" || rest == "- [X]" {
             return Match(indentation: indentation, prefix: "- [x]", isChecked: true, content: "")
         }
         return nil

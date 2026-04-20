@@ -22,7 +22,6 @@ struct NoteListView: View {
 
     #if os(iOS)
     @State private var path = NavigationPath()
-    @State private var splitViewVisibility: NavigationSplitViewVisibility = .detailOnly
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
@@ -38,40 +37,27 @@ struct NoteListView: View {
     var body: some View {
         #if os(iOS)
         if horizontalSizeClass == .regular {
-            NavigationSplitView(columnVisibility: $splitViewVisibility) {
-                SidebarView(
-                    rootStore: store,
-                    fileWatcher: fileWatcher,
-                    selectedNote: $selectedNote,
-                    selectedNoteStore: $selectedNoteStore,
-                    selectedIsNew: $selectedNoteIsNew,
-                    externallyDeletingNoteID: $externallyDeletingNoteID,
-                    onNoteActivated: collapseSidebar
-                )
-            } detail: {
-                splitDetailView
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: openTodayNote) {
-                        Label("Today", systemImage: "calendar")
-                    }
-                    .accessibilityIdentifier("today_button")
-                }
-                if locationManager != nil {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: { showSettings = true }) {
-                            Label("Settings", systemImage: "gearshape")
-                        }
-                        .accessibilityIdentifier("settings_button")
-                    }
-                }
-            }
+            NotoSplitView(
+                store: store,
+                fileWatcher: fileWatcher,
+                selectedNote: $selectedNote,
+                selectedNoteStore: $selectedNoteStore,
+                selectedIsNew: $selectedNoteIsNew,
+                externallyDeletingNoteID: $externallyDeletingNoteID
+            )
             .sheet(isPresented: $showSettings) {
                 if let locationManager {
                     NavigationStack {
                         SettingsView(locationManager: locationManager)
                     }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { _ in
+                openTodayNote()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openSettings)) { _ in
+                if locationManager != nil {
+                    showSettings = true
                 }
             }
             .onChange(of: selectedNote?.fileURL) { _, newURL in
@@ -91,6 +77,7 @@ struct NoteListView: View {
                     fileWatcher: fileWatcher,
                     path: $path,
                     onTodayTap: { path.append(NoteRoute.todayNote) },
+                    onCreateRootNote: createRootNoteAndPush,
                     onSettingsTap: locationManager != nil ? { path.append(NoteRoute.settings) } : nil
                 )
                 .navigationDestination(for: NoteRoute.self) { route in
@@ -100,77 +87,83 @@ struct NoteListView: View {
                             store: MarkdownNoteStore(directoryURL: directoryURL, vaultRootURL: vaultRootURL),
                             note: note,
                             isNew: isNew,
-                            fileWatcher: fileWatcher
+                            fileWatcher: fileWatcher,
+                            onOpenTodayNote: { path.append(NoteRoute.todayNote) },
+                            onCreateRootNote: createRootNoteAndPush,
+                            onTapBreadcrumbLevel: { folderURL in
+                                path = NavigationPath()
+                                if folderURL.standardizedFileURL != vaultRootURL.standardizedFileURL {
+                                    path.append(NoteRoute.folder(
+                                        folderURL: folderURL,
+                                        name: folderURL.lastPathComponent,
+                                        vaultRootURL: vaultRootURL
+                                    ))
+                                }
+                            }
                         )
                     case .folder(let folderURL, let name, let vaultRootURL):
                         FolderContentView(
                             store: MarkdownNoteStore(directoryURL: folderURL, vaultRootURL: vaultRootURL),
                             title: name,
                             fileWatcher: fileWatcher,
-                            path: $path
+                            path: $path,
+                            onTodayTap: { path.append(NoteRoute.todayNote) },
+                            onCreateRootNote: createRootNoteAndPush
                         )
                     case .settings:
                         if let locationManager {
                             SettingsView(locationManager: locationManager)
                         }
                     case .todayNote:
-                        TodayNoteDestination(store: store, fileWatcher: fileWatcher)
+                        TodayNoteDestination(
+                            store: store,
+                            fileWatcher: fileWatcher,
+                            onOpenTodayNote: { path.append(NoteRoute.todayNote) },
+                            onCreateRootNote: createRootNoteAndPush,
+                            onTapBreadcrumbLevel: { folderURL in
+                                path = NavigationPath()
+                                if folderURL.standardizedFileURL != store.vaultRootURL.standardizedFileURL {
+                                    path.append(NoteRoute.folder(
+                                        folderURL: folderURL,
+                                        name: folderURL.lastPathComponent,
+                                        vaultRootURL: store.vaultRootURL
+                                    ))
+                                }
+                            }
+                        )
                     }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { _ in
+                path.append(NoteRoute.todayNote)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openSettings)) { _ in
+                if locationManager != nil {
+                    path.append(NoteRoute.settings)
                 }
             }
         }
         #elseif os(macOS)
-        NavigationSplitView {
-            SidebarView(
-                rootStore: store,
-                fileWatcher: fileWatcher,
-                selectedNote: $selectedNote,
-                selectedNoteStore: $selectedNoteStore,
-                selectedIsNew: $selectedNoteIsNew,
-                externallyDeletingNoteID: $externallyDeletingNoteID
-            )
-        } detail: {
-            if let selectedNote, let selectedNoteStore {
-                NoteEditorScreen(
-                    store: selectedNoteStore,
-                    note: selectedNote,
-                    isNew: selectedNoteIsNew,
-                    fileWatcher: fileWatcher,
-                    onDelete: {
-                        self.selectedNote = nil
-                        self.selectedNoteStore = nil
-                        self.selectedNoteIsNew = false
-                    },
-                    externallyDeletingNoteID: $externallyDeletingNoteID
-                )
-                .id(selectedNote.id)
-            } else {
-                Text("Select a note")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: openTodayNote) {
-                    Label("Today", systemImage: "calendar")
-                }
-                .accessibilityIdentifier("today_button")
-            }
-            if locationManager != nil {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: { showSettings = true }) {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                    .accessibilityIdentifier("settings_button")
-                }
-            }
-        }
+        NotoSplitView(
+            store: store,
+            fileWatcher: fileWatcher,
+            selectedNote: $selectedNote,
+            selectedNoteStore: $selectedNoteStore,
+            selectedIsNew: $selectedNoteIsNew,
+            externallyDeletingNoteID: $externallyDeletingNoteID
+        )
         .sheet(isPresented: $showSettings) {
             if let locationManager {
                 SettingsView(locationManager: locationManager)
                     .frame(minWidth: 400, minHeight: 200)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { _ in
+            openTodayNote()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openSettings)) { _ in
+            if locationManager != nil {
+                showSettings = true
             }
         }
         .onChange(of: selectedNote?.fileURL) { _, newURL in
@@ -202,6 +195,8 @@ struct NoteListView: View {
                     self.selectedNoteStore = nil
                     self.selectedNoteIsNew = false
                 },
+                onOpenTodayNote: { openTodayNote() },
+                onCreateRootNote: { createRootNoteAndSelect() },
                 externallyDeletingNoteID: $externallyDeletingNoteID,
                 showsInlineBackButton: false
             )
@@ -209,8 +204,9 @@ struct NoteListView: View {
         } else {
             Text("Select a note")
                 .font(.title2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppTheme.background)
         }
     }
 
@@ -219,6 +215,24 @@ struct NoteListView: View {
         selectedNote = note
         selectedNoteIsNew = isNew
         collapseSidebar()
+    }
+
+    #if os(iOS)
+    private func createRootNoteAndPush() {
+        let note = store.createNote()
+        path = NavigationPath()
+        path.append(NoteRoute.note(
+            note,
+            directoryURL: store.vaultRootURL,
+            vaultRootURL: store.vaultRootURL,
+            isNew: true
+        ))
+    }
+    #endif
+
+    private func createRootNoteAndSelect() {
+        let note = store.createNote()
+        selectNote(note, in: store, isNew: true)
     }
 
     private func persistLastOpenedNoteURL(_ url: URL?) {
@@ -247,8 +261,6 @@ struct NoteListView: View {
 
     #if os(iOS)
     private func collapseSidebar() {
-        guard horizontalSizeClass == .regular else { return }
-        splitViewVisibility = .detailOnly
     }
     #else
     private func collapseSidebar() {}
@@ -259,12 +271,22 @@ struct NoteListView: View {
 private struct TodayNoteDestination: View {
     var store: MarkdownNoteStore
     var fileWatcher: VaultFileWatcher?
+    var onOpenTodayNote: (() -> Void)?
+    var onCreateRootNote: (() -> Void)?
+    var onTapBreadcrumbLevel: ((URL) -> Void)?
     @State private var data: (store: MarkdownNoteStore, note: MarkdownNote)?
 
     var body: some View {
         Group {
             if let data {
-                NoteEditorScreen(store: data.store, note: data.note, fileWatcher: fileWatcher)
+                NoteEditorScreen(
+                    store: data.store,
+                    note: data.note,
+                    fileWatcher: fileWatcher,
+                    onOpenTodayNote: onOpenTodayNote,
+                    onCreateRootNote: onCreateRootNote,
+                    onTapBreadcrumbLevel: onTapBreadcrumbLevel
+                )
             } else {
                 ProgressView()
             }
@@ -289,6 +311,8 @@ struct SidebarView: View {
     @Binding var selectedIsNew: Bool
     @Binding var externallyDeletingNoteID: UUID?
     var onNoteActivated: (() -> Void)? = nil
+    var onTodayTap: (() -> Void)? = nil
+    var onCreateRootNote: (() -> Void)? = nil
 
     /// Stack of (store, title) for folder navigation. Empty = showing root.
     @State private var folderStack: [(store: MarkdownNoteStore, title: String)] = []
@@ -340,7 +364,10 @@ struct SidebarView: View {
                 ForEach(currentStore.items) { (item: DirectoryItem) in
                     sidebarRow(for: item)
                 }
+                .listRowBackground(AppTheme.background)
             }
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.background)
             .contextMenu {
                 Button(action: createNote) {
                     Label("New Note", systemImage: "doc.badge.plus")
@@ -350,6 +377,9 @@ struct SidebarView: View {
                 }
             }
         }
+        .background(AppTheme.background)
+        .foregroundStyle(AppTheme.primaryText)
+        .tint(AppTheme.primaryText)
         .listStyle(.sidebar)
         .navigationTitle(currentTitle)
         .alert("New Folder", isPresented: $showNewFolderAlert) {
@@ -366,6 +396,12 @@ struct SidebarView: View {
         .onAppear {
             rootStore.loadItems()
         }
+        #if os(iOS)
+        .notoAppBottomToolbar(
+            onOpenTodayNote: onTodayTap,
+            onCreateRootNote: onCreateRootNote
+        )
+        #endif
     }
 
     @ViewBuilder
@@ -403,7 +439,8 @@ struct SidebarView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("note_\(note.title)")
-            .listRowBackground(selectedNote?.id == note.id ? Color.accentColor.opacity(0.2) : nil)
+            .foregroundStyle(AppTheme.primaryText)
+            .listRowBackground(selectedNote?.id == note.id ? AppTheme.selectedRowBackground : AppTheme.background)
             .contextMenu {
                 Button(role: .destructive) {
                     externallyDeletingNoteID = note.id
@@ -481,7 +518,8 @@ private struct SidebarFolderRow: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("note_\(note.title)")
-                        .listRowBackground(selectedNote?.id == note.id ? Color.accentColor.opacity(0.2) : nil)
+                        .foregroundStyle(AppTheme.primaryText)
+                        .listRowBackground(selectedNote?.id == note.id ? AppTheme.selectedRowBackground : AppTheme.background)
                         .contextMenu {
                             Button(role: .destructive) {
                                 externallyDeletingNoteID = note.id
@@ -532,6 +570,7 @@ struct FolderContentView: View {
     var fileWatcher: VaultFileWatcher?
     @Binding var path: NavigationPath
     var onTodayTap: (() -> Void)?
+    var onCreateRootNote: (() -> Void)?
     var onSettingsTap: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
@@ -567,21 +606,19 @@ struct FolderContentView: View {
                 }
             }
             .onDelete(perform: deleteItems)
+            .listRowBackground(AppTheme.background)
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.background)
+        .foregroundStyle(AppTheme.primaryText)
+        .tint(AppTheme.primaryText)
         .accessibilityIdentifier("note_list")
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(!isRoot)
         .toolbar {
-            if isRoot {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { onTodayTap?() }) {
-                        Label("Today", systemImage: "calendar")
-                    }
-                    .accessibilityIdentifier("today_button")
-                }
-            } else {
+            if !isRoot {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { dismiss() }) {
                         Image(systemName: "chevron.left")
@@ -589,32 +626,35 @@ struct FolderContentView: View {
                     .accessibilityIdentifier("back_button")
                 }
             }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 16) {
-                    if isRoot, let onSettingsTap {
-                        Button(action: onSettingsTap) {
-                            Image(systemName: "gearshape")
-                        }
-                        .accessibilityIdentifier("settings_button")
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if isRoot, let onSettingsTap {
+                    Button(action: onSettingsTap) {
+                        Label("Settings", systemImage: "gearshape")
                     }
-                    Button(action: createNote) {
-                        Image(systemName: "doc.badge.plus")
-                            .accessibilityLabel("New Note")
-                    }
-                    .accessibilityIdentifier("new_note_button")
-                    Menu {
-                        Button(action: { showNewFolderAlert = true }) {
-                            Label("New Folder", systemImage: "folder.badge.plus")
-                        }
-                        .accessibilityIdentifier("new_folder_button")
-                    } label: {
-                        Image(systemName: "plus")
-                            .accessibilityLabel("More")
-                    }
-                    .accessibilityIdentifier("add_menu")
+                    .labelStyle(.iconOnly)
+                    .accessibilityIdentifier("settings_button")
                 }
+                Button(action: createNote) {
+                    Label("New Note", systemImage: "doc.badge.plus")
+                }
+                .labelStyle(.iconOnly)
+                .accessibilityIdentifier("new_note_button")
+                Menu {
+                    Button(action: { showNewFolderAlert = true }) {
+                        Label("New Folder", systemImage: "folder.badge.plus")
+                    }
+                    .accessibilityIdentifier("new_folder_button")
+                } label: {
+                    Label("More", systemImage: "plus")
+                }
+                .labelStyle(.iconOnly)
+                .accessibilityIdentifier("add_menu")
             }
         }
+        .notoAppBottomToolbar(
+            onOpenTodayNote: onTodayTap,
+            onCreateRootNote: onCreateRootNote
+        )
         .alert("New Folder", isPresented: $showNewFolderAlert) {
             TextField("Folder name", text: $newFolderName)
             Button("Create") {
@@ -659,6 +699,58 @@ struct FolderContentView: View {
 }
 #endif
 
+// MARK: - Shared iOS Bottom Toolbar
+
+#if os(iOS)
+private struct NotoAppBottomToolbarModifier: ViewModifier {
+    var onOpenTodayNote: (() -> Void)?
+    var onCreateRootNote: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        if onOpenTodayNote == nil && onCreateRootNote == nil {
+            content
+        } else {
+            content.toolbar {
+                ToolbarItemGroup(placement: .bottomBar) {
+                    Button(action: { onOpenTodayNote?() }) {
+                        Label("Today", systemImage: "calendar")
+                    }
+                    .labelStyle(.iconOnly)
+                    .accessibilityIdentifier("today_button")
+                    .accessibilityLabel("Today")
+
+                    Button(action: {}) {
+                        Label("Search", systemImage: "magnifyingglass")
+                    }
+                    .labelStyle(.iconOnly)
+                    .accessibilityIdentifier("search_button")
+                    .accessibilityLabel("Search")
+
+                    Button(action: { onCreateRootNote?() }) {
+                        Label("New Note", systemImage: "square.and.pencil")
+                    }
+                    .labelStyle(.iconOnly)
+                    .accessibilityIdentifier("new_root_note_button")
+                    .accessibilityLabel("New Note")
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    func notoAppBottomToolbar(
+        onOpenTodayNote: (() -> Void)?,
+        onCreateRootNote: (() -> Void)?
+    ) -> some View {
+        modifier(NotoAppBottomToolbarModifier(
+            onOpenTodayNote: onOpenTodayNote,
+            onCreateRootNote: onCreateRootNote
+        ))
+    }
+}
+#endif
+
 // MARK: - Row Views
 
 struct FolderRow: View {
@@ -667,15 +759,16 @@ struct FolderRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "folder.fill")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
                 .font(.title3)
             VStack(alignment: .leading, spacing: 4) {
                 Text(folder.name)
                     .font(.headline)
+                    .foregroundStyle(AppTheme.primaryText)
                     .lineLimit(1)
                 Text(folder.modifiedDate, style: .relative)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
             }
         }
         .padding(.vertical, 4)
@@ -688,15 +781,16 @@ struct MarkdownNoteRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "doc.text")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
                 .font(.title3)
             VStack(alignment: .leading, spacing: 4) {
                 Text(note.title)
                     .font(.headline)
+                    .foregroundStyle(AppTheme.primaryText)
                     .lineLimit(1)
                 Text(note.modifiedDate, style: .relative)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
             }
         }
         .padding(.vertical, 4)

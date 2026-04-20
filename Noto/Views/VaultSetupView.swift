@@ -16,12 +16,13 @@ struct VaultSetupView: View {
             VStack(spacing: 12) {
                 Image(systemName: "doc.text.fill")
                     .font(.system(size: 56))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
                 Text("Welcome to Noto")
                     .font(.largeTitle.bold())
+                    .foregroundStyle(AppTheme.primaryText)
                 Text("Your notes, your files, your folders.")
                     .font(.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
             }
 
             Spacer()
@@ -35,16 +36,17 @@ struct VaultSetupView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Create New Vault")
                                 .font(.headline)
+                                .foregroundStyle(AppTheme.primaryText)
                             Text("Pick a location — a Noto folder will be created")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppTheme.secondaryText)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppTheme.secondaryText)
                     }
                     .padding()
-                    .background(.quaternary)
+                    .background(AppTheme.separator.opacity(0.75))
                     .cornerRadius(12)
                 }
                 .accessibilityIdentifier("create_vault_button")
@@ -57,16 +59,17 @@ struct VaultSetupView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Open Existing Vault")
                                 .font(.headline)
+                                .foregroundStyle(AppTheme.primaryText)
                             Text("Choose a folder that already has markdown files")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppTheme.secondaryText)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppTheme.secondaryText)
                     }
                     .padding()
-                    .background(.quaternary)
+                    .background(AppTheme.separator.opacity(0.75))
                     .cornerRadius(12)
                 }
                 .accessibilityIdentifier("open_vault_button")
@@ -75,6 +78,10 @@ struct VaultSetupView: View {
 
             Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.background)
+        .foregroundStyle(AppTheme.primaryText)
+        .tint(AppTheme.primaryText)
         #if os(iOS)
         .sheet(isPresented: $showCreatePicker) {
             FolderPickerView { url in

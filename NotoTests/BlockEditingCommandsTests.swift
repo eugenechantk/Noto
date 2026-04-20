@@ -5,6 +5,32 @@ import Testing
 @Suite("Block Editing Commands")
 struct BlockEditingCommandsTests {
 
+    @Test("Text edit diff returns the minimal replacement for inserted indentation")
+    func textEditDiffFindsInsertedIndentation() {
+        let replacement = TextEditDiff.singleReplacement(
+            from: "- Item",
+            to: "  - Item"
+        )
+
+        #expect(replacement == TextReplacement(
+            range: NSRange(location: 0, length: 0),
+            replacement: "  "
+        ))
+    }
+
+    @Test("Text edit diff returns the minimal replacement for removed indentation")
+    func textEditDiffFindsRemovedIndentation() {
+        let replacement = TextEditDiff.singleReplacement(
+            from: "  - Item",
+            to: "- Item"
+        )
+
+        #expect(replacement == TextReplacement(
+            range: NSRange(location: 0, length: 2),
+            replacement: ""
+        ))
+    }
+
     @Test("Indent adds two leading spaces and preserves newline")
     func indentPreservesTrailingNewline() {
         #expect(BlockEditingCommands.indentedLine("Task\n") == "  Task\n")
@@ -103,6 +129,16 @@ struct BlockEditingCommandsTests {
         ))
     }
 
+    @Test("Checkbox toggle switches unchecked todo markdown to checked")
+    func checkboxToggleChecksTodoLine() {
+        #expect(TodoMarkdown.checkboxToggledLine("- [ ] hello") == "- [x] hello")
+    }
+
+    @Test("Checkbox toggle switches checked todo markdown to unchecked")
+    func checkboxToggleUnchecksTodoLine() {
+        #expect(TodoMarkdown.checkboxToggledLine("- [x] hello") == "- [ ] hello")
+    }
+
     @Test("Todo toggle transforms every selected line using markdown todo syntax")
     func todoToggleSelectedLines() {
         let result = BlockEditingCommands.toggledTodoLines(
@@ -160,6 +196,55 @@ struct BlockEditingCommandsTests {
         let result = BlockEditingCommands.toggledStrikethrough(
             in: "hello  world",
             selection: NSRange(location: 6, length: 0)
+        )
+
+        #expect(result == nil)
+    }
+
+    @Test("Return at end of a bullet continues a bullet at the same level")
+    func lineBreakContinuesBulletAtSameLevel() {
+        let result = BlockEditingCommands.continuedListLineBreak(
+            in: "- Parent",
+            selection: NSRange(location: 8, length: 0)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "- Parent\n- ",
+            selection: NSRange(location: 11, length: 0)
+        ))
+    }
+
+    @Test("Return at end of a nested bullet keeps the nested level")
+    func lineBreakContinuesNestedBulletAtSameLevel() {
+        let result = BlockEditingCommands.continuedListLineBreak(
+            in: "  - Child",
+            selection: NSRange(location: 9, length: 0)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "  - Child\n  - ",
+            selection: NSRange(location: 14, length: 0)
+        ))
+    }
+
+    @Test("Return on an empty bullet exits the list")
+    func lineBreakOnEmptyBulletExitsList() {
+        let result = BlockEditingCommands.continuedListLineBreak(
+            in: "- ",
+            selection: NSRange(location: 2, length: 0)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "",
+            selection: NSRange(location: 0, length: 0)
+        ))
+    }
+
+    @Test("Return in a paragraph uses default text insertion")
+    func lineBreakInParagraphFallsBackToDefaultInsertion() {
+        let result = BlockEditingCommands.continuedListLineBreak(
+            in: "Paragraph",
+            selection: NSRange(location: 9, length: 0)
         )
 
         #expect(result == nil)

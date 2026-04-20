@@ -83,6 +83,12 @@ struct BlockTypeDetectionTests {
         #expect(block.blockType == .todo(checked: true, indent: 0))
     }
 
+    @Test("- [X] prefix is checked todo")
+    func testTodoUppercaseCheckedType() {
+        let block = Block(text: "- [X] Done task")
+        #expect(block.blockType == .todo(checked: true, indent: 0))
+    }
+
     @Test("- prefix is bullet")
     func testBulletType() {
         let block = Block(text: "- Item")
