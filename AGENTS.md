@@ -24,3 +24,24 @@
 - For multi-window note behavior, distinguish same-process window sync from external filesystem sync. Same-app windows should use the in-process sync path; `VaultFileWatcher` is only the fallback for external changes.
 - For iOS iCloud note-open failures, do not assume the file is missing just because iCloud metadata says it needs download. Check whether the file is actually readable first.
 - For iCloud-backed notes in general, prefer real filesystem outcomes over inferred metadata: actual write success on macOS, actual read success on iOS.
+
+## Sharing Architecture
+
+- Default principle: make behavior as shared as possible across iOS, iPadOS, and macOS. Put non-UI logic in Swift packages such as `Packages/NotoVault` when it can stand alone. For UI, prefer shared SwiftUI views, shared view models/session objects, and small platform adapters over duplicating whole screens. Split by platform only when UIKit/AppKit APIs, navigation models, input systems, or platform conventions make sharing materially worse.
+
+### Note List and Sidebar
+
+- Shared responsibilities should include vault/directory loading, item ordering, note title resolution, filename/title rules, date formatting inputs, persistence contracts, and any reusable row/sidebar state that is not tied to a platform widget. Prefer implementing these in `Packages/NotoVault` or in `Noto/Views/Shared/` when UI-bound.
+- `NoteListView` is the platform entry point and may branch for compact iOS navigation, regular iPad layouts, and macOS split-window behavior. Keep those branches thin: navigation shell, toolbar placement, selection binding, and platform presentation differences belong there.
+- `NotoSidebarView`, `NotoSplitView`, shared rows, loaders, and title/count helpers should remain cross-platform unless a concrete platform behavior requires a separate implementation.
+- iOS and iPadOS should share list/sidebar logic by default. Separate iPad behavior only for size-class/navigation presentation differences, not for data loading or note/folder semantics.
+- macOS-specific list/sidebar code is acceptable for native split view, commands, multi-window behavior, keyboard shortcuts, context menus, or AppKit/macOS conventions. Do not fork note list data rules just because the visual container differs.
+
+### Editor
+
+- Shared editor responsibilities include `NoteEditorSession`, load/save/autosave, title updates, note renaming, same-process sync, iCloud/readability handling, remote-update conflict UI intent, markdown parsing, markdown editing transforms, todo markdown behavior, word/character counting, and styling rules that can be expressed platform-neutrally.
+- The live iOS/iPadOS editor is `TextKit2EditorView`, not `BlockEditorView`. Confirm through `Noto/Views/NoteEditorScreen.swift` before editing editor behavior.
+- `TextKit2EditorView.swift` has a shared upper layer for markdown block detection, frontmatter handling, visual specs, paragraph/inline styling, editing transforms coordination, and TextKit delegate behavior. Prefer adding new markdown/text semantics there first so iOS, iPadOS, and macOS benefit together.
+- The concrete TextKit stacks are platform-specific: iOS/iPadOS use `UITextView` and its TextKit 2 stack; macOS uses `NSTextView` with its own AppKit TextKit setup. Platform-specific code should stay limited to native view construction, keyboard/input behavior, selection quirks, accessory/toolbars, click/tap handling, and AppKit/UIKit delegate differences.
+- iOS/iPadOS-specific editor chrome lives in `Noto/Views/iOS/`; macOS-specific editor chrome lives in `Noto/Views/macOS/`; shared editor composition lives in `Noto/Views/Shared/`. Prefer moving common chrome concepts into shared abstractions before adding parallel platform implementations.
+- For new editor features such as hyperlinks, lists, inline marks, counters, or note links: put parsing, transforms, models, and styling intent in shared code first; add only the minimum iOS/iPadOS and macOS adapters needed for native interaction.
