@@ -416,7 +416,7 @@ enum MarkdownParagraphStyler {
                 attributed.addAttribute(.foregroundColor, value: PlatformColor.clear, range: markerRange)
             } else {
                 attributed.addAttributes([
-                    .foregroundColor: MarkdownTheme.checkedColor,
+                    .foregroundColor: MarkdownTheme.prefixColor,
                     .font: PlatformFont.systemFont(ofSize: MarkdownTheme.bodyFont.pointSize, weight: .semibold),
                 ], range: markerRange)
             }

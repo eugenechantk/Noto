@@ -45,7 +45,7 @@ struct TextKit2MarkdownLayoutTests {
         let lightTrait = UITraitCollection(userInterfaceStyle: .light)
 
         #expect(attributed.string.hasPrefix("- "))
-        #expect(markerColor?.resolvedColor(with: lightTrait) == UIColor.secondaryLabel.resolvedColor(with: lightTrait))
+        #expect(markerColor?.resolvedColor(with: lightTrait) == AppTheme.uiMutedText.resolvedColor(with: lightTrait))
     }
 
     @Test("Todo markdown prefix is hidden so the circle control is the visible marker")
