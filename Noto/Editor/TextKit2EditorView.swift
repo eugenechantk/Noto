@@ -482,6 +482,11 @@ final class TextKit2EditorCoordinator {
 
 #if os(iOS)
 
+private enum TextKit2EditorMetrics {
+    static let textContainerInset = UIEdgeInsets(top: 16, left: 12, bottom: 16, right: 12)
+    static let typingBottomClearance: CGFloat = 72
+}
+
 struct TextKit2EditorView: UIViewControllerRepresentable {
     @Binding var text: String
     var autoFocus: Bool = false
@@ -533,7 +538,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
         textView.font = MarkdownTheme.bodyFont
         textView.textColor = MarkdownTheme.bodyColor
         textView.backgroundColor = .systemBackground
-        textView.textContainerInset = UIEdgeInsets(top: 16, left: 12, bottom: 16, right: 12)
+        textView.textContainerInset = TextKit2EditorMetrics.textContainerInset
+        textView.contentInset.bottom = TextKit2EditorMetrics.typingBottomClearance
+        textView.verticalScrollIndicatorInsets.bottom = TextKit2EditorMetrics.typingBottomClearance
         textView.keyboardDismissMode = .interactive
         textView.alwaysBounceVertical = true
         textView.accessibilityIdentifier = "note_editor"
@@ -552,6 +559,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
             applyText(pendingText)
             self.pendingText = nil
         }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard textView.isFirstResponder else { return }
+        scrollSelectionAboveTypingClearance()
     }
 
     func loadText(_ markdown: String) {
@@ -573,6 +586,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
                 tv.becomeFirstResponder()
                 let end = tv.endOfDocument
                 tv.selectedTextRange = tv.textRange(from: end, to: end)
+                self?.scrollSelectionAboveTypingClearance()
             }
         }
     }
@@ -581,10 +595,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
 
     func textViewDidChange(_ textView: UITextView) {
         coordinator?.publishEditorText(textView.text ?? "")
+        scrollSelectionAboveTypingClearance()
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
         updateTypingAttributes()
+        scrollSelectionAboveTypingClearance()
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {
@@ -607,6 +623,31 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate {
             for: textView.text ?? "",
             selectionLocation: textView.selectedRange.location
         )
+    }
+
+    private func scrollSelectionAboveTypingClearance() {
+        guard textView.bounds.height > 0,
+              let selectionEnd = textView.selectedTextRange?.end else { return }
+
+        textView.layoutIfNeeded()
+
+        let caretRect = textView.caretRect(for: selectionEnd)
+        // Treat our bottom inset as scrollable slack, not as occupied viewport space.
+        let systemBottomInset = max(0, textView.adjustedContentInset.bottom - textView.contentInset.bottom)
+        let visibleBottomY = textView.bounds.maxY - systemBottomInset
+        let requiredBottomY = caretRect.maxY + TextKit2EditorMetrics.typingBottomClearance
+        let neededScrollDelta = requiredBottomY - visibleBottomY
+        guard neededScrollDelta > 0 else { return }
+
+        let minimumOffsetY = -textView.adjustedContentInset.top
+        let maximumOffsetY = max(
+            minimumOffsetY,
+            textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom
+        )
+        let targetOffsetY = min(maximumOffsetY, textView.contentOffset.y + neededScrollDelta)
+        guard targetOffsetY > textView.contentOffset.y else { return }
+
+        textView.setContentOffset(CGPoint(x: textView.contentOffset.x, y: targetOffsetY), animated: false)
     }
 }
 
