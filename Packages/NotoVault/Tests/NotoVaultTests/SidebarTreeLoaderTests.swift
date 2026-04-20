@@ -47,6 +47,39 @@ struct SidebarTreeLoaderTests {
     }
 
     @Test
+    func noteRowsUseMarkdownTitleInsteadOfFilename() throws {
+        let root = try makeVault { root in
+            let noteURL = root.appendingPathComponent("F28A576E-2004-4FBF-81C6-8F41DD03737C.md")
+            let markdown = """
+            ---
+            id: F28A576E-2004-4FBF-81C6-8F41DD03737C
+            created: 2026-04-20T00:00:00Z
+            updated: 2026-04-20T00:00:00Z
+            ---
+
+            # Today's testing
+            """
+            try markdown.write(to: noteURL, atomically: true, encoding: .utf8)
+        }
+
+        let rows = try SidebarTreeLoader().loadRows(rootURL: root)
+
+        #expect(rows.map(\.name) == ["Today's testing"])
+    }
+
+    @Test
+    func uuidFilenameWithoutTitleDisplaysUntitled() throws {
+        let root = try makeVault { root in
+            let noteURL = root.appendingPathComponent("F28A576E-2004-4FBF-81C6-8F41DD03737C.md")
+            try "# ".write(to: noteURL, atomically: true, encoding: .utf8)
+        }
+
+        let rows = try SidebarTreeLoader().loadRows(rootURL: root)
+
+        #expect(rows.map(\.name) == ["Untitled"])
+    }
+
+    @Test
     func filterKeepsAncestorFoldersForDescendantMatches() throws {
         let root = try makeVault { root in
             try makeFolder(root.appendingPathComponent("Projects")) { projects in

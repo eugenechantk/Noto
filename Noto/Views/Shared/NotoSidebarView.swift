@@ -14,6 +14,9 @@ struct NotoSidebarView: View {
     @State private var rows: [SidebarTreeNode] = []
     @State private var expandedFolderURLs: Set<URL> = []
     @State private var hasLoadedExpansionState = false
+    @State private var showNewFolderAlert = false
+    @State private var newFolderName = ""
+    @State private var newFolderParentURL: URL?
 
     private let loader = SidebarTreeLoader()
 
@@ -33,14 +36,30 @@ struct NotoSidebarView: View {
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
+            .contextMenu {
+                createMenuItems(in: rootStore.vaultRootURL)
+            }
         }
         .background(.clear)
         .navigationTitle("Noto")
+        .alert("New Folder", isPresented: $showNewFolderAlert) {
+            TextField("Folder name", text: $newFolderName)
+            Button("Create") {
+                commitNewFolder()
+            }
+            Button("Cancel", role: .cancel) {
+                resetNewFolderState()
+            }
+        }
         .task {
             reloadTree()
         }
         .onChange(of: fileWatcher?.changeCount) { _, _ in
             reloadTree()
+            applySelectedNoteUpdate(selectedNote)
+        }
+        .onChange(of: selectedNote) { _, updatedNote in
+            applySelectedNoteUpdate(updatedNote)
         }
     }
 
@@ -107,17 +126,43 @@ struct NotoSidebarView: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier(accessibilityIdentifier(for: row))
         .contextMenu {
-            deleteButton(for: row)
+            contextMenuItems(for: row)
         }
     }
 
     @ViewBuilder
-    private func deleteButton(for row: SidebarTreeNode) -> some View {
+    private func contextMenuItems(for row: SidebarTreeNode) -> some View {
+        switch row.kind {
+        case .folder:
+            createMenuItems(in: row.url)
+        case .note:
+            createMenuItems(in: row.url.deletingLastPathComponent())
+        }
+
+        Divider()
+
         Button(role: .destructive) {
             delete(row)
         } label: {
             Label("Delete", systemImage: "trash")
         }
+    }
+
+    @ViewBuilder
+    private func createMenuItems(in directoryURL: URL) -> some View {
+        Button {
+            createNote(in: directoryURL)
+        } label: {
+            Label("New Note", systemImage: "doc.badge.plus")
+        }
+        .accessibilityIdentifier("new_note_context_menu_item")
+
+        Button {
+            beginNewFolder(in: directoryURL)
+        } label: {
+            Label("New Folder", systemImage: "folder.badge.plus")
+        }
+        .accessibilityIdentifier("new_folder_context_menu_item")
     }
 
     private func rowBackground(for row: SidebarTreeNode) -> some View {
@@ -173,12 +218,51 @@ struct NotoSidebarView: View {
         selectedIsNew = false
     }
 
+    private func createNote(in directoryURL: URL) {
+        let noteStore = MarkdownNoteStore(directoryURL: directoryURL, vaultRootURL: rootStore.vaultRootURL)
+        let note = noteStore.createNote()
+        expandedFolderURLs.insert(directoryURL.standardizedFileURL)
+        persistExpansionState()
+        selectedNoteStore = noteStore
+        selectedNote = note
+        selectedIsNew = true
+        reloadTree()
+    }
+
+    private func beginNewFolder(in directoryURL: URL) {
+        newFolderParentURL = directoryURL
+        newFolderName = ""
+        showNewFolderAlert = true
+    }
+
+    private func commitNewFolder() {
+        let name = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            resetNewFolderState()
+            return
+        }
+
+        let parentURL = newFolderParentURL ?? rootStore.vaultRootURL
+        let parentStore = MarkdownNoteStore(directoryURL: parentURL, vaultRootURL: rootStore.vaultRootURL)
+        let folder = parentStore.createFolder(name: name)
+        expandedFolderURLs.insert(parentURL.standardizedFileURL)
+        expandedFolderURLs.insert(folder.folderURL.standardizedFileURL)
+        persistExpansionState()
+        resetNewFolderState()
+        reloadTree()
+    }
+
+    private func resetNewFolderState() {
+        newFolderName = ""
+        newFolderParentURL = nil
+    }
+
     private func delete(_ row: SidebarTreeNode) {
         switch row.kind {
         case .folder:
             let parentStore = MarkdownNoteStore(directoryURL: row.url.deletingLastPathComponent(), vaultRootURL: rootStore.vaultRootURL)
             parentStore.deleteFolder(NotoFolder(
-                id: UUID(uuid: UUID.nameToUUID(row.url.path)),
+                id: VaultDirectoryLoader.stableID(for: row.url),
                 folderURL: row.url,
                 name: row.name,
                 modifiedDate: row.modifiedAt
@@ -201,13 +285,12 @@ struct NotoSidebarView: View {
 
     private func markdownNote(for url: URL, modifiedAt: Date) -> MarkdownNote {
         let content = CoordinatedFileManager.readString(from: url) ?? ""
-        let id = MarkdownNote.idFromFrontmatter(content) ?? UUID(uuid: UUID.nameToUUID(url.path))
-        let title = MarkdownNote.titleFrom(content)
-        let fallbackTitle = url.deletingPathExtension().lastPathComponent
+        let titleResolver = NoteTitleResolver()
+        let id = MarkdownNote.idFromFrontmatter(content) ?? VaultDirectoryLoader.stableID(for: url)
         return MarkdownNote(
             id: id,
             fileURL: url,
-            title: title == "Untitled" ? fallbackTitle : title,
+            title: titleResolver.title(from: content, fallbackTitle: titleResolver.fallbackTitle(for: url)),
             modifiedDate: modifiedAt
         )
     }
@@ -215,6 +298,29 @@ struct NotoSidebarView: View {
     private func isSelected(_ row: SidebarTreeNode) -> Bool {
         guard case .note = row.kind else { return false }
         return selectedNote?.fileURL.standardizedFileURL == row.url.standardizedFileURL
+    }
+
+    private func applySelectedNoteUpdate(_ note: MarkdownNote?) {
+        guard let note else { return }
+        let normalizedURL = note.fileURL.standardizedFileURL
+
+        guard let index = rows.firstIndex(where: { $0.url == normalizedURL }) else {
+            reloadTree()
+            return
+        }
+
+        let row = rows[index]
+        guard case .note = row.kind, row.name != note.title || row.modifiedAt != note.modifiedDate else {
+            return
+        }
+
+        rows[index] = SidebarTreeNode(
+            kind: row.kind,
+            depth: row.depth,
+            name: note.title,
+            url: normalizedURL,
+            modifiedAt: note.modifiedDate
+        )
     }
 
     private func reloadTree() {
@@ -261,21 +367,5 @@ struct NotoSidebarView: View {
             .map(\.standardizedFileURL.path)
             .sorted()
         UserDefaults.standard.set(paths, forKey: expansionStateKey)
-    }
-}
-
-private extension UUID {
-    static func nameToUUID(_ name: String) -> uuid_t {
-        var hasher = Hasher()
-        hasher.combine(name)
-        let hash = hasher.finalize()
-        let u = UInt64(bitPattern: Int64(hash))
-        return (
-            UInt8(truncatingIfNeeded: u), UInt8(truncatingIfNeeded: u >> 8),
-            UInt8(truncatingIfNeeded: u >> 16), UInt8(truncatingIfNeeded: u >> 24),
-            UInt8(truncatingIfNeeded: u >> 32), UInt8(truncatingIfNeeded: u >> 40),
-            UInt8(truncatingIfNeeded: u >> 48), UInt8(truncatingIfNeeded: u >> 56),
-            0, 0, 0, 0, 0, 0, 0, 0
-        )
     }
 }

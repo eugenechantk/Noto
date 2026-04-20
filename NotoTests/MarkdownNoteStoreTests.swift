@@ -125,6 +125,35 @@ struct NoteCRUDTests {
         #expect(saved.contains("Body text"))
     }
 
+    @Test("Load items derives note title from markdown content")
+    @MainActor
+    func testLoadItemsDerivesTitleFromMarkdownContent() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let id = UUID()
+        let fileURL = vault.appendingPathComponent("\(id.uuidString).md")
+        let content = MarkdownNote.makeFrontmatter(id: id) + "# Shared Loader Title\nBody text"
+        try content.write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        #expect(store.notes.first?.id == id)
+        #expect(store.notes.first?.title == "Shared Loader Title")
+    }
+
+    @Test("UUID filename without title loads as Untitled")
+    @MainActor
+    func testLoadItemsUUIDFilenameWithoutTitleLoadsAsUntitled() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let fileURL = vault.appendingPathComponent("\(UUID().uuidString).md")
+        try "# ".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        #expect(store.notes.first?.title == "Untitled")
+    }
+
     @Test("Delete note removes file and item")
     @MainActor
     func testDeleteNote() {

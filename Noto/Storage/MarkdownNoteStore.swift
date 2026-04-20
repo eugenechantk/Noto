@@ -1,4 +1,5 @@
 import Foundation
+import NotoVault
 import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "MarkdownNoteStore")
@@ -111,6 +112,39 @@ enum DirectoryItem: Identifiable, Hashable {
     }
 }
 
+extension MarkdownNote {
+    init(summary: NoteSummary) {
+        self.init(
+            id: summary.id,
+            fileURL: summary.fileURL,
+            title: summary.title,
+            modifiedDate: summary.modifiedDate
+        )
+    }
+}
+
+extension NotoFolder {
+    init(summary: FolderSummary) {
+        self.init(
+            id: summary.id,
+            folderURL: summary.folderURL,
+            name: summary.name,
+            modifiedDate: summary.modifiedDate
+        )
+    }
+}
+
+extension DirectoryItem {
+    init(item: VaultListItem) {
+        switch item {
+        case .folder(let folder):
+            self = .folder(NotoFolder(summary: folder))
+        case .note(let note):
+            self = .note(MarkdownNote(summary: note))
+        }
+    }
+}
+
 /// File-based note storage. Reads/writes .md files and folders in a vault directory.
 @MainActor
 @Observable
@@ -146,54 +180,13 @@ final class MarkdownNoteStore {
     }
 
     func loadItems() {
-        let fm = FileManager.default
-        guard let contents = try? fm.contentsOfDirectory(
-            at: directoryURL,
-            includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else {
+        do {
+            items = try VaultDirectoryLoader()
+                .loadItems(in: directoryURL)
+                .map { DirectoryItem(item: $0) }
+        } catch {
             logger.error("Failed to list directory contents")
-            return
-        }
-
-        var loaded: [DirectoryItem] = []
-
-        for url in contents {
-            guard let attrs = try? url.resourceValues(forKeys: [.contentModificationDateKey, .isDirectoryKey]),
-                  let modDate = attrs.contentModificationDate,
-                  let isDir = attrs.isDirectory else { continue }
-
-            if isDir {
-                let name = url.lastPathComponent
-                let id = UUID(uuid: UUID.nameToUUID(url.path))
-                loaded.append(.folder(NotoFolder(id: id, folderURL: url, name: name, modifiedDate: modDate)))
-            } else if url.pathExtension == "md" {
-                // Derive title from filename for fast listing — no file I/O needed.
-                // Full content (frontmatter ID, etc.) is read when the note is opened.
-                let stem = url.deletingPathExtension().lastPathComponent
-                let title = stem.isEmpty ? "Untitled" : stem
-                let noteId = UUID(uuid: UUID.nameToUUID(url.path))
-
-                loaded.append(.note(MarkdownNote(id: noteId, fileURL: url, title: title, modifiedDate: modDate)))
-            }
-        }
-
-        // Folders first (alphabetical), then notes (by modification date descending)
-        let folders = loaded.filter {
-            if case .folder = $0 { return true }; return false
-        }.sorted {
-            if case .folder(let a) = $0, case .folder(let b) = $1 { return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending }
-            return false
-        }
-        let notes = loaded.filter {
-            if case .note = $0 { return true }; return false
-        }.sorted { $0.modifiedDate > $1.modifiedDate }
-
-        items = folders + notes
-        for item in items {
-            if case .note(let n) = item {
-                logger.info("[loadItems] note title='\(n.title)' file=\(n.fileURL.lastPathComponent)")
-            }
+            items = []
         }
     }
 
@@ -500,7 +493,7 @@ final class MarkdownNoteStore {
         if let fmId = MarkdownNote.idFromFrontmatter(existingContent) {
             id = fmId
         } else {
-            id = UUID(uuid: UUID.nameToUUID(fileURL.path))
+            id = VaultDirectoryLoader.stableID(for: fileURL)
         }
         let attrs = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey])
         let note = MarkdownNote(
@@ -529,7 +522,7 @@ final class MarkdownNoteStore {
         CoordinatedFileManager.createDirectory(at: folderURL)
 
         let folder = NotoFolder(
-            id: UUID(uuid: UUID.nameToUUID(folderURL.path)),
+            id: VaultDirectoryLoader.stableID(for: folderURL),
             folderURL: folderURL,
             name: name,
             modifiedDate: Date()
@@ -568,23 +561,5 @@ private extension MarkdownNoteStore {
             logger.error("Fallback delete failed for \(url.lastPathComponent): \(error)")
             return false
         }
-    }
-}
-
-// MARK: - UUID Helper
-
-private extension UUID {
-    static func nameToUUID(_ name: String) -> uuid_t {
-        var hasher = Hasher()
-        hasher.combine(name)
-        let hash = hasher.finalize()
-        let u = UInt64(bitPattern: Int64(hash))
-        return (
-            UInt8(truncatingIfNeeded: u), UInt8(truncatingIfNeeded: u >> 8),
-            UInt8(truncatingIfNeeded: u >> 16), UInt8(truncatingIfNeeded: u >> 24),
-            UInt8(truncatingIfNeeded: u >> 32), UInt8(truncatingIfNeeded: u >> 40),
-            UInt8(truncatingIfNeeded: u >> 48), UInt8(truncatingIfNeeded: u >> 56),
-            0, 0, 0, 0, 0, 0, 0, 0
-        )
     }
 }

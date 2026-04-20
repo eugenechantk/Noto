@@ -43,7 +43,8 @@ struct NoteListView: View {
                 selectedNote: $selectedNote,
                 selectedNoteStore: $selectedNoteStore,
                 selectedIsNew: $selectedNoteIsNew,
-                externallyDeletingNoteID: $externallyDeletingNoteID
+                externallyDeletingNoteID: $externallyDeletingNoteID,
+                onOpenTodayNote: openTodayNote
             )
             .sheet(isPresented: $showSettings) {
                 if let locationManager {
@@ -150,7 +151,8 @@ struct NoteListView: View {
             selectedNote: $selectedNote,
             selectedNoteStore: $selectedNoteStore,
             selectedIsNew: $selectedNoteIsNew,
-            externallyDeletingNoteID: $externallyDeletingNoteID
+            externallyDeletingNoteID: $externallyDeletingNoteID,
+            onOpenTodayNote: openTodayNote
         )
         .sheet(isPresented: $showSettings) {
             if let locationManager {
@@ -198,7 +200,7 @@ struct NoteListView: View {
                 onOpenTodayNote: { openTodayNote() },
                 onCreateRootNote: { createRootNoteAndSelect() },
                 externallyDeletingNoteID: $externallyDeletingNoteID,
-                showsInlineBackButton: false
+                chromeMode: .compactNavigation(showsInlineBackButton: false)
             )
             .id(selectedNote.id)
         } else {
@@ -667,6 +669,16 @@ struct FolderContentView: View {
             Button("Cancel", role: .cancel) { newFolderName = "" }
         }
         .onAppear {
+            store.loadItems()
+        }
+        .onChange(of: fileWatcher?.changeCount) { _, _ in
+            store.loadItems()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { notification in
+            guard let snapshot = notification.object as? NoteSyncSnapshot else { return }
+            guard snapshot.fileURL.deletingLastPathComponent().standardizedFileURL == store.directoryURL.standardizedFileURL else {
+                return
+            }
             store.loadItems()
         }
         .overlay {

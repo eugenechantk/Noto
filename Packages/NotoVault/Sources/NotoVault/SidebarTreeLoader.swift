@@ -24,13 +24,41 @@ public struct SidebarTreeNode: Identifiable, Equatable, Hashable, Sendable {
     }
 }
 
+public struct VaultTreeRow: Identifiable, Equatable, Hashable, Sendable {
+    public let item: VaultListItem
+    public let depth: Int
+    public let isExpanded: Bool?
+
+    public var id: UUID {
+        item.id
+    }
+
+    public init(item: VaultListItem, depth: Int, isExpanded: Bool?) {
+        self.item = item
+        self.depth = depth
+        self.isExpanded = isExpanded
+    }
+}
+
 public struct SidebarTreeLoader {
-    public init() {}
+    private let directoryLoader: VaultDirectoryLoader
+
+    public init(directoryLoader: VaultDirectoryLoader = VaultDirectoryLoader()) {
+        self.directoryLoader = directoryLoader
+    }
 
     public func loadRows(
         rootURL: URL,
         expandedFolderURLs: Set<URL>? = nil
     ) throws -> [SidebarTreeNode] {
+        try loadTreeRows(rootURL: rootURL, expandedFolderURLs: expandedFolderURLs)
+            .map { SidebarTreeNode(row: $0) }
+    }
+
+    public func loadTreeRows(
+        rootURL: URL,
+        expandedFolderURLs: Set<URL>? = nil
+    ) throws -> [VaultTreeRow] {
         let normalizedExpanded = expandedFolderURLs.map {
             Set($0.map { $0.standardizedFileURL })
         }
@@ -63,58 +91,25 @@ public struct SidebarTreeLoader {
         in directoryURL: URL,
         depth: Int,
         expandedFolderURLs: Set<URL>?
-    ) throws -> [SidebarTreeNode] {
-        let children = try FileManager.default.contentsOfDirectory(
-            at: directoryURL,
-            includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )
+    ) throws -> [VaultTreeRow] {
+        let items = try directoryLoader.loadItems(in: directoryURL)
 
-        var folders: [SidebarTreeNode] = []
-        var notes: [SidebarTreeNode] = []
-
-        for childURL in children {
-            let values = try childURL.resourceValues(forKeys: [.contentModificationDateKey, .isDirectoryKey])
-            let modifiedAt = values.contentModificationDate ?? .distantPast
-            if values.isDirectory == true {
-                let normalizedURL = childURL.standardizedFileURL
-                let isExpanded = expandedFolderURLs?.contains(normalizedURL) ?? true
-                folders.append(SidebarTreeNode(
-                    kind: .folder(isExpanded: isExpanded),
-                    depth: depth,
-                    name: normalizedURL.lastPathComponent,
-                    url: normalizedURL,
-                    modifiedAt: modifiedAt
-                ))
-            } else if childURL.pathExtension == "md" {
-                let normalizedURL = childURL.standardizedFileURL
-                notes.append(SidebarTreeNode(
-                    kind: .note,
-                    depth: depth,
-                    name: normalizedURL.deletingPathExtension().lastPathComponent,
-                    url: normalizedURL,
-                    modifiedAt: modifiedAt
-                ))
-            }
-        }
-
-        folders.sort {
-            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-        }
-        notes.sort { $0.modifiedAt > $1.modifiedAt }
-
-        var rows: [SidebarTreeNode] = []
-        for folder in folders {
-            rows.append(folder)
-            if case .folder(isExpanded: true) = folder.kind {
+        var rows: [VaultTreeRow] = []
+        for item in items {
+            switch item {
+            case .folder(let folder):
+                let isExpanded = expandedFolderURLs?.contains(folder.folderURL.standardizedFileURL) ?? true
+                rows.append(VaultTreeRow(item: item, depth: depth, isExpanded: isExpanded))
+                guard isExpanded else { continue }
                 rows += try loadChildren(
-                    in: folder.url,
+                    in: folder.folderURL,
                     depth: depth + 1,
                     expandedFolderURLs: expandedFolderURLs
                 )
+            case .note:
+                rows.append(VaultTreeRow(item: item, depth: depth, isExpanded: nil))
             }
         }
-        rows += notes
         return rows
     }
 
@@ -134,6 +129,30 @@ public struct SidebarTreeLoader {
                 nextAncestorDepth -= 1
             }
             cursor -= 1
+        }
+    }
+
+}
+
+private extension SidebarTreeNode {
+    init(row: VaultTreeRow) {
+        switch row.item {
+        case .folder(let folder):
+            self.init(
+                kind: .folder(isExpanded: row.isExpanded ?? false),
+                depth: row.depth,
+                name: folder.name,
+                url: folder.folderURL,
+                modifiedAt: folder.modifiedDate
+            )
+        case .note(let note):
+            self.init(
+                kind: .note,
+                depth: row.depth,
+                name: note.title,
+                url: note.fileURL,
+                modifiedAt: note.modifiedDate
+            )
         }
     }
 }
