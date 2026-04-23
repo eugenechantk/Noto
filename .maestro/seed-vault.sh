@@ -11,6 +11,7 @@
 #   - Project Plan.md (todos)
 #   - Long Scrolling Note.md (long editor content for scrolling/glass checks)
 #   - Captures/The State of Consumer AI - Usage.md (captured source note)
+#   - Captures/The $120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money.md (long stress-test capture)
 #
 # Large scale creates a performance vault. Defaults can be overridden:
 #   ROOT_NOTE_COUNT=2000 FOLDER_COUNT=12 NOTES_PER_FOLDER=1000 ./seed-vault.sh <udid> --scale large
@@ -44,6 +45,8 @@ fi
 
 VAULT_DIR="$DATA_DIR/Documents/Noto"
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FIXTURES_DIR="$SCRIPT_DIR/fixtures"
 
 echo "Seeding vault at: $VAULT_DIR"
 
@@ -255,7 +258,12 @@ Good capture fixtures need enough structure to exercise rendering and navigation
 <!-- noto:content:end -->
 NOTEEOF
 
-    echo "Done. Vault seeded with 3 folders and 5 notes."
+    # --- Long Stress-Test Capture ---
+    cp \
+        "$FIXTURES_DIR/Captures/The \$120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money.md" \
+        "$VAULT_DIR/Captures/"
+
+    echo "Done. Vault seeded with 3 folders and 6 notes."
 }
 
 seed_large_vault() {
