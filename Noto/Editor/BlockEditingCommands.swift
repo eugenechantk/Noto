@@ -346,11 +346,12 @@ struct BlockEditingCommands {
 
     static func toggledTodoLines(in text: String, selection: NSRange) -> TextSelectionTransform? {
         transformedSelectedLines(in: text, selection: selection, lineTransform: TodoMarkdown.toolbarToggledLine) { originalLine, transformedLine, offset in
+            let wasTodoLine = TodoMarkdown.match(in: originalLine) != nil
             let originalContentStart = TodoMarkdown.toolbarContentStart(in: originalLine)
             let transformedContentStart = TodoMarkdown.toolbarToggledContentStart(in: originalLine)
 
             if offset <= originalContentStart {
-                return min(offset, transformedContentStart)
+                return wasTodoLine ? min(offset, transformedContentStart) : transformedContentStart
             }
 
             let contentOffset = offset - originalContentStart

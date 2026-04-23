@@ -39,13 +39,15 @@ enum BlockType: Equatable {
         let indent = indentCount / 2
         let stripped = String(text.dropFirst(indentCount))
 
-        // Todo: - [ ] or - [x]
-        if stripped.hasPrefix("- [ ] ") || stripped == "- [ ]" {
+        // Todo: - [ ] or - [x], but only after the required trailing space.
+        if stripped.hasPrefix("- [ ] ") {
             return .todo(checked: false, indent: indent)
         }
-        if stripped.hasPrefix("- [x] ") || stripped == "- [x]" ||
-            stripped.hasPrefix("- [X] ") || stripped == "- [X]" {
+        if stripped.hasPrefix("- [x] ") || stripped.hasPrefix("- [X] ") {
             return .todo(checked: true, indent: indent)
+        }
+        if isNonRenderableTodoPrefix(stripped) {
+            return .paragraph
         }
 
         // Headings (only at indent 0)
@@ -72,6 +74,27 @@ enum BlockType: Equatable {
         }
 
         return .paragraph
+    }
+
+    private static func isNonRenderableTodoPrefix(_ stripped: String) -> Bool {
+        let exactPendingPrefixes = ["- [", "- [ ", "- [x", "- [X", "- [ ]", "- [x]", "- [X]"]
+        if exactPendingPrefixes.contains(stripped) {
+            return true
+        }
+
+        if stripped.hasPrefix("- [ ]"), stripped != "- [ ] " {
+            return true
+        }
+
+        if stripped.hasPrefix("- [x]"), stripped != "- [x] " {
+            return true
+        }
+
+        if stripped.hasPrefix("- [X]"), stripped != "- [X] " {
+            return true
+        }
+
+        return false
     }
 
     /// The prefix string for this block type (used for auto-continue).

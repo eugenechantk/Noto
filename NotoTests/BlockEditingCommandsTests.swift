@@ -155,6 +155,19 @@ struct BlockEditingCommandsTests {
         ))
     }
 
+    @Test("Todo toggle on an empty line moves the caret after the inserted prefix")
+    func todoToggleOnEmptyLinePlacesCaretAfterPrefix() {
+        let result = BlockEditingCommands.toggledTodoLines(
+            in: "",
+            selection: NSRange(location: 0, length: 0)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "- [ ] ",
+            selection: NSRange(location: 6, length: 0)
+        ))
+    }
+
     @Test("Todo toggle removes markdown todo syntax from the current line and preserves content-relative cursor position")
     func todoToggleRemovesTodoPrefix() {
         let result = BlockEditingCommands.toggledTodoLines(

@@ -8,11 +8,10 @@ struct TextKit2MarkdownLayoutTests {
 
     @Test("List metrics come from a single declarative visual spec")
     func listMetricsUseSharedVisualSpec() {
-        #expect(MarkdownVisualSpec.listBaseIndent == 12)
-        #expect(MarkdownVisualSpec.listIndentStep == 4)
         #expect(MarkdownVisualSpec.listMarkerTextGap == 8)
-        #expect(MarkdownVisualSpec.todoTextStartOffset == 28)
+        #expect(MarkdownVisualSpec.todoSymbolSize == 20)
         #expect(MarkdownVisualSpec.todoControlSize == 28)
+        #expect(MarkdownVisualSpec.todoTextStartOffset == MarkdownVisualSpec.todoSymbolSize + MarkdownVisualSpec.listMarkerTextGap)
     }
 
     @Test("Bullet continuation lines align with first-line content")
@@ -22,17 +21,18 @@ struct TextKit2MarkdownLayoutTests {
         let paragraphStyle = MarkdownParagraphStyler.paragraphStyle(for: kind, text: text)
         let expectedIndent = MarkdownParagraphStyler.listContentIndent(for: kind, text: text)
 
-        #expect(paragraphStyle.firstLineHeadIndent == MarkdownVisualSpec.listBaseIndent)
-        #expect(abs(paragraphStyle.headIndent - (MarkdownVisualSpec.listBaseIndent + expectedIndent)) < 0.5)
+        #expect(paragraphStyle.firstLineHeadIndent == 0)
+        #expect(abs(paragraphStyle.headIndent - expectedIndent) < 0.5)
     }
 
-    @Test("Nested bullet indentation uses the reduced visual step")
-    func nestedBulletIndentationUsesReducedStep() {
+    @Test("Nested bullet indentation follows the markdown source spaces")
+    func nestedBulletIndentationFollowsSourceSpaces() {
         let text = "    - Nested"
         let kind = MarkdownBlockKind.detect(from: text)
         let paragraphStyle = MarkdownParagraphStyler.paragraphStyle(for: kind, text: text)
+        let expectedIndent = MarkdownParagraphStyler.sourceIndentWidth(for: kind, text: text, indentLevel: 2)
 
-        #expect(paragraphStyle.firstLineHeadIndent == MarkdownVisualSpec.listLeadingOffset(for: 2))
+        #expect(abs(paragraphStyle.firstLineHeadIndent - expectedIndent) < 0.5)
         #expect(paragraphStyle.headIndent > paragraphStyle.firstLineHeadIndent)
     }
 
@@ -61,16 +61,87 @@ struct TextKit2MarkdownLayoutTests {
         #expect(prefixColor?.resolvedColor(with: lightTrait) == UIColor.clear.resolvedColor(with: lightTrait))
     }
 
+    @Test("Bare todo syntax stays raw text until the trailing space is present")
+    func bareTodoSyntaxStaysRawUntilTrailingSpace() {
+        #expect(MarkdownBlockKind.detect(from: "- [ ]") == .paragraph)
+        #expect(MarkdownBlockKind.detect(from: "- [x]") == .paragraph)
+        #expect(MarkdownBlockKind.detect(from: "- [ ] ") == .todo(checked: false, indent: 0))
+        #expect(MarkdownBlockKind.detect(from: "- [x] ") == .todo(checked: true, indent: 0))
+    }
+
     @Test("Todo wrapped lines align with first-line text after the circle")
     func todoWrappedLinesAlignWithTextAfterCircle() {
         let text = "- [ ] A long todo that wraps onto another visual line"
         let kind = MarkdownBlockKind.detect(from: text)
         let paragraphStyle = MarkdownParagraphStyler.paragraphStyle(for: kind, text: text)
-        let expectedHeadIndent = MarkdownVisualSpec.listBaseIndent + MarkdownVisualSpec.todoTextStartOffset
+        let hiddenPrefixWidth = MarkdownParagraphStyler.todoHiddenPrefixWidth(for: kind, text: text)
+        let expectedHeadIndent = MarkdownVisualSpec.todoTextStartOffset
 
         #expect(paragraphStyle.headIndent > paragraphStyle.firstLineHeadIndent)
-        #expect(abs((paragraphStyle.headIndent - paragraphStyle.firstLineHeadIndent) - 2) < 0.5)
+        #expect(abs((paragraphStyle.headIndent - paragraphStyle.firstLineHeadIndent) - hiddenPrefixWidth) < 0.5)
         #expect(abs(paragraphStyle.headIndent - expectedHeadIndent) < 0.5)
+    }
+
+    @Test("Unindented todos render flush left with the shared text gap")
+    func unindentedTodosRenderFlushLeftWithSharedTextGap() {
+        let text = "- [ ] Visible todo"
+        let kind = MarkdownBlockKind.detect(from: text)
+        let paragraphStyle = MarkdownParagraphStyler.paragraphStyle(for: kind, text: text)
+        let markerRect = TodoMarkerGeometry.markerRect(
+            contentLeadingX: paragraphStyle.headIndent,
+            lineMidY: 20
+        )
+        let circleRect = TodoMarkerGeometry.symbolRect(in: markerRect)
+
+        #expect(abs(circleRect.minX) < 1)
+        #expect(abs(paragraphStyle.headIndent - circleRect.maxX - MarkdownVisualSpec.listMarkerTextGap) < 1)
+    }
+
+    @Test("Nested todo indentation follows the markdown source spaces")
+    func nestedTodoIndentationFollowsSourceSpaces() {
+        let text = "    - [ ] Nested todo"
+        let kind = MarkdownBlockKind.detect(from: text)
+        let paragraphStyle = MarkdownParagraphStyler.paragraphStyle(for: kind, text: text)
+        let expectedIndent = MarkdownParagraphStyler.sourceIndentWidth(for: kind, text: text, indentLevel: 2)
+        let markerRect = TodoMarkerGeometry.markerRect(
+            contentLeadingX: paragraphStyle.headIndent,
+            lineMidY: 20
+        )
+        let circleRect = TodoMarkerGeometry.symbolRect(in: markerRect)
+
+        #expect(abs(circleRect.minX - expectedIndent) < 1)
+        #expect(abs(paragraphStyle.headIndent - (expectedIndent + MarkdownVisualSpec.todoTextStartOffset)) < 1)
+    }
+
+    @Test("Empty todo content boundary stays aligned with populated todos")
+    func emptyTodoContentBoundaryMatchesPopulatedTodo() {
+        let emptyText = "- [ ] "
+        let emptyKind = MarkdownBlockKind.detect(from: emptyText)
+        let emptyParagraphStyle = MarkdownParagraphStyler.paragraphStyle(for: emptyKind, text: emptyText)
+        let emptyHiddenPrefixWidth = MarkdownParagraphStyler.todoHiddenPrefixWidth(for: emptyKind, text: emptyText)
+        let emptyBoundaryX = emptyParagraphStyle.firstLineHeadIndent
+            + emptyHiddenPrefixWidth
+            + MarkdownParagraphStyler.todoTrailingSpaceWidthCompensation(for: emptyKind, text: emptyText)
+
+        let populatedText = "- [ ] Filled"
+        let populatedKind = MarkdownBlockKind.detect(from: populatedText)
+        let populatedParagraphStyle = MarkdownParagraphStyler.paragraphStyle(for: populatedKind, text: populatedText)
+        let populatedHiddenPrefixWidth = MarkdownParagraphStyler.todoHiddenPrefixWidth(for: populatedKind, text: populatedText)
+        let populatedBoundaryX = populatedParagraphStyle.firstLineHeadIndent + populatedHiddenPrefixWidth
+
+        #expect(abs(emptyBoundaryX - populatedBoundaryX) < 0.5)
+        #expect(abs(populatedBoundaryX - MarkdownVisualSpec.todoTextStartOffset) < 0.5)
+    }
+
+    @Test("List paragraph spacing stays stable while typing list prefixes")
+    func listParagraphSpacingStaysStableWhileTypingPrefixes() {
+        let pendingBulletSpacing = MarkdownParagraphStyler.paragraphStyle(for: .paragraph, text: "-").paragraphSpacingBefore
+        let bulletSpacing = MarkdownParagraphStyler.paragraphStyle(for: MarkdownBlockKind.detect(from: "- "), text: "- ").paragraphSpacingBefore
+        let pendingTodoSpacing = MarkdownParagraphStyler.paragraphStyle(for: .paragraph, text: "- [ ]").paragraphSpacingBefore
+        let todoSpacing = MarkdownParagraphStyler.paragraphStyle(for: MarkdownBlockKind.detect(from: "- [ ] "), text: "- [ ] ").paragraphSpacingBefore
+
+        #expect(pendingBulletSpacing == bulletSpacing)
+        #expect(pendingTodoSpacing == todoSpacing)
     }
 
     @Test("Markdown hyperlinks style the title as an actionable link")
@@ -359,20 +430,18 @@ struct TextKit2MarkdownLayoutTests {
 
     @Test("Todo fragment marker rect follows visual indent metrics")
     func todoFragmentMarkerRectFollowsVisualIndentMetrics() {
-        let rect = TodoLayoutFragment.markerRect(
-            fragmentFrame: CGRect(x: 0, y: 100, width: 300, height: 40),
-            point: CGPoint(x: 16, y: 0),
-            indent: 2
+        let rect = TodoMarkerGeometry.markerRect(
+            contentLeadingX: MarkdownVisualSpec.todoTextStartOffset,
+            lineMidY: 120
         )
-        let expectedLeading = 16
-            + MarkdownVisualSpec.listLeadingOffset(for: 2)
-            + MarkdownVisualSpec.todoSymbolSize / 2
-            - MarkdownVisualSpec.todoMarkerContentLeadingAdjustment
+        let circleRect = TodoMarkerGeometry.symbolRect(in: rect)
+        let expectedCircleLeading = 0 as CGFloat
 
-        #expect(abs(rect.midX - expectedLeading) < 1)
+        #expect(abs(circleRect.minX - expectedCircleLeading) < 1)
         #expect(abs(rect.midY - 120) < 1)
         #expect(rect.width == MarkdownVisualSpec.todoControlSize)
         #expect(rect.height == MarkdownVisualSpec.todoControlSize)
+        #expect(abs(MarkdownVisualSpec.todoTextStartOffset - circleRect.maxX - MarkdownVisualSpec.listMarkerTextGap) < 1)
     }
 
     @Test("Image fragment rect preserves reserved height minus vertical padding")
@@ -676,20 +745,18 @@ struct TextKit2MarkdownLayoutMacTests {
 
     @Test("Todo fragment marker rect follows visual indent metrics")
     func todoFragmentMarkerRectFollowsVisualIndentMetrics() {
-        let rect = TodoLayoutFragment.markerRect(
-            fragmentFrame: CGRect(x: 0, y: 100, width: 300, height: 40),
-            point: CGPoint(x: 48, y: 0),
-            indent: 2
+        let rect = TodoMarkerGeometry.markerRect(
+            contentLeadingX: MarkdownVisualSpec.todoTextStartOffset,
+            lineMidY: 120
         )
-        let expectedLeading = 48
-            + MarkdownVisualSpec.listLeadingOffset(for: 2)
-            + MarkdownVisualSpec.todoSymbolSize / 2
-            - MarkdownVisualSpec.todoMarkerContentLeadingAdjustment
+        let circleRect = TodoMarkerGeometry.symbolRect(in: rect)
+        let expectedCircleLeading = 0 as CGFloat
 
-        #expect(abs(rect.midX - expectedLeading) < 1)
+        #expect(abs(circleRect.minX - expectedCircleLeading) < 1)
         #expect(abs(rect.midY - 120) < 1)
         #expect(rect.width == MarkdownVisualSpec.todoControlSize)
         #expect(rect.height == MarkdownVisualSpec.todoControlSize)
+        #expect(abs(MarkdownVisualSpec.todoTextStartOffset - circleRect.maxX - MarkdownVisualSpec.listMarkerTextGap) < 1)
     }
 }
 #endif

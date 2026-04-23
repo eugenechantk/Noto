@@ -246,12 +246,14 @@ enum MarkdownBlockKind: Equatable {
             return .imageLink(imageLink)
         }
 
-        if stripped.hasPrefix("- [ ] ") || stripped == "- [ ]" {
+        if stripped.hasPrefix("- [ ] ") {
             return .todo(checked: false, indent: indent)
         }
-        if stripped.hasPrefix("- [x] ") || stripped == "- [x]" ||
-            stripped.hasPrefix("- [X] ") || stripped == "- [X]" {
+        if stripped.hasPrefix("- [x] ") || stripped.hasPrefix("- [X] ") {
             return .todo(checked: true, indent: indent)
+        }
+        if isNonRenderableTodoPrefix(stripped) {
+            return .paragraph
         }
         if indent == 0 {
             if stripped.hasPrefix("### ") { return .heading(level: 3) }
@@ -286,9 +288,6 @@ enum MarkdownBlockKind: Equatable {
             if stripped.hasPrefix("- [ ] ") || stripped.hasPrefix("- [x] ") || stripped.hasPrefix("- [X] ") {
                 return indentCount + 6
             }
-            if stripped == "- [ ]" || stripped == "- [x]" || stripped == "- [X]" {
-                return indentCount + 5
-            }
             return 0
         case .bullet:
             return indentCount + (stripped.hasPrefix("- ") || stripped.hasPrefix("* ") || stripped.hasPrefix("• ") ? 2 : 0)
@@ -297,6 +296,27 @@ enum MarkdownBlockKind: Equatable {
             return indentCount + (stripped.hasPrefix(marker) ? marker.count : 0)
         case .frontmatter, .paragraph, .imageLink, .xmlTag, .collapsedXMLTagContent: return 0
         }
+    }
+
+    private static func isNonRenderableTodoPrefix(_ stripped: String) -> Bool {
+        let exactPendingPrefixes = ["- [", "- [ ", "- [x", "- [X", "- [ ]", "- [x]", "- [X]"]
+        if exactPendingPrefixes.contains(stripped) {
+            return true
+        }
+
+        if stripped.hasPrefix("- [ ]"), stripped != "- [ ] " {
+            return true
+        }
+
+        if stripped.hasPrefix("- [x]"), stripped != "- [x] " {
+            return true
+        }
+
+        if stripped.hasPrefix("- [X]"), stripped != "- [X] " {
+            return true
+        }
+
+        return false
     }
 }
 
@@ -407,17 +427,21 @@ enum MarkdownVisualSpec {
     static let h3Font = Font(pointSize: 18, weight: .semibold)
     static let codeFont = Font(pointSize: 16, weight: .regular, isMonospaced: true)
 
+    // Legacy list indent values kept for inactive block-editor compatibility.
     static let listBaseIndent: CGFloat = 12
     static let listIndentStep: CGFloat = 4
+    // Bullets, ordered lists, and todos all share this marker-to-text gap.
     static let listMarkerTextGap: CGFloat = 8
     static let todoPrefixVisualWidth: CGFloat = 2
     static let hyperlinkSyntaxVisualWidth: CGFloat = 0.01
-    static let todoTextStartOffset: CGFloat = 28
     static let todoControlSize: CGFloat = 28
-    static let todoSymbolSize: CGFloat = 18
-    static let todoMarkerContentLeadingAdjustment: CGFloat = 12
-    static let todoControlLeadingInset: CGFloat = 2
-    static let todoControlImageLeadingInset: CGFloat = 5
+    static let todoSymbolSize: CGFloat = 20
+    static let todoTextStartOffset: CGFloat = todoSymbolSize + listMarkerTextGap
+    static let todoMarkerHitInset: CGFloat = max(0, (todoControlSize - todoSymbolSize) / 2)
+    static let todoVisibleInset: CGFloat = 1
+    static let todoCheckedVisibleInset: CGFloat = 2
+    static let todoOutlineWidth: CGFloat = 2
+    static let todoCheckmarkWidth: CGFloat = 2
     static let imagePreviewReservedHeight: CGFloat = 300
     static let imagePreviewVerticalPadding: CGFloat = 8
     static let imagePreviewCornerRadius: CGFloat = 8
@@ -457,14 +481,20 @@ private enum MarkdownTheme {
     #if os(iOS)
     static let bodyColor: PlatformColor = AppTheme.uiPrimaryText
     static let prefixColor: PlatformColor = AppTheme.uiMutedText
-    static let checkedColor: PlatformColor = AppTheme.uiSecondaryText
+    static let checkedTextColor: PlatformColor = AppTheme.uiSecondaryText
+    static let todoUncheckedColor: PlatformColor = .systemGray2
+    static let todoCheckedFillColor: PlatformColor = .systemGreen
+    static let todoCheckmarkColor: PlatformColor = .white
     static let codeColor: PlatformColor = AppTheme.uiSecondaryText
     static let codeBgColor: PlatformColor = AppTheme.uiCodeBackground
     static let linkColor: PlatformColor = .systemBlue
     #elseif os(macOS)
     static let bodyColor: PlatformColor = AppTheme.nsPrimaryText
     static let prefixColor: PlatformColor = AppTheme.nsMutedText
-    static let checkedColor: PlatformColor = AppTheme.nsSecondaryText
+    static let checkedTextColor: PlatformColor = AppTheme.nsSecondaryText
+    static let todoUncheckedColor: PlatformColor = .tertiaryLabelColor
+    static let todoCheckedFillColor: PlatformColor = .systemGreen
+    static let todoCheckmarkColor: PlatformColor = .white
     static let codeColor: PlatformColor = AppTheme.nsSecondaryText
     static let codeBgColor: PlatformColor = AppTheme.nsCodeBackground
     static let linkColor: PlatformColor = .linkColor
@@ -534,21 +564,23 @@ enum MarkdownParagraphStyler {
             paraStyle.paragraphSpacing = spacing * 0.4
 
         case .todo(_, let indent):
-            let indentPt = MarkdownTheme.listLeadingOffset(for: indent)
+            let indentPt = sourceIndentWidth(for: kind, text: text, indentLevel: indent)
             let contentIndent = listContentIndent(for: kind, text: text)
-            paraStyle.firstLineHeadIndent = indentPt + contentIndent - MarkdownTheme.todoPrefixVisualWidth
+            let hiddenPrefixWidth = todoHiddenPrefixWidth(for: kind, text: text)
+            let trailingSpaceCompensation = todoTrailingSpaceWidthCompensation(for: kind, text: text)
+            paraStyle.firstLineHeadIndent = indentPt + contentIndent - hiddenPrefixWidth - trailingSpaceCompensation
             paraStyle.headIndent = indentPt + contentIndent
             paraStyle.paragraphSpacingBefore = 4
 
         case .bullet(let indent):
-            let indentPt = MarkdownTheme.listLeadingOffset(for: indent)
+            let indentPt = sourceIndentWidth(for: kind, text: text, indentLevel: indent)
             let contentIndent = listContentIndent(for: kind, text: text)
             paraStyle.firstLineHeadIndent = indentPt
             paraStyle.headIndent = indentPt + contentIndent
             paraStyle.paragraphSpacingBefore = 4
 
         case .orderedList(_, let indent):
-            let indentPt = MarkdownTheme.listLeadingOffset(for: indent)
+            let indentPt = sourceIndentWidth(for: kind, text: text, indentLevel: indent)
             let contentIndent = listContentIndent(for: kind, text: text)
             paraStyle.firstLineHeadIndent = indentPt
             paraStyle.headIndent = indentPt + contentIndent
@@ -577,10 +609,20 @@ enum MarkdownParagraphStyler {
             paraStyle.paragraphSpacing = 0
 
         case .paragraph:
-            paraStyle.paragraphSpacingBefore = 6
+            paraStyle.paragraphSpacingBefore = paragraphUsesListSpacingWhileTyping(text) ? 4 : 6
         }
 
         return paraStyle
+    }
+
+    static func sourceIndentWidth(for kind: MarkdownBlockKind, text: String, indentLevel: Int) -> CGFloat {
+        let _ = indentLevel
+        let leadingSpaces = text.prefix(while: { $0 == " " }).count
+        guard leadingSpaces > 0 else { return 0 }
+
+        let indentString = String(repeating: " ", count: leadingSpaces)
+        let font = MarkdownTheme.font(for: kind)
+        return ceil((indentString as NSString).size(withAttributes: [.font: font]).width)
     }
 
     static func listContentIndent(for kind: MarkdownBlockKind, text: String) -> CGFloat {
@@ -595,6 +637,29 @@ enum MarkdownParagraphStyler {
         let font = MarkdownTheme.font(for: kind)
         let prefixWidth = ceil((prefix as NSString).size(withAttributes: [.font: font]).width)
         return prefixWidth
+    }
+
+    static func todoHiddenPrefixWidth(for kind: MarkdownBlockKind, text: String) -> CGFloat {
+        guard case .todo = kind else { return 0 }
+
+        let prefixLength = kind.prefixLength(in: text)
+        let fullLength = (text as NSString).length
+        let hiddenPrefixLength = todoHiddenPrefixLength(prefixLength: prefixLength, fullLength: fullLength)
+        guard hiddenPrefixLength > 0 else { return 0 }
+
+        let hiddenPrefix = String((text as NSString).substring(to: hiddenPrefixLength))
+        let hiddenFont = PlatformFont.systemFont(ofSize: MarkdownTheme.todoPrefixVisualWidth, weight: .regular)
+        return ceil((hiddenPrefix as NSString).size(withAttributes: [.font: hiddenFont]).width)
+    }
+
+    static func todoTrailingSpaceWidthCompensation(for kind: MarkdownBlockKind, text: String) -> CGFloat {
+        guard case .todo = kind else { return 0 }
+
+        let prefixLength = kind.prefixLength(in: text)
+        let fullLength = (text as NSString).length
+        guard prefixLength > 0, prefixLength == fullLength, text.hasSuffix(" ") else { return 0 }
+
+        return ceil((" " as NSString).size(withAttributes: [.font: MarkdownTheme.font(for: kind)]).width)
     }
 
     static func style(
@@ -628,7 +693,7 @@ enum MarkdownParagraphStyler {
         case .todo(let checked, _):
             attributed.addAttributes([
                 .font: MarkdownTheme.bodyFont,
-                .foregroundColor: checked ? MarkdownTheme.checkedColor : MarkdownTheme.bodyColor,
+                .foregroundColor: checked ? MarkdownTheme.checkedTextColor : MarkdownTheme.bodyColor,
                 .paragraphStyle: paraStyle,
             ], range: fullRange)
             if checked {
@@ -962,29 +1027,99 @@ enum TodoMarkerGeometry {
         lineMidY: CGFloat
     ) -> CGRect {
         let controlSize = MarkdownVisualSpec.todoControlSize
-        let symbolSize = MarkdownVisualSpec.todoSymbolSize
-        let symbolLeading = contentLeadingX
-            - MarkdownVisualSpec.todoTextStartOffset
-            - MarkdownVisualSpec.todoMarkerContentLeadingAdjustment
+        let controlLeading = contentLeadingX - MarkdownVisualSpec.todoTextStartOffset
         return CGRect(
-            x: symbolLeading,
-            y: lineMidY - symbolSize / 2,
-            width: symbolSize,
-            height: symbolSize
-        ).integral.insetBy(dx: -max(0, (controlSize - symbolSize) / 2), dy: -max(0, (controlSize - symbolSize) / 2))
+            x: controlLeading - MarkdownVisualSpec.todoMarkerHitInset,
+            y: lineMidY - controlSize / 2,
+            width: controlSize,
+            height: controlSize
+        ).integral
     }
 
-    static func markerRect(
-        textContainerOriginX: CGFloat,
-        lineMidY: CGFloat,
-        indent: Int
-    ) -> CGRect {
-        let contentLeadingX = textContainerOriginX
-            + MarkdownVisualSpec.listLeadingOffset(for: indent)
-            + MarkdownVisualSpec.todoTextStartOffset
-        return markerRect(contentLeadingX: contentLeadingX, lineMidY: lineMidY)
+    static func symbolRect(in markerRect: CGRect) -> CGRect {
+        CGRect(
+            x: markerRect.minX + MarkdownVisualSpec.todoMarkerHitInset,
+            y: markerRect.midY - MarkdownVisualSpec.todoSymbolSize / 2,
+            width: MarkdownVisualSpec.todoSymbolSize,
+            height: MarkdownVisualSpec.todoSymbolSize
+        )
+    }
+
+}
+
+#if os(iOS)
+final class TodoMarkerButton: UIControl {
+    var paragraphLocation: Int = 0
+    var isChecked = false {
+        didSet { setNeedsDisplay() }
+    }
+    var markerRectInBounds = CGRect(
+        x: 0,
+        y: 0,
+        width: MarkdownVisualSpec.todoControlSize,
+        height: MarkdownVisualSpec.todoControlSize
+    ) {
+        didSet { setNeedsDisplay() }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isOpaque = false
+        accessibilityTraits = .button
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draw(_ rect: CGRect) {
+        guard let context = UIGraphicsGetCurrentContext() else { return }
+
+        context.saveGState()
+        defer { context.restoreGState() }
+
+        let symbolRect = TodoMarkerGeometry.symbolRect(in: markerRectInBounds)
+        let uncheckedColor = MarkdownTheme.todoUncheckedColor.cgColor
+        let checkedFillColor = MarkdownTheme.todoCheckedFillColor.cgColor
+        let checkmarkColor = MarkdownTheme.todoCheckmarkColor.cgColor
+
+        if isChecked {
+            context.setFillColor(checkedFillColor)
+            context.fillEllipse(
+                in: symbolRect.insetBy(
+                    dx: MarkdownVisualSpec.todoCheckedVisibleInset,
+                    dy: MarkdownVisualSpec.todoCheckedVisibleInset
+                )
+            )
+        } else {
+            context.setStrokeColor(uncheckedColor)
+            context.setLineWidth(MarkdownVisualSpec.todoOutlineWidth)
+            context.strokeEllipse(
+                in: symbolRect.insetBy(
+                    dx: MarkdownVisualSpec.todoOutlineWidth / 2,
+                    dy: MarkdownVisualSpec.todoOutlineWidth / 2
+                )
+            )
+            return
+        }
+
+        let checkmarkRect = symbolRect.insetBy(
+            dx: MarkdownVisualSpec.todoCheckedVisibleInset,
+            dy: MarkdownVisualSpec.todoCheckedVisibleInset
+        )
+        let checkPath = CGMutablePath()
+        checkPath.move(to: CGPoint(x: checkmarkRect.minX + checkmarkRect.width * 0.26, y: checkmarkRect.midY))
+        checkPath.addLine(to: CGPoint(x: checkmarkRect.minX + checkmarkRect.width * 0.43, y: checkmarkRect.maxY - checkmarkRect.height * 0.30))
+        checkPath.addLine(to: CGPoint(x: checkmarkRect.maxX - checkmarkRect.width * 0.22, y: checkmarkRect.minY + checkmarkRect.height * 0.30))
+        context.addPath(checkPath)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        context.setStrokeColor(checkmarkColor)
+        context.setLineWidth(MarkdownVisualSpec.todoCheckmarkWidth)
+        context.strokePath()
     }
 }
+#endif
 
 // MARK: - XMLCollapseControlGeometry
 
