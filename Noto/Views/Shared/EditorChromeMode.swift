@@ -13,3 +13,17 @@ enum EditorChromeMode {
         #endif
     }
 }
+
+struct EditorLeadingChromeControls {
+    var sidebarSystemImage: String?
+    var sidebarAccessibilityLabel: String?
+    var onToggleSidebar: (() -> Void)?
+    var showsBackButton = false
+    var onBack: (() -> Void)?
+
+    static let none = EditorLeadingChromeControls()
+
+    var isEmpty: Bool {
+        onToggleSidebar == nil && (!showsBackButton || onBack == nil)
+    }
+}

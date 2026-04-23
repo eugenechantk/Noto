@@ -12,6 +12,177 @@ enum NoteRoute: Hashable {
     case todayNote
 }
 
+// MARK: - Stack History
+
+struct NoteStackEntry: Equatable, Hashable {
+    var note: MarkdownNote
+    var directoryURL: URL
+    var vaultRootURL: URL
+    var isNew: Bool
+
+    init(note: MarkdownNote, directoryURL: URL, vaultRootURL: URL, isNew: Bool) {
+        self.note = note
+        self.directoryURL = directoryURL
+        self.vaultRootURL = vaultRootURL
+        self.isNew = isNew
+    }
+
+    init(note: MarkdownNote, store: MarkdownNoteStore, isNew: Bool) {
+        self.note = note
+        self.directoryURL = store.directoryURL
+        self.vaultRootURL = store.vaultRootURL
+        self.isNew = isNew
+    }
+
+    @MainActor
+    var store: MarkdownNoteStore {
+        MarkdownNoteStore(directoryURL: directoryURL, vaultRootURL: vaultRootURL, autoload: false)
+    }
+
+    func hasSameNavigationTarget(as other: NoteStackEntry) -> Bool {
+        note.fileURL.standardizedFileURL == other.note.fileURL.standardizedFileURL &&
+            directoryURL.standardizedFileURL == other.directoryURL.standardizedFileURL &&
+            vaultRootURL.standardizedFileURL == other.vaultRootURL.standardizedFileURL
+    }
+
+    static func == (lhs: NoteStackEntry, rhs: NoteStackEntry) -> Bool {
+        lhs.note.fileURL.standardizedFileURL == rhs.note.fileURL.standardizedFileURL &&
+            lhs.directoryURL.standardizedFileURL == rhs.directoryURL.standardizedFileURL &&
+            lhs.vaultRootURL.standardizedFileURL == rhs.vaultRootURL.standardizedFileURL &&
+            lhs.isNew == rhs.isNew
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(note.fileURL.standardizedFileURL.path)
+        hasher.combine(directoryURL.standardizedFileURL.path)
+        hasher.combine(vaultRootURL.standardizedFileURL.path)
+        hasher.combine(isNew)
+    }
+}
+
+struct NoteStackNavigationState: Equatable {
+    private(set) var root: NoteStackEntry?
+    var path: [NoteStackEntry] = []
+
+    var visibleEntry: NoteStackEntry? {
+        path.last ?? root
+    }
+
+    mutating func select(_ entry: NoteStackEntry) {
+        guard let visibleEntry else {
+            root = entry
+            return
+        }
+
+        if visibleEntry.hasSameNavigationTarget(as: entry) {
+            replaceVisibleEntry(entry)
+        } else {
+            path.append(entry)
+        }
+    }
+
+    mutating func replaceVisibleEntry(_ entry: NoteStackEntry) {
+        if path.isEmpty {
+            root = entry
+        } else {
+            path[path.index(before: path.endIndex)] = entry
+        }
+    }
+
+    mutating func clear() {
+        root = nil
+        path.removeAll()
+    }
+}
+
+struct NoteNavigationHistory: Equatable {
+    private(set) var entries: [NoteStackEntry] = []
+    private(set) var currentIndex: Int?
+
+    var currentEntry: NoteStackEntry? {
+        guard let currentIndex, entries.indices.contains(currentIndex) else { return nil }
+        return entries[currentIndex]
+    }
+
+    var canGoBack: Bool {
+        guard let currentIndex else { return false }
+        return currentIndex > 0
+    }
+
+    var canGoForward: Bool {
+        guard let currentIndex else { return false }
+        return currentIndex < entries.index(before: entries.endIndex)
+    }
+
+    mutating func visit(_ entry: NoteStackEntry) {
+        guard let currentIndex else {
+            entries = [entry]
+            self.currentIndex = 0
+            return
+        }
+
+        if entries[currentIndex].hasSameNavigationTarget(as: entry) {
+            entries[currentIndex] = entry
+            return
+        }
+
+        entries.removeSubrange(entries.index(after: currentIndex)..<entries.endIndex)
+        entries.append(entry)
+        self.currentIndex = entries.index(before: entries.endIndex)
+    }
+
+    mutating func replaceCurrent(_ entry: NoteStackEntry) {
+        guard let currentIndex, entries.indices.contains(currentIndex) else {
+            visit(entry)
+            return
+        }
+        entries[currentIndex] = entry
+    }
+
+    mutating func goBack() -> NoteStackEntry? {
+        guard canGoBack, let currentIndex else { return nil }
+        let newIndex = entries.index(before: currentIndex)
+        self.currentIndex = newIndex
+        return entries[newIndex]
+    }
+
+    mutating func goForward() -> NoteStackEntry? {
+        guard canGoForward, let currentIndex else { return nil }
+        let newIndex = entries.index(after: currentIndex)
+        self.currentIndex = newIndex
+        return entries[newIndex]
+    }
+
+    mutating func moveToAdjacentEntry(matching entry: NoteStackEntry) -> Bool {
+        guard let currentIndex else { return false }
+
+        if currentIndex > entries.startIndex {
+            let previousIndex = entries.index(before: currentIndex)
+            if entries[previousIndex].hasSameNavigationTarget(as: entry) {
+                entries[previousIndex] = entry
+                self.currentIndex = previousIndex
+                return true
+            }
+        }
+
+        if currentIndex < entries.index(before: entries.endIndex) {
+            let nextIndex = entries.index(after: currentIndex)
+            if entries[nextIndex].hasSameNavigationTarget(as: entry) {
+                entries[nextIndex] = entry
+                self.currentIndex = nextIndex
+                return true
+            }
+        }
+
+        return false
+    }
+
+    mutating func clear() {
+        entries.removeAll()
+        currentIndex = nil
+    }
+}
+
 // MARK: - Root View
 
 /// Root entry point — NavigationStack on iOS, NavigationSplitView on macOS.
@@ -22,6 +193,7 @@ struct NoteListView: View {
 
     #if os(iOS)
     @State private var path = NavigationPath()
+    @State private var compactNoteHistory = NoteNavigationHistory()
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
@@ -77,6 +249,7 @@ struct NoteListView: View {
                     isRoot: true,
                     fileWatcher: fileWatcher,
                     path: $path,
+                    onOpenNote: openCompactNote,
                     onTodayTap: { path.append(NoteRoute.todayNote) },
                     onCreateRootNote: createRootNoteAndPush,
                     onSettingsTap: locationManager != nil ? { path.append(NoteRoute.settings) } : nil
@@ -85,7 +258,7 @@ struct NoteListView: View {
                     switch route {
                     case .note(let note, let directoryURL, let vaultRootURL, let isNew):
                         NoteEditorScreen(
-                            store: MarkdownNoteStore(directoryURL: directoryURL, vaultRootURL: vaultRootURL),
+                            store: MarkdownNoteStore(directoryURL: directoryURL, vaultRootURL: vaultRootURL, autoload: false),
                             note: note,
                             isNew: isNew,
                             fileWatcher: fileWatcher,
@@ -100,14 +273,22 @@ struct NoteListView: View {
                                         vaultRootURL: vaultRootURL
                                     ))
                                 }
-                            }
+                            },
+                            onOpenDocumentLink: { relativePath in
+                                openDocumentLink(relativePath, vaultRootURL: vaultRootURL)
+                            },
+                            canNavigateBack: compactNoteHistory.canGoBack,
+                            canNavigateForward: compactNoteHistory.canGoForward,
+                            onNavigateBack: navigateCompactHistoryBack,
+                            onNavigateForward: navigateCompactHistoryForward
                         )
                     case .folder(let folderURL, let name, let vaultRootURL):
                         FolderContentView(
-                            store: MarkdownNoteStore(directoryURL: folderURL, vaultRootURL: vaultRootURL),
+                            store: MarkdownNoteStore(directoryURL: folderURL, vaultRootURL: vaultRootURL, autoload: false),
                             title: name,
                             fileWatcher: fileWatcher,
                             path: $path,
+                            onOpenNote: openCompactNote,
                             onTodayTap: { path.append(NoteRoute.todayNote) },
                             onCreateRootNote: createRootNoteAndPush
                         )
@@ -130,11 +311,23 @@ struct NoteListView: View {
                                         vaultRootURL: store.vaultRootURL
                                     ))
                                 }
-                            }
+                            },
+                            onOpenDocumentLink: { relativePath in
+                                openDocumentLink(relativePath, vaultRootURL: store.vaultRootURL)
+                            },
+                            canNavigateBack: compactNoteHistory.canGoBack,
+                            canNavigateForward: compactNoteHistory.canGoForward,
+                            onNavigateBack: navigateCompactHistoryBack,
+                            onNavigateForward: navigateCompactHistoryForward
                         )
                     }
                 }
             }
+            .notoAppBottomToolbar(
+                onOpenTodayNote: { path.append(NoteRoute.todayNote) },
+                onSearch: {},
+                onCreateRootNote: createRootNoteAndPush
+            )
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { _ in
                 path.append(NoteRoute.todayNote)
             }
@@ -184,6 +377,11 @@ struct NoteListView: View {
         selectNote(todayNote, in: todayStore, isNew: false)
     }
 
+    private func openDocumentLinkInSelection(_ relativePath: String) {
+        guard let resolved = store.note(atVaultRelativePath: relativePath) else { return }
+        selectNote(resolved.note, in: resolved.store, isNew: false)
+    }
+
     @ViewBuilder
     private var splitDetailView: some View {
         if let selectedNote, let selectedNoteStore {
@@ -199,6 +397,7 @@ struct NoteListView: View {
                 },
                 onOpenTodayNote: { openTodayNote() },
                 onCreateRootNote: { createRootNoteAndSelect() },
+                onOpenDocumentLink: openDocumentLinkInSelection,
                 externallyDeletingNoteID: $externallyDeletingNoteID,
                 chromeMode: .compactNavigation(showsInlineBackButton: false)
             )
@@ -222,13 +421,45 @@ struct NoteListView: View {
     #if os(iOS)
     private func createRootNoteAndPush() {
         let note = store.createNote()
+        let entry = NoteStackEntry(note: note, store: store, isNew: true)
+        compactNoteHistory.visit(entry)
         path = NavigationPath()
-        path.append(NoteRoute.note(
-            note,
-            directoryURL: store.vaultRootURL,
-            vaultRootURL: store.vaultRootURL,
-            isNew: true
-        ))
+        path.append(noteRoute(for: entry))
+    }
+
+    private func openDocumentLink(_ relativePath: String, vaultRootURL: URL) {
+        guard let resolved = store.note(atVaultRelativePath: relativePath) else { return }
+        openCompactNote(resolved.note, in: resolved.store, isNew: false)
+    }
+
+    private func openCompactNote(_ note: MarkdownNote, in noteStore: MarkdownNoteStore, isNew: Bool) {
+        let entry = NoteStackEntry(note: note, store: noteStore, isNew: isNew)
+        compactNoteHistory.visit(entry)
+        path.append(noteRoute(for: entry))
+    }
+
+    private func navigateCompactHistoryBack() {
+        guard let entry = compactNoteHistory.goBack() else { return }
+        replaceCompactVisibleNote(with: entry)
+    }
+
+    private func navigateCompactHistoryForward() {
+        guard let entry = compactNoteHistory.goForward() else { return }
+        replaceCompactVisibleNote(with: entry)
+    }
+
+    private func replaceCompactVisibleNote(with entry: NoteStackEntry) {
+        path = NavigationPath()
+        path.append(noteRoute(for: entry))
+    }
+
+    private func noteRoute(for entry: NoteStackEntry) -> NoteRoute {
+        .note(
+            entry.note,
+            directoryURL: entry.directoryURL,
+            vaultRootURL: entry.vaultRootURL,
+            isNew: entry.isNew
+        )
     }
     #endif
 
@@ -276,6 +507,11 @@ private struct TodayNoteDestination: View {
     var onOpenTodayNote: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
     var onTapBreadcrumbLevel: ((URL) -> Void)?
+    var onOpenDocumentLink: ((String) -> Void)?
+    var canNavigateBack: Bool = false
+    var canNavigateForward: Bool = false
+    var onNavigateBack: (() -> Void)?
+    var onNavigateForward: (() -> Void)?
     @State private var data: (store: MarkdownNoteStore, note: MarkdownNote)?
 
     var body: some View {
@@ -287,7 +523,12 @@ private struct TodayNoteDestination: View {
                     fileWatcher: fileWatcher,
                     onOpenTodayNote: onOpenTodayNote,
                     onCreateRootNote: onCreateRootNote,
-                    onTapBreadcrumbLevel: onTapBreadcrumbLevel
+                    onTapBreadcrumbLevel: onTapBreadcrumbLevel,
+                    onOpenDocumentLink: onOpenDocumentLink,
+                    canNavigateBack: canNavigateBack,
+                    canNavigateForward: canNavigateForward,
+                    onNavigateBack: onNavigateBack,
+                    onNavigateForward: onNavigateForward
                 )
             } else {
                 ProgressView()
@@ -396,14 +637,8 @@ struct SidebarView: View {
             Button("Cancel", role: .cancel) { newFolderName = "" }
         }
         .onAppear {
-            rootStore.loadItems()
+            rootStore.loadItemsInBackground()
         }
-        #if os(iOS)
-        .notoAppBottomToolbar(
-            onOpenTodayNote: onTodayTap,
-            onCreateRootNote: onCreateRootNote
-        )
-        #endif
     }
 
     @ViewBuilder
@@ -571,11 +806,11 @@ struct FolderContentView: View {
     var isRoot: Bool = false
     var fileWatcher: VaultFileWatcher?
     @Binding var path: NavigationPath
+    var onOpenNote: ((MarkdownNote, MarkdownNoteStore, Bool) -> Void)?
     var onTodayTap: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
     var onSettingsTap: (() -> Void)?
 
-    @Environment(\.dismiss) private var dismiss
     @State private var showNewFolderAlert = false
     @State private var newFolderName = ""
 
@@ -596,11 +831,7 @@ struct FolderContentView: View {
                     .accessibilityIdentifier("folder_\(folder.name)")
                 case .note(let note):
                     Button {
-                        path.append(NoteRoute.note(
-                            note,
-                            directoryURL: store.directoryURL,
-                            vaultRootURL: store.vaultRootURL
-                        ))
+                        openNote(note, isNew: false)
                     } label: {
                         MarkdownNoteRow(note: note)
                     }
@@ -618,16 +849,7 @@ struct FolderContentView: View {
         .accessibilityIdentifier("note_list")
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(!isRoot)
         .toolbar {
-            if !isRoot {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "chevron.left")
-                    }
-                    .accessibilityIdentifier("back_button")
-                }
-            }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 if isRoot, let onSettingsTap {
                     Button(action: onSettingsTap) {
@@ -653,10 +875,6 @@ struct FolderContentView: View {
                 .accessibilityIdentifier("add_menu")
             }
         }
-        .notoAppBottomToolbar(
-            onOpenTodayNote: onTodayTap,
-            onCreateRootNote: onCreateRootNote
-        )
         .alert("New Folder", isPresented: $showNewFolderAlert) {
             TextField("Folder name", text: $newFolderName)
             Button("Create") {
@@ -669,20 +887,23 @@ struct FolderContentView: View {
             Button("Cancel", role: .cancel) { newFolderName = "" }
         }
         .onAppear {
-            store.loadItems()
+            store.loadItemsInBackground()
         }
         .onChange(of: fileWatcher?.changeCount) { _, _ in
-            store.loadItems()
+            store.loadItemsInBackground()
         }
         .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { notification in
             guard let snapshot = notification.object as? NoteSyncSnapshot else { return }
             guard snapshot.fileURL.deletingLastPathComponent().standardizedFileURL == store.directoryURL.standardizedFileURL else {
                 return
             }
-            store.loadItems()
+            store.loadItemsInBackground()
         }
         .overlay {
-            if store.items.isEmpty {
+            if store.isLoadingItems {
+                ProgressView()
+                    .allowsHitTesting(false)
+            } else if store.items.isEmpty {
                 ContentUnavailableView(
                     "Empty",
                     systemImage: "folder",
@@ -695,12 +916,20 @@ struct FolderContentView: View {
 
     private func createNote() {
         let note = store.createNote()
-        path.append(NoteRoute.note(
-            note,
-            directoryURL: store.directoryURL,
-            vaultRootURL: store.vaultRootURL,
-            isNew: true
-        ))
+        openNote(note, isNew: true)
+    }
+
+    private func openNote(_ note: MarkdownNote, isNew: Bool) {
+        if let onOpenNote {
+            onOpenNote(note, store, isNew)
+        } else {
+            path.append(NoteRoute.note(
+                note,
+                directoryURL: store.directoryURL,
+                vaultRootURL: store.vaultRootURL,
+                isNew: isNew
+            ))
+        }
     }
 
     private func deleteItems(at offsets: IndexSet) {
@@ -716,47 +945,90 @@ struct FolderContentView: View {
 #if os(iOS)
 private struct NotoAppBottomToolbarModifier: ViewModifier {
     var onOpenTodayNote: (() -> Void)?
+    var onSearch: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
 
     func body(content: Content) -> some View {
-        if onOpenTodayNote == nil && onCreateRootNote == nil {
+        if onOpenTodayNote == nil && onSearch == nil && onCreateRootNote == nil {
             content
         } else {
-            content.toolbar {
-                ToolbarItemGroup(placement: .bottomBar) {
-                    Button(action: { onOpenTodayNote?() }) {
-                        Label("Today", systemImage: "calendar")
-                    }
-                    .labelStyle(.iconOnly)
-                    .accessibilityIdentifier("today_button")
-                    .accessibilityLabel("Today")
-
-                    Button(action: {}) {
-                        Label("Search", systemImage: "magnifyingglass")
-                    }
-                    .labelStyle(.iconOnly)
-                    .accessibilityIdentifier("search_button")
-                    .accessibilityLabel("Search")
-
-                    Button(action: { onCreateRootNote?() }) {
-                        Label("New Note", systemImage: "square.and.pencil")
-                    }
-                    .labelStyle(.iconOnly)
-                    .accessibilityIdentifier("new_root_note_button")
-                    .accessibilityLabel("New Note")
+            content.overlay(alignment: .bottom) {
+                HStack {
+                    Spacer(minLength: 0)
+                    NotoAppBottomToolbar(
+                        onOpenTodayNote: onOpenTodayNote,
+                        onSearch: onSearch,
+                        onCreateRootNote: onCreateRootNote
+                    )
+                    Spacer(minLength: 0)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 8)
             }
         }
+    }
+}
+
+private struct NotoAppBottomToolbar: View {
+    var onOpenTodayNote: (() -> Void)?
+    var onSearch: (() -> Void)?
+    var onCreateRootNote: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button {
+                onOpenTodayNote?()
+            } label: {
+                toolbarLabel("Today", systemImage: "calendar")
+            }
+            .accessibilityIdentifier("today_button")
+            .accessibilityLabel("Today")
+
+            Button {
+                onSearch?()
+            } label: {
+                toolbarLabel("Search", systemImage: "magnifyingglass")
+            }
+            .accessibilityIdentifier("search_button")
+            .accessibilityLabel("Search")
+
+            Button {
+                onCreateRootNote?()
+            } label: {
+                toolbarLabel("New Note", systemImage: "square.and.pencil")
+            }
+            .accessibilityIdentifier("new_root_note_button")
+            .accessibilityLabel("New Note")
+        }
+        .buttonStyle(.plain)
+        .font(.system(size: 18, weight: .medium))
+        .foregroundStyle(AppTheme.primaryText)
+        .padding(.horizontal, 8)
+        .frame(height: 48)
+        .background(.regularMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(AppTheme.primaryText.opacity(0.08), lineWidth: 0.5)
+        }
+    }
+
+    private func toolbarLabel(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .labelStyle(.iconOnly)
+            .frame(width: 48, height: 48)
+            .contentShape(Rectangle())
     }
 }
 
 extension View {
     func notoAppBottomToolbar(
         onOpenTodayNote: (() -> Void)?,
+        onSearch: (() -> Void)?,
         onCreateRootNote: (() -> Void)?
     ) -> some View {
         modifier(NotoAppBottomToolbarModifier(
             onOpenTodayNote: onOpenTodayNote,
+            onSearch: onSearch,
             onCreateRootNote: onCreateRootNote
         ))
     }

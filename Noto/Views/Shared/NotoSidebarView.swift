@@ -1,6 +1,10 @@
 import SwiftUI
 import NotoVault
 
+#if os(macOS)
+import AppKit
+#endif
+
 struct NotoSidebarView: View {
     var rootStore: MarkdownNoteStore
     var fileWatcher: VaultFileWatcher?
@@ -8,40 +12,37 @@ struct NotoSidebarView: View {
     @Binding var selectedNoteStore: MarkdownNoteStore?
     @Binding var selectedIsNew: Bool
     @Binding var externallyDeletingNoteID: UUID?
+    @Binding var searchText: String
+    @Binding var isSearchPresented: Bool
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var searchText = ""
     @State private var rows: [SidebarTreeNode] = []
+    @State private var searchableRows: [SidebarTreeNode] = []
     @State private var expandedFolderURLs: Set<URL> = []
     @State private var hasLoadedExpansionState = false
     @State private var showNewFolderAlert = false
     @State private var newFolderName = ""
     @State private var newFolderParentURL: URL?
+    @State private var searchLoadTask: Task<Void, Never>?
+    @FocusState private var isSearchFocused: Bool
 
     private let loader = SidebarTreeLoader()
 
     var body: some View {
         VStack(spacing: 8) {
-            searchField
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
-
-            List {
-                ForEach(displayRows) { row in
-                    sidebarRow(row)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(rowBackground(for: row))
-                }
-            }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-            .contextMenu {
-                createMenuItems(in: rootStore.vaultRootURL)
+            sidebarRows
+        }
+        .background {
+            sidebarBackground
+        }
+        .navigationTitle("Noto")
+        #if os(macOS)
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                searchButton
             }
         }
-        .background(.clear)
-        .navigationTitle("Noto")
+        #endif
         .alert("New Folder", isPresented: $showNewFolderAlert) {
             TextField("Folder name", text: $newFolderName)
             Button("Create") {
@@ -61,66 +62,156 @@ struct NotoSidebarView: View {
         .onChange(of: selectedNote) { _, updatedNote in
             applySelectedNoteUpdate(updatedNote)
         }
+        .onChange(of: searchText) { _, updatedSearchText in
+            handleSearchTextChange(updatedSearchText)
+        }
+    }
+
+    @ViewBuilder
+    private var sidebarBackground: some View {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+            .ignoresSafeArea()
+        #else
+        AppTheme.background
+            .ignoresSafeArea(edges: .bottom)
+        #endif
+    }
+
+    @ViewBuilder
+    private var sidebarRows: some View {
+        #if os(macOS)
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(displayRows) { row in
+                    sidebarRow(row)
+                        .padding(.horizontal, 8)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .background(.clear)
+        .contextMenu {
+            createMenuItems(in: rootStore.vaultRootURL)
+        }
+        #else
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(displayRows) { row in
+                    sidebarRow(row)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
+        }
+        .background(AppTheme.background)
+        .contextMenu {
+            createMenuItems(in: rootStore.vaultRootURL)
+        }
+        #endif
+    }
+
+    private var sidebarRowInsets: EdgeInsets {
+        #if os(macOS)
+        EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
+        #else
+        EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
+        #endif
     }
 
     private var displayRows: [SidebarTreeNode] {
-        loader.filterRows(rows, matching: searchText)
+        let trimmedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSearchText.isEmpty else { return rows }
+        return loader.filterRows(searchableRows, matching: trimmedSearchText)
     }
 
-    private var searchField: some View {
-        HStack(spacing: 7) {
+    private var searchButton: some View {
+        Button {
+            isSearchPresented.toggle()
+        } label: {
+            Label("Search", systemImage: "magnifyingglass")
+        }
+        .labelStyle(.iconOnly)
+        .accessibilityIdentifier("search_button")
+        .accessibilityLabel("Search")
+        .help("Search")
+        .popover(isPresented: $isSearchPresented, arrowEdge: .top) {
+            searchPopover
+        }
+    }
+
+    private var searchPopover: some View {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.body)
                 .foregroundStyle(AppTheme.mutedText)
             TextField("Search", text: $searchText)
                 .textFieldStyle(.plain)
-                .font(.body)
-                .foregroundStyle(AppTheme.primaryText)
+                .focused($isSearchFocused)
                 .accessibilityIdentifier("sidebar_search_field")
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Label("Clear Search", systemImage: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .labelStyle(.iconOnly)
+                .foregroundStyle(AppTheme.mutedText)
+                .accessibilityIdentifier("clear_search_button")
+                .accessibilityLabel("Clear Search")
+            }
         }
         .padding(.horizontal, 10)
-        .frame(minHeight: searchFieldHeight)
-        .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(AppTheme.primaryText.opacity(0.07))
+        .frame(width: 240, height: 32)
+        .onAppear {
+            isSearchFocused = true
         }
-    }
-
-    private var searchFieldHeight: CGFloat {
-        #if os(macOS)
-        28
-        #else
-        horizontalSizeClass == .regular ? 36 : 32
-        #endif
     }
 
     private var rowHeight: CGFloat {
         #if os(macOS)
-        24
+        28
         #else
-        horizontalSizeClass == .regular ? 44 : 32
+        40
+        #endif
+    }
+
+    private func rowContentInsets(for row: SidebarTreeNode) -> EdgeInsets {
+        #if os(macOS)
+        EdgeInsets(top: 0, leading: 10 + CGFloat(row.depth) * 16, bottom: 0, trailing: 8)
+        #else
+        return EdgeInsets(
+            top: 1,
+            leading: 20 + CGFloat(row.depth) * 16,
+            bottom: 1,
+            trailing: 20
+        )
         #endif
     }
 
     @ViewBuilder
     private func sidebarRow(_ row: SidebarTreeNode) -> some View {
+        let isSelected = isSelected(row)
+
         Button {
             activate(row)
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: symbolName(for: row))
-                    .font(.body)
-                    .foregroundStyle(.tint)
+                    .font(.body.weight(isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.secondaryText)
                     .frame(width: 18, alignment: .center)
                 Text(row.name)
-                    .font(.body)
-                    .foregroundStyle(AppTheme.secondaryText)
+                    .font(.body.weight(isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.secondaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 0)
             }
-            .padding(.leading, CGFloat(row.depth) * 16)
-            .frame(minHeight: rowHeight, alignment: .leading)
+            .padding(rowContentInsets(for: row))
+            .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
+            .background(rowBackground(for: row))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -195,7 +286,7 @@ struct NotoSidebarView: View {
         case .folder:
             toggleFolder(row.url)
         case .note:
-            selectNote(at: row.url, modifiedAt: row.modifiedAt)
+            selectNote(row)
         }
     }
 
@@ -210,9 +301,18 @@ struct NotoSidebarView: View {
         reloadTree()
     }
 
-    private func selectNote(at url: URL, modifiedAt: Date) {
-        let noteStore = MarkdownNoteStore(directoryURL: url.deletingLastPathComponent(), vaultRootURL: rootStore.vaultRootURL)
-        let note = markdownNote(for: url, modifiedAt: modifiedAt)
+    private func selectNote(_ row: SidebarTreeNode) {
+        let noteStore = MarkdownNoteStore(
+            directoryURL: row.url.deletingLastPathComponent(),
+            vaultRootURL: rootStore.vaultRootURL,
+            autoload: false
+        )
+        let note = MarkdownNote(
+            id: row.noteID ?? VaultDirectoryLoader.stableID(for: row.url),
+            fileURL: row.url,
+            title: row.name,
+            modifiedDate: row.modifiedAt
+        )
         selectedNoteStore = noteStore
         selectedNote = note
         selectedIsNew = false
@@ -304,46 +404,94 @@ struct NotoSidebarView: View {
         guard let note else { return }
         let normalizedURL = note.fileURL.standardizedFileURL
 
-        guard let index = rows.firstIndex(where: { $0.url == normalizedURL }) else {
+        let didUpdateVisibleRows = updateNoteRow(
+            in: &rows,
+            matching: normalizedURL,
+            title: note.title,
+            modifiedAt: note.modifiedDate
+        )
+        let didUpdateSearchableRows = updateNoteRow(
+            in: &searchableRows,
+            matching: normalizedURL,
+            title: note.title,
+            modifiedAt: note.modifiedDate
+        )
+
+        guard didUpdateVisibleRows || didUpdateSearchableRows else {
             reloadTree()
             return
         }
+    }
 
-        let row = rows[index]
-        guard case .note = row.kind, row.name != note.title || row.modifiedAt != note.modifiedDate else {
-            return
+    private func updateNoteRow(
+        in rowSnapshot: inout [SidebarTreeNode],
+        matching normalizedURL: URL,
+        title: String,
+        modifiedAt: Date
+    ) -> Bool {
+        guard let index = rowSnapshot.firstIndex(where: { $0.url == normalizedURL }) else {
+            return false
         }
 
-        rows[index] = SidebarTreeNode(
+        let row = rowSnapshot[index]
+        guard case .note = row.kind else {
+            return true
+        }
+        guard row.name != title || row.modifiedAt != modifiedAt else {
+            return true
+        }
+
+        rowSnapshot[index] = SidebarTreeNode(
             kind: row.kind,
             depth: row.depth,
-            name: note.title,
+            name: title,
             url: normalizedURL,
-            modifiedAt: note.modifiedDate
+            modifiedAt: modifiedAt,
+            noteID: row.noteID
         )
+        return true
     }
 
     private func reloadTree() {
         do {
             loadExpansionStateIfNeeded()
             if !hasPersistedExpansionState {
-                let expandedRows = try loader.loadRows(rootURL: rootStore.vaultRootURL)
-                expandedFolderURLs = Set(expandedRows.compactMap { row in
-                    if case .folder = row.kind {
-                        return row.url.standardizedFileURL
-                    }
-                    return nil
-                })
+                expandedFolderURLs = []
                 persistExpansionState()
-                rows = expandedRows
-            } else {
-                rows = try loader.loadRows(
-                    rootURL: rootStore.vaultRootURL,
-                    expandedFolderURLs: expandedFolderURLs
-                )
             }
+
+            rows = try loader.loadRows(
+                rootURL: rootStore.vaultRootURL,
+                expandedFolderURLs: expandedFolderURLs
+            )
+            handleSearchTextChange(searchText)
         } catch {
             rows = []
+            searchableRows = []
+        }
+    }
+
+    private func handleSearchTextChange(_ text: String) {
+        let trimmedSearchText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSearchText.isEmpty else {
+            searchLoadTask?.cancel()
+            searchableRows = []
+            return
+        }
+
+        reloadSearchableRows()
+    }
+
+    private func reloadSearchableRows() {
+        searchLoadTask?.cancel()
+        let rootURL = rootStore.vaultRootURL
+        searchLoadTask = Task {
+            let loadedRows = await Task.detached(priority: .userInitiated) {
+                (try? SidebarTreeLoader().loadRows(rootURL: rootURL)) ?? []
+            }.value
+
+            guard !Task.isCancelled else { return }
+            searchableRows = loadedRows
         }
     }
 

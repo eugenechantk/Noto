@@ -73,6 +73,102 @@ private func cleanupVault(_ url: URL) {
     try? FileManager.default.removeItem(at: url)
 }
 
+@MainActor
+private func waitForBackgroundLoad(_ store: MarkdownNoteStore) async {
+    for _ in 0..<40 {
+        if !store.isLoadingItems { return }
+        try? await Task.sleep(nanoseconds: 25_000_000)
+    }
+}
+
+@MainActor
+private func makeHistoryEntry(
+    title: String,
+    fileName: String,
+    in store: MarkdownNoteStore
+) -> NoteStackEntry {
+    let fileURL = store.vaultRootURL.appendingPathComponent(fileName)
+    let note = MarkdownNote(
+        id: UUID(),
+        fileURL: fileURL,
+        title: title,
+        modifiedDate: Date()
+    )
+    return NoteStackEntry(note: note, store: store, isNew: false)
+}
+
+// MARK: - Note Navigation History Tests
+
+@Suite("Note Navigation History")
+struct NoteNavigationHistoryTests {
+    @Test("Tracks back and forward visits")
+    @MainActor
+    func noteNavigationHistoryTracksBackAndForwardVisits() {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+        let first = makeHistoryEntry(title: "First", fileName: "First.md", in: store)
+        let second = makeHistoryEntry(title: "Second", fileName: "Second.md", in: store)
+        var history = NoteNavigationHistory()
+
+        history.visit(first)
+        history.visit(second)
+
+        #expect(history.currentEntry?.hasSameNavigationTarget(as: second) == true)
+        #expect(history.canGoBack)
+        #expect(!history.canGoForward)
+
+        let previous = history.goBack()
+        #expect(previous?.hasSameNavigationTarget(as: first) == true)
+        #expect(!history.canGoBack)
+        #expect(history.canGoForward)
+
+        let next = history.goForward()
+        #expect(next?.hasSameNavigationTarget(as: second) == true)
+    }
+
+    @Test("Replaces duplicate visible visits")
+    @MainActor
+    func noteNavigationHistoryReplacesDuplicateVisibleVisits() {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+        let first = makeHistoryEntry(title: "First", fileName: "First.md", in: store)
+        var renamedFirst = makeHistoryEntry(title: "Renamed", fileName: "First.md", in: store)
+        renamedFirst.note.title = "Renamed"
+        var history = NoteNavigationHistory()
+
+        history.visit(first)
+        history.visit(renamedFirst)
+
+        #expect(history.entries.count == 1)
+        #expect(history.currentEntry?.note.title == "Renamed")
+        #expect(!history.canGoBack)
+    }
+
+    @Test("Drops forward entries after a new visit")
+    @MainActor
+    func noteNavigationHistoryDropsForwardEntriesAfterNewVisit() {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+        let first = makeHistoryEntry(title: "First", fileName: "First.md", in: store)
+        let second = makeHistoryEntry(title: "Second", fileName: "Second.md", in: store)
+        let third = makeHistoryEntry(title: "Third", fileName: "Third.md", in: store)
+        var history = NoteNavigationHistory()
+
+        history.visit(first)
+        history.visit(second)
+        _ = history.goBack()
+        history.visit(third)
+
+        #expect(history.entries.count == 2)
+        #expect(history.currentEntry?.hasSameNavigationTarget(as: third) == true)
+        #expect(!history.canGoForward)
+        #expect(history.goBack()?.hasSameNavigationTarget(as: first) == true)
+    }
+}
+
 // MARK: - Note CRUD Tests
 
 @Suite("Note CRUD")
@@ -105,6 +201,68 @@ struct NoteCRUDTests {
         let content = store.readContent(of: note)
         #expect(content.contains("---"))
         #expect(content.contains("# "))
+    }
+
+    @Test("Page mention documents use vault-relative note paths")
+    @MainActor
+    func pageMentionDocumentsUseVaultRelativePaths() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let folder = vault.appendingPathComponent("Projects")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let fileURL = folder.appendingPathComponent("Project Brief.md")
+        try "# Project Brief\nDetails".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let store = MarkdownNoteStore(vaultURL: vault)
+        let documents = store.pageMentionDocuments(matching: "brief")
+
+        #expect(documents.first?.title == "Project Brief")
+        #expect(documents.first?.relativePath == "Projects/Project Brief.md")
+    }
+
+    @Test("Page mention documents require a query before scanning")
+    @MainActor
+    func pageMentionDocumentsRequireQuery() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let fileURL = vault.appendingPathComponent("Project Brief.md")
+        try "# Project Brief\nDetails".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        #expect(store.pageMentionDocuments(matching: "").isEmpty)
+        #expect(store.pageMentionDocuments(matching: "   ").isEmpty)
+    }
+
+    @Test("Page mention documents can opt into empty-query suggestions")
+    @MainActor
+    func pageMentionDocumentsCanAllowEmptyQuery() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let fileURL = vault.appendingPathComponent("Project Brief.md")
+        try "# Project Brief\nDetails".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let store = MarkdownNoteStore(vaultURL: vault)
+        let documents = store.pageMentionDocuments(matching: "", limit: 10, allowEmptyQuery: true)
+
+        #expect(documents.map(\.title) == ["Project Brief"])
+    }
+
+    @Test("Vault-relative note paths resolve to notes")
+    @MainActor
+    func vaultRelativeNotePathsResolveToNotes() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let folder = vault.appendingPathComponent("Projects")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let fileURL = folder.appendingPathComponent("Project Brief.md")
+        try "# Project Brief\nDetails".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let store = MarkdownNoteStore(vaultURL: vault)
+        let resolved = try #require(store.note(atVaultRelativePath: "Projects/Project Brief.md"))
+
+        #expect(resolved.note.title == "Project Brief")
+        #expect(resolved.store.directoryURL.standardizedFileURL == folder.standardizedFileURL)
     }
 
     @Test("Save content writes file and updates title in items")
@@ -269,6 +427,56 @@ struct DailyNoteTests {
         let (_, note2) = store.todayNote()
 
         #expect(note1.fileURL == note2.fileURL)
+    }
+
+    @Test("Foreground refresh does not create today's note")
+    @MainActor
+    func testForegroundRefreshDoesNotCreateTodayNote() async {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        store.refreshForForegroundActivation()
+        await waitForBackgroundLoad(store)
+
+        let dailyFolder = vault.appendingPathComponent("Daily Notes")
+        #expect(!FileManager.default.fileExists(atPath: dailyFolder.path))
+    }
+
+    @Test("Autoload can be deferred for responsive app launch")
+    @MainActor
+    func testAutoloadCanBeDeferredForResponsiveLaunch() async throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        try "# Existing\n".write(to: vault.appendingPathComponent("Existing.md"), atomically: true, encoding: .utf8)
+
+        let store = MarkdownNoteStore(vaultURL: vault, autoload: false)
+
+        #expect(store.items.isEmpty)
+
+        store.loadItemsInBackground()
+        await waitForBackgroundLoad(store)
+
+        #expect(store.items.count == 1)
+    }
+
+    @Test("Autoload can be deferred for responsive navigation destinations")
+    @MainActor
+    func testAutoloadCanBeDeferredForResponsiveNavigationDestinations() async throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let folder = vault.appendingPathComponent("Folder")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "# Nested\n".write(to: folder.appendingPathComponent("Nested.md"), atomically: true, encoding: .utf8)
+
+        let store = MarkdownNoteStore(directoryURL: folder, vaultRootURL: vault, autoload: false)
+
+        #expect(store.items.isEmpty)
+
+        store.loadItemsInBackground()
+        await waitForBackgroundLoad(store)
+
+        #expect(store.items.count == 1)
     }
 
     @Test("Existing daily note without template gets it applied retroactively")

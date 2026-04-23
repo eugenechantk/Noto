@@ -12,8 +12,9 @@ public struct SidebarTreeNode: Identifiable, Equatable, Hashable, Sendable {
     public let name: String
     public let url: URL
     public let modifiedAt: Date
+    public let noteID: UUID?
 
-    public init(kind: Kind, depth: Int, name: String, url: URL, modifiedAt: Date) {
+    public init(kind: Kind, depth: Int, name: String, url: URL, modifiedAt: Date, noteID: UUID? = nil) {
         let normalizedURL = url.standardizedFileURL
         self.id = normalizedURL.path
         self.kind = kind
@@ -21,6 +22,7 @@ public struct SidebarTreeNode: Identifiable, Equatable, Hashable, Sendable {
         self.name = name
         self.url = normalizedURL
         self.modifiedAt = modifiedAt
+        self.noteID = noteID
     }
 }
 
@@ -87,6 +89,14 @@ public struct SidebarTreeLoader {
             .map { rows[$0] }
     }
 
+    public func searchRows(
+        rootURL: URL,
+        matching query: String
+    ) throws -> [SidebarTreeNode] {
+        let rows = try loadRows(rootURL: rootURL)
+        return filterRows(rows, matching: query)
+    }
+
     private func loadChildren(
         in directoryURL: URL,
         depth: Int,
@@ -151,7 +161,8 @@ private extension SidebarTreeNode {
                 depth: row.depth,
                 name: note.title,
                 url: note.fileURL,
-                modifiedAt: note.modifiedDate
+                modifiedAt: note.modifiedDate,
+                noteID: note.id
             )
         }
     }

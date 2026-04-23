@@ -34,6 +34,35 @@ struct VaultDirectoryLoaderTests {
     }
 
     @Test
+    func loadItemsResolvesMetadataFromPrefixForLargeNotes() throws {
+        let noteID = "F28A576E-2004-4FBF-81C6-8F41DD03737C"
+        let root = try makeVault { root in
+            let noteURL = root.appendingPathComponent("Large.md")
+            let markdown = """
+            ---
+            id: \(noteID)
+            created: 2026-04-20T00:00:00Z
+            updated: 2026-04-20T00:00:00Z
+            ---
+
+            # Large Note
+
+            \(String(repeating: "Body line\n", count: 20_000))
+            """
+            try markdown.write(to: noteURL, atomically: true, encoding: .utf8)
+        }
+
+        let items = try VaultDirectoryLoader().loadItems(in: root)
+
+        guard case .note(let note) = items.first else {
+            Issue.record("Expected a note")
+            return
+        }
+        #expect(note.title == "Large Note")
+        #expect(note.id.uuidString == noteID)
+    }
+
+    @Test
     func uuidNoteWithoutTitleDisplaysUntitled() throws {
         let root = try makeVault { root in
             let noteURL = root.appendingPathComponent("F28A576E-2004-4FBF-81C6-8F41DD03737C.md")

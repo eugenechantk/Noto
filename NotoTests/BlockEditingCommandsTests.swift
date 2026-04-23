@@ -77,6 +77,32 @@ struct BlockEditingCommandsTests {
         ))
     }
 
+    @Test("Indenting an ordered item renumbers it as the next child item")
+    func indentOrderedItemRenumbersAtChildLevel() {
+        let result = BlockEditingCommands.indentedLines(
+            in: "1. Parent\n  1. Existing child\n2. New child\n3. Next parent",
+            selection: NSRange(location: 31, length: 0)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "1. Parent\n  1. Existing child\n  2. New child\n2. Next parent",
+            selection: NSRange(location: 33, length: 0)
+        ))
+    }
+
+    @Test("Indenting the first ordered child starts that child level at one")
+    func indentFirstOrderedChildStartsAtOne() {
+        let result = BlockEditingCommands.indentedLines(
+            in: "1. Parent\n2. Child\n3. Next parent",
+            selection: NSRange(location: 12, length: 0)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "1. Parent\n  1. Child\n2. Next parent",
+            selection: NSRange(location: 14, length: 0)
+        ))
+    }
+
     @Test("Outdent removes markdown indentation from the current line and repositions the cursor")
     func outdentCurrentLineAtCursor() {
         let result = BlockEditingCommands.outdentedLines(
@@ -100,6 +126,19 @@ struct BlockEditingCommandsTests {
         #expect(result == TextSelectionTransform(
             text: "Alpha\nBeta\nGamma",
             selection: NSRange(location: 0, length: 11)
+        ))
+    }
+
+    @Test("Outdenting an ordered child renumbers it at the parent level")
+    func outdentOrderedChildRenumbersAtParentLevel() {
+        let result = BlockEditingCommands.outdentedLines(
+            in: "1. Parent\n  1. Child\n2. Next parent",
+            selection: NSRange(location: 14, length: 0)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "1. Parent\n2. Child\n3. Next parent",
+            selection: NSRange(location: 12, length: 0)
         ))
     }
 
@@ -199,6 +238,160 @@ struct BlockEditingCommandsTests {
         )
 
         #expect(result == nil)
+    }
+
+    @Test("Bold wraps selected text in markdown markers")
+    func boldWrapsSelection() {
+        let result = BlockEditingCommands.toggledBold(
+            in: "hello world",
+            selection: NSRange(location: 6, length: 5)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "hello **world**",
+            selection: NSRange(location: 8, length: 5)
+        ))
+    }
+
+    @Test("Bold removes markdown markers when selection is already wrapped")
+    func boldUnwrapsWrappedSelection() {
+        let result = BlockEditingCommands.toggledBold(
+            in: "hello **world**",
+            selection: NSRange(location: 8, length: 5)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "hello world",
+            selection: NSRange(location: 6, length: 5)
+        ))
+    }
+
+    @Test("Italic wraps the word at the cursor")
+    func italicWrapsWordAtCursor() {
+        let result = BlockEditingCommands.toggledItalic(
+            in: "hello world",
+            selection: NSRange(location: 8, length: 0)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "hello *world*",
+            selection: NSRange(location: 7, length: 5)
+        ))
+    }
+
+    @Test("Italic removes markdown markers without unwrapping bold markers")
+    func italicUnwrapsOnlyStandaloneItalicMarkers() {
+        let italicResult = BlockEditingCommands.toggledItalic(
+            in: "hello *world*",
+            selection: NSRange(location: 7, length: 5)
+        )
+        let boldResult = BlockEditingCommands.toggledItalic(
+            in: "hello **world**",
+            selection: NSRange(location: 8, length: 5)
+        )
+
+        #expect(italicResult == TextSelectionTransform(
+            text: "hello world",
+            selection: NSRange(location: 6, length: 5)
+        ))
+        #expect(boldResult == TextSelectionTransform(
+            text: "hello ***world***",
+            selection: NSRange(location: 9, length: 5)
+        ))
+    }
+
+    @Test("Hyperlink toggle wraps a selected URL in markdown link syntax")
+    func hyperlinkToggleWrapsSelectedURL() {
+        let result = BlockEditingCommands.toggledHyperlink(
+            in: "visit https://example.com",
+            selection: NSRange(location: 6, length: 19)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "visit [https://example.com](https://example.com)",
+            selection: NSRange(location: 7, length: 19)
+        ))
+    }
+
+    @Test("Hyperlink toggle wraps the URL at the cursor")
+    func hyperlinkToggleWrapsURLAtCursor() {
+        let result = BlockEditingCommands.toggledHyperlink(
+            in: "visit https://example.com now",
+            selection: NSRange(location: 12, length: 0)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "visit [https://example.com](https://example.com) now",
+            selection: NSRange(location: 7, length: 19)
+        ))
+    }
+
+    @Test("Hyperlink toggle unwraps an existing markdown link to its title")
+    func hyperlinkToggleUnwrapsExistingLink() {
+        let result = BlockEditingCommands.toggledHyperlink(
+            in: "visit [Example](https://example.com)",
+            selection: NSRange(location: 7, length: 7)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "visit Example",
+            selection: NSRange(location: 6, length: 7)
+        ))
+    }
+
+    @Test("Hyperlink toggle ignores selected text that is not a URL")
+    func hyperlinkToggleIgnoresNonURLSelection() {
+        let result = BlockEditingCommands.toggledHyperlink(
+            in: "visit Example",
+            selection: NSRange(location: 6, length: 7)
+        )
+
+        #expect(result == nil)
+    }
+
+    @Test("Markdown hyperlinks accept vault-relative note paths")
+    func markdownHyperlinksAcceptVaultRelativeNotePaths() {
+        let target = HyperlinkMarkdown.target(at: 1, in: "[Project Brief](Folder/Project Brief.md)")
+
+        #expect(target == .vaultDocument(relativePath: "Folder/Project Brief.md"))
+    }
+
+    @Test("Page mention detects active query after at-prefix")
+    func pageMentionDetectsActiveQuery() {
+        let result = PageMentionMarkdown.activeQuery(
+            in: "See @Project Br",
+            selection: NSRange(location: 15, length: 0)
+        )
+
+        #expect(result == PageMentionQuery(
+            range: NSRange(location: 4, length: 11),
+            query: "Project Br"
+        ))
+    }
+
+    @Test("Page mention detects empty query after at-prefix")
+    func pageMentionDetectsEmptyQuery() {
+        let result = PageMentionMarkdown.activeQuery(
+            in: "See @",
+            selection: NSRange(location: 5, length: 0)
+        )
+
+        #expect(result == PageMentionQuery(
+            range: NSRange(location: 4, length: 1),
+            query: ""
+        ))
+    }
+
+    @Test("Page mention inserts markdown link with relative path")
+    func pageMentionMarkdownUsesRelativePath() {
+        let document = PageMentionDocument(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+            title: "Project Brief",
+            relativePath: "Folder/Project Brief.md",
+            fileURL: URL(fileURLWithPath: "/tmp/Folder/Project Brief.md")
+        )
+
+        #expect(PageMentionMarkdown.markdownLink(for: document) == "[Project Brief](Folder/Project Brief.md)")
     }
 
     @Test("Return at end of a bullet continues a bullet at the same level")

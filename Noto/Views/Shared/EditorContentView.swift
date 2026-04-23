@@ -3,9 +3,8 @@ import NotoVault
 
 struct EditorContentView: View {
     @Bindable var session: NoteEditorSession
-    #if os(macOS)
-    private let wordCounter = WordCounter()
-    #endif
+    var pageMentionProvider: ((String) -> [PageMentionDocument])?
+    var onOpenDocumentLink: ((String) -> Void)?
 
     var body: some View {
         Group {
@@ -46,17 +45,12 @@ struct EditorContentView: View {
             TextKit2EditorView(
                 text: $session.content,
                 autoFocus: session.isNew,
-                onTextChange: session.handleEditorChange
+                onTextChange: session.handleEditorChange,
+                pageMentionProvider: pageMentionProvider,
+                onOpenDocumentLink: onOpenDocumentLink
             )
         }
         .background(AppTheme.background)
-        #if os(macOS)
-        .overlay(alignment: .bottomTrailing) {
-            EditorStatusOverlay(count: wordCounter.count(in: session.content))
-                .padding(.trailing, 24)
-                .padding(.bottom, 16)
-        }
-        #endif
         #if os(iOS)
         .ignoresSafeArea(edges: [.top, .bottom])
         #endif

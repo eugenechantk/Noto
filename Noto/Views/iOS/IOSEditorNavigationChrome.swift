@@ -7,6 +7,7 @@ struct EditorNavigationChrome: ViewModifier {
     let vaultRootURL: URL
     let noteFileURL: URL
     let statusCount: WordCounter.Count
+    var leadingControls: EditorLeadingChromeControls = .none
     var onTapBreadcrumbLevel: ((URL) -> Void)?
     var onOpenTodayNote: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
@@ -23,15 +24,31 @@ struct EditorNavigationChrome: ViewModifier {
         content
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(true)
+            .navigationBarBackButtonHidden(hidesSystemBackButton)
             .toolbar {
-                if case .compactNavigation(let showsInlineBackButton) = mode {
-                    if showsInlineBackButton {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button(action: onDismiss) {
-                                Image(systemName: "chevron.left")
+                if case .compactNavigation = mode {
+                    if !leadingControls.isEmpty {
+                        ToolbarItemGroup(placement: .navigationBarLeading) {
+                            if let onToggleSidebar = leadingControls.onToggleSidebar,
+                               let sidebarSystemImage = leadingControls.sidebarSystemImage {
+                                Button {
+                                    onToggleSidebar()
+                                } label: {
+                                    Image(systemName: sidebarSystemImage)
+                                }
+                                .accessibilityIdentifier("sidebar_toggle_button")
+                                .accessibilityLabel(leadingControls.sidebarAccessibilityLabel ?? "Toggle Sidebar")
                             }
-                            .accessibilityIdentifier("back_button")
+
+                            if leadingControls.showsBackButton, let onBack = leadingControls.onBack {
+                                Button {
+                                    onBack()
+                                } label: {
+                                    Image(systemName: "chevron.left")
+                                }
+                                .accessibilityIdentifier("back_button")
+                                .accessibilityLabel("Back")
+                            }
                         }
                     }
 
@@ -60,15 +77,13 @@ struct EditorNavigationChrome: ViewModifier {
                     }
                 }
             }
-            .notoAppBottomToolbar(
-                onOpenTodayNote: bottomToolbarAction(onOpenTodayNote),
-                onCreateRootNote: bottomToolbarAction(onCreateRootNote)
-            )
     }
 
-    private func bottomToolbarAction(_ action: (() -> Void)?) -> (() -> Void)? {
-        guard case .compactNavigation = mode else { return nil }
-        return action
+    private var hidesSystemBackButton: Bool {
+        if case .compactNavigation(let showsInlineBackButton) = mode {
+            return !showsInlineBackButton
+        }
+        return true
     }
 
     private func formatted(_ value: Int) -> String {

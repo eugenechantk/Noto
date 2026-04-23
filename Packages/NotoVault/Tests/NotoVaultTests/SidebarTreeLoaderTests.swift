@@ -65,6 +65,7 @@ struct SidebarTreeLoaderTests {
         let rows = try SidebarTreeLoader().loadRows(rootURL: root)
 
         #expect(rows.map(\.name) == ["Today's testing"])
+        #expect(rows.first?.noteID?.uuidString == "F28A576E-2004-4FBF-81C6-8F41DD03737C")
     }
 
     @Test
@@ -99,6 +100,32 @@ struct SidebarTreeLoaderTests {
 
         #expect(filtered.map(\.name) == ["Projects", "Drafts", "Launch Plan"])
         #expect(filtered.map(\.depth) == [0, 1, 2])
+    }
+
+    @Test
+    func searchRowsIgnoresCollapsedFolderExpansionState() throws {
+        let root = try makeVault { root in
+            try makeFolder(root.appendingPathComponent("Projects")) { projects in
+                try makeFolder(projects.appendingPathComponent("Drafts")) { drafts in
+                    try writeNote(drafts.appendingPathComponent("Launch Plan.md"))
+                }
+            }
+            try writeNote(root.appendingPathComponent("Root.md"))
+        }
+
+        let loader = SidebarTreeLoader()
+        let visibleRows = try loader.loadRows(rootURL: root, expandedFolderURLs: [])
+        let searchRows = try loader.searchRows(rootURL: root, matching: "launch")
+
+        #expect(visibleRows.map(\.name) == ["Projects", "Root"])
+        #expect(searchRows.map(\.name) == ["Projects", "Drafts", "Launch Plan"])
+        #expect(searchRows.map(\.depth) == [0, 1, 2])
+
+        guard case .folder(let isExpanded) = visibleRows[0].kind else {
+            Issue.record("Expected a folder row")
+            return
+        }
+        #expect(isExpanded == false)
     }
 
     private func makeVault(_ build: (URL) throws -> Void) throws -> URL {

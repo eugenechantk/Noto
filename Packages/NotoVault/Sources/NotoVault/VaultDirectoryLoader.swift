@@ -1,6 +1,8 @@
 import Foundation
 
 public struct VaultDirectoryLoader: Sendable {
+    private static let maxFrontmatterBytes = 64 * 1024
+
     private let titleResolver: NoteTitleResolver
 
     public init(titleResolver: NoteTitleResolver = NoteTitleResolver()) {
@@ -32,12 +34,7 @@ public struct VaultDirectoryLoader: Sendable {
                     modifiedDate: modifiedAt
                 ))
             } else if normalizedURL.pathExtension == "md" {
-                notes.append(NoteSummary(
-                    id: noteID(at: normalizedURL),
-                    fileURL: normalizedURL,
-                    title: titleResolver.title(forFileAt: normalizedURL),
-                    modifiedDate: modifiedAt
-                ))
+                notes.append(noteSummary(at: normalizedURL, modifiedAt: modifiedAt))
             }
         }
 
@@ -55,12 +52,23 @@ public struct VaultDirectoryLoader: Sendable {
         return hash.uuid
     }
 
-    private func noteID(at url: URL) -> UUID {
-        guard let markdown = try? String(contentsOf: url, encoding: .utf8),
-              let frontmatterID = frontmatterID(from: markdown) else {
-            return Self.stableID(for: url)
+    private func noteSummary(at url: URL, modifiedAt: Date) -> NoteSummary {
+        let fallbackTitle = titleResolver.fallbackTitle(for: url)
+        guard let markdown = MarkdownPrefixReader.readPrefix(from: url, maxBytes: Self.maxFrontmatterBytes) else {
+            return NoteSummary(
+                id: Self.stableID(for: url),
+                fileURL: url,
+                title: fallbackTitle,
+                modifiedDate: modifiedAt
+            )
         }
-        return frontmatterID
+
+        return NoteSummary(
+            id: frontmatterID(from: markdown) ?? Self.stableID(for: url),
+            fileURL: url,
+            title: titleResolver.title(from: markdown, fallbackTitle: fallbackTitle),
+            modifiedDate: modifiedAt
+        )
     }
 
     private func frontmatterID(from markdown: String) -> UUID? {

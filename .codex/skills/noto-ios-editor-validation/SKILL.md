@@ -35,6 +35,17 @@ Use this skill whenever changing Noto's iOS editor rendering, list indentation, 
    - Capture evidence with `flowdeck ui simulator screen`.
    - Check contrast, translucency, and pill shape against the requested Liquid Glass direction.
 
+## Visual replacement pattern
+
+Use this when backing markdown/text remains in the document but is replaced visually by a native control or overlay, such as `- [ ] ` becoming a todo circle followed by editable text.
+
+- Keep the backing text as the source of truth for persistence, commands, undo/redo, and cross-platform sync.
+- Separate semantic hiding from layout metrics. Structural marker characters can be clear or visually collapsed, but the insertion boundary next to editable content must keep normal body-font metrics.
+- Always test the empty-content boundary. For todos, `- [ ] |` is a distinct case from `- [ ] text|`; the caret, selection rect, line height, and overlay position may be computed from different attributed runs.
+- Preserve stable geometry for wrapping and hit testing: first-line indent, continuation indent, control frame, caret rect, and text start should all derive from shared visual specs.
+- Validate on both platform text systems when the behavior affects attributed text metrics. `UITextView` and `NSTextView` can use different sources for insertion-point height and selection geometry.
+- Prefer focused rendering tests that inspect attributed runs and paragraph styles, then add UI validation when the risk is visual or interaction-heavy.
+
 ## Test expectations
 
 - Add or update focused unit tests for rendering math when possible.

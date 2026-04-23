@@ -10,6 +10,8 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 enum NotoAppCommands {
     static let openToday = Notification.Name("NotoAppCommands.openToday")
     static let openSettings = Notification.Name("NotoAppCommands.openSettings")
+    static let toggleSidebar = Notification.Name("NotoAppCommands.toggleSidebar")
+    static let showSearch = Notification.Name("NotoAppCommands.showSearch")
 }
 
 #if os(macOS)
@@ -86,6 +88,33 @@ struct NotoApp: App {
                 }
                 .keyboardShortcut("t", modifiers: [.command])
 
+                #if os(macOS)
+                Button("Toggle Sidebar") {
+                    NotificationCenter.default.post(name: NotoAppCommands.toggleSidebar, object: nil)
+                }
+                .keyboardShortcut("b", modifiers: [.command, .shift])
+
+                Button("Search") {
+                    NotificationCenter.default.post(name: NotoAppCommands.showSearch, object: nil)
+                }
+                .keyboardShortcut("k", modifiers: [.command])
+
+                Button("Bold") {
+                    NoteEditorCommands.requestToggleBold()
+                }
+                .keyboardShortcut("b", modifiers: [.command])
+
+                Button("Italic") {
+                    NoteEditorCommands.requestToggleItalic()
+                }
+                .keyboardShortcut("i", modifiers: [.command])
+
+                Button("Link") {
+                    NoteEditorCommands.requestToggleHyperlink()
+                }
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+                #endif
+
                 #if os(iOS)
                 Button("Settings") {
                     NotificationCenter.default.post(name: NotoAppCommands.openSettings, object: nil)
@@ -137,7 +166,7 @@ struct MainAppView: View {
     init(vaultURL: URL, locationManager: VaultLocationManager) {
         self.vaultURL = vaultURL
         self.locationManager = locationManager
-        _store = State(wrappedValue: MarkdownNoteStore(vaultURL: vaultURL))
+        _store = State(wrappedValue: MarkdownNoteStore(vaultURL: vaultURL, autoload: false))
     }
 
     var body: some View {
@@ -145,17 +174,19 @@ struct MainAppView: View {
             .background(AppTheme.background)
             .foregroundStyle(AppTheme.primaryText)
             .tint(AppTheme.primaryText)
+            .task {
+                store.loadItemsInBackground()
+            }
             .onAppear {
                 fileWatcher.watch(directory: vaultURL)
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
-                    _ = store.todayNote()
-                    store.loadItems()
+                    store.refreshForForegroundActivation()
                 }
             }
             .onChange(of: fileWatcher.changeCount) { _, _ in
-                store.loadItems()
+                store.loadItemsInBackground()
             }
     }
 }

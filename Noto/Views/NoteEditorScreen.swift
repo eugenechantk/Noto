@@ -10,14 +10,18 @@ struct NoteEditorScreen: View {
     var onCreateRootNote: (() -> Void)? = nil
     var onTapBreadcrumbLevel: ((URL) -> Void)? = nil
     var onNoteUpdated: ((MarkdownNote) -> Void)? = nil
+    var onOpenDocumentLink: ((String) -> Void)? = nil
+    var canNavigateBack = false
+    var canNavigateForward = false
+    var onNavigateBack: (() -> Void)? = nil
+    var onNavigateForward: (() -> Void)? = nil
+    var leadingChromeControls: EditorLeadingChromeControls = .none
     var chromeMode: EditorChromeMode
     private var externallyDeletingNoteID: Binding<UUID?>?
 
     @State private var session: NoteEditorSession
     @State private var showDeleteConfirmation = false
-    #if os(iOS)
     private let wordCounter = WordCounter()
-    #endif
 
     init(
         store: MarkdownNoteStore,
@@ -29,6 +33,12 @@ struct NoteEditorScreen: View {
         onCreateRootNote: (() -> Void)? = nil,
         onTapBreadcrumbLevel: ((URL) -> Void)? = nil,
         onNoteUpdated: ((MarkdownNote) -> Void)? = nil,
+        onOpenDocumentLink: ((String) -> Void)? = nil,
+        canNavigateBack: Bool = false,
+        canNavigateForward: Bool = false,
+        onNavigateBack: (() -> Void)? = nil,
+        onNavigateForward: (() -> Void)? = nil,
+        leadingChromeControls: EditorLeadingChromeControls = .none,
         externallyDeletingNoteID: Binding<UUID?>? = nil,
         chromeMode: EditorChromeMode = .platformDefault
     ) {
@@ -40,6 +50,12 @@ struct NoteEditorScreen: View {
         self.onCreateRootNote = onCreateRootNote
         self.onTapBreadcrumbLevel = onTapBreadcrumbLevel
         self.onNoteUpdated = onNoteUpdated
+        self.onOpenDocumentLink = onOpenDocumentLink
+        self.canNavigateBack = canNavigateBack
+        self.canNavigateForward = canNavigateForward
+        self.onNavigateBack = onNavigateBack
+        self.onNavigateForward = onNavigateForward
+        self.leadingChromeControls = leadingChromeControls
         self.externallyDeletingNoteID = externallyDeletingNoteID
         self.chromeMode = chromeMode
         _session = State(initialValue: NoteEditorSession(store: store, note: note, isNew: isNew))
@@ -48,7 +64,11 @@ struct NoteEditorScreen: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        EditorContentView(session: session)
+        EditorContentView(
+            session: session,
+            pageMentionProvider: pageMentionDocuments(matching:),
+            onOpenDocumentLink: onOpenDocumentLink
+        )
         .background(AppTheme.background)
         .foregroundStyle(AppTheme.primaryText)
         .tint(AppTheme.primaryText)
@@ -58,16 +78,27 @@ struct NoteEditorScreen: View {
             vaultRootURL: store.vaultRootURL,
             noteFileURL: session.note.fileURL,
             statusCount: wordCounter.count(in: session.content),
+            leadingControls: leadingChromeControls,
             onTapBreadcrumbLevel: onTapBreadcrumbLevel,
             onOpenTodayNote: onOpenTodayNote,
             onCreateRootNote: onCreateRootNote,
             onDeleteRequested: { showDeleteConfirmation = true },
             onDismiss: { dismiss() }
         ))
+        .simultaneousGesture(navigationHistorySwipeGesture)
         #elseif os(macOS)
         .modifier(EditorNavigationChrome(
             mode: chromeMode,
             title: MarkdownNote.titleFrom(session.content),
+            vaultRootURL: store.vaultRootURL,
+            noteFileURL: session.note.fileURL,
+            statusCount: wordCounter.count(in: session.content),
+            canNavigateBack: canNavigateBack,
+            canNavigateForward: canNavigateForward,
+            onNavigateBack: onNavigateBack,
+            onNavigateForward: onNavigateForward,
+            onOpenTodayNote: onOpenTodayNote,
+            onTapBreadcrumbLevel: onTapBreadcrumbLevel,
             onDeleteRequested: { showDeleteConfirmation = true }
         ))
         #endif
@@ -110,4 +141,36 @@ struct NoteEditorScreen: View {
         onDelete?()
         dismiss()
     }
+
+    private func pageMentionDocuments(matching query: String) -> [PageMentionDocument] {
+        #if os(iOS)
+        store.pageMentionDocuments(
+            matching: query,
+            excluding: session.note.fileURL,
+            limit: 50
+        )
+        #else
+        store.pageMentionDocuments(matching: query, excluding: session.note.fileURL)
+        #endif
+    }
+
+    #if os(iOS)
+    private var navigationHistorySwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 36, coordinateSpace: .local)
+            .onEnded { value in
+                let horizontalDistance = value.translation.width
+                let verticalDistance = value.translation.height
+                guard abs(horizontalDistance) >= 80,
+                      abs(horizontalDistance) > abs(verticalDistance) * 1.4 else {
+                    return
+                }
+
+                if horizontalDistance > 0, canNavigateBack {
+                    onNavigateBack?()
+                } else if horizontalDistance < 0, canNavigateForward {
+                    onNavigateForward?()
+                }
+            }
+    }
+    #endif
 }

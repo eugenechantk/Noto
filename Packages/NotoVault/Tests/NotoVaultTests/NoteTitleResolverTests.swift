@@ -45,4 +45,18 @@ struct NoteTitleResolverTests {
 
         #expect(resolver.fallbackTitle(for: url) == "Meeting Notes")
     }
+
+    @Test
+    func fileTitleResolutionUsesEarlyMarkdownOnly() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NotoVaultTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let noteURL = root.appendingPathComponent("Large.md")
+        let content = "# Fast Title\n\n" + String(repeating: "Large body\n", count: 20_000)
+        try content.write(to: noteURL, atomically: true, encoding: .utf8)
+
+        #expect(resolver.title(forFileAt: noteURL) == "Fast Title")
+    }
 }

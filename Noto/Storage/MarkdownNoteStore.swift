@@ -84,6 +84,13 @@ struct MarkdownNote: Identifiable, Hashable {
     }
 }
 
+struct PageMentionDocument: Identifiable, Equatable {
+    let id: UUID
+    let title: String
+    let relativePath: String
+    let fileURL: URL
+}
+
 /// Represents a folder on disk.
 struct NotoFolder: Identifiable, Hashable {
     let id: UUID
@@ -155,21 +162,31 @@ final class MarkdownNoteStore {
     }
 
     private(set) var items: [DirectoryItem] = []
+    private(set) var isLoadingItems = false
+
+    @ObservationIgnored
+    private var loadItemsTask: Task<Void, Never>?
 
     let directoryURL: URL
     let vaultRootURL: URL
 
     /// Initialize for a specific directory within the vault.
-    init(directoryURL: URL, vaultRootURL: URL? = nil) {
+    init(directoryURL: URL, vaultRootURL: URL? = nil, autoload: Bool = true) {
         self.directoryURL = directoryURL
         self.vaultRootURL = vaultRootURL ?? directoryURL
         ensureDirectoryExists()
-        loadItems()
+        if autoload {
+            loadItems()
+        }
     }
 
     /// Convenience: initialize for the vault root.
-    convenience init(vaultURL: URL) {
-        self.init(directoryURL: vaultURL, vaultRootURL: vaultURL)
+    convenience init(vaultURL: URL, autoload: Bool = true) {
+        self.init(directoryURL: vaultURL, vaultRootURL: vaultURL, autoload: autoload)
+    }
+
+    deinit {
+        loadItemsTask?.cancel()
     }
 
     private func ensureDirectoryExists() {
@@ -180,6 +197,10 @@ final class MarkdownNoteStore {
     }
 
     func loadItems() {
+        loadItemsTask?.cancel()
+        isLoadingItems = true
+        defer { isLoadingItems = false }
+
         do {
             items = try VaultDirectoryLoader()
                 .loadItems(in: directoryURL)
@@ -187,6 +208,36 @@ final class MarkdownNoteStore {
         } catch {
             logger.error("Failed to list directory contents")
             items = []
+        }
+    }
+
+    func refreshForForegroundActivation() {
+        loadItemsInBackground()
+    }
+
+    func loadItemsInBackground() {
+        loadItemsTask?.cancel()
+
+        let directoryURL = directoryURL
+        isLoadingItems = true
+
+        loadItemsTask = Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) {
+                Result {
+                    try VaultDirectoryLoader().loadItems(in: directoryURL)
+                }
+            }.value
+
+            guard !Task.isCancelled else { return }
+
+            switch result {
+            case .success(let loadedItems):
+                self?.items = loadedItems.map { DirectoryItem(item: $0) }
+            case .failure:
+                logger.error("Failed to list directory contents")
+                self?.items = []
+            }
+            self?.isLoadingItems = false
         }
     }
 
@@ -200,6 +251,92 @@ final class MarkdownNoteStore {
         let content = CoordinatedFileManager.readString(from: note.fileURL) ?? ""
         DebugTrace.record("store read note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(content))")
         return content
+    }
+
+    func vaultRelativePath(for fileURL: URL) -> String? {
+        let rootPath = vaultRootURL.standardizedFileURL.path
+        let filePath = fileURL.standardizedFileURL.path
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        guard filePath.hasPrefix(prefix) else { return nil }
+        return String(filePath.dropFirst(prefix.count))
+    }
+
+    func note(atVaultRelativePath relativePath: String) -> (store: MarkdownNoteStore, note: MarkdownNote)? {
+        let decodedPath = relativePath.removingPercentEncoding ?? relativePath
+        let components = decodedPath.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard !components.isEmpty,
+              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+            return nil
+        }
+
+        var fileURL = vaultRootURL
+        for component in components {
+            fileURL.appendPathComponent(component)
+        }
+        fileURL = fileURL.standardizedFileURL
+
+        let rootPath = vaultRootURL.standardizedFileURL.path
+        let filePath = fileURL.path
+        guard filePath.hasPrefix(rootPath + "/"),
+              fileURL.pathExtension.localizedCaseInsensitiveCompare("md") == .orderedSame,
+              FileManager.default.fileExists(atPath: filePath) else {
+            return nil
+        }
+
+        let content = CoordinatedFileManager.readString(from: fileURL) ?? ""
+        let id = MarkdownNote.idFromFrontmatter(content) ?? VaultDirectoryLoader.stableID(for: fileURL)
+        let modifiedDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+            ?? Date()
+        let note = MarkdownNote(
+            id: id,
+            fileURL: fileURL,
+            title: Self.displayTitle(for: fileURL, content: content),
+            modifiedDate: modifiedDate
+        )
+        let noteStore = MarkdownNoteStore(
+            directoryURL: fileURL.deletingLastPathComponent(),
+            vaultRootURL: vaultRootURL,
+            autoload: false
+        )
+        return (noteStore, note)
+    }
+
+    func pageMentionDocuments(
+        matching query: String,
+        excluding excludedURL: URL? = nil,
+        limit: Int = 5,
+        allowEmptyQuery: Bool = false
+    ) -> [PageMentionDocument] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        let excludedPath = excludedURL?.standardizedFileURL.path
+        let documents = allPageMentionDocuments(excludingPath: excludedPath)
+        guard !normalizedQuery.isEmpty else {
+            return allowEmptyQuery ? Array(documents.prefix(limit)) : []
+        }
+
+        return Array(documents
+            .filter { document in
+                document.title.lowercased().contains(normalizedQuery) ||
+                    document.relativePath.lowercased().contains(normalizedQuery)
+            }
+            .sorted { lhs, rhs in
+                let lhsTitle = lhs.title.lowercased()
+                let rhsTitle = rhs.title.lowercased()
+                let lhsPath = lhs.relativePath.lowercased()
+                let rhsPath = rhs.relativePath.lowercased()
+
+                let lhsTitlePrefix = lhsTitle.hasPrefix(normalizedQuery)
+                let rhsTitlePrefix = rhsTitle.hasPrefix(normalizedQuery)
+                if lhsTitlePrefix != rhsTitlePrefix { return lhsTitlePrefix }
+
+                let lhsPathPrefix = lhsPath.hasPrefix(normalizedQuery)
+                let rhsPathPrefix = rhsPath.hasPrefix(normalizedQuery)
+                if lhsPathPrefix != rhsPathPrefix { return lhsPathPrefix }
+
+                return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+            }
+            .prefix(limit))
     }
 
     func createNote() -> MarkdownNote {
@@ -515,6 +652,51 @@ final class MarkdownNoteStore {
 
     private var folderCount: Int {
         items.prefix(while: { if case .folder = $0 { return true }; return false }).count
+    }
+
+    private func allPageMentionDocuments(excludingPath: String?) -> [PageMentionDocument] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: vaultRootURL.standardizedFileURL,
+            includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        var documents: [PageMentionDocument] = []
+        for case let fileURL as URL in enumerator {
+            let normalizedURL = fileURL.standardizedFileURL
+            guard normalizedURL.pathExtension.localizedCaseInsensitiveCompare("md") == .orderedSame,
+                  normalizedURL.path != excludingPath,
+                  let relativePath = vaultRelativePath(for: normalizedURL) else {
+                continue
+            }
+
+            documents.append(PageMentionDocument(
+                id: VaultDirectoryLoader.stableID(for: normalizedURL),
+                title: Self.pageMentionTitle(for: normalizedURL),
+                relativePath: relativePath,
+                fileURL: normalizedURL
+            ))
+        }
+
+        return documents.sorted {
+            $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+        }
+    }
+
+    private static func displayTitle(for fileURL: URL, content: String) -> String {
+        let title = MarkdownNote.titleFrom(content)
+        if title == "Untitled" {
+            let fallback = fileURL.deletingPathExtension().lastPathComponent
+            return fallback.isEmpty ? title : fallback
+        }
+        return title
+    }
+
+    private static func pageMentionTitle(for fileURL: URL) -> String {
+        let title = fileURL.deletingPathExtension().lastPathComponent
+        return title.isEmpty ? "Untitled" : title
     }
 
     func createFolder(name: String) -> NotoFolder {
