@@ -2,7 +2,18 @@ import Foundation
 
 enum DebugTrace {
     private static let eventsKey = "DebugTraceEvents"
+    private static let enabledKey = "EnableDebugTrace"
     private static let maxEvents = 200
+    private static let formatter = ISO8601DateFormatter()
+
+    private static var isEnabled: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.environment["NOTO_DEBUG_TRACE"] == "1"
+            || UserDefaults.standard.bool(forKey: enabledKey)
+        #else
+        false
+        #endif
+    }
 
     static func reset() {
         #if DEBUG
@@ -12,8 +23,9 @@ enum DebugTrace {
 
     static func record(_ message: String) {
         #if DEBUG
+        guard isEnabled else { return }
         var events = UserDefaults.standard.stringArray(forKey: eventsKey) ?? []
-        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let timestamp = formatter.string(from: Date())
         events.append("[\(timestamp)] \(message)")
         if events.count > maxEvents {
             events.removeFirst(events.count - maxEvents)
