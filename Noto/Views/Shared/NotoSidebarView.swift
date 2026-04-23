@@ -35,7 +35,8 @@ struct NotoSidebarView: View {
         .navigationTitle("Noto")
         #if os(macOS)
         .toolbar {
-            ToolbarItem(placement: .automatic) {
+            ToolbarItemGroup(placement: .automatic) {
+                sidebarToggleButton
                 searchButton
             }
         }
@@ -130,6 +131,20 @@ struct NotoSidebarView: View {
             searchPopover
         }
     }
+
+    #if os(macOS)
+    private var sidebarToggleButton: some View {
+        Button {
+            NotificationCenter.default.post(name: NotoAppCommands.toggleSidebar, object: nil)
+        } label: {
+            Label("Toggle Sidebar", systemImage: "sidebar.left")
+        }
+        .labelStyle(.iconOnly)
+        .accessibilityIdentifier("sidebar_toggle_button")
+        .accessibilityLabel("Toggle Sidebar")
+        .help("Toggle Sidebar")
+    }
+    #endif
 
     private var searchPopover: some View {
         HStack(spacing: 8) {

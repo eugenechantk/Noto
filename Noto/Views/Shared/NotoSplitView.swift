@@ -64,6 +64,9 @@ struct NotoSplitView: View {
             isSearchPresented: $isSearchPresented,
             onSelectNote: sidebarSelectNoteAction
         )
+        #if os(macOS)
+        .toolbar(removing: .sidebarToggle)
+        #endif
     }
 
     #if os(iOS)
