@@ -263,6 +263,113 @@ struct TextKit2EditorLifecycleTests {
         #expect(hiddenTitleLink.absoluteString == "https://example.com")
     }
 
+    @MainActor
+    @Test("XML tag collapse caret survives selection changes")
+    func xmlTagCollapseCaretSurvivesSelectionChanges() throws {
+        let controller = TextKit2EditorViewController()
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.loadViewIfNeeded()
+        controller.loadText("<noto:content>\nBody\n</noto:content>")
+        controller.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        let button = try #require(controller.textView.descendant(
+            withAccessibilityIdentifier: "xml_tag_collapse_0"
+        ) as? UIButton)
+        #expect(button.frame.width >= 44)
+        #expect(button.frame.height >= 32)
+
+        controller.textView.selectedRange = NSRange(location: 16, length: 0)
+        controller.textViewDidChangeSelection(controller.textView)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        let buttonAfterSelection = try #require(controller.textView.descendant(
+            withAccessibilityIdentifier: "xml_tag_collapse_0"
+        ) as? UIButton)
+        #expect(buttonAfterSelection === button)
+    }
+
+    @MainActor
+    @Test("Collapsed XML tag content hides native editor overlays")
+    func collapsedXMLTagContentHidesNativeEditorOverlays() throws {
+        let controller = TextKit2EditorViewController()
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.loadViewIfNeeded()
+        controller.loadText("<noto:content>\n![Field](https://example.com/image.jpg)\n</noto:content>")
+        controller.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        #expect(controller.textView.descendant(withAccessibilityIdentifier: "markdown_image_preview_15") != nil)
+
+        let collapseButton = try #require(controller.textView.descendant(
+            withAccessibilityIdentifier: "xml_tag_collapse_0"
+        ) as? UIButton)
+        collapseButton.sendActions(for: .touchUpInside)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        let expandButton = try #require(controller.textView.descendant(
+            withAccessibilityIdentifier: "xml_tag_collapse_0"
+        ) as? UIButton)
+        #expect(expandButton.accessibilityLabel == "Expand noto:content")
+        #expect(controller.textView.descendant(withAccessibilityIdentifier: "markdown_image_preview_15") == nil)
+    }
+
+    @MainActor
+    @Test("Expanding XML tag content realigns todo overlays after layout shifts")
+    func expandingXMLTagContentRealignsTodoOverlaysAfterLayoutShifts() throws {
+        let controller = TextKit2EditorViewController()
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 820, height: 1180))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.loadViewIfNeeded()
+
+        let markdown = """
+        <noto:highlights>
+        > First highlight line wraps into a taller block so the todo section below has to move when this tag expands.
+        > Second highlight line keeps the collapsed and expanded layouts materially different.
+        > Third highlight line gives TextKit another fragment to recalculate.
+        </noto:highlights>
+
+        ## Capture checks
+
+        - [ ] Open this file from the Captures folder.
+        - [ ] Confirm the Source and Readwise rows render link titles.
+        """
+        controller.loadText(markdown)
+        controller.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        let openingButton = try #require(controller.textView.descendant(
+            withAccessibilityIdentifier: "xml_tag_collapse_0"
+        ) as? UIButton)
+        openingButton.sendActions(for: .touchUpInside)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        let expandButton = try #require(controller.textView.descendant(
+            withAccessibilityIdentifier: "xml_tag_collapse_0"
+        ) as? UIButton)
+        expandButton.sendActions(for: .touchUpInside)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+
+        let nsMarkdown = markdown as NSString
+        let todoParagraphLocation = nsMarkdown.range(of: "- [ ] Open this file").location
+        let todoButton = try #require(controller.textView.descendant(
+            withAccessibilityIdentifier: "todo_checkbox_\(todoParagraphLocation)"
+        ) as? UIButton)
+        let contentLocation = todoParagraphLocation + "- [ ] ".count
+        let contentPosition = try #require(controller.textView.position(
+            from: controller.textView.beginningOfDocument,
+            offset: contentLocation
+        ))
+        let caretRect = controller.textView.caretRect(for: contentPosition)
+
+        #expect(abs(todoButton.frame.midY - caretRect.midY) < 1.0)
+    }
+
     @Test("Frontmatter range covers the YAML metadata block only")
     func detectsFrontmatterRange() throws {
         let markdown = """

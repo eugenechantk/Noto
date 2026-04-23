@@ -1391,11 +1391,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var pageMentionSheetViewController: PageMentionSheetViewController?
     private var pendingPageMentionTriggerLocation: Int?
     private var suppressedPageMentionLocation: Int?
-    private var loadingImageURLs: Set<String> = []
     private var collapsedXMLTagOpeningLocations: Set<Int> = []
     private var revealedHyperlinkRanges: [NSRange] = []
     private var hyperlinkRangesAtTapStart: [NSRange] = []
     private var isRestylingText = false
+    private var isOverlayRefreshScheduled = false
+    private var lastOverlayLayoutSize: CGSize = .zero
     private var keyboardObserverTokens: [NSObjectProtocol] = []
     private var keyboardFrameInScreen: CGRect?
 
@@ -1462,7 +1463,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         updateKeyboardAvoidanceInsets()
-        refreshEditorOverlays()
+        refreshEditorOverlaysAfterLayoutChangeIfNeeded()
         positionPageMentionSuggestions()
     }
 
@@ -1545,10 +1546,10 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
                 tv.becomeFirstResponder()
                 let end = tv.endOfDocument
                 tv.selectedTextRange = tv.textRange(from: end, to: end)
-                self?.refreshTodoCheckboxes()
+                self?.scheduleEditorOverlayRefresh()
             }
         }
-        scheduleTodoCheckboxRefresh()
+        scheduleEditorOverlayRefresh()
         updatePageMentionSuggestions()
     }
 
@@ -1740,7 +1741,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         textView.selectedRange = transform.selection
         updateTypingAttributes()
         coordinator?.commitAppliedEditorText(transform.text)
-        scheduleTodoCheckboxRefresh()
+        scheduleEditorOverlayRefresh()
     }
 
     private func updatePageMentionSuggestions() {
@@ -2062,7 +2063,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         coordinator?.publishEditorText(textView.text ?? "")
         updateTypingAttributes()
         scrollSelectionAboveKeyboard()
-        scheduleTodoCheckboxRefresh()
+        scheduleEditorOverlayRefresh()
         updatePageMentionSuggestions()
     }
 
@@ -2071,7 +2072,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             updateRevealedHyperlinkRangesForSelection(restyle: true)
         }
         updateTypingAttributes()
-        scheduleTodoCheckboxRefresh()
         updatePageMentionSuggestions()
     }
 
@@ -2138,7 +2138,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private func restyleTextPreservingSelection() {
         applyHyperlinkRenderAttributesToTextStorage()
         updateTypingAttributes()
-        scheduleTodoCheckboxRefresh()
+        scheduleEditorOverlayRefresh()
     }
 
     private func applyHyperlinkRenderAttributesToTextStorage() {
@@ -2334,10 +2334,21 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         // especially when the finger starts over a rendered image preview.
     }
 
-    private func scheduleTodoCheckboxRefresh() {
+    private func scheduleEditorOverlayRefresh() {
+        guard !isOverlayRefreshScheduled else { return }
+        isOverlayRefreshScheduled = true
         DispatchQueue.main.async { [weak self] in
-            self?.refreshEditorOverlays()
+            guard let self else { return }
+            self.isOverlayRefreshScheduled = false
+            self.refreshEditorOverlays()
         }
+    }
+
+    private func refreshEditorOverlaysAfterLayoutChangeIfNeeded() {
+        let size = textView.bounds.size
+        guard size != lastOverlayLayoutSize else { return }
+        lastOverlayLayoutSize = size
+        refreshEditorOverlays()
     }
 
     private func refreshEditorOverlays() {
@@ -2366,7 +2377,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             let lineText = nsText.substring(with: lineRange)
             let kind = MarkdownBlockKind.detect(from: lineText)
 
-            if case .todo(let checked, let indent) = kind {
+            if !isCollapsedXMLTagContentRange(lineRange),
+               case .todo(let checked, let indent) = kind {
                 addTodoCheckbox(
                     checked: checked,
                     indent: indent,
@@ -2450,7 +2462,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             let lineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
             let lineText = nsText.substring(with: lineRange)
 
-            if let imageLink = MarkdownImageLinkParser.parse(from: lineText) {
+            if !isCollapsedXMLTagContentRange(lineRange),
+               let imageLink = MarkdownImageLinkParser.parse(from: lineText) {
                 addImagePreview(imageLink, paragraphLocation: paragraphRange.location)
             }
 
@@ -2501,7 +2514,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
                 imageView.image = image
                 imageView.backgroundColor = .clear
             } else {
-                loadImageIfNeeded(url: url, urlString: imageLink.urlString, imageView: imageView)
+                loadImageIfNeeded(url: url, imageView: imageView)
             }
         }
 
@@ -2544,6 +2557,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         }
 
         let buttonSize = MarkdownVisualSpec.xmlTagCollapseControlSize
+        let hitTargetWidth = max(CGFloat(44), caretRect.minX + 6)
+        let hitTargetHeight = max(CGFloat(32), buttonSize)
         let isCollapsed = collapsedXMLTagOpeningLocations.contains(block.openingLineRange.location)
         let button = UIButton(type: .system)
         let imageName = isCollapsed ? "chevron.right" : "chevron.down"
@@ -2555,10 +2570,10 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         button.accessibilityIdentifier = "xml_tag_collapse_\(block.openingLineRange.location)"
         button.accessibilityLabel = isCollapsed ? "Expand \(block.tagName)" : "Collapse \(block.tagName)"
         button.frame = CGRect(
-            x: max(0, caretRect.minX - buttonSize - 2),
-            y: caretRect.midY - buttonSize / 2,
-            width: buttonSize,
-            height: buttonSize
+            x: 0,
+            y: caretRect.midY - hitTargetHeight / 2,
+            width: hitTargetWidth,
+            height: hitTargetHeight
         )
         button.addTarget(self, action: #selector(xmlTagCollapseButtonTapped(_:)), for: .touchUpInside)
 
@@ -2566,9 +2581,16 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         xmlTagCollapseButtons.append(button)
     }
 
+    private func isCollapsedXMLTagContentRange(_ range: NSRange) -> Bool {
+        markdownDelegate.collapsedXMLTagRanges.contains { collapsedRange in
+            NSIntersectionRange(collapsedRange, range).length > 0
+        }
+    }
+
     @objc
     private func xmlTagCollapseButtonTapped(_ sender: UIButton) {
         let openingLocation = sender.tag
+        let visibleOffset = textView.contentOffset
         if collapsedXMLTagOpeningLocations.contains(openingLocation) {
             collapsedXMLTagOpeningLocations.remove(openingLocation)
         } else {
@@ -2577,6 +2599,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         syncCollapsedXMLTagState()
         rebuildTextLayoutPreservingSelection()
         refreshEditorOverlays()
+        restoreVisibleOffset(visibleOffset)
+        refreshEditorOverlaysAfterTextLayoutSettles(restoring: visibleOffset)
     }
 
     private func syncCollapsedXMLTagState() {
@@ -2632,18 +2656,47 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         updateTypingAttributes()
     }
 
-    private func loadImageIfNeeded(url: URL, urlString: String, imageView: UIImageView) {
-        guard !loadingImageURLs.contains(urlString) else { return }
-        loadingImageURLs.insert(urlString)
-
-        MarkdownImageLoader.load(url: url) { [weak self, weak imageView] image in
+    private func refreshEditorOverlaysAfterTextLayoutSettles(restoring offset: CGPoint) {
+        DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.loadingImageURLs.remove(urlString)
+            self.restoreVisibleOffset(offset)
+            self.forceEditorLayout()
+            self.refreshEditorOverlays()
+            self.restoreVisibleOffset(offset)
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.restoreVisibleOffset(offset)
+                self.forceEditorLayout()
+                self.refreshEditorOverlays()
+                self.restoreVisibleOffset(offset)
+            }
+        }
+    }
+
+    private func forceEditorLayout() {
+        view.setNeedsLayout()
+        textView.setNeedsLayout()
+        view.layoutIfNeeded()
+        textView.layoutIfNeeded()
+    }
+
+    private func restoreVisibleOffset(_ offset: CGPoint) {
+        textView.layoutIfNeeded()
+        let maxX = max(0, textView.contentSize.width - textView.bounds.width)
+        let maxY = max(0, textView.contentSize.height - textView.bounds.height)
+        textView.setContentOffset(CGPoint(
+            x: min(max(offset.x, 0), maxX),
+            y: min(max(offset.y, 0), maxY)
+        ), animated: false)
+    }
+
+    private func loadImageIfNeeded(url: URL, imageView: UIImageView) {
+        MarkdownImageLoader.load(url: url) { [weak imageView] image in
             if let image {
                 imageView?.image = image
                 imageView?.backgroundColor = .clear
             }
-            self.scheduleTodoCheckboxRefresh()
         }
     }
 
@@ -2781,7 +2834,6 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var pageMentionSuggestionDocuments: [PageMentionDocument] = []
     private var selectedPageMentionSuggestionIndex = 0
     private var activePageMentionQuery: PageMentionQuery?
-    private var loadingImageURLs: Set<String> = []
     private var collapsedXMLTagOpeningLocations: Set<Int> = []
     private var strikethroughObserver: NSObjectProtocol?
     private var boldObserver: NSObjectProtocol?
@@ -2789,6 +2841,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var hyperlinkObserver: NSObjectProtocol?
     private var revealedHyperlinkRanges: [NSRange] = []
     private var isRestylingText = false
+    private var isOverlayRefreshScheduled = false
+    private var lastOverlayLayoutSize: NSSize = .zero
     private let minimumHorizontalTextInset: CGFloat = 48
     private let maximumTextWidth: CGFloat = 600
     private let verticalTextInset: CGFloat = 16
@@ -2909,21 +2963,22 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        syncTextContainerInsets()
-        refreshEditorOverlays()
+        let didUpdateTextContainerInsets = syncTextContainerInsets()
+        refreshEditorOverlaysAfterLayoutChangeIfNeeded(force: didUpdateTextContainerInsets)
         positionPageMentionSuggestions()
     }
 
-    private func syncTextContainerInsets() {
+    private func syncTextContainerInsets() -> Bool {
         let visibleWidth = scrollView.contentView.bounds.width
-        guard visibleWidth > 0 else { return }
+        guard visibleWidth > 0 else { return false }
 
         let centeredInset = floor((visibleWidth - maximumTextWidth) / 2)
         let horizontalInset = max(minimumHorizontalTextInset, centeredInset)
         let targetInset = NSSize(width: horizontalInset, height: verticalTextInset)
-        guard textView.textContainerInset != targetInset else { return }
+        guard textView.textContainerInset != targetInset else { return false }
 
         textView.textContainerInset = targetInset
+        return true
     }
 
     func loadText(_ markdown: String) {
@@ -2944,10 +2999,10 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
                 guard let tv = self?.textView else { return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: tv.string.count, length: 0))
-                self?.refreshEditorOverlays()
+                self?.scheduleEditorOverlayRefresh()
             }
         }
-        scheduleTodoCheckboxRefresh()
+        scheduleEditorOverlayRefresh()
         updatePageMentionSuggestions()
     }
 
@@ -2960,7 +3015,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
         flushTextToBinding()
         updateTypingAttributes()
-        scheduleTodoCheckboxRefresh()
+        scheduleEditorOverlayRefresh()
         updatePageMentionSuggestions()
     }
 
@@ -2969,7 +3024,6 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             updateRevealedHyperlinkRangesForSelection(restyle: true)
         }
         updateTypingAttributes()
-        scheduleTodoCheckboxRefresh()
         updatePageMentionSuggestions()
     }
 
@@ -3094,7 +3148,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         restoreVisibleOrigin(visibleOrigin)
         updateTypingAttributes()
         coordinator?.commitAppliedEditorText(transform.text)
-        scheduleTodoCheckboxRefresh()
+        scheduleEditorOverlayRefresh()
     }
 
     private func updatePageMentionSuggestions() {
@@ -3436,7 +3490,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private func restyleTextPreservingSelection() {
         applyHyperlinkRenderAttributesToTextStorage()
         updateTypingAttributes()
-        scheduleTodoCheckboxRefresh()
+        scheduleEditorOverlayRefresh()
     }
 
     private func applyHyperlinkRenderAttributesToTextStorage() {
@@ -3488,10 +3542,21 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         ]
     }
 
-    private func scheduleTodoCheckboxRefresh() {
+    private func scheduleEditorOverlayRefresh() {
+        guard !isOverlayRefreshScheduled else { return }
+        isOverlayRefreshScheduled = true
         DispatchQueue.main.async { [weak self] in
-            self?.refreshEditorOverlays()
+            guard let self else { return }
+            self.isOverlayRefreshScheduled = false
+            self.refreshEditorOverlays()
         }
+    }
+
+    private func refreshEditorOverlaysAfterLayoutChangeIfNeeded(force: Bool = false) {
+        let size = textView.bounds.size
+        guard force || size != lastOverlayLayoutSize else { return }
+        lastOverlayLayoutSize = size
+        refreshEditorOverlays()
     }
 
     private func refreshEditorOverlays() {
@@ -3520,7 +3585,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             let lineText = nsText.substring(with: lineRange)
             let kind = MarkdownBlockKind.detect(from: lineText)
 
-            if case .todo(let checked, let indent) = kind {
+            if !isCollapsedXMLTagContentRange(lineRange),
+               case .todo(let checked, let indent) = kind {
                 addTodoCheckbox(
                     checked: checked,
                     indent: indent,
@@ -3621,7 +3687,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             let lineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
             let lineText = nsText.substring(with: lineRange)
 
-            if let imageLink = MarkdownImageLinkParser.parse(from: lineText) {
+            if !isCollapsedXMLTagContentRange(lineRange),
+               let imageLink = MarkdownImageLinkParser.parse(from: lineText) {
                 addImagePreview(imageLink, paragraphLocation: paragraphRange.location)
             }
 
@@ -3682,7 +3749,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
                 imageView.image = image
                 imageView.layer?.backgroundColor = NSColor.clear.cgColor
             } else {
-                loadImageIfNeeded(url: url, urlString: imageLink.urlString, imageView: imageView)
+                loadImageIfNeeded(url: url, imageView: imageView)
             }
         }
 
@@ -3732,6 +3799,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
 
         let buttonSize = MarkdownVisualSpec.xmlTagCollapseControlSize
+        let hitTargetWidth = max(CGFloat(44), caretRect.minX + 6)
+        let hitTargetHeight = max(CGFloat(32), buttonSize)
         let isCollapsed = collapsedXMLTagOpeningLocations.contains(block.openingLineRange.location)
         let button = NSButton()
         button.isBordered = false
@@ -3752,19 +3821,26 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         button.layer?.backgroundColor = (textView.backgroundColor ?? AppTheme.nsBackground).cgColor
         button.imageScaling = .scaleProportionallyDown
         button.frame = NSRect(
-            x: max(0, caretRect.minX - buttonSize - 2),
-            y: caretRect.midY - buttonSize / 2,
-            width: buttonSize,
-            height: buttonSize
+            x: 0,
+            y: caretRect.midY - hitTargetHeight / 2,
+            width: hitTargetWidth,
+            height: hitTargetHeight
         )
 
         textView.addSubview(button)
         xmlTagCollapseButtons.append(button)
     }
 
+    private func isCollapsedXMLTagContentRange(_ range: NSRange) -> Bool {
+        markdownDelegate.collapsedXMLTagRanges.contains { collapsedRange in
+            NSIntersectionRange(collapsedRange, range).length > 0
+        }
+    }
+
     @objc
     private func xmlTagCollapseButtonTapped(_ sender: NSButton) {
         let openingLocation = sender.tag
+        let visibleOrigin = scrollView.contentView.bounds.origin
         if collapsedXMLTagOpeningLocations.contains(openingLocation) {
             collapsedXMLTagOpeningLocations.remove(openingLocation)
         } else {
@@ -3773,6 +3849,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         syncCollapsedXMLTagState()
         rebuildTextLayoutPreservingSelection()
         refreshEditorOverlays()
+        restoreVisibleOrigin(visibleOrigin)
+        refreshEditorOverlaysAfterTextLayoutSettles(restoring: visibleOrigin)
     }
 
     private func syncCollapsedXMLTagState() {
@@ -3827,18 +3905,37 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         updateTypingAttributes()
     }
 
-    private func loadImageIfNeeded(url: URL, urlString: String, imageView: NSImageView) {
-        guard !loadingImageURLs.contains(urlString) else { return }
-        loadingImageURLs.insert(urlString)
-
-        MarkdownImageLoader.load(url: url) { [weak self, weak imageView] image in
+    private func refreshEditorOverlaysAfterTextLayoutSettles(restoring origin: NSPoint) {
+        DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.loadingImageURLs.remove(urlString)
+            self.restoreVisibleOrigin(origin)
+            self.forceEditorLayout()
+            self.refreshEditorOverlays()
+            self.restoreVisibleOrigin(origin)
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.restoreVisibleOrigin(origin)
+                self.forceEditorLayout()
+                self.refreshEditorOverlays()
+                self.restoreVisibleOrigin(origin)
+            }
+        }
+    }
+
+    private func forceEditorLayout() {
+        view.needsLayout = true
+        textView.needsLayout = true
+        view.layoutSubtreeIfNeeded()
+        textView.layoutSubtreeIfNeeded()
+    }
+
+    private func loadImageIfNeeded(url: URL, imageView: NSImageView) {
+        MarkdownImageLoader.load(url: url) { [weak imageView] image in
             if let image {
                 imageView?.image = image
                 imageView?.layer?.backgroundColor = NSColor.clear.cgColor
             }
-            self.scheduleTodoCheckboxRefresh()
         }
     }
 
