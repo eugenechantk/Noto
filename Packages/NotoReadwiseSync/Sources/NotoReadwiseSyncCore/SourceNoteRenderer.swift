@@ -1,12 +1,14 @@
 import Foundation
 
 public enum SourceNoteRenderer {
-    public static let startMarker = "<!-- noto:source:start -->"
-    public static let endMarker = "<!-- noto:source:end -->"
-    public static let highlightsStartMarker = "<!-- noto:highlights:start -->"
-    public static let highlightsEndMarker = "<!-- noto:highlights:end -->"
-    public static let contentStartMarker = "<!-- noto:content:start -->"
-    public static let contentEndMarker = "<!-- noto:content:end -->"
+    public static let startMarker = "<!-- readwise:source:start -->"
+    public static let endMarker = "<!-- readwise:source:end -->"
+    public static let metadataStartMarker = "<!-- readwise:metadata:start -->"
+    public static let metadataEndMarker = "<!-- readwise:metadata:end -->"
+    public static let highlightsStartMarker = "<!-- readwise:highlights:start -->"
+    public static let highlightsEndMarker = "<!-- readwise:highlights:end -->"
+    public static let contentStartMarker = "<!-- readwise:content:start -->"
+    public static let contentEndMarker = "<!-- readwise:content:end -->"
 
     public static func renderNewNote(
         for book: ReadwiseBook,
@@ -30,7 +32,7 @@ public enum SourceNoteRenderer {
         let createdAt = metadata.createdAt ?? capturedAt
         let markdownWithUpdatedFrontmatter = replaceFrontmatter(
             in: existingMarkdown,
-            with: frontmatter(for: book, id: id, createdAt: createdAt, updatedAt: capturedAt)
+            with: frontmatter(for: book, id: id, createdAt: createdAt, updatedAt: capturedAt, preservingTags: metadata.tags)
         )
         return replaceGeneratedSection(
             in: markdownWithUpdatedFrontmatter,
@@ -81,7 +83,7 @@ public enum SourceNoteRenderer {
         let createdAt = metadata.createdAt ?? capturedAt
         let markdownWithUpdatedFrontmatter = replaceFrontmatter(
             in: existingMarkdown,
-            with: frontmatter(for: document, id: id, createdAt: createdAt, updatedAt: capturedAt)
+            with: frontmatter(for: document, id: id, createdAt: createdAt, updatedAt: capturedAt, preservingTags: metadata.tags)
         )
         return replaceGeneratedSection(
             in: markdownWithUpdatedFrontmatter,
@@ -108,7 +110,7 @@ public enum SourceNoteRenderer {
         let createdAt = metadata.createdAt ?? capturedAt
         let markdownWithUpdatedFrontmatter = replaceFrontmatter(
             in: existingMarkdown,
-            with: frontmatter(for: document, matchedBook: matchedBook, id: id, createdAt: createdAt, updatedAt: capturedAt)
+            with: frontmatter(for: document, matchedBook: matchedBook, id: id, createdAt: createdAt, updatedAt: capturedAt, preservingTags: metadata.tags)
         )
         return replaceGeneratedSection(
             in: markdownWithUpdatedFrontmatter,
@@ -233,7 +235,7 @@ public enum SourceNoteRenderer {
         highlightsBlock: String,
         contentBlock: String
     ) -> String {
-        [metadataBlock, highlightsBlock, contentBlock].joined(separator: "\n\n")
+        [metadataSection(for: metadataBlock), highlightsBlock, contentBlock].joined(separator: "\n\n")
     }
 
     private static func replaceGeneratedSection(
@@ -313,25 +315,40 @@ public enum SourceNoteRenderer {
     }
 
     private static func replaceMetadataBeforeFirstGeneratedBlock(in markdown: String, with metadataBlock: String) -> String {
+        let metadataSection = metadataSection(for: metadataBlock)
+        if markdown.contains(metadataStartMarker) || markdown.contains(metadataEndMarker) {
+            return replaceBlock(
+                in: markdown,
+                start: metadataStartMarker,
+                end: metadataEndMarker,
+                with: metadataSection
+            )
+        }
+
         guard let firstMarkerRange = firstGeneratedMarkerRange(in: markdown) else {
-            return insertGeneratedBlock(markdown, generatedBlock: metadataBlock)
+            return insertGeneratedBlock(markdown, generatedBlock: metadataSection)
         }
 
         let lineStart = markdown[..<firstMarkerRange.lowerBound].lastIndex(of: "\n")
             .map { markdown.index(after: $0) } ?? markdown.startIndex
-        let beforeMarker = markdown[..<lineStart]
-        let beforeMarkerString = String(beforeMarker)
-        let metadataStart: String.Index
-        if let metadataStartInPrefix = sourceMetadataStart(in: beforeMarkerString) {
-            let offset = beforeMarkerString.distance(from: beforeMarkerString.startIndex, to: metadataStartInPrefix)
-            metadataStart = markdown.index(markdown.startIndex, offsetBy: offset)
-        } else {
-            metadataStart = lineStart
+        let beforeMarkerString = String(markdown[..<lineStart])
+        var updated = markdown
+        if let metadataRange = generatedMetadataRange(in: beforeMarkerString) {
+            let lowerOffset = beforeMarkerString.distance(from: beforeMarkerString.startIndex, to: metadataRange.lowerBound)
+            let upperOffset = beforeMarkerString.distance(from: beforeMarkerString.startIndex, to: metadataRange.upperBound)
+            let metadataStart = markdown.index(markdown.startIndex, offsetBy: lowerOffset)
+            let metadataEnd = markdown.index(markdown.startIndex, offsetBy: upperOffset)
+            updated.replaceSubrange(metadataStart..<metadataEnd, with: metadataSection + "\n\n")
+            return updated
         }
 
-        var updated = markdown
-        updated.replaceSubrange(metadataStart..<lineStart, with: metadataBlock + "\n\n")
+        updated.replaceSubrange(lineStart..<lineStart, with: metadataSection + "\n\n")
         return updated
+    }
+
+    private static func metadataSection(for metadataBlock: String) -> String {
+        [metadataStartMarker, metadataBlock, metadataEndMarker]
+            .joined(separator: "\n")
     }
 
     private static func firstGeneratedMarkerRange(in markdown: String) -> Range<String.Index>? {
@@ -340,21 +357,77 @@ public enum SourceNoteRenderer {
             .min { $0.lowerBound < $1.lowerBound }
     }
 
-    private static func sourceMetadataStart(in markdownPrefix: String) -> String.Index? {
-        let patterns = ["\nSource: ", "\n\nSource: "]
-        for pattern in patterns {
-            if let range = markdownPrefix.range(of: pattern, options: .backwards) {
-                return markdownPrefix.index(after: range.lowerBound)
+    private static func generatedMetadataRange(in markdownPrefix: String) -> Range<String.Index>? {
+        var cursor = markdownPrefix.startIndex
+        var bestRange: Range<String.Index>?
+
+        while cursor < markdownPrefix.endIndex {
+            let lineStart = cursor
+            let lineEnd = markdownPrefix[cursor...].firstIndex(of: "\n") ?? markdownPrefix.endIndex
+            let line = String(markdownPrefix[lineStart..<lineEnd])
+
+            if line.hasPrefix("Source: ") {
+                var scanCursor = lineStart
+                var metadataEnd = lineStart
+                var sawCaptured = false
+
+                while scanCursor < markdownPrefix.endIndex {
+                    let scanLineEnd = markdownPrefix[scanCursor...].firstIndex(of: "\n") ?? markdownPrefix.endIndex
+                    let scanLine = String(markdownPrefix[scanCursor..<scanLineEnd])
+                    guard isGeneratedMetadataLine(scanLine) else { break }
+
+                    if scanLine.hasPrefix("Captured: ") {
+                        sawCaptured = true
+                    }
+                    metadataEnd = scanLineEnd == markdownPrefix.endIndex
+                        ? markdownPrefix.endIndex
+                        : markdownPrefix.index(after: scanLineEnd)
+                    scanCursor = metadataEnd
+                }
+
+                if sawCaptured {
+                    let rangeEnd = endOfFollowingBlankLines(in: markdownPrefix, from: metadataEnd)
+                    bestRange = lineStart..<rangeEnd
+                }
+                let nextLineStart = lineEnd == markdownPrefix.endIndex
+                    ? markdownPrefix.endIndex
+                    : markdownPrefix.index(after: lineEnd)
+                cursor = scanCursor > nextLineStart ? scanCursor : nextLineStart
+            } else {
+                cursor = lineEnd == markdownPrefix.endIndex
+                    ? markdownPrefix.endIndex
+                    : markdownPrefix.index(after: lineEnd)
             }
         }
-        return nil
+
+        return bestRange
+    }
+
+    private static func isGeneratedMetadataLine(_ line: String) -> Bool {
+        line.hasPrefix("Source: ")
+            || line.hasPrefix("Readwise: ")
+            || line.hasPrefix("Captured: ")
+    }
+
+    private static func endOfFollowingBlankLines(in markdown: String, from start: String.Index) -> String.Index {
+        var cursor = start
+        while cursor < markdown.endIndex {
+            let lineEnd = markdown[cursor...].firstIndex(of: "\n") ?? markdown.endIndex
+            let line = markdown[cursor..<lineEnd]
+            guard line.trimmingCharacters(in: .whitespaces).isEmpty else {
+                break
+            }
+            cursor = lineEnd == markdown.endIndex ? markdown.endIndex : markdown.index(after: lineEnd)
+        }
+        return cursor
     }
 
     private static func frontmatter(
         for book: ReadwiseBook,
         id: UUID,
         createdAt: Date,
-        updatedAt: Date
+        updatedAt: Date,
+        preservingTags existingTags: [String] = []
     ) -> String {
         var lines: [String] = [
             "---",
@@ -377,8 +450,7 @@ public enum SourceNoteRenderer {
         appendOptional("author", book.author, to: &lines)
         appendOptional("asin", book.asin, to: &lines)
         appendOptional("readwise_source", book.source, to: &lines)
-        lines.append("tags:")
-        lines.append("  - imported/readwise")
+        appendTags(["imported/readwise"], preserving: existingTags, to: &lines)
         lines.append("---")
         return lines.joined(separator: "\n")
     }
@@ -387,7 +459,8 @@ public enum SourceNoteRenderer {
         for document: ReaderDocument,
         id: UUID,
         createdAt: Date,
-        updatedAt: Date
+        updatedAt: Date,
+        preservingTags existingTags: [String] = []
     ) -> String {
         var lines: [String] = [
             "---",
@@ -411,9 +484,7 @@ public enum SourceNoteRenderer {
         if let wordCount = document.wordCount {
             lines.append("word_count: \(wordCount)")
         }
-        lines.append("tags:")
-        lines.append("  - imported/reader")
-        appendReaderTags(document.tags, to: &lines)
+        appendTags(["imported/reader"] + document.tags, preserving: existingTags, to: &lines)
         lines.append("---")
         return lines.joined(separator: "\n")
     }
@@ -423,7 +494,8 @@ public enum SourceNoteRenderer {
         matchedBook: ReadwiseBook,
         id: UUID,
         createdAt: Date,
-        updatedAt: Date
+        updatedAt: Date,
+        preservingTags existingTags: [String] = []
     ) -> String {
         var lines: [String] = [
             "---",
@@ -452,17 +524,17 @@ public enum SourceNoteRenderer {
         if let wordCount = document.wordCount {
             lines.append("word_count: \(wordCount)")
         }
-        lines.append("tags:")
-        lines.append("  - imported/reader")
-        lines.append("  - imported/readwise")
-        appendReaderTags(document.tags, to: &lines)
+        appendTags(["imported/reader", "imported/readwise"] + document.tags, preserving: existingTags, to: &lines)
         lines.append("---")
         return lines.joined(separator: "\n")
     }
 
-    private static func appendReaderTags(_ tags: [String], to lines: inout [String]) {
-        for tag in tags.compactMap(\.nonEmpty) {
-            lines.append("  - \(yamlScalar(tag))")
+    private static func appendTags(_ generatedTags: [String], preserving existingTags: [String], to lines: inout [String]) {
+        lines.append("tags:")
+        var seen = Set<String>()
+        for tag in generatedTags.compactMap(\.nonEmpty) + existingTags.compactMap(\.nonEmpty) {
+            guard seen.insert(tag).inserted else { continue }
+            lines.append("  - \(tag.hasPrefix("imported/") ? tag : yamlScalar(tag))")
         }
     }
 
@@ -524,14 +596,31 @@ public enum SourceNoteRenderer {
                 of: "\n---",
                 range: markdown.index(markdown.startIndex, offsetBy: 3)..<markdown.endIndex
               ) else {
-            return ExistingFrontmatter(id: nil, createdAt: nil)
+            return ExistingFrontmatter(id: nil, createdAt: nil, tags: [])
         }
 
         let frontmatter = markdown[markdown.startIndex..<closeRange.upperBound]
         var id: UUID?
         var createdAt: Date?
+        var tags: [String] = []
+        var isReadingTags = false
 
         for line in frontmatter.components(separatedBy: "\n") {
+            if line.trimmingCharacters(in: .whitespaces) == "tags:" {
+                isReadingTags = true
+                continue
+            }
+            if isReadingTags {
+                if let tag = parseTagLine(line) {
+                    tags.append(tag)
+                    continue
+                }
+                if line.hasPrefix(" ") || line.hasPrefix("\t") || line.trimmingCharacters(in: .whitespaces).isEmpty {
+                    continue
+                }
+                isReadingTags = false
+            }
+
             let parts = line.split(separator: ":", maxSplits: 1)
             guard parts.count == 2 else { continue }
             let key = parts[0].trimmingCharacters(in: .whitespaces)
@@ -544,7 +633,21 @@ public enum SourceNoteRenderer {
             }
         }
 
-        return ExistingFrontmatter(id: id, createdAt: createdAt)
+        return ExistingFrontmatter(id: id, createdAt: createdAt, tags: tags)
+    }
+
+    private static func parseTagLine(_ line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("- ") else { return nil }
+        var value = String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+        if value.hasPrefix("\""), value.hasSuffix("\""), value.count >= 2 {
+            value.removeFirst()
+            value.removeLast()
+            value = value
+                .replacingOccurrences(of: "\\\"", with: "\"")
+                .replacingOccurrences(of: "\\\\", with: "\\")
+        }
+        return value.nonEmpty
     }
 
     private static func insertGeneratedBlock(_ markdown: String, generatedBlock: String) -> String {
@@ -577,6 +680,7 @@ public enum SourceNoteRenderer {
 private struct ExistingFrontmatter {
     let id: UUID?
     let createdAt: Date?
+    let tags: [String]
 }
 
 private enum FNV1a64 {

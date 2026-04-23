@@ -70,10 +70,12 @@ struct ReadwiseSyncTests {
 
         #expect(note.contains("updated: 2026-04-21T00:00:00Z"))
         #expect(!note.contains("modified:"))
-        #expect(note.contains("<!-- noto:highlights:start -->"))
-        #expect(note.contains("<!-- noto:highlights:end -->"))
-        #expect(note.contains("<!-- noto:content:start -->"))
-        #expect(note.contains("<!-- noto:content:end -->"))
+        #expect(note.contains("<!-- readwise:metadata:start -->"))
+        #expect(note.contains("<!-- readwise:metadata:end -->"))
+        #expect(note.contains("<!-- readwise:highlights:start -->"))
+        #expect(note.contains("<!-- readwise:highlights:end -->"))
+        #expect(note.contains("<!-- readwise:content:start -->"))
+        #expect(note.contains("<!-- readwise:content:end -->"))
         #expect(note.contains("Source: [How to Do What You Love](https://example.com/love)"))
         #expect(note.contains("Readwise: [Open in Readwise](https://readwise.io/bookreview/123)"))
         #expect(note.contains("Captured: 2026-04-21T00:00:00Z"))
@@ -148,7 +150,7 @@ struct ReadwiseSyncTests {
         #expect(existing.contains("First paragraph with **bold text**"))
     }
 
-    @Test func updateMigratesLegacyEmptyPlaceholdersToEmptyBlocks() throws {
+    @Test func updateMigratesEmptyPlaceholdersToEmptyBlocks() throws {
         let book = try loadFixtureBooks()[0]
         let capturedAt = ISO8601DateFormatter.noto.date(from: "2026-04-21T00:00:00Z")!
         let existing = """
@@ -162,13 +164,13 @@ struct ReadwiseSyncTests {
         Source: Placeholder
         Captured: 2026-04-21T00:00:00Z
 
-        <!-- noto:highlights:start -->
+        <!-- readwise:highlights:start -->
         _No highlights imported._
-        <!-- noto:highlights:end -->
+        <!-- readwise:highlights:end -->
 
-        <!-- noto:content:start -->
+        <!-- readwise:content:start -->
         _No full content imported._
-        <!-- noto:content:end -->
+        <!-- readwise:content:end -->
         """
 
         let updated = SourceNoteRenderer.renderUpdatedNote(
@@ -179,10 +181,10 @@ struct ReadwiseSyncTests {
 
         #expect(!updated.contains("No highlights imported"))
         #expect(!updated.contains("No full content imported"))
-        #expect(updated.contains("<!-- noto:content:start -->\n<!-- noto:content:end -->"))
+        #expect(updated.contains("<!-- readwise:content:start -->\n<!-- readwise:content:end -->"))
     }
 
-    @Test func readerUpdateMigratesLegacyEmptyHighlightsPlaceholder() throws {
+    @Test func readerUpdateMigratesEmptyHighlightsPlaceholder() throws {
         let document = try loadReaderFixtureDocuments()[0]
         let capturedAt = ISO8601DateFormatter.noto.date(from: "2026-04-21T00:00:00Z")!
         let existing = """
@@ -196,13 +198,13 @@ struct ReadwiseSyncTests {
         Source: Placeholder
         Captured: 2026-04-21T00:00:00Z
 
-        <!-- noto:highlights:start -->
+        <!-- readwise:highlights:start -->
         _No highlights imported._
-        <!-- noto:highlights:end -->
+        <!-- readwise:highlights:end -->
 
-        <!-- noto:content:start -->
+        <!-- readwise:content:start -->
         Old content.
-        <!-- noto:content:end -->
+        <!-- readwise:content:end -->
         """
 
         let updated = SourceNoteRenderer.renderUpdatedNote(
@@ -212,8 +214,137 @@ struct ReadwiseSyncTests {
         )
 
         #expect(!updated.contains("No highlights imported"))
-        #expect(updated.contains("<!-- noto:highlights:start -->\n<!-- noto:highlights:end -->"))
+        #expect(updated.contains("<!-- readwise:highlights:start -->\n<!-- readwise:highlights:end -->"))
         #expect(updated.contains("First paragraph with **bold text**"))
+    }
+
+    @Test func readerUpdatePreservesManualMarkdownBetweenMetadataAndGeneratedBlocks() throws {
+        let document = try loadReaderFixtureDocuments()[0]
+        let capturedAt = ISO8601DateFormatter.noto.date(from: "2026-04-21T00:00:00Z")!
+        var existing = SourceNoteRenderer.renderNewNote(
+            for: document,
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            createdAt: capturedAt,
+            capturedAt: capturedAt
+        )
+        existing = existing.replacingOccurrences(
+            of: "\n<!-- readwise:highlights:start -->",
+            with: "\n## Thoughts\nmanual note before generated markers\n\n<!-- readwise:highlights:start -->"
+        )
+
+        let updated = SourceNoteRenderer.renderUpdatedNote(
+            existingMarkdown: existing,
+            document: document,
+            capturedAt: ISO8601DateFormatter.noto.date(from: "2026-04-22T00:00:00Z")!
+        )
+
+        #expect(updated.contains("Captured: 2026-04-22T00:00:00Z"))
+        #expect(!updated.contains("Captured: 2026-04-21T00:00:00Z"))
+        #expect(updated.contains("<!-- readwise:metadata:start -->"))
+        #expect(updated.contains("<!-- readwise:metadata:end -->"))
+        #expect(updated.contains("## Thoughts\nmanual note before generated markers"))
+        #expect(updated.contains("<!-- readwise:highlights:start -->\n<!-- readwise:highlights:end -->"))
+        #expect(updated.contains("First paragraph with **bold text**"))
+    }
+
+    @Test func readerUpdateMigratesUnmarkedMetadataIntoGeneratedBlock() throws {
+        let document = try loadReaderFixtureDocuments()[0]
+        let existing = """
+        ---
+        id: 11111111-1111-1111-1111-111111111111
+        created: 2026-04-21T00:00:00Z
+        updated: 2026-04-21T00:00:00Z
+        ---
+        # Placeholder Note
+
+        Source: Placeholder
+        Readwise: [Open in Reader](https://read.readwise.io/read/old)
+        Captured: 2026-04-21T00:00:00Z
+
+        ## Thoughts
+        Keep this.
+
+        <!-- readwise:highlights:start -->
+        <!-- readwise:highlights:end -->
+
+        <!-- readwise:content:start -->
+        Old content.
+        <!-- readwise:content:end -->
+        """
+
+        let updated = SourceNoteRenderer.renderUpdatedNote(
+            existingMarkdown: existing,
+            document: document,
+            capturedAt: ISO8601DateFormatter.noto.date(from: "2026-04-22T00:00:00Z")!
+        )
+
+        #expect(updated.contains("<!-- readwise:metadata:start -->\nSource: [Long Reader Article](https://example.com/full-article)"))
+        #expect(updated.contains("Captured: 2026-04-22T00:00:00Z\n<!-- readwise:metadata:end -->"))
+        #expect(!updated.contains("Source: Placeholder"))
+        #expect(updated.contains("## Thoughts\nKeep this."))
+    }
+
+    @Test func readerUpdateReplacesExistingMetadataBlock() throws {
+        let document = try loadReaderFixtureDocuments()[0]
+        let existing = """
+        ---
+        id: 11111111-1111-1111-1111-111111111111
+        created: 2026-04-21T00:00:00Z
+        updated: 2026-04-21T00:00:00Z
+        ---
+        # Placeholder Note
+
+        <!-- readwise:metadata:start -->
+        Source: Placeholder
+        Captured: 2026-04-21T00:00:00Z
+        <!-- readwise:metadata:end -->
+
+        ## Thoughts
+        Keep this too.
+
+        <!-- readwise:highlights:start -->
+        <!-- readwise:highlights:end -->
+
+        <!-- readwise:content:start -->
+        Old content.
+        <!-- readwise:content:end -->
+        """
+
+        let updated = SourceNoteRenderer.renderUpdatedNote(
+            existingMarkdown: existing,
+            document: document,
+            capturedAt: ISO8601DateFormatter.noto.date(from: "2026-04-22T00:00:00Z")!
+        )
+
+        #expect(!updated.contains("Source: Placeholder"))
+        #expect(updated.contains("<!-- readwise:metadata:start -->"))
+        #expect(updated.contains("Captured: 2026-04-22T00:00:00Z\n<!-- readwise:metadata:end -->"))
+        #expect(updated.contains("## Thoughts\nKeep this too."))
+    }
+
+    @Test func readerUpdatePreservesExistingFrontmatterTags() throws {
+        let document = try loadReaderFixtureDocuments()[0]
+        let capturedAt = ISO8601DateFormatter.noto.date(from: "2026-04-21T00:00:00Z")!
+        var existing = SourceNoteRenderer.renderNewNote(
+            for: document,
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            createdAt: capturedAt,
+            capturedAt: capturedAt
+        )
+        existing = existing.replacingOccurrences(
+            of: "  - \"content-creation\"\n---",
+            with: "  - \"content-creation\"\n  - \"manual/tag\"\n---"
+        )
+
+        let updated = SourceNoteRenderer.renderUpdatedNote(
+            existingMarkdown: existing,
+            document: document,
+            capturedAt: ISO8601DateFormatter.noto.date(from: "2026-04-22T00:00:00Z")!
+        )
+
+        #expect(updated.contains("  - imported/reader"))
+        #expect(updated.contains("  - \"content-creation\""))
+        #expect(updated.contains("  - \"manual/tag\""))
     }
 
     @Test func syncCreatesFlatSourceNotesAndResolvesFilenameConflicts() throws {
@@ -298,9 +429,9 @@ struct ReadwiseSyncTests {
         #expect(note.contains("Source: [Long Reader Article](https://example.com/full-article)"))
         #expect(note.contains("Readwise: [Open in Reader](https://read.readwise.io/new/read/01readerfullcontent)"))
         #expect(note.contains("  - \"content-creation\""))
-        #expect(note.contains("<!-- noto:highlights:start -->"))
+        #expect(note.contains("<!-- readwise:highlights:start -->"))
         #expect(!note.contains("No highlights imported"))
-        #expect(note.contains("<!-- noto:content:start -->"))
+        #expect(note.contains("<!-- readwise:content:start -->"))
         #expect(note.contains("# Long Reader Article"))
         #expect(note.contains("**bold text**"))
     }
