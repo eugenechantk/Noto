@@ -334,6 +334,17 @@ struct TextKit2MarkdownLayoutTests {
         #expect(fragment is TodoLayoutFragment)
     }
 
+    @Test("Image paragraphs use the image layout fragment")
+    func imageParagraphsUseImageLayoutFragment() {
+        let paragraph = MarkdownParagraph(
+            attributedString: NSAttributedString(string: "![](https://example.com/chart.png)"),
+            blockKind: .imageLink(MarkdownImageLink(urlString: "https://example.com/chart.png", altText: ""))
+        )
+        let fragment = MarkdownTextDelegate().layoutFragment(for: paragraph)
+
+        #expect(fragment is ImageLayoutFragment)
+    }
+
     @Test("Collapsed XML paragraphs use hidden fragments instead of todo fragments")
     func collapsedXMLParagraphsUseHiddenFragmentsInsteadOfTodoFragments() {
         let paragraph = MarkdownParagraph(
@@ -362,6 +373,32 @@ struct TextKit2MarkdownLayoutTests {
         #expect(abs(rect.midY - 120) < 1)
         #expect(rect.width == MarkdownVisualSpec.todoControlSize)
         #expect(rect.height == MarkdownVisualSpec.todoControlSize)
+    }
+
+    @Test("Image fragment rect preserves reserved height minus vertical padding")
+    func imageFragmentRectPreservesReservedHeightMinusVerticalPadding() {
+        let rect = ImageFragmentGeometry.imageRect(
+            fragmentFrame: CGRect(x: 24, y: 100, width: 320, height: MarkdownVisualSpec.imagePreviewReservedHeight),
+            point: CGPoint(x: 16, y: 12)
+        )
+
+        #expect(rect.minX == 16)
+        #expect(rect.minY == 20)
+        #expect(rect.width == 320)
+        #expect(rect.height == MarkdownVisualSpec.imagePreviewReservedHeight - MarkdownVisualSpec.imagePreviewVerticalPadding * 2)
+    }
+
+    @Test("Image fragment uses aspect fill sizing")
+    func imageFragmentUsesAspectFillSizing() {
+        let drawRect = ImageFragmentGeometry.aspectFillRect(
+            imageSize: CGSize(width: 400, height: 200),
+            in: CGRect(x: 0, y: 0, width: 100, height: 100)
+        )
+
+        #expect(drawRect.width == 200)
+        #expect(drawRect.height == 100)
+        #expect(drawRect.minX == -50)
+        #expect(drawRect.minY == 0)
     }
 }
 #endif

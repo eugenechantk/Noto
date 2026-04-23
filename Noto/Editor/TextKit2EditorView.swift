@@ -1047,6 +1047,126 @@ final class TodoLayoutFragment: NSTextLayoutFragment {
     }
 }
 
+// MARK: - ImageLayoutFragment
+
+enum ImageFragmentGeometry {
+    static func imageRect(
+        fragmentFrame: CGRect,
+        point: CGPoint = .zero,
+        availableWidth: CGFloat? = nil
+    ) -> CGRect {
+        let verticalPadding = MarkdownVisualSpec.imagePreviewVerticalPadding
+        let resolvedWidth = max(
+            fragmentFrame.width,
+            max(0, (availableWidth ?? fragmentFrame.width) - point.x)
+        )
+        return CGRect(
+            x: point.x,
+            y: point.y + verticalPadding,
+            width: resolvedWidth,
+            height: max(0, fragmentFrame.height - verticalPadding * 2)
+        ).integral
+    }
+
+    static func aspectFillRect(
+        imageSize: CGSize,
+        in bounds: CGRect
+    ) -> CGRect {
+        guard imageSize.width > 0,
+              imageSize.height > 0,
+              bounds.width > 0,
+              bounds.height > 0 else {
+            return bounds
+        }
+
+        let scale = max(bounds.width / imageSize.width, bounds.height / imageSize.height)
+        let drawSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        return CGRect(
+            x: bounds.midX - drawSize.width / 2,
+            y: bounds.midY - drawSize.height / 2,
+            width: drawSize.width,
+            height: drawSize.height
+        )
+    }
+}
+
+final class ImageLayoutFragment: NSTextLayoutFragment {
+    override var renderingSurfaceBounds: CGRect {
+        let baseBounds = super.renderingSurfaceBounds
+        let targetWidth = max(baseBounds.width, expandedRenderingWidth())
+        let targetHeight = max(baseBounds.height, layoutFragmentFrame.height)
+        return CGRect(x: 0, y: baseBounds.minY, width: targetWidth, height: targetHeight)
+    }
+
+    override func draw(at point: CGPoint, in context: CGContext) {
+        super.draw(at: point, in: context)
+        guard let paragraph = textElement as? MarkdownParagraph,
+              case .imageLink(let imageLink) = paragraph.blockKind else {
+            return
+        }
+
+        let imageRect = ImageFragmentGeometry.imageRect(
+            fragmentFrame: layoutFragmentFrame,
+            point: point,
+            availableWidth: textLayoutManager?.usageBoundsForTextContainer.width
+        )
+        guard imageRect.width > 0, imageRect.height > 0 else { return }
+
+        context.saveGState()
+        defer { context.restoreGState() }
+
+        let clipPath = CGPath(
+            roundedRect: imageRect,
+            cornerWidth: MarkdownVisualSpec.imagePreviewCornerRadius,
+            cornerHeight: MarkdownVisualSpec.imagePreviewCornerRadius,
+            transform: nil
+        )
+        context.addPath(clipPath)
+        context.clip()
+
+        #if os(iOS)
+        context.setFillColor(AppTheme.uiCodeBackground.cgColor)
+        #elseif os(macOS)
+        context.setFillColor(AppTheme.nsCodeBackground.cgColor)
+        #endif
+        context.fill(imageRect)
+
+        guard let url = imageLink.url,
+              let image = MarkdownImageLoader.cachedImage(for: url) else {
+            return
+        }
+
+        let drawRect = ImageFragmentGeometry.aspectFillRect(imageSize: image.size, in: imageRect)
+        #if os(iOS)
+        image.draw(in: drawRect)
+        #elseif os(macOS)
+        NSGraphicsContext.current?.imageInterpolation = .high
+        image.draw(
+            in: drawRect,
+            from: NSRect(origin: .zero, size: image.size),
+            operation: .sourceOver,
+            fraction: 1,
+            respectFlipped: true,
+            hints: nil
+        )
+        #endif
+    }
+
+    private func expandedRenderingWidth() -> CGFloat {
+        let usageWidth = textLayoutManager?.usageBoundsForTextContainer.width ?? 0
+        if usageWidth > 0 {
+            return max(layoutFragmentFrame.width, usageWidth - layoutFragmentFrame.minX)
+        }
+
+        let containerWidth = textLayoutManager?.textContainer?.size.width ?? 0
+        if containerWidth.isFinite && containerWidth > 0 {
+            return max(layoutFragmentFrame.width, containerWidth - layoutFragmentFrame.minX)
+        }
+
+        return layoutFragmentFrame.width
+    }
+}
+
 // MARK: - MarkdownImageLoader
 
 private enum MarkdownImageLoader {
@@ -1085,6 +1205,7 @@ private enum MarkdownImageLoader {
 final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSTextLayoutManagerDelegate {
     var revealedHyperlinkRanges: [NSRange] = []
     var collapsedXMLTagRanges: [NSRange] = []
+    var requestImageLoad: ((URL) -> Void)?
 
     func textContentStorage(
         _ textContentStorage: NSTextContentStorage,
@@ -1163,18 +1284,27 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
     }
 
     func layoutFragment(for textElement: NSTextElement) -> NSTextLayoutFragment {
-        guard let paragraph = textElement as? MarkdownParagraph,
-              paragraph.blockKind == .frontmatter ||
-                paragraph.blockKind == .collapsedXMLTagContent ||
-                isTodo(paragraph.blockKind) else {
+        guard let paragraph = textElement as? MarkdownParagraph else {
             return NSTextLayoutFragment(textElement: textElement, range: nil)
+        }
+
+        if case .imageLink(let imageLink) = paragraph.blockKind {
+            if let url = imageLink.url,
+               MarkdownImageLoader.cachedImage(for: url) == nil {
+                requestImageLoad?(url)
+            }
+            return ImageLayoutFragment(textElement: textElement, range: nil)
         }
 
         if isTodo(paragraph.blockKind) {
             return TodoLayoutFragment(textElement: textElement, range: nil)
         }
 
-        return HiddenFrontmatterLayoutFragment(textElement: textElement, range: nil)
+        if paragraph.blockKind == .frontmatter || paragraph.blockKind == .collapsedXMLTagContent {
+            return HiddenFrontmatterLayoutFragment(textElement: textElement, range: nil)
+        }
+
+        return NSTextLayoutFragment(textElement: textElement, range: nil)
     }
 
     private func isTodo(_ kind: MarkdownBlockKind) -> Bool {
@@ -1552,7 +1682,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private(set) var textView: UITextView!
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
-    private var imagePreviewViews: [UIImageView] = []
     private var xmlTagCollapseButtons: [UIButton] = []
     private var pageMentionSuggestionView: UIStackView?
     private var pageMentionSuggestionDocuments: [PageMentionDocument] = []
@@ -1571,6 +1700,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var lastOverlayLayoutSize: CGSize = .zero
     private var keyboardObserverTokens: [NSObjectProtocol] = []
     private var keyboardFrameInScreen: CGRect?
+    private var loadingImageURLs: Set<URL> = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -1584,6 +1714,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
            let contentStorage = layoutManager.textContentManager as? NSTextContentStorage {
             contentStorage.delegate = markdownDelegate
             layoutManager.delegate = markdownDelegate
+            markdownDelegate.requestImageLoad = { [weak self] url in
+                self?.requestImageLoad(for: url)
+            }
         } else {
             logger.warning("TextKit 2 not available — falling back to unstyled editing")
         }
@@ -2526,10 +2659,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        // Overlay controls and image previews are subviews of the text view's
-        // scrollable content, so they move with the document automatically.
-        // Rebuilding them during an active pan can cancel scrolling gestures,
-        // especially when the finger starts over a rendered image preview.
+        // Rebuilding XML collapse controls during an active pan can cancel
+        // scrolling gestures, so the scroll callback stays passive.
     }
 
     private func scheduleEditorOverlayRefresh() {
@@ -2552,76 +2683,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
         applyCollapsedXMLTagAttributesToTextStorage()
-        refreshImagePreviews()
         refreshXMLTagCollapseButtons()
-    }
-
-    private func refreshImagePreviews() {
-        guard isViewLoaded, textView != nil else { return }
-
-        imagePreviewViews.forEach { $0.removeFromSuperview() }
-        imagePreviewViews.removeAll()
-
-        textView.layoutIfNeeded()
-
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.text ?? "",
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        )
-        for block in blocks where block.isNativeOverlayEligible {
-            if case .imageLink(let imageLink) = block.kind {
-                addImagePreview(imageLink, paragraphLocation: block.paragraphRange.location)
-            }
-        }
-    }
-
-    private func addImagePreview(_ imageLink: MarkdownImageLink, paragraphLocation: Int) {
-        guard let startPosition = textView.position(from: textView.beginningOfDocument, offset: paragraphLocation) else {
-            return
-        }
-
-        let caretRect = textView.caretRect(for: startPosition)
-        guard !caretRect.isNull,
-              caretRect.origin.x.isFinite,
-              caretRect.origin.y.isFinite,
-              caretRect.size.width.isFinite,
-              caretRect.size.height.isFinite else {
-            return
-        }
-
-        let linePadding = textView.textContainer.lineFragmentPadding
-        let horizontalInset = textView.textContainerInset
-        let x = horizontalInset.left + linePadding
-        let width = max(80, textView.bounds.width - horizontalInset.left - horizontalInset.right - linePadding * 2)
-        let verticalPadding = MarkdownVisualSpec.imagePreviewVerticalPadding
-        let height = MarkdownVisualSpec.imagePreviewReservedHeight - verticalPadding * 2
-
-        let imageView = UIImageView(frame: CGRect(
-            x: x,
-            y: caretRect.minY + verticalPadding,
-            width: width,
-            height: height
-        ))
-        imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        imageView.isUserInteractionEnabled = false
-        imageView.backgroundColor = AppTheme.uiCodeBackground
-        imageView.layer.cornerRadius = MarkdownVisualSpec.imagePreviewCornerRadius
-        imageView.layer.cornerCurve = .continuous
-        imageView.accessibilityIdentifier = "markdown_image_preview_\(paragraphLocation)"
-        imageView.accessibilityLabel = imageLink.altText.isEmpty ? "Image" : imageLink.altText
-
-        if let url = imageLink.url {
-            if let image = MarkdownImageLoader.cachedImage(for: url) {
-                imageView.image = image
-                imageView.backgroundColor = .clear
-            } else {
-                loadImageIfNeeded(url: url, imageView: imageView)
-            }
-        }
-
-        textView.addSubview(imageView)
-        imagePreviewViews.append(imageView)
     }
 
     private func refreshXMLTagCollapseButtons() {
@@ -2793,13 +2855,29 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         ), animated: false)
     }
 
-    private func loadImageIfNeeded(url: URL, imageView: UIImageView) {
-        MarkdownImageLoader.load(url: url) { [weak imageView] image in
-            if let image {
-                imageView?.image = image
-                imageView?.backgroundColor = .clear
-            }
+    private func requestImageLoad(for url: URL) {
+        guard loadingImageURLs.insert(url).inserted else { return }
+
+        MarkdownImageLoader.load(url: url) { [weak self] _ in
+            guard let self else { return }
+            self.loadingImageURLs.remove(url)
+            self.invalidateImageFragments()
         }
+    }
+
+    private func invalidateImageFragments() {
+        guard isViewLoaded, textView != nil else { return }
+        guard let layoutManager = textView.textLayoutManager,
+              let documentRange = layoutManager.textContentManager?.documentRange else {
+            textView.setNeedsDisplay()
+            return
+        }
+
+        layoutManager.invalidateLayout(for: documentRange)
+        layoutManager.ensureLayout(for: documentRange)
+        textView.setNeedsLayout()
+        textView.layoutIfNeeded()
+        textView.setNeedsDisplay()
     }
 
     @discardableResult
@@ -2919,45 +2997,6 @@ private final class HyperlinkOpeningTextView: NSTextView {
     }
 }
 
-private final class MarkdownPassthroughImageView: NSImageView {
-    override var image: NSImage? {
-        didSet {
-            needsDisplay = true
-        }
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let image,
-              image.size.width > 0,
-              image.size.height > 0 else {
-            super.draw(dirtyRect)
-            return
-        }
-
-        NSGraphicsContext.current?.imageInterpolation = .high
-        let scale = max(bounds.width / image.size.width, bounds.height / image.size.height)
-        let drawSize = NSSize(width: image.size.width * scale, height: image.size.height * scale)
-        let drawRect = NSRect(
-            x: bounds.midX - drawSize.width / 2,
-            y: bounds.midY - drawSize.height / 2,
-            width: drawSize.width,
-            height: drawSize.height
-        )
-        image.draw(
-            in: drawRect,
-            from: NSRect(origin: .zero, size: image.size),
-            operation: .sourceOver,
-            fraction: 1,
-            respectFlipped: true,
-            hints: nil
-        )
-    }
-}
-
 struct TextKit2EditorView: NSViewControllerRepresentable {
     @Binding var text: String
     var autoFocus: Bool = false
@@ -2997,7 +3036,6 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
-    private var imagePreviewViews: [NSImageView] = []
     private var xmlTagCollapseButtons: [NSButton] = []
     private var pageMentionSuggestionView: NSStackView?
     private var pageMentionSuggestionDocuments: [PageMentionDocument] = []
@@ -3015,6 +3053,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private let minimumHorizontalTextInset: CGFloat = 48
     private let maximumTextWidth: CGFloat = 600
     private let verticalTextInset: CGFloat = 16
+    private var loadingImageURLs: Set<URL> = []
 
     override func loadView() {
         view = NSView()
@@ -3036,6 +3075,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         // Set our delegate on the content storage
         contentStorage.delegate = markdownDelegate
         layoutManager.delegate = markdownDelegate
+        markdownDelegate.requestImageLoad = { [weak self] url in
+            self?.requestImageLoad(for: url)
+        }
 
         // Create NSTextView backed by the TextKit 2 container
         textView = HyperlinkOpeningTextView(frame: .zero, textContainer: container)
@@ -3734,86 +3776,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
         applyCollapsedXMLTagAttributesToTextStorage()
-        refreshImagePreviews()
         refreshXMLTagCollapseButtons()
-    }
-
-    private func refreshImagePreviews() {
-        guard isViewLoaded, textView != nil else { return }
-
-        imagePreviewViews.forEach { $0.removeFromSuperview() }
-        imagePreviewViews.removeAll()
-
-        textView.layoutSubtreeIfNeeded()
-
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.string,
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        )
-        for block in blocks where block.isNativeOverlayEligible {
-            if case .imageLink(let imageLink) = block.kind {
-                addImagePreview(imageLink, paragraphLocation: block.paragraphRange.location)
-            }
-        }
-    }
-
-    private func addImagePreview(_ imageLink: MarkdownImageLink, paragraphLocation: Int) {
-        let screenRect = textView.firstRect(
-            forCharacterRange: NSRange(location: paragraphLocation, length: 0),
-            actualRange: nil
-        )
-
-        guard let window = textView.window,
-              !screenRect.isNull,
-              screenRect.origin.x.isFinite,
-              screenRect.origin.y.isFinite,
-              screenRect.size.width.isFinite,
-              screenRect.size.height.isFinite else {
-            return
-        }
-
-        let windowRect = window.convertFromScreen(screenRect)
-        let caretRect = textView.convert(windowRect, from: nil)
-        guard !caretRect.isNull,
-              caretRect.origin.x.isFinite,
-              caretRect.origin.y.isFinite,
-              caretRect.size.width.isFinite,
-              caretRect.size.height.isFinite else {
-            return
-        }
-
-        let linePadding = textView.textContainer?.lineFragmentPadding ?? 0
-        let horizontalInset = textView.textContainerInset.width
-        let x = horizontalInset + linePadding
-        let width = max(80, textView.bounds.width - (horizontalInset + linePadding) * 2)
-        let verticalPadding = MarkdownVisualSpec.imagePreviewVerticalPadding
-        let height = MarkdownVisualSpec.imagePreviewReservedHeight - verticalPadding * 2
-
-        let imageView = MarkdownPassthroughImageView(frame: NSRect(
-            x: x,
-            y: caretRect.minY + verticalPadding,
-            width: width,
-            height: height
-        ))
-        imageView.imageScaling = .scaleNone
-        imageView.wantsLayer = true
-        imageView.layer?.backgroundColor = AppTheme.nsCodeBackground.cgColor
-        imageView.layer?.cornerRadius = MarkdownVisualSpec.imagePreviewCornerRadius
-        imageView.layer?.masksToBounds = true
-        imageView.setAccessibilityIdentifier("markdown_image_preview_\(paragraphLocation)")
-        imageView.setAccessibilityLabel(imageLink.altText.isEmpty ? "Image" : imageLink.altText)
-
-        if let url = imageLink.url {
-            if let image = MarkdownImageLoader.cachedImage(for: url) {
-                imageView.image = image
-                imageView.layer?.backgroundColor = NSColor.clear.cgColor
-            } else {
-                loadImageIfNeeded(url: url, imageView: imageView)
-            }
-        }
-
-        textView.addSubview(imageView)
-        imagePreviewViews.append(imageView)
     }
 
     private func refreshXMLTagCollapseButtons() {
@@ -3989,13 +3952,31 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         textView.layoutSubtreeIfNeeded()
     }
 
-    private func loadImageIfNeeded(url: URL, imageView: NSImageView) {
-        MarkdownImageLoader.load(url: url) { [weak imageView] image in
-            if let image {
-                imageView?.image = image
-                imageView?.layer?.backgroundColor = NSColor.clear.cgColor
-            }
+    private func requestImageLoad(for url: URL) {
+        guard loadingImageURLs.insert(url).inserted else { return }
+
+        MarkdownImageLoader.load(url: url) { [weak self] _ in
+            guard let self else { return }
+            self.loadingImageURLs.remove(url)
+            self.invalidateImageFragments()
         }
+    }
+
+    private func invalidateImageFragments() {
+        guard isViewLoaded, textView != nil else { return }
+        guard let layoutManager = textView.textLayoutManager,
+              let documentRange = layoutManager.textContentManager?.documentRange else {
+            textView.needsDisplay = true
+            return
+        }
+
+        layoutManager.invalidateLayout(for: documentRange)
+        layoutManager.ensureLayout(for: documentRange)
+        view.needsLayout = true
+        textView.needsLayout = true
+        view.layoutSubtreeIfNeeded()
+        textView.layoutSubtreeIfNeeded()
+        textView.needsDisplay = true
     }
 
     @discardableResult

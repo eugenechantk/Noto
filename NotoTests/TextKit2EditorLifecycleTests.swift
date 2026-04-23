@@ -292,8 +292,8 @@ struct TextKit2EditorLifecycleTests {
     }
 
     @MainActor
-    @Test("Collapsed XML tag content hides native editor overlays")
-    func collapsedXMLTagContentHidesNativeEditorOverlays() throws {
+    @Test("Image paragraphs render without overlay preview views and stay hidden while XML is collapsed")
+    func imageParagraphsRenderWithoutOverlayPreviewViewsAndStayHiddenWhileXMLIsCollapsed() throws {
         let controller = TextKit2EditorViewController()
         let window = UIWindow(frame: UIScreen.main.bounds)
         window.rootViewController = controller
@@ -303,7 +303,7 @@ struct TextKit2EditorLifecycleTests {
         controller.view.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
 
-        #expect(controller.textView.descendant(withAccessibilityIdentifier: "markdown_image_preview_15") != nil)
+        #expect(controller.textView.descendant(withAccessibilityIdentifier: "markdown_image_preview_15") == nil)
 
         let collapseButton = try #require(controller.textView.descendant(
             withAccessibilityIdentifier: "xml_tag_collapse_0"
