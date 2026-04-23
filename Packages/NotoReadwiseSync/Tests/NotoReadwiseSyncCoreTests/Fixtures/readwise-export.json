@@ -1,0 +1,107 @@
+{
+  "count": 2,
+  "nextPageCursor": null,
+  "results": [
+    {
+      "user_book_id": 123,
+      "is_deleted": false,
+      "title": "How to Do What You Love",
+      "author": "Paul Graham",
+      "readable_title": "How to Do What You Love",
+      "source": "reader",
+      "cover_image_url": "https://example.com/cover.jpg",
+      "unique_url": "https://example.com/love",
+      "book_tags": [],
+      "category": "articles",
+      "document_note": "",
+      "summary": "",
+      "readwise_url": "https://readwise.io/bookreview/123",
+      "source_url": "https://example.com/love",
+      "external_id": "01readerarticle",
+      "asin": null,
+      "highlights": [
+        {
+          "id": 456,
+          "is_deleted": false,
+          "text": "To do great work, you need to do what you love.",
+          "location": 1,
+          "location_type": "order",
+          "note": "Central thesis",
+          "color": "yellow",
+          "highlighted_at": "2026-04-20T10:00:00.000Z",
+          "created_at": "2026-04-20T10:00:00.000Z",
+          "updated_at": "2026-04-20T10:05:00.000Z",
+          "external_id": "highlight-456",
+          "end_location": null,
+          "url": null,
+          "book_id": 123,
+          "tags": [],
+          "is_favorite": false,
+          "is_discard": false,
+          "readwise_url": "https://readwise.io/open/456"
+        },
+        {
+          "id": 457,
+          "is_deleted": true,
+          "text": "Deleted highlight should not render.",
+          "location": 2,
+          "location_type": "order",
+          "note": null,
+          "color": "yellow",
+          "highlighted_at": "2026-04-20T10:00:00.000Z",
+          "created_at": "2026-04-20T10:00:00.000Z",
+          "updated_at": "2026-04-20T10:05:00.000Z",
+          "external_id": "highlight-457",
+          "end_location": null,
+          "url": null,
+          "book_id": 123,
+          "tags": [],
+          "is_favorite": false,
+          "is_discard": false,
+          "readwise_url": "https://readwise.io/open/457"
+        }
+      ]
+    },
+    {
+      "user_book_id": 124,
+      "is_deleted": false,
+      "title": "How to Do What You Love",
+      "author": "Different Author",
+      "readable_title": "How to Do What You Love",
+      "source": "kindle",
+      "cover_image_url": null,
+      "unique_url": "",
+      "book_tags": [],
+      "category": "books",
+      "document_note": "",
+      "summary": "",
+      "readwise_url": "https://readwise.io/bookreview/124",
+      "source_url": null,
+      "external_id": null,
+      "asin": "B000000001",
+      "highlights": [
+        {
+          "id": 890,
+          "is_deleted": false,
+          "text": "A book highlight.",
+          "location": 3,
+          "location_type": "page",
+          "note": null,
+          "color": "blue",
+          "highlighted_at": "2026-04-19T10:00:00.000Z",
+          "created_at": "2026-04-19T10:00:00.000Z",
+          "updated_at": "2026-04-19T10:05:00.000Z",
+          "external_id": null,
+          "end_location": null,
+          "url": null,
+          "book_id": 124,
+          "tags": [],
+          "is_favorite": false,
+          "is_discard": false,
+          "readwise_url": "https://readwise.io/open/890"
+        }
+      ]
+    }
+  ]
+}
+

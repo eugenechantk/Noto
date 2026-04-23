@@ -1,0 +1,38 @@
+{
+  "count": 1,
+  "nextPageCursor": null,
+  "results": [
+    {
+      "id": "01readerfullcontent",
+      "url": "https://read.readwise.io/new/read/01readerfullcontent",
+      "source_url": "https://example.com/full-article",
+      "title": "Long Reader Article",
+      "author": "Reader Author",
+      "source": "Reader add from import URL",
+      "category": "article",
+      "location": "later",
+      "tags": {
+        "content-creation": {
+          "name": "content-creation",
+          "type": "manual",
+          "created": 1773107788810
+        }
+      },
+      "site_name": "Example",
+      "word_count": 1200,
+      "reading_time": "6 mins",
+      "created_at": "2026-04-20T00:00:00Z",
+      "updated_at": "2026-04-21T00:00:00Z",
+      "notes": "",
+      "published_date": "2026-04-19",
+      "summary": "A useful summary.",
+      "image_url": null,
+      "parent_id": null,
+      "reading_progress": 0.5,
+      "saved_at": "2026-04-20T00:00:00Z",
+      "last_moved_at": "2026-04-20T00:00:00Z",
+      "html_content": "<article><h1>Long Reader Article</h1><p>First paragraph with <strong>bold text</strong> and <a href=\"https://example.com/link\">a link</a>.</p><ul><li>One</li><li>Two</li></ul></article>",
+      "raw_source_url": "https://example.com/raw.html"
+    }
+  ]
+}
