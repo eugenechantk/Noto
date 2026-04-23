@@ -10,7 +10,11 @@ struct NotoSplitView: View {
     @Binding var externallyDeletingNoteID: UUID?
     var onOpenTodayNote: (() -> Void)? = nil
 
+    #if os(iOS)
+    @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
+    #else
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    #endif
     @State private var sidebarSearchText = ""
     @State private var isSearchPresented = false
     @State private var noteHistory = NoteNavigationHistory()
@@ -31,6 +35,7 @@ struct NotoSplitView: View {
             detailView
                 .notoBackgroundExtension()
         }
+        .navigationSplitViewStyle(.prominentDetail)
         .navigationTitle("Noto")
         .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.toggleSidebar)) { _ in
             toggleSidebar()
@@ -56,7 +61,8 @@ struct NotoSplitView: View {
             selectedIsNew: $selectedIsNew,
             externallyDeletingNoteID: $externallyDeletingNoteID,
             searchText: $sidebarSearchText,
-            isSearchPresented: $isSearchPresented
+            isSearchPresented: $isSearchPresented,
+            onSelectNote: sidebarSelectNoteAction
         )
     }
 
@@ -74,7 +80,9 @@ struct NotoSplitView: View {
             }
             .background(AppTheme.background)
         }
-        .navigationSplitViewStyle(.balanced)
+        .navigationSplitViewStyle(.prominentDetail)
+        .toolbarBackground(.regularMaterial, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .notoAppBottomToolbar(
             onOpenTodayNote: onOpenTodayNote,
             onSearch: { isSearchPresented.toggle() },
@@ -306,6 +314,16 @@ struct NotoSplitView: View {
         )
         #else
         .none
+        #endif
+    }
+
+    private var sidebarSelectNoteAction: (() -> Void)? {
+        #if os(iOS)
+        return {
+            columnVisibility = .detailOnly
+        }
+        #else
+        return nil
         #endif
     }
 

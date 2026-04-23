@@ -14,6 +14,7 @@ struct NotoSidebarView: View {
     @Binding var externallyDeletingNoteID: UUID?
     @Binding var searchText: String
     @Binding var isSearchPresented: Bool
+    var onSelectNote: (() -> Void)? = nil
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var rows: [SidebarTreeNode] = []
@@ -29,12 +30,7 @@ struct NotoSidebarView: View {
     private let loader = SidebarTreeLoader()
 
     var body: some View {
-        VStack(spacing: 8) {
-            sidebarRows
-        }
-        .background {
-            sidebarBackground
-        }
+        sidebarRows
         .navigationTitle("Noto")
         #if os(macOS)
         .toolbar {
@@ -68,55 +64,29 @@ struct NotoSidebarView: View {
     }
 
     @ViewBuilder
-    private var sidebarBackground: some View {
-        #if os(macOS)
-        Color(nsColor: .windowBackgroundColor)
-            .ignoresSafeArea()
-        #else
-        AppTheme.background
-            .ignoresSafeArea(edges: .bottom)
-        #endif
-    }
-
-    @ViewBuilder
     private var sidebarRows: some View {
-        #if os(macOS)
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(displayRows) { row in
-                    sidebarRow(row)
-                        .padding(.horizontal, 8)
-                }
+        List(selection: selectedSidebarRowID) {
+            ForEach(displayRows) { row in
+                sidebarRow(row)
+                    .tag(row.id)
+                    .listRowInsets(sidebarRowInsets)
+                    .notoSidebarRowBackground(rowBackground(for: row))
+                    .listRowSeparator(.hidden)
             }
-            .padding(.vertical, 4)
         }
-        .background(.clear)
+        .listStyle(.sidebar)
+        .notoSidebarRowSpacing()
+        .environment(\.defaultMinListRowHeight, rowHeight)
         .contextMenu {
             createMenuItems(in: rootStore.vaultRootURL)
         }
-        #else
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(displayRows) { row in
-                    sidebarRow(row)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.top, 6)
-            .padding(.bottom, 4)
-        }
-        .background(AppTheme.background)
-        .contextMenu {
-            createMenuItems(in: rootStore.vaultRootURL)
-        }
-        #endif
     }
 
     private var sidebarRowInsets: EdgeInsets {
         #if os(macOS)
-        EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
+        EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6)
         #else
-        EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
+        EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
         #endif
     }
 
@@ -124,6 +94,21 @@ struct NotoSidebarView: View {
         let trimmedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedSearchText.isEmpty else { return rows }
         return loader.filterRows(searchableRows, matching: trimmedSearchText)
+    }
+
+    private var selectedSidebarRowID: Binding<String?> {
+        Binding(
+            get: {
+                selectedNote?.fileURL.standardizedFileURL.path
+            },
+            set: { rowID in
+                guard let rowID,
+                      let row = displayRows.first(where: { $0.id == rowID }) else {
+                    return
+                }
+                activate(row)
+            }
+        )
     }
 
     private var searchButton: some View {
@@ -173,19 +158,19 @@ struct NotoSidebarView: View {
         #if os(macOS)
         28
         #else
-        40
+        34
         #endif
     }
 
     private func rowContentInsets(for row: SidebarTreeNode) -> EdgeInsets {
         #if os(macOS)
-        EdgeInsets(top: 0, leading: 10 + CGFloat(row.depth) * 16, bottom: 0, trailing: 8)
+        EdgeInsets(top: 0, leading: 4 + CGFloat(row.depth) * 14, bottom: 0, trailing: 4)
         #else
         return EdgeInsets(
-            top: 1,
-            leading: 20 + CGFloat(row.depth) * 16,
-            bottom: 1,
-            trailing: 20
+            top: 2,
+            leading: 6 + CGFloat(row.depth) * 14,
+            bottom: 2,
+            trailing: 6
         )
         #endif
     }
@@ -193,28 +178,21 @@ struct NotoSidebarView: View {
     @ViewBuilder
     private func sidebarRow(_ row: SidebarTreeNode) -> some View {
         let isSelected = isSelected(row)
-
-        Button {
-            activate(row)
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: symbolName(for: row))
-                    .font(.body.weight(isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.secondaryText)
-                    .frame(width: 18, alignment: .center)
-                Text(row.name)
-                    .font(.body.weight(isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.secondaryText)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Spacer(minLength: 0)
-            }
-            .padding(rowContentInsets(for: row))
-            .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
-            .background(rowBackground(for: row))
-            .contentShape(Rectangle())
+        HStack(spacing: 8) {
+            Image(systemName: symbolName(for: row))
+                .font(.body.weight(isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.secondaryText)
+                .frame(width: 18, alignment: .center)
+            Text(row.name)
+                .font(.body.weight(isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.secondaryText)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
+        .padding(rowContentInsets(for: row))
+        .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
+        .contentShape(Rectangle())
         .accessibilityIdentifier(accessibilityIdentifier(for: row))
         .contextMenu {
             contextMenuItems(for: row)
@@ -257,7 +235,7 @@ struct NotoSidebarView: View {
     }
 
     private func rowBackground(for row: SidebarTreeNode) -> some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
             .fill(isSelected(row) ? AppTheme.selectedRowBackground : Color.clear)
     }
 
@@ -316,6 +294,7 @@ struct NotoSidebarView: View {
         selectedNoteStore = noteStore
         selectedNote = note
         selectedIsNew = false
+        onSelectNote?()
     }
 
     private func createNote(in directoryURL: URL) {
@@ -327,6 +306,7 @@ struct NotoSidebarView: View {
         selectedNote = note
         selectedIsNew = true
         reloadTree()
+        onSelectNote?()
     }
 
     private func beginNewFolder(in directoryURL: URL) {
@@ -515,5 +495,25 @@ struct NotoSidebarView: View {
             .map(\.standardizedFileURL.path)
             .sorted()
         UserDefaults.standard.set(paths, forKey: expansionStateKey)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func notoSidebarRowSpacing() -> some View {
+        #if os(iOS)
+        self.listRowSpacing(0)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func notoSidebarRowBackground<Background: View>(_ background: Background) -> some View {
+        #if os(iOS)
+        self.listRowBackground(background)
+        #else
+        self
+        #endif
     }
 }
