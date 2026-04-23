@@ -2333,7 +2333,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             button.accessibilityIdentifier = "page_mention_suggestion_\(index)"
             button.accessibilityLabel = "Mention \(document.title), \(document.relativePath)"
             button.addTarget(self, action: #selector(pageMentionSuggestionTapped(_:)), for: .touchUpInside)
-            stackView.addArrangedSubview(button)
+            stackView.addArrangedSubview(makePageMentionSuggestionRowContainer(for: button))
         }
 
         if stackView.superview == nil {
@@ -2350,6 +2350,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         stackView.isLayoutMarginsRelativeArrangement = true
         stackView.layoutMargins = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
         stackView.backgroundColor = AppTheme.uiBackground
+        stackView.accessibilityIdentifier = "page_mention_suggestions"
         stackView.layer.cornerRadius = 10
         stackView.layer.cornerCurve = .continuous
         stackView.layer.borderColor = AppTheme.uiSeparator.cgColor
@@ -2357,6 +2358,20 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         stackView.clipsToBounds = true
         pageMentionSuggestionView = stackView
         return stackView
+    }
+
+    private func makePageMentionSuggestionRowContainer(for button: UIButton) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .clear
+        button.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(button)
+        NSLayoutConstraint.activate([
+            button.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
+            button.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
+            button.topAnchor.constraint(equalTo: container.topAnchor),
+            button.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+        return container
     }
 
     private func pageMentionEmptyStateTitle(_ text: String) -> NSAttributedString {
@@ -2456,10 +2471,19 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func refreshPageMentionSelection() {
         guard let stackView = pageMentionSuggestionView else { return }
-        for case let button as UIButton in stackView.arrangedSubviews {
+        for button in pageMentionSuggestionButtons(in: stackView) {
             button.backgroundColor = button.tag == selectedPageMentionSuggestionIndex
                 ? AppTheme.uiSeparator.withAlphaComponent(0.75)
                 : .clear
+        }
+    }
+
+    private func pageMentionSuggestionButtons(in stackView: UIStackView) -> [UIButton] {
+        stackView.arrangedSubviews.compactMap { arrangedSubview in
+            if let button = arrangedSubview as? UIButton {
+                return button
+            }
+            return arrangedSubview.subviews.compactMap { $0 as? UIButton }.first
         }
     }
 
@@ -3431,19 +3455,11 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
 
         for (index, document) in documents.enumerated() {
-            let button = NSButton(title: "", target: self, action: #selector(pageMentionSuggestionClicked(_:)))
-            button.tag = index
-            button.isBordered = false
-            button.alignment = .left
-            button.translatesAutoresizingMaskIntoConstraints = false
-            button.wantsLayer = true
-            button.layer?.cornerRadius = 6
-            button.attributedTitle = pageMentionButtonTitle(for: document)
-            button.setAccessibilityIdentifier("page_mention_suggestion_\(index)")
-            button.setAccessibilityLabel("Mention \(document.title), \(document.relativePath)")
-            stackView.addArrangedSubview(button)
-            button.heightAnchor.constraint(equalToConstant: 44).isActive = true
-            button.widthAnchor.constraint(
+            let rowView = PageMentionSuggestionRowView(document: document, index: index)
+            rowView.button.target = self
+            rowView.button.action = #selector(pageMentionSuggestionClicked(_:))
+            stackView.addArrangedSubview(rowView)
+            rowView.widthAnchor.constraint(
                 equalTo: stackView.widthAnchor,
                 constant: -(stackView.edgeInsets.left + stackView.edgeInsets.right)
             ).isActive = true
@@ -3520,15 +3536,22 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         let windowRect = window.convertFromScreen(screenRect)
         let caretRect = view.convert(windowRect, from: nil)
         let horizontalMargin: CGFloat = 16
-        let rowCount = max(1, min(pageMentionSuggestionDocuments.count, 5))
         let width = min(max(360, view.bounds.width * 0.45), view.bounds.width - horizontalMargin * 2)
-        let height = CGFloat(rowCount) * 48 + 16
+        let height = pageMentionSuggestionPopoverHeight(for: stackView)
         let x = min(max(horizontalMargin, caretRect.minX), max(horizontalMargin, view.bounds.width - width - horizontalMargin))
         var y = caretRect.minY - height - 6
         if y < 8 {
             y = caretRect.maxY + 6
         }
         stackView.frame = NSRect(x: x, y: y, width: width, height: height)
+    }
+
+    private func pageMentionSuggestionPopoverHeight(for stackView: NSStackView) -> CGFloat {
+        let rowCount = max(1, min(pageMentionSuggestionDocuments.count, 5))
+        let rowHeight: CGFloat = 44
+        let contentHeight = CGFloat(rowCount) * rowHeight
+        let spacingHeight = CGFloat(max(rowCount - 1, 0)) * stackView.spacing
+        return stackView.edgeInsets.top + contentHeight + spacingHeight + stackView.edgeInsets.bottom
     }
 
     private func hidePageMentionSuggestions() {
@@ -3560,10 +3583,88 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     private func refreshPageMentionSelection() {
         guard let stackView = pageMentionSuggestionView else { return }
-        for case let button as NSButton in stackView.arrangedSubviews {
-            button.layer?.backgroundColor = button.tag == selectedPageMentionSuggestionIndex
+        for rowView in pageMentionSuggestionRows(in: stackView) {
+            rowView.backgroundView.layer?.backgroundColor = rowView.button.tag == selectedPageMentionSuggestionIndex
                 ? AppTheme.nsSeparator.withAlphaComponent(0.75).cgColor
                 : NSColor.clear.cgColor
+        }
+    }
+
+    private func pageMentionSuggestionButtons(in stackView: NSStackView) -> [NSButton] {
+        pageMentionSuggestionRows(in: stackView).map(\.button)
+    }
+
+    private func pageMentionSuggestionRows(in stackView: NSStackView) -> [PageMentionSuggestionRowView] {
+        stackView.arrangedSubviews.compactMap { arrangedSubview in
+            arrangedSubview as? PageMentionSuggestionRowView
+        }
+    }
+
+    private final class PageMentionSuggestionRowView: NSView {
+        let backgroundView = NSView()
+        let button = NSButton(title: "", target: nil, action: nil)
+
+        init(document: PageMentionDocument, index: Int) {
+            super.init(frame: .zero)
+            translatesAutoresizingMaskIntoConstraints = false
+            wantsLayer = true
+
+            let titleLabel = NSTextField(labelWithString: document.title)
+            titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+            titleLabel.textColor = AppTheme.nsPrimaryText
+            titleLabel.alignment = .left
+            titleLabel.lineBreakMode = .byTruncatingTail
+
+            let subtitleLabel = NSTextField(labelWithString: document.relativePath)
+            subtitleLabel.font = NSFont.systemFont(ofSize: 11, weight: .regular)
+            subtitleLabel.textColor = AppTheme.nsMutedText
+            subtitleLabel.alignment = .left
+            subtitleLabel.lineBreakMode = .byTruncatingTail
+
+            let textStack = NSStackView(views: [titleLabel, subtitleLabel])
+            textStack.orientation = .vertical
+            textStack.alignment = .leading
+            textStack.spacing = 2
+            textStack.translatesAutoresizingMaskIntoConstraints = false
+
+            backgroundView.translatesAutoresizingMaskIntoConstraints = false
+            backgroundView.wantsLayer = true
+            backgroundView.layer?.cornerRadius = 6
+            backgroundView.layer?.cornerCurve = .continuous
+            addSubview(backgroundView)
+            backgroundView.addSubview(textStack)
+
+            button.tag = index
+            button.isBordered = false
+            button.title = ""
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.setAccessibilityIdentifier("page_mention_suggestion_\(index)")
+            button.setAccessibilityLabel("Mention \(document.title), \(document.relativePath)")
+            backgroundView.addSubview(button)
+
+            NSLayoutConstraint.activate([
+                heightAnchor.constraint(equalToConstant: 44),
+                backgroundView.leadingAnchor.constraint(equalTo: leadingAnchor),
+                backgroundView.trailingAnchor.constraint(equalTo: trailingAnchor),
+                backgroundView.topAnchor.constraint(equalTo: topAnchor),
+                backgroundView.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+                textStack.leadingAnchor.constraint(equalTo: backgroundView.leadingAnchor, constant: 12),
+                textStack.trailingAnchor.constraint(equalTo: backgroundView.trailingAnchor, constant: -12),
+                textStack.topAnchor.constraint(greaterThanOrEqualTo: backgroundView.topAnchor, constant: 6),
+                textStack.bottomAnchor.constraint(lessThanOrEqualTo: backgroundView.bottomAnchor, constant: -6),
+                textStack.centerYAnchor.constraint(equalTo: backgroundView.centerYAnchor),
+
+                button.leadingAnchor.constraint(equalTo: backgroundView.leadingAnchor),
+                button.trailingAnchor.constraint(equalTo: backgroundView.trailingAnchor),
+                button.topAnchor.constraint(equalTo: backgroundView.topAnchor),
+                button.bottomAnchor.constraint(equalTo: backgroundView.bottomAnchor),
+            ])
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
         }
     }
 

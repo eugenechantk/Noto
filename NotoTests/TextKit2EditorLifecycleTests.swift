@@ -370,6 +370,43 @@ struct TextKit2EditorLifecycleTests {
         #expect(abs(emptyMarkerRect.minX - populatedMarkerRect.minX) < 1.0)
     }
 
+    @MainActor
+    @Test("Page mention suggestion rows keep horizontal inset inside the iOS popover")
+    func pageMentionSuggestionRowsKeepHorizontalInsetInsidePopover() throws {
+        let controller = TextKit2EditorViewController()
+        controller.pageMentionProvider = { query in
+            guard query == "27" else { return [] }
+            return [
+                PageMentionDocument(
+                    id: UUID(),
+                    title: "2026-03-27",
+                    relativePath: "Daily Notes/2026-03-27.md",
+                    fileURL: URL(fileURLWithPath: "/tmp/NotoVault/Daily Notes/2026-03-27.md")
+                )
+            ]
+        }
+
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 900, height: 700))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.loadViewIfNeeded()
+        controller.loadText("@27")
+        controller.textView.selectedRange = NSRange(location: controller.textView.text.count, length: 0)
+        controller.textView.becomeFirstResponder()
+
+        controller.textViewDidChange(controller.textView)
+        controller.textViewDidChangeSelection(controller.textView)
+        controller.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        let stackView = try #require(controller.view.descendant(withAccessibilityIdentifier: "page_mention_suggestions") as? UIStackView)
+        let button = try #require(controller.view.descendant(withAccessibilityIdentifier: "page_mention_suggestion_0") as? UIButton)
+        let buttonFrameInStack = stackView.convert(button.bounds, from: button)
+
+        #expect(buttonFrameInStack.minX >= stackView.layoutMargins.left + 9)
+        #expect(buttonFrameInStack.maxX <= stackView.bounds.width - stackView.layoutMargins.right - 9)
+    }
+
     @Test("Frontmatter range covers the YAML metadata block only")
     func detectsFrontmatterRange() throws {
         let markdown = """
@@ -480,16 +517,17 @@ struct TextKit2EditorLifecycleMacTests {
     }
 
     @MainActor
-    @Test("Page mention suggestion rows fill the macOS popover width")
-    func pageMentionSuggestionRowsFillPopoverWidth() throws {
+    @Test("Page mention suggestion rows keep symmetric outer inset inside the macOS popover")
+    func pageMentionSuggestionRowsKeepSymmetricOuterInsetInsidePopover() throws {
         let controller = TextKit2EditorViewController()
         controller.pageMentionProvider = { query in
             guard query == "孤独" else { return [] }
             return [
                 PageMentionDocument(
-                    path: "Captures/你的孤独，正撑起一个万亿新赛道.md",
+                    id: UUID(),
                     title: "你的孤独，正撑起一个万亿新赛道",
-                    relativePath: "Captures/你的孤独，正撑起一个万亿新赛道.md"
+                    relativePath: "Captures/你的孤独，正撑起一个万亿新赛道.md",
+                    fileURL: URL(fileURLWithPath: "/tmp/NotoVault/Captures/你的孤独，正撑起一个万亿新赛道.md")
                 )
             ]
         }
@@ -507,8 +545,10 @@ struct TextKit2EditorLifecycleMacTests {
         let button = try #require(controller.view.descendant(withAccessibilityIdentifier: "page_mention_suggestion_0") as? NSButton)
         controller.view.layoutSubtreeIfNeeded()
 
-        let expectedWidth = stackView.bounds.width - stackView.edgeInsets.left - stackView.edgeInsets.right
-        #expect(abs(button.frame.width - expectedWidth) < 1.0)
+        let rowBackground = try #require(button.superview)
+        let rowFrameInStack = stackView.convert(rowBackground.bounds, from: rowBackground)
+        #expect(abs(rowFrameInStack.minX - stackView.edgeInsets.left) < 1.0)
+        #expect(abs(rowFrameInStack.maxX - (stackView.bounds.width - stackView.edgeInsets.right)) < 1.0)
     }
 }
 
