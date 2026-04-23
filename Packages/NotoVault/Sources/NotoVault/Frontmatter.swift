@@ -3,6 +3,11 @@ import Foundation
 /// Parses and serializes YAML frontmatter in markdown files.
 /// Supports a minimal subset: id, created, modified.
 enum Frontmatter {
+    private static let formatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 
     struct Metadata {
         let id: UUID
@@ -47,9 +52,6 @@ enum Frontmatter {
             return (nil, markdown)
         }
 
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-
         let createdAt = dict["created"].flatMap { formatter.date(from: $0) } ?? Date()
         let modifiedAt = dict["modified"].flatMap { formatter.date(from: $0) } ?? Date()
 
@@ -68,9 +70,6 @@ enum Frontmatter {
 
     /// Serializes a NoteFile into a markdown string with frontmatter.
     static func serialize(_ note: NoteFile) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-
         var result = "---\n"
         result += "id: \(note.id.uuidString)\n"
         result += "created: \(formatter.string(from: note.createdAt))\n"
