@@ -348,6 +348,7 @@ enum MarkdownSemanticAnalyzer {
     ) -> [MarkdownRenderableBlock] {
         let nsText = text as NSString
         guard nsText.length > 0 else { return [] }
+        let frontmatterRange = MarkdownFrontmatter.range(in: text)
 
         var blocks: [MarkdownRenderableBlock] = []
         var paragraphLocation = 0
@@ -358,7 +359,7 @@ enum MarkdownSemanticAnalyzer {
             let isCollapsed = collapsedXMLTagRanges.contains { collapsedRange in
                 NSIntersectionRange(visibleLineRange, collapsedRange).length > 0
             }
-            let kind: MarkdownBlockKind = MarkdownFrontmatter.contains(position: paragraphRange.location, in: text)
+            let kind: MarkdownBlockKind = MarkdownFrontmatter.contains(position: paragraphRange.location, inRange: frontmatterRange)
                 ? .frontmatter
                 : MarkdownBlockKind.detect(from: lineText)
 
@@ -400,6 +401,11 @@ enum MarkdownFrontmatter {
     static func contains(position: Int, in fullText: String) -> Bool {
         guard let range = range(in: fullText) else { return false }
         return NSLocationInRange(position, range)
+    }
+
+    static func contains(position: Int, inRange frontmatterRange: NSRange?) -> Bool {
+        guard let frontmatterRange else { return false }
+        return NSLocationInRange(position, frontmatterRange)
     }
 }
 
@@ -472,8 +478,6 @@ private enum MarkdownTheme {
     static let h2Font = platformFont(MarkdownVisualSpec.h2Font)
     static let h3Font = platformFont(MarkdownVisualSpec.h3Font)
     static let codeFont = platformFont(MarkdownVisualSpec.codeFont)
-    static let listBaseIndent = MarkdownVisualSpec.listBaseIndent
-    static let listIndentStep = MarkdownVisualSpec.listIndentStep
     static let listMarkerTextGap = MarkdownVisualSpec.listMarkerTextGap
     static let todoPrefixVisualWidth = MarkdownVisualSpec.todoPrefixVisualWidth
     static let todoTextStartOffset = MarkdownVisualSpec.todoTextStartOffset
@@ -507,10 +511,6 @@ private enum MarkdownTheme {
         case .heading(3): return h3Font
         default: return bodyFont
         }
-    }
-
-    static func listLeadingOffset(for indentLevel: Int) -> CGFloat {
-        MarkdownVisualSpec.listLeadingOffset(for: indentLevel)
     }
 
     static func platformFont(_ spec: MarkdownVisualSpec.Font) -> PlatformFont {
@@ -799,6 +799,27 @@ enum MarkdownParagraphStyler {
     private static func todoHiddenPrefixLength(prefixLength: Int, fullLength: Int) -> Int {
         guard prefixLength == fullLength else { return prefixLength }
         return max(0, prefixLength - 1)
+    }
+
+    private static func paragraphUsesListSpacingWhileTyping(_ text: String) -> Bool {
+        let stripped = String(text.dropFirst(text.prefix(while: { $0 == " " }).count))
+        guard !stripped.isEmpty else { return false }
+
+        if stripped == "-" || stripped == "*" || stripped == "•" {
+            return true
+        }
+
+        if stripped.hasPrefix("- [") {
+            return true
+        }
+
+        guard let dotIndex = stripped.firstIndex(of: "."),
+              dotIndex > stripped.startIndex,
+              stripped[stripped.startIndex..<dotIndex].allSatisfy(\.isNumber) else {
+            return false
+        }
+
+        return stripped.distance(from: stripped.startIndex, to: dotIndex) == stripped.count - 1
     }
 
     private static func applyListPrefixStyling(
@@ -1147,17 +1168,6 @@ enum XMLCollapseControlGeometry {
 final class TodoLayoutFragment: NSTextLayoutFragment {
     override func draw(at point: CGPoint, in context: CGContext) {
         super.draw(at: point, in: context)
-        guard let paragraph = textElement as? MarkdownParagraph,
-              case .todo(let checked, _) = paragraph.blockKind else {
-            return
-        }
-
-        let markerAnchorFrame = textLineFragments.first?.typographicBounds ?? layoutFragmentFrame
-        let markerRect = TodoMarkerGeometry.markerRect(
-            contentLeadingX: point.x + markerAnchorFrame.minX + MarkdownVisualSpec.todoTextStartOffset,
-            lineMidY: point.y + markerAnchorFrame.midY
-        )
-        drawTodoMarker(checked: checked, in: markerRect, context: context)
     }
 
     static func markerRect(
@@ -1165,41 +1175,11 @@ final class TodoLayoutFragment: NSTextLayoutFragment {
         point: CGPoint = .zero,
         indent: Int
     ) -> CGRect {
-        TodoMarkerGeometry.markerRect(
-            textContainerOriginX: point.x,
-            lineMidY: point.y + fragmentFrame.midY,
-            indent: indent
+        let _ = indent
+        return TodoMarkerGeometry.markerRect(
+            contentLeadingX: point.x + MarkdownVisualSpec.todoTextStartOffset,
+            lineMidY: point.y + fragmentFrame.midY
         )
-    }
-
-    private func drawTodoMarker(checked: Bool, in rect: CGRect, context: CGContext) {
-        context.saveGState()
-        defer { context.restoreGState() }
-
-        let lineWidth: CGFloat = 2
-        let circleRect = rect.insetBy(dx: (rect.width - MarkdownVisualSpec.todoSymbolSize) / 2,
-                                      dy: (rect.height - MarkdownVisualSpec.todoSymbolSize) / 2)
-        let markerColor = checked ? MarkdownTheme.checkedColor : MarkdownTheme.prefixColor
-
-        #if os(iOS)
-        context.setStrokeColor(markerColor.cgColor)
-        context.setFillColor(markerColor.cgColor)
-        #elseif os(macOS)
-        context.setStrokeColor(markerColor.cgColor)
-        context.setFillColor(markerColor.cgColor)
-        #endif
-        context.setLineWidth(lineWidth)
-        context.strokeEllipse(in: circleRect.insetBy(dx: lineWidth / 2, dy: lineWidth / 2))
-
-        guard checked else { return }
-        let checkPath = CGMutablePath()
-        checkPath.move(to: CGPoint(x: circleRect.minX + circleRect.width * 0.28, y: circleRect.midY))
-        checkPath.addLine(to: CGPoint(x: circleRect.minX + circleRect.width * 0.44, y: circleRect.maxY - circleRect.height * 0.30))
-        checkPath.addLine(to: CGPoint(x: circleRect.maxX - circleRect.width * 0.24, y: circleRect.minY + circleRect.height * 0.28))
-        context.addPath(checkPath)
-        context.setLineCap(.round)
-        context.setLineJoin(.round)
-        context.strokePath()
     }
 }
 
@@ -1361,6 +1341,7 @@ private enum MarkdownImageLoader {
 final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSTextLayoutManagerDelegate {
     var revealedHyperlinkRanges: [NSRange] = []
     var collapsedXMLTagRanges: [NSRange] = []
+    var frontmatterRange: NSRange?
     var requestImageLoad: ((URL) -> Void)?
 
     func textContentStorage(
@@ -1379,7 +1360,7 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
         let kind: MarkdownBlockKind
         if collapsedXMLTagRanges.contains(where: { NSIntersectionRange($0, range).length > 0 }) {
             kind = .collapsedXMLTagContent
-        } else if MarkdownFrontmatter.contains(position: range.location, in: textStorage.string) {
+        } else if MarkdownFrontmatter.contains(position: range.location, inRange: frontmatterRange) {
             kind = .frontmatter
         } else {
             kind = MarkdownBlockKind.detect(from: text)
@@ -1525,6 +1506,25 @@ final class TextKit2EditorCoordinator {
 
     func typingAttributes(for documentText: String, selectionLocation: Int) -> [NSAttributedString.Key: Any] {
         MarkdownTypingAttributes.attributes(for: documentText, selectionLocation: selectionLocation)
+    }
+}
+
+enum HyperlinkSelectionRanges {
+    static func fullRangesOnSelectedLines(in text: String, selection: NSRange) -> [NSRange] {
+        let nsText = text as NSString
+        guard nsText.length > 0, selection.location != NSNotFound else { return [] }
+
+        let safeLocation = max(0, min(selection.location, nsText.length))
+        let safeLength = max(0, min(selection.length, nsText.length - safeLocation))
+        let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: safeLength))
+        let lineText = nsText.substring(with: lineRange)
+
+        return HyperlinkMarkdown.matches(in: lineText).map { match in
+            NSRange(
+                location: lineRange.location + match.fullRange.location,
+                length: match.fullRange.length
+            )
+        }
     }
 }
 
@@ -1837,8 +1837,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     var onOpenDocumentLink: ((String) -> Void)?
     private(set) var textView: UITextView!
     private let markdownDelegate = MarkdownTextDelegate()
+    private var todoMarkerButtons: [Int: TodoMarkerButton] = [:]
     private var pendingText: String?
-    private var xmlTagCollapseButtons: [UIButton] = []
     private var pageMentionSuggestionView: UIStackView?
     private var pageMentionSuggestionDocuments: [PageMentionDocument] = []
     private var selectedPageMentionSuggestionIndex = 0
@@ -1846,13 +1846,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var pageMentionSheetViewController: PageMentionSheetViewController?
     private var pendingPageMentionTriggerLocation: Int?
     private var suppressedPageMentionLocation: Int?
-    private var collapsedXMLTagOpeningLocations: Set<Int> = []
     private var revealedHyperlinkRanges: [NSRange] = []
     private var hyperlinkRangesAtTapStart: [NSRange] = []
-    private weak var todoMarkerTapRecognizer: UITapGestureRecognizer?
     private weak var hyperlinkTapRecognizer: UITapGestureRecognizer?
     private var isRestylingText = false
     private var isOverlayRefreshScheduled = false
+    private var isImageFragmentRedrawScheduled = false
     private var lastOverlayLayoutSize: CGSize = .zero
     private var keyboardObserverTokens: [NSObjectProtocol] = []
     private var keyboardFrameInScreen: CGRect?
@@ -1891,7 +1890,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             .underlineStyle: NSUnderlineStyle.single.rawValue,
         ]
         textView.translatesAutoresizingMaskIntoConstraints = false
-        installTodoMarkerTapRecognizer()
         installHyperlinkTapRecognizer()
         view.addSubview(textView)
 
@@ -1998,6 +1996,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func applyText(_ markdown: String) {
+        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: markdown)
         coordinator?.beginApplyingEditorText(markdown)
         textView.text = markdown
         coordinator?.finishApplyingEditorText()
@@ -2519,6 +2518,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     func textViewDidChange(_ textView: UITextView) {
+        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: textView.text ?? "")
         if !isRestylingText {
             updateRevealedHyperlinkRangesForSelection(restyle: false)
         }
@@ -2577,16 +2577,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func hyperlinkRangesOnSelectedLines(in text: String, selection: NSRange) -> [NSRange] {
-        let nsText = text as NSString
-        guard nsText.length > 0, selection.location != NSNotFound else { return [] }
-
-        let safeLocation = max(0, min(selection.location, nsText.length))
-        let safeLength = max(0, min(selection.length, nsText.length - safeLocation))
-        let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: safeLength))
-
-        return HyperlinkMarkdown.matches(in: text)
-            .map(\.fullRange)
-            .filter { NSIntersectionRange($0, lineRange).length > 0 }
+        HyperlinkSelectionRanges.fullRangesOnSelectedLines(in: text, selection: selection)
     }
 
     private func nsRangesEqual(_ lhs: [NSRange], _ rhs: [NSRange]) -> Bool {
@@ -2661,25 +2652,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         hyperlinkTapRecognizer = recognizer
     }
 
-    private func installTodoMarkerTapRecognizer() {
-        let recognizer = UITapGestureRecognizer(target: self, action: #selector(handleTodoMarkerTap(_:)))
-        recognizer.numberOfTapsRequired = 1
-        recognizer.cancelsTouchesInView = true
-        recognizer.delegate = self
-        textView.addGestureRecognizer(recognizer)
-        todoMarkerTapRecognizer = recognizer
-    }
-
-    @objc
-    private func handleTodoMarkerTap(_ recognizer: UITapGestureRecognizer) {
-        guard recognizer.state == .ended,
-              let textView = recognizer.view as? UITextView else {
-            return
-        }
-
-        toggleTodoMarker(atTextViewPoint: recognizer.location(in: textView))
-    }
-
     @objc
     private func handleHyperlinkTap(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended,
@@ -2713,9 +2685,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        if gestureRecognizer === todoMarkerTapRecognizer {
-            return todoBlock(containingMarkerPoint: touch.location(in: textView)) != nil
-        }
         if gestureRecognizer === hyperlinkTapRecognizer {
             hyperlinkRangesAtTapStart = revealedHyperlinkRanges
         }
@@ -2815,8 +2784,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        // Rebuilding XML collapse controls during an active pan can cancel
-        // scrolling gestures, so the scroll callback stays passive.
+        refreshTodoMarkerButtons()
     }
 
     private func scheduleEditorOverlayRefresh() {
@@ -2838,155 +2806,11 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
-        refreshXMLTagCollapseButtons()
-    }
-
-    private func refreshXMLTagCollapseButtons() {
-        guard isViewLoaded, textView != nil else { return }
-
-        xmlTagCollapseButtons.forEach { $0.removeFromSuperview() }
-        xmlTagCollapseButtons.removeAll()
-
-        textView.layoutIfNeeded()
-
-        for (block, frame) in visibleXMLTagCollapseButtonFrames() {
-            addXMLTagCollapseButton(for: block)
-            xmlTagCollapseButtons.last?.frame = frame
-        }
-    }
-
-    private func addXMLTagCollapseButton(for block: XMLLikeTagBlock) {
-        let isCollapsed = collapsedXMLTagOpeningLocations.contains(block.openingLineRange.location)
-        let button = UIButton(type: .system)
-        let imageName = isCollapsed ? "chevron.right" : "chevron.down"
-        let config = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
-        button.setImage(UIImage(systemName: imageName, withConfiguration: config), for: .normal)
-        button.tintColor = AppTheme.uiMutedText
-        button.backgroundColor = textView.backgroundColor ?? AppTheme.uiBackground
-        button.tag = block.openingLineRange.location
-        button.accessibilityIdentifier = "xml_tag_collapse_\(block.openingLineRange.location)"
-        button.accessibilityLabel = isCollapsed ? "Expand \(block.tagName)" : "Collapse \(block.tagName)"
-        button.addTarget(self, action: #selector(xmlTagCollapseButtonTapped(_:)), for: .touchUpInside)
-
-        textView.addSubview(button)
-        xmlTagCollapseButtons.append(button)
-    }
-
-    private func visibleXMLTagCollapseButtonFrames() -> [(XMLLikeTagBlock, CGRect)] {
-        guard let layoutManager = textView.textLayoutManager,
-              let documentRange = layoutManager.textContentManager?.documentRange else {
-            return []
-        }
-
-        let text = textView.text ?? ""
-        let blocks = XMLLikeTagParser.blocks(in: text)
-        guard !blocks.isEmpty else { return [] }
-
-        let nsText = text as NSString
-        let openingLines = blocks.map { block in
-            nsText.substring(with: MarkdownLineRanges.visibleLineRange(from: block.openingLineRange, in: nsText))
-        }
-        let visibleRect = CGRect(origin: textView.contentOffset, size: textView.bounds.size)
-        var nextOpeningIndex = 0
-        var results: [(XMLLikeTagBlock, CGRect)] = []
-
-        layoutManager.ensureLayout(for: documentRange)
-        layoutManager.enumerateTextLayoutFragments(from: nil, options: [.ensuresLayout]) { fragment in
-            guard nextOpeningIndex < openingLines.count else { return false }
-            guard let paragraph = fragment.textElement as? MarkdownParagraph,
-                  paragraph.blockKind == .xmlTag else {
-                return true
-            }
-
-            let paragraphText = paragraph.attributedString.string.trimmingCharacters(in: .newlines)
-            guard paragraphText == openingLines[nextOpeningIndex] else {
-                return true
-            }
-
-            let block = blocks[nextOpeningIndex]
-            nextOpeningIndex += 1
-
-            let frame = XMLCollapseControlGeometry.buttonFrame(for: fragment)
-            if visibleRect.intersects(frame) {
-                results.append((block, frame))
-            }
-            return true
-        }
-
-        return results
-    }
-
-    @objc
-    private func xmlTagCollapseButtonTapped(_ sender: UIButton) {
-        let openingLocation = sender.tag
-        let visibleOffset = textView.contentOffset
-        if collapsedXMLTagOpeningLocations.contains(openingLocation) {
-            collapsedXMLTagOpeningLocations.remove(openingLocation)
-        } else {
-            collapsedXMLTagOpeningLocations.insert(openingLocation)
-        }
-        syncCollapsedXMLTagState()
-        rebuildTextLayoutPreservingSelection()
-        refreshEditorOverlays()
-        restoreVisibleOffset(visibleOffset)
-        refreshEditorOverlaysAfterTextLayoutSettles(restoring: visibleOffset)
+        refreshTodoMarkerButtons()
     }
 
     private func syncCollapsedXMLTagState() {
-        let blocks = XMLLikeTagParser.blocks(in: textView.text ?? "")
-        let validOpeningLocations = Set(blocks.map(\.openingLineRange.location))
-        collapsedXMLTagOpeningLocations = collapsedXMLTagOpeningLocations.intersection(validOpeningLocations)
-        markdownDelegate.collapsedXMLTagRanges = blocks
-            .filter { collapsedXMLTagOpeningLocations.contains($0.openingLineRange.location) }
-            .map(\.collapsedContentRange)
-    }
-
-    private func rebuildTextLayoutPreservingSelection() {
-        let currentText = textView.text ?? ""
-        let selectedRange = textView.selectedRange
-        isRestylingText = true
-        textView.text = currentText
-        isRestylingText = false
-        textView.selectedRange = NSRange(
-            location: min(selectedRange.location, (currentText as NSString).length),
-            length: min(selectedRange.length, max(0, (currentText as NSString).length - selectedRange.location))
-        )
-        updateTypingAttributes()
-    }
-
-    private func refreshEditorOverlaysAfterTextLayoutSettles(restoring offset: CGPoint) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.restoreVisibleOffset(offset)
-            self.forceEditorLayout()
-            self.refreshEditorOverlays()
-            self.restoreVisibleOffset(offset)
-
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.restoreVisibleOffset(offset)
-                self.forceEditorLayout()
-                self.refreshEditorOverlays()
-                self.restoreVisibleOffset(offset)
-            }
-        }
-    }
-
-    private func forceEditorLayout() {
-        view.setNeedsLayout()
-        textView.setNeedsLayout()
-        view.layoutIfNeeded()
-        textView.layoutIfNeeded()
-    }
-
-    private func restoreVisibleOffset(_ offset: CGPoint) {
-        textView.layoutIfNeeded()
-        let maxX = max(0, textView.contentSize.width - textView.bounds.width)
-        let maxY = max(0, textView.contentSize.height - textView.bounds.height)
-        textView.setContentOffset(CGPoint(
-            x: min(max(offset.x, 0), maxX),
-            y: min(max(offset.y, 0), maxY)
-        ), animated: false)
+        markdownDelegate.collapsedXMLTagRanges = []
     }
 
     private func requestImageLoad(for url: URL) {
@@ -2995,31 +2819,99 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         MarkdownImageLoader.load(url: url) { [weak self] _ in
             guard let self else { return }
             self.loadingImageURLs.remove(url)
-            self.invalidateImageFragments()
+            self.scheduleImageFragmentRedraw()
         }
     }
 
-    private func invalidateImageFragments() {
+    private func scheduleImageFragmentRedraw() {
+        guard !isImageFragmentRedrawScheduled else { return }
+        isImageFragmentRedrawScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isImageFragmentRedrawScheduled = false
+            self.redrawVisibleImageFragments()
+        }
+    }
+
+    private func redrawVisibleImageFragments() {
         guard isViewLoaded, textView != nil else { return }
-        guard let layoutManager = textView.textLayoutManager,
-              let documentRange = layoutManager.textContentManager?.documentRange else {
-            textView.setNeedsDisplay()
-            return
+        textView.setNeedsDisplay(textView.bounds)
+    }
+
+    private func refreshTodoMarkerButtons() {
+        guard isViewLoaded, textView != nil else { return }
+
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.text ?? "",
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        )
+        let visibleRect = textView.bounds.insetBy(dx: -8, dy: -80)
+        var activeLocations: Set<Int> = []
+
+        for block in blocks {
+            guard case .todo(let checked, _) = block.kind,
+                  !block.isCollapsedXMLTagContent,
+                  let overlayLayout = todoMarkerOverlayLayout(for: block),
+                  overlayLayout.hitRect.intersects(visibleRect) else {
+                continue
+            }
+
+            activeLocations.insert(block.paragraphRange.location)
+
+            let button = todoMarkerButtons[block.paragraphRange.location] ?? makeTodoMarkerButton()
+            button.paragraphLocation = block.paragraphRange.location
+            button.isChecked = checked
+            button.accessibilityIdentifier = "todo_checkbox_\(block.paragraphRange.location)"
+            button.accessibilityLabel = checked ? "Checked todo" : "Unchecked todo"
+            button.accessibilityValue = checked ? "Checked" : "Unchecked"
+            button.frame = overlayLayout.hitRect.integral
+            button.markerRectInBounds = overlayLayout.markerRect.offsetBy(
+                dx: -overlayLayout.hitRect.minX,
+                dy: -overlayLayout.hitRect.minY
+            )
+            if button.superview !== textView {
+                textView.addSubview(button)
+            }
+            todoMarkerButtons[block.paragraphRange.location] = button
         }
 
-        layoutManager.invalidateLayout(for: documentRange)
-        layoutManager.ensureLayout(for: documentRange)
-        textView.setNeedsLayout()
-        textView.layoutIfNeeded()
-        textView.setNeedsDisplay()
+        for (location, button) in todoMarkerButtons where !activeLocations.contains(location) {
+            button.removeFromSuperview()
+            todoMarkerButtons.removeValue(forKey: location)
+        }
+    }
+
+    private func makeTodoMarkerButton() -> TodoMarkerButton {
+        let button = TodoMarkerButton(frame: .zero)
+        button.addTarget(self, action: #selector(handleTodoMarkerButtonTap(_:)), for: .touchUpInside)
+        return button
+    }
+
+    @objc
+    private func handleTodoMarkerButtonTap(_ sender: TodoMarkerButton) {
+        toggleTodoCheckbox(atParagraphLocation: sender.paragraphLocation)
     }
 
     @discardableResult
     func toggleTodoMarker(atTextViewPoint point: CGPoint) -> Bool {
         syncCollapsedXMLTagState()
-        guard let block = todoBlock(containingMarkerPoint: point) else { return false }
-        toggleTodoCheckbox(atParagraphLocation: block.paragraphRange.location)
-        return true
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.text ?? "",
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        )
+
+        for block in blocks where !block.isCollapsedXMLTagContent {
+            guard case .todo = block.kind,
+                  let overlayLayout = todoMarkerOverlayLayout(for: block),
+                  overlayLayout.hitRect.insetBy(dx: -4, dy: -4).contains(point) else {
+                continue
+            }
+
+            toggleTodoCheckbox(atParagraphLocation: block.paragraphRange.location)
+            return true
+        }
+
+        return false
     }
 
     func todoMarkerHitRect(forParagraphLocation paragraphLocation: Int) -> CGRect? {
@@ -3033,8 +2925,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             return nil
         }
 
+        return todoMarkerOverlayLayout(for: block)?.hitRect
+    }
+
+    private func todoMarkerOverlayLayout(for block: MarkdownRenderableBlock) -> (markerRect: CGRect, hitRect: CGRect)? {
         let prefixLength = block.kind.prefixLength(in: block.lineText)
-        let contentLocation = paragraphLocation + prefixLength
+        let contentLocation = block.paragraphRange.location + prefixLength
         guard let contentPosition = textView.position(from: textView.beginningOfDocument, offset: contentLocation) else {
             return nil
         }
@@ -3048,30 +2944,13 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         )
         let hitLeading = max(0, markerRect.minX - 8)
         let hitTrailing = max(markerRect.maxX, caretRect.minX + 8)
-        return CGRect(
+        let hitRect = CGRect(
             x: hitLeading,
             y: markerRect.minY,
             width: hitTrailing - hitLeading,
             height: markerRect.height
         )
-    }
-
-    private func todoBlock(containingMarkerPoint point: CGPoint) -> MarkdownRenderableBlock? {
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.text ?? "",
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        )
-
-        for block in blocks where !block.isCollapsedXMLTagContent {
-            guard case .todo = block.kind,
-                  let rect = todoMarkerHitRect(forParagraphLocation: block.paragraphRange.location),
-                  rect.insetBy(dx: -4, dy: -4).contains(point) else {
-                continue
-            }
-            return block
-        }
-
-        return nil
+        return (markerRect, hitRect)
     }
 
     private func isFiniteRect(_ rect: CGRect) -> Bool {
@@ -3170,12 +3049,10 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
-    private var xmlTagCollapseButtons: [NSButton] = []
     private var pageMentionSuggestionView: NSStackView?
     private var pageMentionSuggestionDocuments: [PageMentionDocument] = []
     private var selectedPageMentionSuggestionIndex = 0
     private var activePageMentionQuery: PageMentionQuery?
-    private var collapsedXMLTagOpeningLocations: Set<Int> = []
     private var strikethroughObserver: NSObjectProtocol?
     private var boldObserver: NSObjectProtocol?
     private var italicObserver: NSObjectProtocol?
@@ -3183,6 +3060,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var revealedHyperlinkRanges: [NSRange] = []
     private var isRestylingText = false
     private var isOverlayRefreshScheduled = false
+    private var isImageFragmentRedrawScheduled = false
     private var lastOverlayLayoutSize: NSSize = .zero
     private let minimumHorizontalTextInset: CGFloat = 48
     private let maximumTextWidth: CGFloat = 600
@@ -3338,6 +3216,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     }
 
     private func applyText(_ markdown: String) {
+        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: markdown)
         coordinator?.beginApplyingEditorText(markdown)
         textView.string = markdown
         coordinator?.finishApplyingEditorText()
@@ -3358,6 +3237,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     func textDidChange(_ notification: Notification) {
         DebugTrace.record("mac textDidChange")
+        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: textView.string)
         if !isRestylingText {
             updateRevealedHyperlinkRangesForSelection(restyle: false)
         }
@@ -3555,12 +3435,18 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             button.tag = index
             button.isBordered = false
             button.alignment = .left
+            button.translatesAutoresizingMaskIntoConstraints = false
             button.wantsLayer = true
             button.layer?.cornerRadius = 6
             button.attributedTitle = pageMentionButtonTitle(for: document)
             button.setAccessibilityIdentifier("page_mention_suggestion_\(index)")
             button.setAccessibilityLabel("Mention \(document.title), \(document.relativePath)")
             stackView.addArrangedSubview(button)
+            button.heightAnchor.constraint(equalToConstant: 44).isActive = true
+            button.widthAnchor.constraint(
+                equalTo: stackView.widthAnchor,
+                constant: -(stackView.edgeInsets.left + stackView.edgeInsets.right)
+            ).isActive = true
         }
 
         if stackView.superview == nil {
@@ -3575,6 +3461,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         stackView.orientation = .vertical
         stackView.spacing = 2
         stackView.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        stackView.setAccessibilityIdentifier("page_mention_suggestions")
         stackView.wantsLayer = true
         stackView.layer?.backgroundColor = AppTheme.nsBackground.cgColor
         stackView.layer?.cornerRadius = 10
@@ -3815,16 +3702,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     }
 
     private func hyperlinkRangesOnSelectedLines(in text: String, selection: NSRange) -> [NSRange] {
-        let nsText = text as NSString
-        guard nsText.length > 0, selection.location != NSNotFound else { return [] }
-
-        let safeLocation = max(0, min(selection.location, nsText.length))
-        let safeLength = max(0, min(selection.length, nsText.length - safeLocation))
-        let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: safeLength))
-
-        return HyperlinkMarkdown.matches(in: text)
-            .map(\.fullRange)
-            .filter { NSIntersectionRange($0, lineRange).length > 0 }
+        HyperlinkSelectionRanges.fullRangesOnSelectedLines(in: text, selection: selection)
     }
 
     private func nsRangesEqual(_ lhs: [NSRange], _ rhs: [NSRange]) -> Bool {
@@ -3909,153 +3787,10 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
-        refreshXMLTagCollapseButtons()
-    }
-
-    private func refreshXMLTagCollapseButtons() {
-        guard isViewLoaded, textView != nil else { return }
-
-        xmlTagCollapseButtons.forEach { $0.removeFromSuperview() }
-        xmlTagCollapseButtons.removeAll()
-
-        textView.layoutSubtreeIfNeeded()
-
-        for (block, frame) in visibleXMLTagCollapseButtonFrames() {
-            addXMLTagCollapseButton(for: block)
-            xmlTagCollapseButtons.last?.frame = frame
-        }
-    }
-
-    private func addXMLTagCollapseButton(for block: XMLLikeTagBlock) {
-        let isCollapsed = collapsedXMLTagOpeningLocations.contains(block.openingLineRange.location)
-        let button = NSButton()
-        button.isBordered = false
-        button.setButtonType(.momentaryChange)
-        button.bezelStyle = .shadowlessSquare
-        button.imagePosition = .imageOnly
-        button.image = NSImage(
-            systemSymbolName: isCollapsed ? "chevron.right" : "chevron.down",
-            accessibilityDescription: nil
-        )
-        button.contentTintColor = AppTheme.nsMutedText
-        button.target = self
-        button.action = #selector(xmlTagCollapseButtonTapped(_:))
-        button.tag = block.openingLineRange.location
-        button.setAccessibilityIdentifier("xml_tag_collapse_\(block.openingLineRange.location)")
-        button.setAccessibilityLabel(isCollapsed ? "Expand \(block.tagName)" : "Collapse \(block.tagName)")
-        button.wantsLayer = true
-        button.layer?.backgroundColor = (textView.backgroundColor ?? AppTheme.nsBackground).cgColor
-        button.imageScaling = .scaleProportionallyDown
-
-        textView.addSubview(button)
-        xmlTagCollapseButtons.append(button)
-    }
-
-    private func visibleXMLTagCollapseButtonFrames() -> [(XMLLikeTagBlock, NSRect)] {
-        guard let layoutManager = textView.textLayoutManager,
-              let documentRange = layoutManager.textContentManager?.documentRange else {
-            return []
-        }
-
-        let text = textView.string
-        let blocks = XMLLikeTagParser.blocks(in: text)
-        guard !blocks.isEmpty else { return [] }
-
-        let nsText = text as NSString
-        let openingLines = blocks.map { block in
-            nsText.substring(with: MarkdownLineRanges.visibleLineRange(from: block.openingLineRange, in: nsText))
-        }
-        let visibleRect = scrollView.contentView.bounds
-        var nextOpeningIndex = 0
-        var results: [(XMLLikeTagBlock, NSRect)] = []
-
-        layoutManager.ensureLayout(for: documentRange)
-        layoutManager.enumerateTextLayoutFragments(from: nil, options: [.ensuresLayout]) { fragment in
-            guard nextOpeningIndex < openingLines.count else { return false }
-            guard let paragraph = fragment.textElement as? MarkdownParagraph,
-                  paragraph.blockKind == .xmlTag else {
-                return true
-            }
-
-            let paragraphText = paragraph.attributedString.string.trimmingCharacters(in: .newlines)
-            guard paragraphText == openingLines[nextOpeningIndex] else {
-                return true
-            }
-
-            let block = blocks[nextOpeningIndex]
-            nextOpeningIndex += 1
-
-            let frame = XMLCollapseControlGeometry.buttonFrame(for: fragment)
-            if visibleRect.intersects(frame) {
-                results.append((block, frame))
-            }
-            return true
-        }
-
-        return results
-    }
-
-    @objc
-    private func xmlTagCollapseButtonTapped(_ sender: NSButton) {
-        let openingLocation = sender.tag
-        let visibleOrigin = scrollView.contentView.bounds.origin
-        if collapsedXMLTagOpeningLocations.contains(openingLocation) {
-            collapsedXMLTagOpeningLocations.remove(openingLocation)
-        } else {
-            collapsedXMLTagOpeningLocations.insert(openingLocation)
-        }
-        syncCollapsedXMLTagState()
-        rebuildTextLayoutPreservingSelection()
-        refreshEditorOverlays()
-        restoreVisibleOrigin(visibleOrigin)
-        refreshEditorOverlaysAfterTextLayoutSettles(restoring: visibleOrigin)
     }
 
     private func syncCollapsedXMLTagState() {
-        let blocks = XMLLikeTagParser.blocks(in: textView.string)
-        let validOpeningLocations = Set(blocks.map(\.openingLineRange.location))
-        collapsedXMLTagOpeningLocations = collapsedXMLTagOpeningLocations.intersection(validOpeningLocations)
-        markdownDelegate.collapsedXMLTagRanges = blocks
-            .filter { collapsedXMLTagOpeningLocations.contains($0.openingLineRange.location) }
-            .map(\.collapsedContentRange)
-    }
-
-    private func rebuildTextLayoutPreservingSelection() {
-        let currentText = textView.string
-        let selectedRange = textView.selectedRange()
-        isRestylingText = true
-        textView.string = currentText
-        isRestylingText = false
-        textView.setSelectedRange(NSRange(
-            location: min(selectedRange.location, (currentText as NSString).length),
-            length: min(selectedRange.length, max(0, (currentText as NSString).length - selectedRange.location))
-        ))
-        updateTypingAttributes()
-    }
-
-    private func refreshEditorOverlaysAfterTextLayoutSettles(restoring origin: NSPoint) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.restoreVisibleOrigin(origin)
-            self.forceEditorLayout()
-            self.refreshEditorOverlays()
-            self.restoreVisibleOrigin(origin)
-
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.restoreVisibleOrigin(origin)
-                self.forceEditorLayout()
-                self.refreshEditorOverlays()
-                self.restoreVisibleOrigin(origin)
-            }
-        }
-    }
-
-    private func forceEditorLayout() {
-        view.needsLayout = true
-        textView.needsLayout = true
-        view.layoutSubtreeIfNeeded()
-        textView.layoutSubtreeIfNeeded()
+        markdownDelegate.collapsedXMLTagRanges = []
     }
 
     private func requestImageLoad(for url: URL) {
@@ -4064,25 +3799,23 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         MarkdownImageLoader.load(url: url) { [weak self] _ in
             guard let self else { return }
             self.loadingImageURLs.remove(url)
-            self.invalidateImageFragments()
+            self.scheduleImageFragmentRedraw()
         }
     }
 
-    private func invalidateImageFragments() {
-        guard isViewLoaded, textView != nil else { return }
-        guard let layoutManager = textView.textLayoutManager,
-              let documentRange = layoutManager.textContentManager?.documentRange else {
-            textView.needsDisplay = true
-            return
+    private func scheduleImageFragmentRedraw() {
+        guard !isImageFragmentRedrawScheduled else { return }
+        isImageFragmentRedrawScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isImageFragmentRedrawScheduled = false
+            self.redrawVisibleImageFragments()
         }
+    }
 
-        layoutManager.invalidateLayout(for: documentRange)
-        layoutManager.ensureLayout(for: documentRange)
-        view.needsLayout = true
-        textView.needsLayout = true
-        view.layoutSubtreeIfNeeded()
-        textView.layoutSubtreeIfNeeded()
-        textView.needsDisplay = true
+    private func redrawVisibleImageFragments() {
+        guard isViewLoaded, textView != nil else { return }
+        textView.setNeedsDisplay(textView.visibleRect)
     }
 
     @discardableResult

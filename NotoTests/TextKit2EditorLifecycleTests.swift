@@ -264,8 +264,8 @@ struct TextKit2EditorLifecycleTests {
     }
 
     @MainActor
-    @Test("XML tag collapse caret survives selection changes")
-    func xmlTagCollapseCaretSurvivesSelectionChanges() throws {
+    @Test("XML tags stay expanded and do not render collapse carets")
+    func xmlTagsStayExpandedAndDoNotRenderCollapseCarets() {
         let controller = TextKit2EditorViewController()
         let window = UIWindow(frame: UIScreen.main.bounds)
         window.rootViewController = controller
@@ -275,25 +275,13 @@ struct TextKit2EditorLifecycleTests {
         controller.view.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
 
-        let button = try #require(controller.textView.descendant(
-            withAccessibilityIdentifier: "xml_tag_collapse_0"
-        ) as? UIButton)
-        #expect(button.frame.width >= 44)
-        #expect(button.frame.height >= 32)
-
-        controller.textView.selectedRange = NSRange(location: 16, length: 0)
-        controller.textViewDidChangeSelection(controller.textView)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-
-        let buttonAfterSelection = try #require(controller.textView.descendant(
-            withAccessibilityIdentifier: "xml_tag_collapse_0"
-        ) as? UIButton)
-        #expect(buttonAfterSelection === button)
+        #expect(controller.textView.descendant(withAccessibilityIdentifier: "xml_tag_collapse_0") == nil)
+        #expect(controller.textView.text.contains("Body"))
     }
 
     @MainActor
-    @Test("Image paragraphs render without overlay preview views and stay hidden while XML is collapsed")
-    func imageParagraphsRenderWithoutOverlayPreviewViewsAndStayHiddenWhileXMLIsCollapsed() throws {
+    @Test("Image paragraphs render without overlay preview views inside expanded XML tags")
+    func imageParagraphsRenderWithoutOverlayPreviewViewsInsideExpandedXMLTags() {
         let controller = TextKit2EditorViewController()
         let window = UIWindow(frame: UIScreen.main.bounds)
         window.rootViewController = controller
@@ -303,51 +291,13 @@ struct TextKit2EditorLifecycleTests {
         controller.view.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
 
-        #expect(controller.textView.descendant(withAccessibilityIdentifier: "markdown_image_preview_15") == nil)
-
-        let collapseButton = try #require(controller.textView.descendant(
-            withAccessibilityIdentifier: "xml_tag_collapse_0"
-        ) as? UIButton)
-        collapseButton.sendActions(for: .touchUpInside)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-
-        let expandButton = try #require(controller.textView.descendant(
-            withAccessibilityIdentifier: "xml_tag_collapse_0"
-        ) as? UIButton)
-        #expect(expandButton.accessibilityLabel == "Expand noto:content")
+        #expect(controller.textView.descendant(withAccessibilityIdentifier: "xml_tag_collapse_0") == nil)
         #expect(controller.textView.descendant(withAccessibilityIdentifier: "markdown_image_preview_15") == nil)
     }
 
     @MainActor
-    @Test("Collapsing XML content does not rewrite backing text storage attributes")
-    func collapsingXMLContentDoesNotRewriteBackingTextStorageAttributes() throws {
-        let controller = TextKit2EditorViewController()
-        let window = UIWindow(frame: UIScreen.main.bounds)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        controller.loadViewIfNeeded()
-        controller.loadText("<noto:content>\nHidden line\n</noto:content>")
-        controller.view.layoutIfNeeded()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-
-        let collapseButton = try #require(controller.textView.descendant(
-            withAccessibilityIdentifier: "xml_tag_collapse_0"
-        ) as? UIButton)
-        collapseButton.sendActions(for: .touchUpInside)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-
-        let hiddenLineLocation = ("<noto:content>\n" as NSString).length
-        let font = try #require(controller.textView.textStorage.attribute(.font, at: hiddenLineLocation, effectiveRange: nil) as? UIFont)
-        let color = try #require(controller.textView.textStorage.attribute(.foregroundColor, at: hiddenLineLocation, effectiveRange: nil) as? UIColor)
-        let lightTrait = UITraitCollection(userInterfaceStyle: .light)
-
-        #expect(abs(font.pointSize - MarkdownVisualSpec.collapsedXMLTagContentFontSize) > 0.5)
-        #expect(color.resolvedColor(with: lightTrait) != UIColor.clear.resolvedColor(with: lightTrait))
-    }
-
-    @MainActor
-    @Test("Expanding XML tag content realigns todo fragment hit regions after layout shifts")
-    func expandingXMLTagContentRealignsTodoFragmentHitRegionsAfterLayoutShifts() throws {
+    @Test("Expanded XML content keeps todo fragment hit regions aligned")
+    func expandedXMLContentKeepsTodoFragmentHitRegionsAligned() throws {
         let controller = TextKit2EditorViewController()
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 820, height: 1180))
         window.rootViewController = controller
@@ -369,23 +319,12 @@ struct TextKit2EditorLifecycleTests {
         """
         controller.loadText(markdown)
         controller.view.layoutIfNeeded()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-
-        let openingButton = try #require(controller.textView.descendant(
-            withAccessibilityIdentifier: "xml_tag_collapse_0"
-        ) as? UIButton)
-        openingButton.sendActions(for: .touchUpInside)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-
-        let expandButton = try #require(controller.textView.descendant(
-            withAccessibilityIdentifier: "xml_tag_collapse_0"
-        ) as? UIButton)
-        expandButton.sendActions(for: .touchUpInside)
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
 
         let nsMarkdown = markdown as NSString
         let todoParagraphLocation = nsMarkdown.range(of: "- [ ] Open this file").location
-        #expect(controller.textView.descendant(withAccessibilityIdentifier: "todo_checkbox_\(todoParagraphLocation)") == nil)
+        let checkbox = controller.textView.descendant(withAccessibilityIdentifier: "todo_checkbox_\(todoParagraphLocation)")
+        #expect(checkbox != nil)
 
         let markerRect = try #require(controller.todoMarkerHitRect(forParagraphLocation: todoParagraphLocation))
         let contentLocation = todoParagraphLocation + "- [ ] ".count
@@ -404,6 +343,31 @@ struct TextKit2EditorLifecycleTests {
 
         controller.textView.undoManager?.redo()
         #expect(controller.textView.text.contains("- [x] Open this file"))
+    }
+
+    @MainActor
+    @Test("Empty todo marker stays horizontally aligned after typing the first character")
+    func emptyTodoMarkerStaysAlignedAfterTypingFirstCharacter() throws {
+        let controller = TextKit2EditorViewController()
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 820, height: 1180))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.loadViewIfNeeded()
+        controller.textView.becomeFirstResponder()
+
+        controller.loadText("- [ ] ")
+        controller.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+
+        let emptyMarkerRect = try #require(controller.todoMarkerHitRect(forParagraphLocation: 0))
+
+        controller.loadText("- [ ] Task")
+        controller.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+
+        let populatedMarkerRect = try #require(controller.todoMarkerHitRect(forParagraphLocation: 0))
+
+        #expect(abs(emptyMarkerRect.minX - populatedMarkerRect.minX) < 1.0)
     }
 
     @Test("Frontmatter range covers the YAML metadata block only")
@@ -513,6 +477,52 @@ struct TextKit2EditorLifecycleMacTests {
         let hiddenTitleLink = try #require(controller.textView.textStorage?.attribute(.link, at: 12, effectiveRange: nil) as? URL)
         #expect(abs(hiddenFont.pointSize - MarkdownVisualSpec.hyperlinkSyntaxVisualWidth) < 0.5)
         #expect(hiddenTitleLink.absoluteString == "https://example.com")
+    }
+
+    @MainActor
+    @Test("Page mention suggestion rows fill the macOS popover width")
+    func pageMentionSuggestionRowsFillPopoverWidth() throws {
+        let controller = TextKit2EditorViewController()
+        controller.pageMentionProvider = { query in
+            guard query == "孤独" else { return [] }
+            return [
+                PageMentionDocument(
+                    path: "Captures/你的孤独，正撑起一个万亿新赛道.md",
+                    title: "你的孤独，正撑起一个万亿新赛道",
+                    relativePath: "Captures/你的孤独，正撑起一个万亿新赛道.md"
+                )
+            ]
+        }
+        controller.loadViewIfNeeded()
+        controller.view.frame = NSRect(x: 0, y: 0, width: 900, height: 700)
+        controller.loadText("and @孤独")
+        controller.textView.setSelectedRange(NSRange(location: controller.textView.string.count, length: 0))
+
+        controller.textDidChange(Notification(name: NSText.didChangeNotification, object: controller.textView))
+        controller.textViewDidChangeSelection(Notification(name: NSTextView.didChangeSelectionNotification, object: controller.textView))
+        controller.view.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        let stackView = try #require(controller.view.descendant(withAccessibilityIdentifier: "page_mention_suggestions") as? NSStackView)
+        let button = try #require(controller.view.descendant(withAccessibilityIdentifier: "page_mention_suggestion_0") as? NSButton)
+        controller.view.layoutSubtreeIfNeeded()
+
+        let expectedWidth = stackView.bounds.width - stackView.edgeInsets.left - stackView.edgeInsets.right
+        #expect(abs(button.frame.width - expectedWidth) < 1.0)
+    }
+}
+
+private extension NSView {
+    func descendant(withAccessibilityIdentifier identifier: String) -> NSView? {
+        if accessibilityIdentifier() == identifier {
+            return self
+        }
+        for subview in subviews {
+            if let match = subview.descendant(withAccessibilityIdentifier: identifier) {
+                return match
+            }
+        }
+        return nil
     }
 }
 #endif

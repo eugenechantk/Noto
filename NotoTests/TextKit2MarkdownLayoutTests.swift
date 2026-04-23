@@ -207,6 +207,22 @@ struct TextKit2MarkdownLayoutTests {
         #expect(renderedWidth - titleWidth < 2)
     }
 
+    @Test("Selected-line hyperlink discovery ignores links on other lines")
+    func selectedLineHyperlinkDiscoveryIgnoresOtherLines() {
+        let text = """
+        [Top](https://example.com/top)
+        Body line
+        [Bottom](https://example.com/bottom)
+        """
+        let nsText = text as NSString
+        let selection = NSRange(location: nsText.range(of: "Bottom").location, length: 0)
+
+        let ranges = HyperlinkSelectionRanges.fullRangesOnSelectedLines(in: text, selection: selection)
+
+        #expect(ranges.count == 1)
+        #expect(nsText.substring(with: ranges[0]) == "[Bottom](https://example.com/bottom)")
+    }
+
     @Test("Empty image links are detected as image placeholders")
     func emptyImageLinksAreDetectedAsImagePlaceholders() {
         let text = "[](https://substackcdn.com/image/fetch/example/https%3A%2F%2Fexample.com%2Fchart.png)"
