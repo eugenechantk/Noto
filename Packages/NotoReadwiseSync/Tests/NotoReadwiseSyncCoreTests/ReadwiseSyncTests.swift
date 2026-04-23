@@ -70,15 +70,13 @@ struct ReadwiseSyncTests {
 
         #expect(note.contains("updated: 2026-04-21T00:00:00Z"))
         #expect(!note.contains("modified:"))
-        #expect(note.contains("<!-- readwise:metadata:start -->"))
-        #expect(note.contains("<!-- readwise:metadata:end -->"))
         #expect(note.contains("<!-- readwise:highlights:start -->"))
         #expect(note.contains("<!-- readwise:highlights:end -->"))
         #expect(note.contains("<!-- readwise:content:start -->"))
         #expect(note.contains("<!-- readwise:content:end -->"))
-        #expect(note.contains("Source: [How to Do What You Love](https://example.com/love)"))
-        #expect(note.contains("Readwise: [Open in Readwise](https://readwise.io/bookreview/123)"))
-        #expect(note.contains("Captured: 2026-04-21T00:00:00Z"))
+        #expect(!note.contains("Source: "))
+        #expect(!note.contains("Readwise: "))
+        #expect(!note.contains("Captured: "))
         #expect(!note.contains("Capture status:"))
         #expect(note.contains("> To do great work, you need to do what you love."))
         #expect(note.contains("> Note: Central thesis"))
@@ -238,10 +236,10 @@ struct ReadwiseSyncTests {
             capturedAt: ISO8601DateFormatter.noto.date(from: "2026-04-22T00:00:00Z")!
         )
 
-        #expect(updated.contains("Captured: 2026-04-22T00:00:00Z"))
+        #expect(!updated.contains("Captured: 2026-04-22T00:00:00Z"))
         #expect(!updated.contains("Captured: 2026-04-21T00:00:00Z"))
-        #expect(updated.contains("<!-- readwise:metadata:start -->"))
-        #expect(updated.contains("<!-- readwise:metadata:end -->"))
+        #expect(!updated.contains("<!-- readwise:metadata:start -->"))
+        #expect(!updated.contains("<!-- readwise:metadata:end -->"))
         #expect(updated.contains("## Thoughts\nmanual note before generated markers"))
         #expect(updated.contains("<!-- readwise:highlights:start -->\n<!-- readwise:highlights:end -->"))
         #expect(updated.contains("First paragraph with **bold text**"))
@@ -278,9 +276,10 @@ struct ReadwiseSyncTests {
             capturedAt: ISO8601DateFormatter.noto.date(from: "2026-04-22T00:00:00Z")!
         )
 
-        #expect(updated.contains("<!-- readwise:metadata:start -->\nSource: [Long Reader Article](https://example.com/full-article)"))
-        #expect(updated.contains("Captured: 2026-04-22T00:00:00Z\n<!-- readwise:metadata:end -->"))
         #expect(!updated.contains("Source: Placeholder"))
+        #expect(!updated.contains("Readwise: [Open in Reader](https://read.readwise.io/read/old)"))
+        #expect(!updated.contains("Captured: 2026-04-22T00:00:00Z"))
+        #expect(!updated.contains("<!-- readwise:metadata:start -->"))
         #expect(updated.contains("## Thoughts\nKeep this."))
     }
 
@@ -317,8 +316,8 @@ struct ReadwiseSyncTests {
         )
 
         #expect(!updated.contains("Source: Placeholder"))
-        #expect(updated.contains("<!-- readwise:metadata:start -->"))
-        #expect(updated.contains("Captured: 2026-04-22T00:00:00Z\n<!-- readwise:metadata:end -->"))
+        #expect(!updated.contains("<!-- readwise:metadata:start -->"))
+        #expect(!updated.contains("Captured: 2026-04-22T00:00:00Z"))
         #expect(updated.contains("## Thoughts\nKeep this too."))
     }
 
@@ -426,8 +425,9 @@ struct ReadwiseSyncTests {
         #expect(note.contains("canonical_key: \"reader:01readerfullcontent\""))
         #expect(note.contains("reader_document_id: \"01readerfullcontent\""))
         #expect(note.contains("reader_location: \"later\""))
-        #expect(note.contains("Source: [Long Reader Article](https://example.com/full-article)"))
-        #expect(note.contains("Readwise: [Open in Reader](https://read.readwise.io/new/read/01readerfullcontent)"))
+        #expect(!note.contains("Source: "))
+        #expect(!note.contains("Readwise: "))
+        #expect(!note.contains("Captured: "))
         #expect(note.contains("  - \"content-creation\""))
         #expect(note.contains("<!-- readwise:highlights:start -->"))
         #expect(!note.contains("No highlights imported"))
@@ -473,7 +473,7 @@ struct ReadwiseSyncTests {
         #expect(note.contains("reader_location: \"later\""))
         #expect(note.contains("readwise_url: \"https://read.readwise.io/new/read/01readerfullcontent\""))
         #expect(note.contains("readwise_bookreview_url: \"https://readwise.io/bookreview/987\""))
-        #expect(note.contains("Readwise: [Open in Reader](https://read.readwise.io/new/read/01readerfullcontent)"))
+        #expect(!note.contains("Readwise: "))
         #expect(note.contains("  - \"content-creation\""))
         #expect(note.contains("> Joined highlight."))
         #expect(note.contains("> Note: Joined note"))

@@ -36,7 +36,6 @@ public enum SourceNoteRenderer {
         )
         return replaceGeneratedSection(
             in: markdownWithUpdatedFrontmatter,
-            metadataBlock: metadataBlock(for: book, capturedAt: capturedAt),
             highlightsBlock: highlightsBlock(for: book),
             contentBlock: normalizedExistingBlock(
                 in: markdownWithUpdatedFrontmatter,
@@ -87,7 +86,6 @@ public enum SourceNoteRenderer {
         )
         return replaceGeneratedSection(
             in: markdownWithUpdatedFrontmatter,
-            metadataBlock: metadataBlock(for: document, capturedAt: capturedAt),
             highlightsBlock: normalizedExistingBlock(
                 in: markdownWithUpdatedFrontmatter,
                 start: highlightsStartMarker,
@@ -114,7 +112,6 @@ public enum SourceNoteRenderer {
         )
         return replaceGeneratedSection(
             in: markdownWithUpdatedFrontmatter,
-            metadataBlock: metadataBlock(for: document, matchedBook: matchedBook, capturedAt: capturedAt),
             highlightsBlock: highlightsBlock(for: matchedBook),
             contentBlock: contentBlock(for: document)
         )
@@ -122,7 +119,6 @@ public enum SourceNoteRenderer {
 
     public static func generatedBlock(for book: ReadwiseBook, capturedAt: Date) -> String {
         generatedSection(
-            metadataBlock: metadataBlock(for: book, capturedAt: capturedAt),
             highlightsBlock: highlightsBlock(for: book),
             contentBlock: emptyContentBlock()
         )
@@ -130,7 +126,6 @@ public enum SourceNoteRenderer {
 
     public static func generatedBlock(for document: ReaderDocument, capturedAt: Date) -> String {
         generatedSection(
-            metadataBlock: metadataBlock(for: document, capturedAt: capturedAt),
             highlightsBlock: emptyHighlightsBlock(),
             contentBlock: contentBlock(for: document)
         )
@@ -138,7 +133,6 @@ public enum SourceNoteRenderer {
 
     public static func generatedBlock(for document: ReaderDocument, matchedBook: ReadwiseBook, capturedAt: Date) -> String {
         generatedSection(
-            metadataBlock: metadataBlock(for: document, matchedBook: matchedBook, capturedAt: capturedAt),
             highlightsBlock: highlightsBlock(for: matchedBook),
             contentBlock: contentBlock(for: document)
         )
@@ -191,35 +185,6 @@ public enum SourceNoteRenderer {
         FNV1a64.hash(block)
     }
 
-    private static func metadataBlock(for book: ReadwiseBook, capturedAt: Date) -> String {
-        var lines = ["Source: \(sourceMarkdown(for: book))"]
-        if let readwiseURL = book.readwiseURL.nonEmpty {
-            lines.append("Readwise: [Open in Readwise](\(readwiseURL))")
-        }
-        lines.append("Captured: \(ISO8601DateFormatter.noto.string(from: capturedAt))")
-        return lines.joined(separator: "\n")
-    }
-
-    private static func metadataBlock(for document: ReaderDocument, capturedAt: Date) -> String {
-        var lines = ["Source: \(sourceMarkdown(for: document))"]
-        if let readwiseURL = document.url.nonEmpty {
-            lines.append("Readwise: [Open in Reader](\(readwiseURL))")
-        }
-        lines.append("Captured: \(ISO8601DateFormatter.noto.string(from: capturedAt))")
-        return lines.joined(separator: "\n")
-    }
-
-    private static func metadataBlock(for document: ReaderDocument, matchedBook: ReadwiseBook, capturedAt: Date) -> String {
-        var lines = ["Source: \(sourceMarkdown(for: document))"]
-        if let readerURL = document.url.nonEmpty {
-            lines.append("Readwise: [Open in Reader](\(readerURL))")
-        } else if let readwiseURL = matchedBook.readwiseURL.nonEmpty {
-            lines.append("Readwise: [Open in Readwise](\(readwiseURL))")
-        }
-        lines.append("Captured: \(ISO8601DateFormatter.noto.string(from: capturedAt))")
-        return lines.joined(separator: "\n")
-    }
-
     private static func emptyHighlightsBlock() -> String {
         [highlightsStartMarker, highlightsEndMarker]
             .joined(separator: "\n")
@@ -230,17 +195,12 @@ public enum SourceNoteRenderer {
             .joined(separator: "\n")
     }
 
-    private static func generatedSection(
-        metadataBlock: String,
-        highlightsBlock: String,
-        contentBlock: String
-    ) -> String {
-        [metadataSection(for: metadataBlock), highlightsBlock, contentBlock].joined(separator: "\n\n")
+    private static func generatedSection(highlightsBlock: String, contentBlock: String) -> String {
+        [highlightsBlock, contentBlock].joined(separator: "\n\n")
     }
 
     private static func replaceGeneratedSection(
         in markdown: String,
-        metadataBlock: String,
         highlightsBlock: String,
         contentBlock: String
     ) -> String {
@@ -257,13 +217,12 @@ public enum SourceNoteRenderer {
                 end: contentEndMarker,
                 with: contentBlock
             )
-            return replaceMetadataBeforeFirstGeneratedBlock(in: updated, with: metadataBlock)
+            return removeMetadataBeforeFirstGeneratedBlock(in: updated)
         }
 
         return replaceGeneratedBlock(
             in: markdown,
             with: generatedSection(
-                metadataBlock: metadataBlock,
                 highlightsBlock: highlightsBlock,
                 contentBlock: contentBlock
             )
@@ -314,41 +273,29 @@ public enum SourceNoteRenderer {
         return updated
     }
 
-    private static func replaceMetadataBeforeFirstGeneratedBlock(in markdown: String, with metadataBlock: String) -> String {
-        let metadataSection = metadataSection(for: metadataBlock)
-        if markdown.contains(metadataStartMarker) || markdown.contains(metadataEndMarker) {
-            return replaceBlock(
-                in: markdown,
-                start: metadataStartMarker,
-                end: metadataEndMarker,
-                with: metadataSection
-            )
-        }
-
-        guard let firstMarkerRange = firstGeneratedMarkerRange(in: markdown) else {
-            return insertGeneratedBlock(markdown, generatedBlock: metadataSection)
-        }
-
-        let lineStart = markdown[..<firstMarkerRange.lowerBound].lastIndex(of: "\n")
-            .map { markdown.index(after: $0) } ?? markdown.startIndex
-        let beforeMarkerString = String(markdown[..<lineStart])
+    private static func removeMetadataBeforeFirstGeneratedBlock(in markdown: String) -> String {
         var updated = markdown
-        if let metadataRange = generatedMetadataRange(in: beforeMarkerString) {
-            let lowerOffset = beforeMarkerString.distance(from: beforeMarkerString.startIndex, to: metadataRange.lowerBound)
-            let upperOffset = beforeMarkerString.distance(from: beforeMarkerString.startIndex, to: metadataRange.upperBound)
-            let metadataStart = markdown.index(markdown.startIndex, offsetBy: lowerOffset)
-            let metadataEnd = markdown.index(markdown.startIndex, offsetBy: upperOffset)
-            updated.replaceSubrange(metadataStart..<metadataEnd, with: metadataSection + "\n\n")
+
+        if let metadataRange = blockRange(in: updated, start: metadataStartMarker, end: metadataEndMarker) {
+            let rangeWithTrailingSpacing = extendedRangeRemovingTrailingBlankLines(in: updated, range: metadataRange)
+            updated.removeSubrange(rangeWithTrailingSpacing)
+        }
+
+        guard let firstMarkerRange = firstGeneratedMarkerRange(in: updated) else {
             return updated
         }
 
-        updated.replaceSubrange(lineStart..<lineStart, with: metadataSection + "\n\n")
-        return updated
-    }
+        let prefix = String(updated[..<firstMarkerRange.lowerBound])
+        guard let metadataRange = generatedMetadataRange(in: prefix) else {
+            return updated
+        }
 
-    private static func metadataSection(for metadataBlock: String) -> String {
-        [metadataStartMarker, metadataBlock, metadataEndMarker]
-            .joined(separator: "\n")
+        let lowerOffset = prefix.distance(from: prefix.startIndex, to: metadataRange.lowerBound)
+        let upperOffset = prefix.distance(from: prefix.startIndex, to: metadataRange.upperBound)
+        let metadataStart = updated.index(updated.startIndex, offsetBy: lowerOffset)
+        let metadataEnd = updated.index(updated.startIndex, offsetBy: upperOffset)
+        updated.removeSubrange(metadataStart..<metadataEnd)
+        return updated
     }
 
     private static func firstGeneratedMarkerRange(in markdown: String) -> Range<String.Index>? {
@@ -420,6 +367,19 @@ public enum SourceNoteRenderer {
             cursor = lineEnd == markdown.endIndex ? markdown.endIndex : markdown.index(after: lineEnd)
         }
         return cursor
+    }
+
+    private static func blockRange(in markdown: String, start: String, end: String) -> Range<String.Index>? {
+        guard let startRange = markdown.range(of: start),
+              let endRange = markdown.range(of: end, range: startRange.upperBound..<markdown.endIndex) else {
+            return nil
+        }
+        return startRange.lowerBound..<endRange.upperBound
+    }
+
+    private static func extendedRangeRemovingTrailingBlankLines(in markdown: String, range: Range<String.Index>) -> Range<String.Index> {
+        let extendedEnd = endOfFollowingBlankLines(in: markdown, from: range.upperBound)
+        return range.lowerBound..<extendedEnd
     }
 
     private static func frontmatter(
@@ -548,26 +508,6 @@ public enum SourceNoteRenderer {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         return "\"\(escaped)\""
-    }
-
-    private static func sourceMarkdown(for book: ReadwiseBook) -> String {
-        guard let url = book.preferredSourceURL else {
-            return book.displayTitle
-        }
-        return "[\(escapeLinkText(book.displayTitle))](\(url))"
-    }
-
-    private static func sourceMarkdown(for document: ReaderDocument) -> String {
-        guard let url = document.preferredSourceURL else {
-            return document.displayTitle
-        }
-        return "[\(escapeLinkText(document.displayTitle))](\(url))"
-    }
-
-    private static func escapeLinkText(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: "[", with: "\\[")
-            .replacingOccurrences(of: "]", with: "\\]")
     }
 
     private static func blockquote(_ text: String) -> [String] {
