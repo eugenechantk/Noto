@@ -2682,7 +2682,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
-        applyCollapsedXMLTagAttributesToTextStorage()
         refreshXMLTagCollapseButtons()
     }
 
@@ -2745,12 +2744,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         xmlTagCollapseButtons.append(button)
     }
 
-    private func isCollapsedXMLTagContentRange(_ range: NSRange) -> Bool {
-        markdownDelegate.collapsedXMLTagRanges.contains { collapsedRange in
-            NSIntersectionRange(collapsedRange, range).length > 0
-        }
-    }
-
     @objc
     private func xmlTagCollapseButtonTapped(_ sender: UIButton) {
         let openingLocation = sender.tag
@@ -2774,37 +2767,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         markdownDelegate.collapsedXMLTagRanges = blocks
             .filter { collapsedXMLTagOpeningLocations.contains($0.openingLineRange.location) }
             .map(\.collapsedContentRange)
-    }
-
-    private func applyCollapsedXMLTagAttributesToTextStorage() {
-        let text = textView.text ?? ""
-        let blocks = XMLLikeTagParser.blocks(in: text)
-        guard !blocks.isEmpty else { return }
-
-        let textStorage = textView.textStorage
-        for block in blocks where collapsedXMLTagOpeningLocations.contains(block.openingLineRange.location) {
-            let range = block.collapsedContentRange
-            guard range.length > 0,
-                  NSMaxRange(range) <= textStorage.length else {
-                continue
-            }
-
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.minimumLineHeight = MarkdownVisualSpec.collapsedXMLTagContentFontSize
-            paragraphStyle.maximumLineHeight = MarkdownVisualSpec.collapsedXMLTagContentFontSize
-            paragraphStyle.lineSpacing = 0
-            paragraphStyle.paragraphSpacing = 0
-            paragraphStyle.paragraphSpacingBefore = 0
-
-            textStorage.addAttributes([
-                .font: PlatformFont.systemFont(
-                    ofSize: MarkdownVisualSpec.collapsedXMLTagContentFontSize,
-                    weight: .regular
-                ),
-                .foregroundColor: PlatformColor.clear,
-                .paragraphStyle: paragraphStyle,
-            ], range: range)
-        }
     }
 
     private func rebuildTextLayoutPreservingSelection() {
@@ -3775,7 +3737,6 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
-        applyCollapsedXMLTagAttributesToTextStorage()
         refreshXMLTagCollapseButtons()
     }
 
@@ -3853,12 +3814,6 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         xmlTagCollapseButtons.append(button)
     }
 
-    private func isCollapsedXMLTagContentRange(_ range: NSRange) -> Bool {
-        markdownDelegate.collapsedXMLTagRanges.contains { collapsedRange in
-            NSIntersectionRange(collapsedRange, range).length > 0
-        }
-    }
-
     @objc
     private func xmlTagCollapseButtonTapped(_ sender: NSButton) {
         let openingLocation = sender.tag
@@ -3882,36 +3837,6 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         markdownDelegate.collapsedXMLTagRanges = blocks
             .filter { collapsedXMLTagOpeningLocations.contains($0.openingLineRange.location) }
             .map(\.collapsedContentRange)
-    }
-
-    private func applyCollapsedXMLTagAttributesToTextStorage() {
-        guard let textStorage = textView.textStorage else { return }
-        let blocks = XMLLikeTagParser.blocks(in: textView.string)
-        guard !blocks.isEmpty else { return }
-
-        for block in blocks where collapsedXMLTagOpeningLocations.contains(block.openingLineRange.location) {
-            let range = block.collapsedContentRange
-            guard range.length > 0,
-                  NSMaxRange(range) <= textStorage.length else {
-                continue
-            }
-
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.minimumLineHeight = MarkdownVisualSpec.collapsedXMLTagContentFontSize
-            paragraphStyle.maximumLineHeight = MarkdownVisualSpec.collapsedXMLTagContentFontSize
-            paragraphStyle.lineSpacing = 0
-            paragraphStyle.paragraphSpacing = 0
-            paragraphStyle.paragraphSpacingBefore = 0
-
-            textStorage.addAttributes([
-                .font: PlatformFont.systemFont(
-                    ofSize: MarkdownVisualSpec.collapsedXMLTagContentFontSize,
-                    weight: .regular
-                ),
-                .foregroundColor: PlatformColor.clear,
-                .paragraphStyle: paragraphStyle,
-            ], range: range)
-        }
     }
 
     private func rebuildTextLayoutPreservingSelection() {

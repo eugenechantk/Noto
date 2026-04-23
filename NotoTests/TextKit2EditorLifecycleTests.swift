@@ -319,6 +319,33 @@ struct TextKit2EditorLifecycleTests {
     }
 
     @MainActor
+    @Test("Collapsing XML content does not rewrite backing text storage attributes")
+    func collapsingXMLContentDoesNotRewriteBackingTextStorageAttributes() throws {
+        let controller = TextKit2EditorViewController()
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.loadViewIfNeeded()
+        controller.loadText("<noto:content>\nHidden line\n</noto:content>")
+        controller.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        let collapseButton = try #require(controller.textView.descendant(
+            withAccessibilityIdentifier: "xml_tag_collapse_0"
+        ) as? UIButton)
+        collapseButton.sendActions(for: .touchUpInside)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        let hiddenLineLocation = ("<noto:content>\n" as NSString).length
+        let font = try #require(controller.textView.textStorage.attribute(.font, at: hiddenLineLocation, effectiveRange: nil) as? UIFont)
+        let color = try #require(controller.textView.textStorage.attribute(.foregroundColor, at: hiddenLineLocation, effectiveRange: nil) as? UIColor)
+        let lightTrait = UITraitCollection(userInterfaceStyle: .light)
+
+        #expect(abs(font.pointSize - MarkdownVisualSpec.collapsedXMLTagContentFontSize) > 0.5)
+        #expect(color.resolvedColor(with: lightTrait) != UIColor.clear.resolvedColor(with: lightTrait))
+    }
+
+    @MainActor
     @Test("Expanding XML tag content realigns todo fragment hit regions after layout shifts")
     func expandingXMLTagContentRealignsTodoFragmentHitRegionsAfterLayoutShifts() throws {
         let controller = TextKit2EditorViewController()
