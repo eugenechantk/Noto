@@ -21,6 +21,7 @@ struct NoteEditorScreen: View {
 
     @State private var session: NoteEditorSession
     @State private var showDeleteConfirmation = false
+    @State private var statusCount = WordCounter.Count(words: 0, characters: 0)
     private let wordCounter = WordCounter()
 
     init(
@@ -77,7 +78,7 @@ struct NoteEditorScreen: View {
             mode: chromeMode,
             vaultRootURL: store.vaultRootURL,
             noteFileURL: session.note.fileURL,
-            statusCount: wordCounter.count(in: session.content),
+            statusCount: statusCount,
             leadingControls: leadingChromeControls,
             onTapBreadcrumbLevel: onTapBreadcrumbLevel,
             onOpenTodayNote: onOpenTodayNote,
@@ -92,7 +93,7 @@ struct NoteEditorScreen: View {
             title: MarkdownNote.titleFrom(session.content),
             vaultRootURL: store.vaultRootURL,
             noteFileURL: session.note.fileURL,
-            statusCount: wordCounter.count(in: session.content),
+            statusCount: statusCount,
             canNavigateBack: canNavigateBack,
             canNavigateForward: canNavigateForward,
             onNavigateBack: onNavigateBack,
@@ -105,6 +106,9 @@ struct NoteEditorScreen: View {
         .task {
             guard !session.hasLoaded else { return }
             await session.loadNoteContent()
+        }
+        .onChange(of: session.content, initial: true) { _, updatedContent in
+            statusCount = wordCounter.count(in: updatedContent)
         }
         .onDisappear {
             session.cancelBackgroundWork()

@@ -25,6 +25,7 @@ struct NotoSidebarView: View {
     @State private var newFolderName = ""
     @State private var newFolderParentURL: URL?
     @State private var searchLoadTask: Task<Void, Never>?
+    @State private var reloadTreeTask: Task<Void, Never>?
     @FocusState private var isSearchFocused: Bool
 
     private let loader = SidebarTreeLoader()
@@ -49,10 +50,10 @@ struct NotoSidebarView: View {
             }
         }
         .task {
-            reloadTree()
+            scheduleReloadTree()
         }
         .onChange(of: fileWatcher?.changeCount) { _, _ in
-            reloadTree()
+            scheduleReloadTree()
             applySelectedNoteUpdate(selectedNote)
         }
         .onChange(of: selectedNote) { _, updatedNote in
@@ -60,6 +61,10 @@ struct NotoSidebarView: View {
         }
         .onChange(of: searchText) { _, updatedSearchText in
             handleSearchTextChange(updatedSearchText)
+        }
+        .onDisappear {
+            reloadTreeTask?.cancel()
+            searchLoadTask?.cancel()
         }
     }
 
@@ -276,7 +281,7 @@ struct NotoSidebarView: View {
             expandedFolderURLs.insert(normalizedURL)
         }
         persistExpansionState()
-        reloadTree()
+        scheduleReloadTree()
     }
 
     private func selectNote(_ row: SidebarTreeNode) {
@@ -305,7 +310,7 @@ struct NotoSidebarView: View {
         selectedNoteStore = noteStore
         selectedNote = note
         selectedIsNew = true
-        reloadTree()
+        scheduleReloadTree()
         onSelectNote?()
     }
 
@@ -329,7 +334,7 @@ struct NotoSidebarView: View {
         expandedFolderURLs.insert(folder.folderURL.standardizedFileURL)
         persistExpansionState()
         resetNewFolderState()
-        reloadTree()
+        scheduleReloadTree()
     }
 
     private func resetNewFolderState() {
@@ -360,7 +365,7 @@ struct NotoSidebarView: View {
             }
             parentStore.deleteNote(note)
         }
-        reloadTree()
+        scheduleReloadTree()
     }
 
     private func markdownNote(for url: URL, modifiedAt: Date) -> MarkdownNote {
@@ -398,7 +403,7 @@ struct NotoSidebarView: View {
         )
 
         guard didUpdateVisibleRows || didUpdateSearchableRows else {
-            reloadTree()
+            scheduleReloadTree()
             return
         }
     }
@@ -432,22 +437,37 @@ struct NotoSidebarView: View {
         return true
     }
 
-    private func reloadTree() {
-        do {
-            loadExpansionStateIfNeeded()
-            if !hasPersistedExpansionState {
-                expandedFolderURLs = []
-                persistExpansionState()
-            }
+    private func scheduleReloadTree() {
+        loadExpansionStateIfNeeded()
+        if !hasPersistedExpansionState {
+            expandedFolderURLs = []
+            persistExpansionState()
+        }
 
-            rows = try loader.loadRows(
-                rootURL: rootStore.vaultRootURL,
-                expandedFolderURLs: expandedFolderURLs
-            )
-            handleSearchTextChange(searchText)
-        } catch {
-            rows = []
-            searchableRows = []
+        reloadTreeTask?.cancel()
+        let rootURL = rootStore.vaultRootURL
+        let expandedFolders = expandedFolderURLs
+
+        reloadTreeTask = Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                Result {
+                    try SidebarTreeLoader().loadRows(
+                        rootURL: rootURL,
+                        expandedFolderURLs: expandedFolders
+                    )
+                }
+            }.value
+
+            guard !Task.isCancelled else { return }
+
+            switch result {
+            case .success(let loadedRows):
+                rows = loadedRows
+                handleSearchTextChange(searchText)
+            case .failure:
+                rows = []
+                searchableRows = []
+            }
         }
     }
 
