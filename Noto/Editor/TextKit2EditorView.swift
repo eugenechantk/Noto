@@ -986,6 +986,27 @@ enum TodoMarkerGeometry {
     }
 }
 
+// MARK: - XMLCollapseControlGeometry
+
+enum XMLCollapseControlGeometry {
+    static func buttonFrame(
+        for fragment: NSTextLayoutFragment
+    ) -> CGRect {
+        let anchorBounds = fragment.textLineFragments.first?.typographicBounds
+            ?? CGRect(origin: .zero, size: fragment.layoutFragmentFrame.size)
+        let buttonSize = MarkdownVisualSpec.xmlTagCollapseControlSize
+        let hitTargetWidth = max(CGFloat(44), fragment.layoutFragmentFrame.minX + 6)
+        let hitTargetHeight = max(CGFloat(32), buttonSize)
+
+        return CGRect(
+            x: 0,
+            y: fragment.layoutFragmentFrame.minY + anchorBounds.midY - hitTargetHeight / 2,
+            width: hitTargetWidth,
+            height: hitTargetHeight
+        )
+    }
+}
+
 // MARK: - TodoLayoutFragment
 
 final class TodoLayoutFragment: NSTextLayoutFragment {
@@ -2691,37 +2712,15 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         xmlTagCollapseButtons.forEach { $0.removeFromSuperview() }
         xmlTagCollapseButtons.removeAll()
 
-        let text = textView.text ?? ""
-        let blocks = XMLLikeTagParser.blocks(in: text)
-        guard !blocks.isEmpty else { return }
-
         textView.layoutIfNeeded()
 
-        for block in blocks {
+        for (block, frame) in visibleXMLTagCollapseButtonFrames() {
             addXMLTagCollapseButton(for: block)
+            xmlTagCollapseButtons.last?.frame = frame
         }
     }
 
     private func addXMLTagCollapseButton(for block: XMLLikeTagBlock) {
-        guard let startPosition = textView.position(
-            from: textView.beginningOfDocument,
-            offset: block.openingLineRange.location
-        ) else {
-            return
-        }
-
-        let caretRect = textView.caretRect(for: startPosition)
-        guard !caretRect.isNull,
-              caretRect.origin.x.isFinite,
-              caretRect.origin.y.isFinite,
-              caretRect.size.width.isFinite,
-              caretRect.size.height.isFinite else {
-            return
-        }
-
-        let buttonSize = MarkdownVisualSpec.xmlTagCollapseControlSize
-        let hitTargetWidth = max(CGFloat(44), caretRect.minX + 6)
-        let hitTargetHeight = max(CGFloat(32), buttonSize)
         let isCollapsed = collapsedXMLTagOpeningLocations.contains(block.openingLineRange.location)
         let button = UIButton(type: .system)
         let imageName = isCollapsed ? "chevron.right" : "chevron.down"
@@ -2732,16 +2731,54 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         button.tag = block.openingLineRange.location
         button.accessibilityIdentifier = "xml_tag_collapse_\(block.openingLineRange.location)"
         button.accessibilityLabel = isCollapsed ? "Expand \(block.tagName)" : "Collapse \(block.tagName)"
-        button.frame = CGRect(
-            x: 0,
-            y: caretRect.midY - hitTargetHeight / 2,
-            width: hitTargetWidth,
-            height: hitTargetHeight
-        )
         button.addTarget(self, action: #selector(xmlTagCollapseButtonTapped(_:)), for: .touchUpInside)
 
         textView.addSubview(button)
         xmlTagCollapseButtons.append(button)
+    }
+
+    private func visibleXMLTagCollapseButtonFrames() -> [(XMLLikeTagBlock, CGRect)] {
+        guard let layoutManager = textView.textLayoutManager,
+              let documentRange = layoutManager.textContentManager?.documentRange else {
+            return []
+        }
+
+        let text = textView.text ?? ""
+        let blocks = XMLLikeTagParser.blocks(in: text)
+        guard !blocks.isEmpty else { return [] }
+
+        let nsText = text as NSString
+        let openingLines = blocks.map { block in
+            nsText.substring(with: MarkdownLineRanges.visibleLineRange(from: block.openingLineRange, in: nsText))
+        }
+        let visibleRect = CGRect(origin: textView.contentOffset, size: textView.bounds.size)
+        var nextOpeningIndex = 0
+        var results: [(XMLLikeTagBlock, CGRect)] = []
+
+        layoutManager.ensureLayout(for: documentRange)
+        layoutManager.enumerateTextLayoutFragments(from: nil, options: [.ensuresLayout]) { fragment in
+            guard nextOpeningIndex < openingLines.count else { return false }
+            guard let paragraph = fragment.textElement as? MarkdownParagraph,
+                  paragraph.blockKind == .xmlTag else {
+                return true
+            }
+
+            let paragraphText = paragraph.attributedString.string.trimmingCharacters(in: .newlines)
+            guard paragraphText == openingLines[nextOpeningIndex] else {
+                return true
+            }
+
+            let block = blocks[nextOpeningIndex]
+            nextOpeningIndex += 1
+
+            let frame = XMLCollapseControlGeometry.buttonFrame(for: fragment)
+            if visibleRect.intersects(frame) {
+                results.append((block, frame))
+            }
+            return true
+        }
+
+        return results
     }
 
     @objc
@@ -3746,44 +3783,15 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         xmlTagCollapseButtons.forEach { $0.removeFromSuperview() }
         xmlTagCollapseButtons.removeAll()
 
-        let blocks = XMLLikeTagParser.blocks(in: textView.string)
-        guard !blocks.isEmpty else { return }
-
         textView.layoutSubtreeIfNeeded()
 
-        for block in blocks {
+        for (block, frame) in visibleXMLTagCollapseButtonFrames() {
             addXMLTagCollapseButton(for: block)
+            xmlTagCollapseButtons.last?.frame = frame
         }
     }
 
     private func addXMLTagCollapseButton(for block: XMLLikeTagBlock) {
-        let screenRect = textView.firstRect(
-            forCharacterRange: NSRange(location: block.openingLineRange.location, length: 0),
-            actualRange: nil
-        )
-
-        guard let window = textView.window,
-              !screenRect.isNull,
-              screenRect.origin.x.isFinite,
-              screenRect.origin.y.isFinite,
-              screenRect.size.width.isFinite,
-              screenRect.size.height.isFinite else {
-            return
-        }
-
-        let windowRect = window.convertFromScreen(screenRect)
-        let caretRect = textView.convert(windowRect, from: nil)
-        guard !caretRect.isNull,
-              caretRect.origin.x.isFinite,
-              caretRect.origin.y.isFinite,
-              caretRect.size.width.isFinite,
-              caretRect.size.height.isFinite else {
-            return
-        }
-
-        let buttonSize = MarkdownVisualSpec.xmlTagCollapseControlSize
-        let hitTargetWidth = max(CGFloat(44), caretRect.minX + 6)
-        let hitTargetHeight = max(CGFloat(32), buttonSize)
         let isCollapsed = collapsedXMLTagOpeningLocations.contains(block.openingLineRange.location)
         let button = NSButton()
         button.isBordered = false
@@ -3803,15 +3811,53 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         button.wantsLayer = true
         button.layer?.backgroundColor = (textView.backgroundColor ?? AppTheme.nsBackground).cgColor
         button.imageScaling = .scaleProportionallyDown
-        button.frame = NSRect(
-            x: 0,
-            y: caretRect.midY - hitTargetHeight / 2,
-            width: hitTargetWidth,
-            height: hitTargetHeight
-        )
 
         textView.addSubview(button)
         xmlTagCollapseButtons.append(button)
+    }
+
+    private func visibleXMLTagCollapseButtonFrames() -> [(XMLLikeTagBlock, NSRect)] {
+        guard let layoutManager = textView.textLayoutManager,
+              let documentRange = layoutManager.textContentManager?.documentRange else {
+            return []
+        }
+
+        let text = textView.string
+        let blocks = XMLLikeTagParser.blocks(in: text)
+        guard !blocks.isEmpty else { return [] }
+
+        let nsText = text as NSString
+        let openingLines = blocks.map { block in
+            nsText.substring(with: MarkdownLineRanges.visibleLineRange(from: block.openingLineRange, in: nsText))
+        }
+        let visibleRect = scrollView.contentView.bounds
+        var nextOpeningIndex = 0
+        var results: [(XMLLikeTagBlock, NSRect)] = []
+
+        layoutManager.ensureLayout(for: documentRange)
+        layoutManager.enumerateTextLayoutFragments(from: nil, options: [.ensuresLayout]) { fragment in
+            guard nextOpeningIndex < openingLines.count else { return false }
+            guard let paragraph = fragment.textElement as? MarkdownParagraph,
+                  paragraph.blockKind == .xmlTag else {
+                return true
+            }
+
+            let paragraphText = paragraph.attributedString.string.trimmingCharacters(in: .newlines)
+            guard paragraphText == openingLines[nextOpeningIndex] else {
+                return true
+            }
+
+            let block = blocks[nextOpeningIndex]
+            nextOpeningIndex += 1
+
+            let frame = XMLCollapseControlGeometry.buttonFrame(for: fragment)
+            if visibleRect.intersects(frame) {
+                results.append((block, frame))
+            }
+            return true
+        }
+
+        return results
     }
 
     @objc
