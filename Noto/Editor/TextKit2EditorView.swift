@@ -415,6 +415,7 @@ enum MarkdownVisualSpec {
     static let todoTextStartOffset: CGFloat = 28
     static let todoControlSize: CGFloat = 28
     static let todoSymbolSize: CGFloat = 18
+    static let todoMarkerContentLeadingAdjustment: CGFloat = 12
     static let todoControlLeadingInset: CGFloat = 2
     static let todoControlImageLeadingInset: CGFloat = 5
     static let imagePreviewReservedHeight: CGFloat = 300
@@ -699,7 +700,7 @@ enum MarkdownParagraphStyler {
         }
 
         // Dim prefix characters. Todo prefixes stay in the backing markdown but
-        // are hidden because an interactive circle is overlaid in their place.
+        // are hidden because a todo layout fragment draws the marker in their place.
         let pfxLen = kind.prefixLength(in: text)
         if pfxLen > 0 && pfxLen <= fullRange.length {
             let prefixColor: PlatformColor
@@ -953,6 +954,99 @@ final class HiddenFrontmatterLayoutFragment: NSTextLayoutFragment {
     #endif
 }
 
+// MARK: - TodoMarkerGeometry
+
+enum TodoMarkerGeometry {
+    static func markerRect(
+        contentLeadingX: CGFloat,
+        lineMidY: CGFloat
+    ) -> CGRect {
+        let controlSize = MarkdownVisualSpec.todoControlSize
+        let symbolSize = MarkdownVisualSpec.todoSymbolSize
+        let symbolLeading = contentLeadingX
+            - MarkdownVisualSpec.todoTextStartOffset
+            - MarkdownVisualSpec.todoMarkerContentLeadingAdjustment
+        return CGRect(
+            x: symbolLeading,
+            y: lineMidY - symbolSize / 2,
+            width: symbolSize,
+            height: symbolSize
+        ).integral.insetBy(dx: -max(0, (controlSize - symbolSize) / 2), dy: -max(0, (controlSize - symbolSize) / 2))
+    }
+
+    static func markerRect(
+        textContainerOriginX: CGFloat,
+        lineMidY: CGFloat,
+        indent: Int
+    ) -> CGRect {
+        let contentLeadingX = textContainerOriginX
+            + MarkdownVisualSpec.listLeadingOffset(for: indent)
+            + MarkdownVisualSpec.todoTextStartOffset
+        return markerRect(contentLeadingX: contentLeadingX, lineMidY: lineMidY)
+    }
+}
+
+// MARK: - TodoLayoutFragment
+
+final class TodoLayoutFragment: NSTextLayoutFragment {
+    override func draw(at point: CGPoint, in context: CGContext) {
+        super.draw(at: point, in: context)
+        guard let paragraph = textElement as? MarkdownParagraph,
+              case .todo(let checked, _) = paragraph.blockKind else {
+            return
+        }
+
+        let markerAnchorFrame = textLineFragments.first?.typographicBounds ?? layoutFragmentFrame
+        let markerRect = TodoMarkerGeometry.markerRect(
+            contentLeadingX: point.x + markerAnchorFrame.minX + MarkdownVisualSpec.todoTextStartOffset,
+            lineMidY: point.y + markerAnchorFrame.midY
+        )
+        drawTodoMarker(checked: checked, in: markerRect, context: context)
+    }
+
+    static func markerRect(
+        fragmentFrame: CGRect,
+        point: CGPoint = .zero,
+        indent: Int
+    ) -> CGRect {
+        TodoMarkerGeometry.markerRect(
+            textContainerOriginX: point.x,
+            lineMidY: point.y + fragmentFrame.midY,
+            indent: indent
+        )
+    }
+
+    private func drawTodoMarker(checked: Bool, in rect: CGRect, context: CGContext) {
+        context.saveGState()
+        defer { context.restoreGState() }
+
+        let lineWidth: CGFloat = 2
+        let circleRect = rect.insetBy(dx: (rect.width - MarkdownVisualSpec.todoSymbolSize) / 2,
+                                      dy: (rect.height - MarkdownVisualSpec.todoSymbolSize) / 2)
+        let markerColor = checked ? MarkdownTheme.checkedColor : MarkdownTheme.prefixColor
+
+        #if os(iOS)
+        context.setStrokeColor(markerColor.cgColor)
+        context.setFillColor(markerColor.cgColor)
+        #elseif os(macOS)
+        context.setStrokeColor(markerColor.cgColor)
+        context.setFillColor(markerColor.cgColor)
+        #endif
+        context.setLineWidth(lineWidth)
+        context.strokeEllipse(in: circleRect.insetBy(dx: lineWidth / 2, dy: lineWidth / 2))
+
+        guard checked else { return }
+        let checkPath = CGMutablePath()
+        checkPath.move(to: CGPoint(x: circleRect.minX + circleRect.width * 0.28, y: circleRect.midY))
+        checkPath.addLine(to: CGPoint(x: circleRect.minX + circleRect.width * 0.44, y: circleRect.maxY - circleRect.height * 0.30))
+        checkPath.addLine(to: CGPoint(x: circleRect.maxX - circleRect.width * 0.24, y: circleRect.minY + circleRect.height * 0.28))
+        context.addPath(checkPath)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        context.strokePath()
+    }
+}
+
 // MARK: - MarkdownImageLoader
 
 private enum MarkdownImageLoader {
@@ -1065,12 +1159,29 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
         textLayoutFragmentFor location: any NSTextLocation,
         in textElement: NSTextElement
     ) -> NSTextLayoutFragment {
+        layoutFragment(for: textElement)
+    }
+
+    func layoutFragment(for textElement: NSTextElement) -> NSTextLayoutFragment {
         guard let paragraph = textElement as? MarkdownParagraph,
-              paragraph.blockKind == .frontmatter || paragraph.blockKind == .collapsedXMLTagContent else {
+              paragraph.blockKind == .frontmatter ||
+                paragraph.blockKind == .collapsedXMLTagContent ||
+                isTodo(paragraph.blockKind) else {
             return NSTextLayoutFragment(textElement: textElement, range: nil)
         }
 
+        if isTodo(paragraph.blockKind) {
+            return TodoLayoutFragment(textElement: textElement, range: nil)
+        }
+
         return HiddenFrontmatterLayoutFragment(textElement: textElement, range: nil)
+    }
+
+    private func isTodo(_ kind: MarkdownBlockKind) -> Bool {
+        if case .todo = kind {
+            return true
+        }
+        return false
     }
 }
 
@@ -1441,7 +1552,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private(set) var textView: UITextView!
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
-    private var todoCheckboxButtons: [UIButton] = []
     private var imagePreviewViews: [UIImageView] = []
     private var xmlTagCollapseButtons: [UIButton] = []
     private var pageMentionSuggestionView: UIStackView?
@@ -1454,6 +1564,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var collapsedXMLTagOpeningLocations: Set<Int> = []
     private var revealedHyperlinkRanges: [NSRange] = []
     private var hyperlinkRangesAtTapStart: [NSRange] = []
+    private weak var todoMarkerTapRecognizer: UITapGestureRecognizer?
+    private weak var hyperlinkTapRecognizer: UITapGestureRecognizer?
     private var isRestylingText = false
     private var isOverlayRefreshScheduled = false
     private var lastOverlayLayoutSize: CGSize = .zero
@@ -1490,6 +1602,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             .underlineStyle: NSUnderlineStyle.single.rawValue,
         ]
         textView.translatesAutoresizingMaskIntoConstraints = false
+        installTodoMarkerTapRecognizer()
         installHyperlinkTapRecognizer()
         view.addSubview(textView)
 
@@ -2256,6 +2369,26 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         recognizer.cancelsTouchesInView = false
         recognizer.delegate = self
         textView.addGestureRecognizer(recognizer)
+        hyperlinkTapRecognizer = recognizer
+    }
+
+    private func installTodoMarkerTapRecognizer() {
+        let recognizer = UITapGestureRecognizer(target: self, action: #selector(handleTodoMarkerTap(_:)))
+        recognizer.numberOfTapsRequired = 1
+        recognizer.cancelsTouchesInView = true
+        recognizer.delegate = self
+        textView.addGestureRecognizer(recognizer)
+        todoMarkerTapRecognizer = recognizer
+    }
+
+    @objc
+    private func handleTodoMarkerTap(_ recognizer: UITapGestureRecognizer) {
+        guard recognizer.state == .ended,
+              let textView = recognizer.view as? UITextView else {
+            return
+        }
+
+        toggleTodoMarker(atTextViewPoint: recognizer.location(in: textView))
     }
 
     @objc
@@ -2291,7 +2424,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        hyperlinkRangesAtTapStart = revealedHyperlinkRanges
+        if gestureRecognizer === todoMarkerTapRecognizer {
+            return todoBlock(containingMarkerPoint: touch.location(in: textView)) != nil
+        }
+        if gestureRecognizer === hyperlinkTapRecognizer {
+            hyperlinkRangesAtTapStart = revealedHyperlinkRanges
+        }
         return true
     }
 
@@ -2414,85 +2552,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
         applyCollapsedXMLTagAttributesToTextStorage()
-        refreshTodoCheckboxes()
         refreshImagePreviews()
         refreshXMLTagCollapseButtons()
-    }
-
-    private func refreshTodoCheckboxes() {
-        guard isViewLoaded, textView != nil else { return }
-
-        todoCheckboxButtons.forEach { $0.removeFromSuperview() }
-        todoCheckboxButtons.removeAll()
-
-        textView.layoutIfNeeded()
-
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.text ?? "",
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        )
-        for block in blocks where block.isNativeOverlayEligible {
-            if case .todo(let checked, let indent) = block.kind {
-                addTodoCheckbox(
-                    checked: checked,
-                    indent: indent,
-                    paragraphLocation: block.paragraphRange.location,
-                    lineText: block.lineText
-                )
-            }
-        }
-    }
-
-    private func addTodoCheckbox(
-        checked: Bool,
-        indent: Int,
-        paragraphLocation: Int,
-        lineText: String
-    ) {
-        let prefixLength = MarkdownBlockKind.detect(from: lineText).prefixLength(in: lineText)
-        let contentLocation = paragraphLocation + prefixLength
-        guard let contentPosition = textView.position(from: textView.beginningOfDocument, offset: contentLocation) else {
-            return
-        }
-
-        let caretRect = textView.caretRect(for: contentPosition)
-        guard !caretRect.isNull,
-              caretRect.origin.x.isFinite,
-              caretRect.origin.y.isFinite,
-              caretRect.size.width.isFinite,
-              caretRect.size.height.isFinite else {
-            return
-        }
-
-        let buttonSize = MarkdownVisualSpec.todoControlSize
-        let symbolSize = MarkdownVisualSpec.todoSymbolSize
-        let contentLeading = caretRect.minX
-        let indentLeading = textView.textContainerInset.left + MarkdownTheme.listLeadingOffset(for: indent)
-        let buttonLeading = max(0, indentLeading - MarkdownVisualSpec.todoControlLeadingInset)
-        let buttonWidth = max(buttonSize, contentLeading - buttonLeading - 2)
-        let centerY = caretRect.midY
-
-        let button = UIButton(type: .system)
-        let imageName = checked ? "checkmark.circle.fill" : "circle"
-        let config = UIImage.SymbolConfiguration(pointSize: symbolSize, weight: .regular)
-        button.setImage(UIImage(systemName: imageName, withConfiguration: config), for: .normal)
-        button.tintColor = checked ? AppTheme.uiSecondaryText : AppTheme.uiMutedText
-        button.backgroundColor = textView.backgroundColor ?? AppTheme.uiBackground
-        button.contentHorizontalAlignment = .left
-        button.imageEdgeInsets = UIEdgeInsets(top: 0, left: MarkdownVisualSpec.todoControlImageLeadingInset, bottom: 0, right: 0)
-        button.tag = paragraphLocation
-        button.accessibilityIdentifier = "todo_checkbox_\(paragraphLocation)"
-        button.accessibilityLabel = checked ? "Mark todo incomplete" : "Mark todo complete"
-        button.frame = CGRect(
-            x: buttonLeading,
-            y: centerY - buttonSize / 2,
-            width: buttonWidth,
-            height: buttonSize
-        )
-        button.addTarget(self, action: #selector(todoCheckboxTapped(_:)), for: .touchUpInside)
-
-        textView.addSubview(button)
-        todoCheckboxButtons.append(button)
     }
 
     private func refreshImagePreviews() {
@@ -2741,9 +2802,72 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         }
     }
 
-    @objc
-    private func todoCheckboxTapped(_ sender: UIButton) {
-        toggleTodoCheckbox(atParagraphLocation: sender.tag)
+    @discardableResult
+    func toggleTodoMarker(atTextViewPoint point: CGPoint) -> Bool {
+        syncCollapsedXMLTagState()
+        guard let block = todoBlock(containingMarkerPoint: point) else { return false }
+        toggleTodoCheckbox(atParagraphLocation: block.paragraphRange.location)
+        return true
+    }
+
+    func todoMarkerHitRect(forParagraphLocation paragraphLocation: Int) -> CGRect? {
+        syncCollapsedXMLTagState()
+        guard let block = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.text ?? "",
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        ).first(where: { $0.paragraphRange.location == paragraphLocation }),
+              !block.isCollapsedXMLTagContent,
+              case .todo = block.kind else {
+            return nil
+        }
+
+        let prefixLength = block.kind.prefixLength(in: block.lineText)
+        let contentLocation = paragraphLocation + prefixLength
+        guard let contentPosition = textView.position(from: textView.beginningOfDocument, offset: contentLocation) else {
+            return nil
+        }
+
+        let caretRect = textView.caretRect(for: contentPosition)
+        guard isFiniteRect(caretRect) else { return nil }
+
+        let markerRect = TodoMarkerGeometry.markerRect(
+            contentLeadingX: caretRect.minX,
+            lineMidY: caretRect.midY
+        )
+        let hitLeading = max(0, markerRect.minX - 8)
+        let hitTrailing = max(markerRect.maxX, caretRect.minX + 8)
+        return CGRect(
+            x: hitLeading,
+            y: markerRect.minY,
+            width: hitTrailing - hitLeading,
+            height: markerRect.height
+        )
+    }
+
+    private func todoBlock(containingMarkerPoint point: CGPoint) -> MarkdownRenderableBlock? {
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.text ?? "",
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        )
+
+        for block in blocks where !block.isCollapsedXMLTagContent {
+            guard case .todo = block.kind,
+                  let rect = todoMarkerHitRect(forParagraphLocation: block.paragraphRange.location),
+                  rect.insetBy(dx: -4, dy: -4).contains(point) else {
+                continue
+            }
+            return block
+        }
+
+        return nil
+    }
+
+    private func isFiniteRect(_ rect: CGRect) -> Bool {
+        !rect.isNull &&
+        rect.origin.x.isFinite &&
+        rect.origin.y.isFinite &&
+        rect.size.width.isFinite &&
+        rect.size.height.isFinite
     }
 
     private func toggleTodoCheckbox(atParagraphLocation paragraphLocation: Int) {
@@ -2775,9 +2899,14 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 private final class HyperlinkOpeningTextView: NSTextView {
     var openHyperlinkTarget: ((HyperlinkMarkdown.Target) -> Void)?
     var shouldOpenHyperlinkAtIndex: ((Int) -> Bool)?
+    var toggleTodoMarkerAtPoint: ((NSPoint) -> Bool)?
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if toggleTodoMarkerAtPoint?(point) == true {
+            return
+        }
+
         let characterIndex = characterIndexForInsertion(at: point)
 
         if shouldOpenHyperlinkAtIndex?(characterIndex) != false,
@@ -2868,7 +2997,6 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
     private var pendingText: String?
-    private var todoCheckboxButtons: [NSButton] = []
     private var imagePreviewViews: [NSImageView] = []
     private var xmlTagCollapseButtons: [NSButton] = []
     private var pageMentionSuggestionView: NSStackView?
@@ -2948,6 +3076,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         (textView as? HyperlinkOpeningTextView)?.shouldOpenHyperlinkAtIndex = { [weak self] characterIndex in
             guard let self else { return true }
             return !self.revealedHyperlinkRanges.contains { NSLocationInRange(characterIndex, $0) }
+        }
+        (textView as? HyperlinkOpeningTextView)?.toggleTodoMarkerAtPoint = { [weak self] point in
+            self?.toggleTodoMarker(atTextViewPoint: point) ?? false
         }
 
         scrollView.hasVerticalScroller = true
@@ -3603,102 +3734,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
         applyCollapsedXMLTagAttributesToTextStorage()
-        refreshTodoCheckboxes()
         refreshImagePreviews()
         refreshXMLTagCollapseButtons()
-    }
-
-    private func refreshTodoCheckboxes() {
-        guard isViewLoaded, textView != nil else { return }
-
-        todoCheckboxButtons.forEach { $0.removeFromSuperview() }
-        todoCheckboxButtons.removeAll()
-
-        textView.layoutSubtreeIfNeeded()
-
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.string,
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        )
-        for block in blocks where block.isNativeOverlayEligible {
-            if case .todo(let checked, let indent) = block.kind {
-                addTodoCheckbox(
-                    checked: checked,
-                    indent: indent,
-                    paragraphLocation: block.paragraphRange.location,
-                    lineText: block.lineText
-                )
-            }
-        }
-    }
-
-    private func addTodoCheckbox(
-        checked: Bool,
-        indent: Int,
-        paragraphLocation: Int,
-        lineText: String
-    ) {
-        let prefixLength = MarkdownBlockKind.detect(from: lineText).prefixLength(in: lineText)
-        let contentLocation = paragraphLocation + prefixLength
-        let screenRect = textView.firstRect(
-            forCharacterRange: NSRange(location: contentLocation, length: 0),
-            actualRange: nil
-        )
-
-        guard let window = textView.window,
-              !screenRect.isNull,
-              screenRect.origin.x.isFinite,
-              screenRect.origin.y.isFinite,
-              screenRect.size.width.isFinite,
-              screenRect.size.height.isFinite else {
-            return
-        }
-
-        let windowRect = window.convertFromScreen(screenRect)
-        let caretRect = textView.convert(windowRect, from: nil)
-        guard !caretRect.isNull,
-              caretRect.origin.x.isFinite,
-              caretRect.origin.y.isFinite,
-              caretRect.size.width.isFinite,
-              caretRect.size.height.isFinite else {
-            return
-        }
-
-        let buttonSize = MarkdownVisualSpec.todoControlSize
-        let symbolSize = MarkdownVisualSpec.todoSymbolSize
-        let contentLeading = caretRect.minX
-        let indentLeading = textView.textContainerInset.width + MarkdownTheme.listLeadingOffset(for: indent)
-        let buttonLeading = max(0, indentLeading - MarkdownVisualSpec.todoControlLeadingInset)
-        let buttonWidth = max(buttonSize, contentLeading - buttonLeading - 2)
-        let centerY = caretRect.midY
-
-        let button = NSButton()
-        button.isBordered = false
-        button.setButtonType(.momentaryChange)
-        button.bezelStyle = .shadowlessSquare
-        button.imagePosition = .imageOnly
-        button.image = NSImage(
-            systemSymbolName: checked ? "checkmark.circle.fill" : "circle",
-            accessibilityDescription: nil
-        )
-        button.contentTintColor = checked ? AppTheme.nsSecondaryText : AppTheme.nsMutedText
-        button.target = self
-        button.action = #selector(todoCheckboxTapped(_:))
-        button.tag = paragraphLocation
-        button.setAccessibilityIdentifier("todo_checkbox_\(paragraphLocation)")
-        button.setAccessibilityLabel(checked ? "Mark todo incomplete" : "Mark todo complete")
-        button.wantsLayer = true
-        button.layer?.backgroundColor = (textView.backgroundColor ?? AppTheme.nsBackground).cgColor
-        button.imageScaling = .scaleProportionallyDown
-        button.frame = NSRect(
-            x: buttonLeading,
-            y: centerY - buttonSize / 2,
-            width: buttonWidth,
-            height: buttonSize
-        )
-
-        textView.addSubview(button)
-        todoCheckboxButtons.append(button)
     }
 
     private func refreshImagePreviews() {
@@ -3961,9 +3998,79 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
     }
 
-    @objc
-    private func todoCheckboxTapped(_ sender: NSButton) {
-        toggleTodoCheckbox(atParagraphLocation: sender.tag)
+    @discardableResult
+    func toggleTodoMarker(atTextViewPoint point: NSPoint) -> Bool {
+        syncCollapsedXMLTagState()
+        guard let block = todoBlock(containingMarkerPoint: point) else { return false }
+        toggleTodoCheckbox(atParagraphLocation: block.paragraphRange.location)
+        return true
+    }
+
+    func todoMarkerHitRect(forParagraphLocation paragraphLocation: Int) -> NSRect? {
+        syncCollapsedXMLTagState()
+        guard let block = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.string,
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        ).first(where: { $0.paragraphRange.location == paragraphLocation }),
+              !block.isCollapsedXMLTagContent,
+              case .todo = block.kind else {
+            return nil
+        }
+
+        let prefixLength = block.kind.prefixLength(in: block.lineText)
+        let contentLocation = paragraphLocation + prefixLength
+        let screenRect = textView.firstRect(
+            forCharacterRange: NSRange(location: contentLocation, length: 0),
+            actualRange: nil
+        )
+
+        guard let window = textView.window,
+              isFiniteRect(screenRect) else {
+            return nil
+        }
+
+        let windowRect = window.convertFromScreen(screenRect)
+        let caretRect = textView.convert(windowRect, from: nil)
+        guard isFiniteRect(caretRect) else { return nil }
+
+        let markerRect = TodoMarkerGeometry.markerRect(
+            contentLeadingX: caretRect.minX,
+            lineMidY: caretRect.midY
+        )
+        let hitLeading = max(0, markerRect.minX - 8)
+        let hitTrailing = max(markerRect.maxX, caretRect.minX + 8)
+        return NSRect(
+            x: hitLeading,
+            y: markerRect.minY,
+            width: hitTrailing - hitLeading,
+            height: markerRect.height
+        )
+    }
+
+    private func todoBlock(containingMarkerPoint point: NSPoint) -> MarkdownRenderableBlock? {
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.string,
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        )
+
+        for block in blocks where !block.isCollapsedXMLTagContent {
+            guard case .todo = block.kind,
+                  let rect = todoMarkerHitRect(forParagraphLocation: block.paragraphRange.location),
+                  rect.insetBy(dx: -4, dy: -4).contains(point) else {
+                continue
+            }
+            return block
+        }
+
+        return nil
+    }
+
+    private func isFiniteRect(_ rect: NSRect) -> Bool {
+        !rect.isNull &&
+        rect.origin.x.isFinite &&
+        rect.origin.y.isFinite &&
+        rect.size.width.isFinite &&
+        rect.size.height.isFinite
     }
 
     private func toggleTodoCheckbox(atParagraphLocation paragraphLocation: Int) {

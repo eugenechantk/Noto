@@ -322,6 +322,47 @@ struct TextKit2MarkdownLayoutTests {
         #expect(collapsedCaptureTodo.isCollapsedXMLTagContent)
         #expect(!collapsedCaptureTodo.isNativeOverlayEligible)
     }
+
+    @Test("Todo paragraphs use the todo layout fragment")
+    func todoParagraphsUseTodoLayoutFragment() {
+        let paragraph = MarkdownParagraph(
+            attributedString: NSAttributedString(string: "- [ ] Todo"),
+            blockKind: .todo(checked: false, indent: 0)
+        )
+        let fragment = MarkdownTextDelegate().layoutFragment(for: paragraph)
+
+        #expect(fragment is TodoLayoutFragment)
+    }
+
+    @Test("Collapsed XML paragraphs use hidden fragments instead of todo fragments")
+    func collapsedXMLParagraphsUseHiddenFragmentsInsteadOfTodoFragments() {
+        let paragraph = MarkdownParagraph(
+            attributedString: NSAttributedString(string: "- [ ] Hidden todo"),
+            blockKind: .collapsedXMLTagContent
+        )
+        let fragment = MarkdownTextDelegate().layoutFragment(for: paragraph)
+
+        #expect(fragment is HiddenFrontmatterLayoutFragment)
+        #expect(!(fragment is TodoLayoutFragment))
+    }
+
+    @Test("Todo fragment marker rect follows visual indent metrics")
+    func todoFragmentMarkerRectFollowsVisualIndentMetrics() {
+        let rect = TodoLayoutFragment.markerRect(
+            fragmentFrame: CGRect(x: 0, y: 100, width: 300, height: 40),
+            point: CGPoint(x: 16, y: 0),
+            indent: 2
+        )
+        let expectedLeading = 16
+            + MarkdownVisualSpec.listLeadingOffset(for: 2)
+            + MarkdownVisualSpec.todoSymbolSize / 2
+            - MarkdownVisualSpec.todoMarkerContentLeadingAdjustment
+
+        #expect(abs(rect.midX - expectedLeading) < 1)
+        #expect(abs(rect.midY - 120) < 1)
+        #expect(rect.width == MarkdownVisualSpec.todoControlSize)
+        #expect(rect.height == MarkdownVisualSpec.todoControlSize)
+    }
 }
 #endif
 
@@ -571,6 +612,47 @@ struct TextKit2MarkdownLayoutMacTests {
         #expect(!collapsedImageLine.isNativeOverlayEligible)
         #expect(collapsedCaptureTodo.isCollapsedXMLTagContent)
         #expect(!collapsedCaptureTodo.isNativeOverlayEligible)
+    }
+
+    @Test("Todo paragraphs use the todo layout fragment")
+    func todoParagraphsUseTodoLayoutFragment() {
+        let paragraph = MarkdownParagraph(
+            attributedString: NSAttributedString(string: "- [ ] Todo"),
+            blockKind: .todo(checked: false, indent: 0)
+        )
+        let fragment = MarkdownTextDelegate().layoutFragment(for: paragraph)
+
+        #expect(fragment is TodoLayoutFragment)
+    }
+
+    @Test("Collapsed XML paragraphs use hidden fragments instead of todo fragments")
+    func collapsedXMLParagraphsUseHiddenFragmentsInsteadOfTodoFragments() {
+        let paragraph = MarkdownParagraph(
+            attributedString: NSAttributedString(string: "- [ ] Hidden todo"),
+            blockKind: .collapsedXMLTagContent
+        )
+        let fragment = MarkdownTextDelegate().layoutFragment(for: paragraph)
+
+        #expect(fragment is HiddenFrontmatterLayoutFragment)
+        #expect(!(fragment is TodoLayoutFragment))
+    }
+
+    @Test("Todo fragment marker rect follows visual indent metrics")
+    func todoFragmentMarkerRectFollowsVisualIndentMetrics() {
+        let rect = TodoLayoutFragment.markerRect(
+            fragmentFrame: CGRect(x: 0, y: 100, width: 300, height: 40),
+            point: CGPoint(x: 48, y: 0),
+            indent: 2
+        )
+        let expectedLeading = 48
+            + MarkdownVisualSpec.listLeadingOffset(for: 2)
+            + MarkdownVisualSpec.todoSymbolSize / 2
+            - MarkdownVisualSpec.todoMarkerContentLeadingAdjustment
+
+        #expect(abs(rect.midX - expectedLeading) < 1)
+        #expect(abs(rect.midY - 120) < 1)
+        #expect(rect.width == MarkdownVisualSpec.todoControlSize)
+        #expect(rect.height == MarkdownVisualSpec.todoControlSize)
     }
 }
 #endif

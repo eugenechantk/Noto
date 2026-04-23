@@ -319,13 +319,14 @@ struct TextKit2EditorLifecycleTests {
     }
 
     @MainActor
-    @Test("Expanding XML tag content realigns todo overlays after layout shifts")
-    func expandingXMLTagContentRealignsTodoOverlaysAfterLayoutShifts() throws {
+    @Test("Expanding XML tag content realigns todo fragment hit regions after layout shifts")
+    func expandingXMLTagContentRealignsTodoFragmentHitRegionsAfterLayoutShifts() throws {
         let controller = TextKit2EditorViewController()
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 820, height: 1180))
         window.rootViewController = controller
         window.makeKeyAndVisible()
         controller.loadViewIfNeeded()
+        controller.textView.becomeFirstResponder()
 
         let markdown = """
         <noto:highlights>
@@ -357,9 +358,9 @@ struct TextKit2EditorLifecycleTests {
 
         let nsMarkdown = markdown as NSString
         let todoParagraphLocation = nsMarkdown.range(of: "- [ ] Open this file").location
-        let todoButton = try #require(controller.textView.descendant(
-            withAccessibilityIdentifier: "todo_checkbox_\(todoParagraphLocation)"
-        ) as? UIButton)
+        #expect(controller.textView.descendant(withAccessibilityIdentifier: "todo_checkbox_\(todoParagraphLocation)") == nil)
+
+        let markerRect = try #require(controller.todoMarkerHitRect(forParagraphLocation: todoParagraphLocation))
         let contentLocation = todoParagraphLocation + "- [ ] ".count
         let contentPosition = try #require(controller.textView.position(
             from: controller.textView.beginningOfDocument,
@@ -367,7 +368,15 @@ struct TextKit2EditorLifecycleTests {
         ))
         let caretRect = controller.textView.caretRect(for: contentPosition)
 
-        #expect(abs(todoButton.frame.midY - caretRect.midY) < 1.0)
+        #expect(abs(markerRect.midY - caretRect.midY) < 1.0)
+        #expect(controller.toggleTodoMarker(atTextViewPoint: CGPoint(x: markerRect.midX, y: markerRect.midY)))
+        #expect(controller.textView.text.contains("- [x] Open this file"))
+
+        controller.textView.undoManager?.undo()
+        #expect(controller.textView.text.contains("- [ ] Open this file"))
+
+        controller.textView.undoManager?.redo()
+        #expect(controller.textView.text.contains("- [x] Open this file"))
     }
 
     @Test("Frontmatter range covers the YAML metadata block only")
