@@ -225,6 +225,103 @@ struct TextKit2MarkdownLayoutTests {
         #expect(block.tagName == "noto:highlights")
         #expect((text as NSString).substring(with: block.collapsedContentRange) == "Hidden line\n<!-- noto:highlights:end -->\n")
     }
+
+    @Test("Semantic analyzer suppresses native renderables inside collapsed XML content")
+    func semanticAnalyzerSuppressesNativeRenderablesInsideCollapsedXMLContent() throws {
+        let text = """
+        <!-- noto:content:start -->
+        ![](https://example.com/chart.png)
+        - [ ] Hidden child todo
+        <!-- noto:content:end -->
+        - [ ] Visible todo
+        ![](https://example.com/visible.png)
+        """
+        let collapsedRange = try #require(XMLLikeTagParser.blocks(in: text).first?.collapsedContentRange)
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(in: text, collapsedXMLTagRanges: [collapsedRange])
+
+        let hiddenImage = try #require(blocks.first { $0.lineText.contains("chart.png") })
+        let hiddenTodo = try #require(blocks.first { $0.lineText.contains("Hidden child todo") })
+        let visibleTodo = try #require(blocks.first { $0.lineText.contains("Visible todo") })
+        let visibleImage = try #require(blocks.first { $0.lineText.contains("visible.png") })
+
+        #expect(hiddenImage.isCollapsedXMLTagContent)
+        #expect(hiddenImage.effectiveKind == .collapsedXMLTagContent)
+        #expect(!hiddenImage.isNativeOverlayEligible)
+        #expect(hiddenTodo.isCollapsedXMLTagContent)
+        #expect(hiddenTodo.effectiveKind == .collapsedXMLTagContent)
+        #expect(!hiddenTodo.isNativeOverlayEligible)
+        #expect(!visibleTodo.isCollapsedXMLTagContent)
+        #expect(visibleTodo.isNativeOverlayEligible)
+        #expect(!visibleImage.isCollapsedXMLTagContent)
+        #expect(visibleImage.isNativeOverlayEligible)
+    }
+
+    @Test("Semantic analyzer keeps opening XML tags visible while collapsed closing tags are hidden")
+    func semanticAnalyzerKeepsOpeningXMLTagsVisibleWhileCollapsedClosingTagsAreHidden() throws {
+        let text = "<noto:content>\nBody\n</noto:content>\n"
+        let collapsedRange = try #require(XMLLikeTagParser.blocks(in: text).first?.collapsedContentRange)
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(in: text, collapsedXMLTagRanges: [collapsedRange])
+
+        let openingTag = try #require(blocks.first { $0.lineText == "<noto:content>" })
+        let closingTag = try #require(blocks.first { $0.lineText == "</noto:content>" })
+
+        #expect(openingTag.kind == .xmlTag)
+        #expect(openingTag.effectiveKind == .xmlTag)
+        #expect(!openingTag.isCollapsedXMLTagContent)
+        #expect(closingTag.kind == .xmlTag)
+        #expect(closingTag.effectiveKind == .collapsedXMLTagContent)
+        #expect(closingTag.isCollapsedXMLTagContent)
+    }
+
+    @Test("Semantic analyzer preserves source-note renderables outside the collapsed block")
+    func semanticAnalyzerPreservesSourceNoteRenderablesOutsideCollapsedBlock() throws {
+        let text = """
+        # The State of Consumer AI - Usage
+
+        Source: [The State of Consumer AI - Usage](https://example.com/consumer-ai-usage)
+
+        <!-- noto:highlights:start -->
+        > Consumer AI apps become useful daily tools.
+        <!-- noto:highlights:end -->
+
+        <!-- noto:content:start -->
+        ![](https://example.com/chart.png)
+        ## Capture checks
+        - [ ] Open this file from the Captures folder.
+        <!-- noto:content:end -->
+        """
+        let blocksByName = Dictionary(uniqueKeysWithValues: XMLLikeTagParser.blocks(in: text).map { ($0.tagName, $0) })
+        let highlightsRange = try #require(blocksByName["noto:highlights"]?.collapsedContentRange)
+        let contentRange = try #require(blocksByName["noto:content"]?.collapsedContentRange)
+
+        let highlightsCollapsed = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: text,
+            collapsedXMLTagRanges: [highlightsRange]
+        )
+        let sourceLine = try #require(highlightsCollapsed.first { $0.lineText.hasPrefix("Source:") })
+        let imageLine = try #require(highlightsCollapsed.first { $0.lineText.contains("chart.png") })
+        let captureTodo = try #require(highlightsCollapsed.first { $0.lineText.contains("Open this file") })
+
+        #expect(sourceLine.kind == .paragraph)
+        #expect(sourceLine.effectiveKind == .paragraph)
+        #expect(!sourceLine.isNativeOverlayEligible)
+        #expect(!imageLine.isCollapsedXMLTagContent)
+        #expect(imageLine.isNativeOverlayEligible)
+        #expect(!captureTodo.isCollapsedXMLTagContent)
+        #expect(captureTodo.isNativeOverlayEligible)
+
+        let contentCollapsed = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: text,
+            collapsedXMLTagRanges: [contentRange]
+        )
+        let collapsedImageLine = try #require(contentCollapsed.first { $0.lineText.contains("chart.png") })
+        let collapsedCaptureTodo = try #require(contentCollapsed.first { $0.lineText.contains("Open this file") })
+
+        #expect(collapsedImageLine.isCollapsedXMLTagContent)
+        #expect(!collapsedImageLine.isNativeOverlayEligible)
+        #expect(collapsedCaptureTodo.isCollapsedXMLTagContent)
+        #expect(!collapsedCaptureTodo.isNativeOverlayEligible)
+    }
 }
 #endif
 
@@ -377,6 +474,103 @@ struct TextKit2MarkdownLayoutMacTests {
 
         #expect(block.tagName == "noto:content")
         #expect((text as NSString).substring(with: block.collapsedContentRange) == "Hidden line\n<!-- noto:content:end -->\n")
+    }
+
+    @Test("Semantic analyzer suppresses native renderables inside collapsed XML content")
+    func semanticAnalyzerSuppressesNativeRenderablesInsideCollapsedXMLContent() throws {
+        let text = """
+        <!-- noto:content:start -->
+        ![](https://example.com/chart.png)
+        - [ ] Hidden child todo
+        <!-- noto:content:end -->
+        - [ ] Visible todo
+        ![](https://example.com/visible.png)
+        """
+        let collapsedRange = try #require(XMLLikeTagParser.blocks(in: text).first?.collapsedContentRange)
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(in: text, collapsedXMLTagRanges: [collapsedRange])
+
+        let hiddenImage = try #require(blocks.first { $0.lineText.contains("chart.png") })
+        let hiddenTodo = try #require(blocks.first { $0.lineText.contains("Hidden child todo") })
+        let visibleTodo = try #require(blocks.first { $0.lineText.contains("Visible todo") })
+        let visibleImage = try #require(blocks.first { $0.lineText.contains("visible.png") })
+
+        #expect(hiddenImage.isCollapsedXMLTagContent)
+        #expect(hiddenImage.effectiveKind == .collapsedXMLTagContent)
+        #expect(!hiddenImage.isNativeOverlayEligible)
+        #expect(hiddenTodo.isCollapsedXMLTagContent)
+        #expect(hiddenTodo.effectiveKind == .collapsedXMLTagContent)
+        #expect(!hiddenTodo.isNativeOverlayEligible)
+        #expect(!visibleTodo.isCollapsedXMLTagContent)
+        #expect(visibleTodo.isNativeOverlayEligible)
+        #expect(!visibleImage.isCollapsedXMLTagContent)
+        #expect(visibleImage.isNativeOverlayEligible)
+    }
+
+    @Test("Semantic analyzer keeps opening XML tags visible while collapsed closing tags are hidden")
+    func semanticAnalyzerKeepsOpeningXMLTagsVisibleWhileCollapsedClosingTagsAreHidden() throws {
+        let text = "<noto:content>\nBody\n</noto:content>\n"
+        let collapsedRange = try #require(XMLLikeTagParser.blocks(in: text).first?.collapsedContentRange)
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(in: text, collapsedXMLTagRanges: [collapsedRange])
+
+        let openingTag = try #require(blocks.first { $0.lineText == "<noto:content>" })
+        let closingTag = try #require(blocks.first { $0.lineText == "</noto:content>" })
+
+        #expect(openingTag.kind == .xmlTag)
+        #expect(openingTag.effectiveKind == .xmlTag)
+        #expect(!openingTag.isCollapsedXMLTagContent)
+        #expect(closingTag.kind == .xmlTag)
+        #expect(closingTag.effectiveKind == .collapsedXMLTagContent)
+        #expect(closingTag.isCollapsedXMLTagContent)
+    }
+
+    @Test("Semantic analyzer preserves source-note renderables outside the collapsed block")
+    func semanticAnalyzerPreservesSourceNoteRenderablesOutsideCollapsedBlock() throws {
+        let text = """
+        # The State of Consumer AI - Usage
+
+        Source: [The State of Consumer AI - Usage](https://example.com/consumer-ai-usage)
+
+        <!-- noto:highlights:start -->
+        > Consumer AI apps become useful daily tools.
+        <!-- noto:highlights:end -->
+
+        <!-- noto:content:start -->
+        ![](https://example.com/chart.png)
+        ## Capture checks
+        - [ ] Open this file from the Captures folder.
+        <!-- noto:content:end -->
+        """
+        let blocksByName = Dictionary(uniqueKeysWithValues: XMLLikeTagParser.blocks(in: text).map { ($0.tagName, $0) })
+        let highlightsRange = try #require(blocksByName["noto:highlights"]?.collapsedContentRange)
+        let contentRange = try #require(blocksByName["noto:content"]?.collapsedContentRange)
+
+        let highlightsCollapsed = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: text,
+            collapsedXMLTagRanges: [highlightsRange]
+        )
+        let sourceLine = try #require(highlightsCollapsed.first { $0.lineText.hasPrefix("Source:") })
+        let imageLine = try #require(highlightsCollapsed.first { $0.lineText.contains("chart.png") })
+        let captureTodo = try #require(highlightsCollapsed.first { $0.lineText.contains("Open this file") })
+
+        #expect(sourceLine.kind == .paragraph)
+        #expect(sourceLine.effectiveKind == .paragraph)
+        #expect(!sourceLine.isNativeOverlayEligible)
+        #expect(!imageLine.isCollapsedXMLTagContent)
+        #expect(imageLine.isNativeOverlayEligible)
+        #expect(!captureTodo.isCollapsedXMLTagContent)
+        #expect(captureTodo.isNativeOverlayEligible)
+
+        let contentCollapsed = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: text,
+            collapsedXMLTagRanges: [contentRange]
+        )
+        let collapsedImageLine = try #require(contentCollapsed.first { $0.lineText.contains("chart.png") })
+        let collapsedCaptureTodo = try #require(contentCollapsed.first { $0.lineText.contains("Open this file") })
+
+        #expect(collapsedImageLine.isCollapsedXMLTagContent)
+        #expect(!collapsedImageLine.isNativeOverlayEligible)
+        #expect(collapsedCaptureTodo.isCollapsedXMLTagContent)
+        #expect(!collapsedCaptureTodo.isNativeOverlayEligible)
     }
 }
 #endif

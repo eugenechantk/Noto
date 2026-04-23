@@ -300,6 +300,66 @@ enum MarkdownBlockKind: Equatable {
     }
 }
 
+// MARK: - MarkdownSemanticAnalyzer
+
+struct MarkdownRenderableBlock: Equatable {
+    let kind: MarkdownBlockKind
+    let effectiveKind: MarkdownBlockKind
+    let paragraphRange: NSRange
+    let visibleLineRange: NSRange
+    let lineText: String
+    let isCollapsedXMLTagContent: Bool
+
+    var isNativeOverlayEligible: Bool {
+        guard !isCollapsedXMLTagContent else { return false }
+        switch kind {
+        case .todo, .imageLink:
+            return true
+        case .paragraph, .heading, .bullet, .orderedList, .frontmatter, .xmlTag, .collapsedXMLTagContent:
+            return false
+        }
+    }
+}
+
+enum MarkdownSemanticAnalyzer {
+    static func renderableBlocks(
+        in text: String,
+        collapsedXMLTagRanges: [NSRange] = []
+    ) -> [MarkdownRenderableBlock] {
+        let nsText = text as NSString
+        guard nsText.length > 0 else { return [] }
+
+        var blocks: [MarkdownRenderableBlock] = []
+        var paragraphLocation = 0
+        while paragraphLocation < nsText.length {
+            let paragraphRange = nsText.paragraphRange(for: NSRange(location: paragraphLocation, length: 0))
+            let visibleLineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
+            let lineText = nsText.substring(with: visibleLineRange)
+            let isCollapsed = collapsedXMLTagRanges.contains { collapsedRange in
+                NSIntersectionRange(visibleLineRange, collapsedRange).length > 0
+            }
+            let kind: MarkdownBlockKind = MarkdownFrontmatter.contains(position: paragraphRange.location, in: text)
+                ? .frontmatter
+                : MarkdownBlockKind.detect(from: lineText)
+
+            blocks.append(MarkdownRenderableBlock(
+                kind: kind,
+                effectiveKind: isCollapsed ? .collapsedXMLTagContent : kind,
+                paragraphRange: paragraphRange,
+                visibleLineRange: visibleLineRange,
+                lineText: lineText,
+                isCollapsedXMLTagContent: isCollapsed
+            ))
+
+            let nextLocation = NSMaxRange(paragraphRange)
+            guard nextLocation > paragraphLocation else { break }
+            paragraphLocation = nextLocation
+        }
+
+        return blocks
+    }
+}
+
 // MARK: - MarkdownFrontmatter
 
 enum MarkdownFrontmatter {
@@ -2365,31 +2425,21 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         todoCheckboxButtons.forEach { $0.removeFromSuperview() }
         todoCheckboxButtons.removeAll()
 
-        let nsText = (textView.text ?? "") as NSString
-        guard nsText.length > 0 else { return }
-
         textView.layoutIfNeeded()
 
-        var paragraphLocation = 0
-        while paragraphLocation < nsText.length {
-            let paragraphRange = nsText.paragraphRange(for: NSRange(location: paragraphLocation, length: 0))
-            let lineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
-            let lineText = nsText.substring(with: lineRange)
-            let kind = MarkdownBlockKind.detect(from: lineText)
-
-            if !isCollapsedXMLTagContentRange(lineRange),
-               case .todo(let checked, let indent) = kind {
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.text ?? "",
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        )
+        for block in blocks where block.isNativeOverlayEligible {
+            if case .todo(let checked, let indent) = block.kind {
                 addTodoCheckbox(
                     checked: checked,
                     indent: indent,
-                    paragraphLocation: paragraphRange.location,
-                    lineText: lineText
+                    paragraphLocation: block.paragraphRange.location,
+                    lineText: block.lineText
                 )
             }
-
-            let nextLocation = NSMaxRange(paragraphRange)
-            guard nextLocation > paragraphLocation else { break }
-            paragraphLocation = nextLocation
         }
     }
 
@@ -2451,25 +2501,16 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         imagePreviewViews.forEach { $0.removeFromSuperview() }
         imagePreviewViews.removeAll()
 
-        let nsText = (textView.text ?? "") as NSString
-        guard nsText.length > 0 else { return }
-
         textView.layoutIfNeeded()
 
-        var paragraphLocation = 0
-        while paragraphLocation < nsText.length {
-            let paragraphRange = nsText.paragraphRange(for: NSRange(location: paragraphLocation, length: 0))
-            let lineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
-            let lineText = nsText.substring(with: lineRange)
-
-            if !isCollapsedXMLTagContentRange(lineRange),
-               let imageLink = MarkdownImageLinkParser.parse(from: lineText) {
-                addImagePreview(imageLink, paragraphLocation: paragraphRange.location)
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.text ?? "",
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        )
+        for block in blocks where block.isNativeOverlayEligible {
+            if case .imageLink(let imageLink) = block.kind {
+                addImagePreview(imageLink, paragraphLocation: block.paragraphRange.location)
             }
-
-            let nextLocation = NSMaxRange(paragraphRange)
-            guard nextLocation > paragraphLocation else { break }
-            paragraphLocation = nextLocation
         }
     }
 
@@ -3573,31 +3614,21 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         todoCheckboxButtons.forEach { $0.removeFromSuperview() }
         todoCheckboxButtons.removeAll()
 
-        let nsText = textView.string as NSString
-        guard nsText.length > 0 else { return }
-
         textView.layoutSubtreeIfNeeded()
 
-        var paragraphLocation = 0
-        while paragraphLocation < nsText.length {
-            let paragraphRange = nsText.paragraphRange(for: NSRange(location: paragraphLocation, length: 0))
-            let lineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
-            let lineText = nsText.substring(with: lineRange)
-            let kind = MarkdownBlockKind.detect(from: lineText)
-
-            if !isCollapsedXMLTagContentRange(lineRange),
-               case .todo(let checked, let indent) = kind {
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.string,
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        )
+        for block in blocks where block.isNativeOverlayEligible {
+            if case .todo(let checked, let indent) = block.kind {
                 addTodoCheckbox(
                     checked: checked,
                     indent: indent,
-                    paragraphLocation: paragraphRange.location,
-                    lineText: lineText
+                    paragraphLocation: block.paragraphRange.location,
+                    lineText: block.lineText
                 )
             }
-
-            let nextLocation = NSMaxRange(paragraphRange)
-            guard nextLocation > paragraphLocation else { break }
-            paragraphLocation = nextLocation
         }
     }
 
@@ -3676,25 +3707,16 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         imagePreviewViews.forEach { $0.removeFromSuperview() }
         imagePreviewViews.removeAll()
 
-        let nsText = textView.string as NSString
-        guard nsText.length > 0 else { return }
-
         textView.layoutSubtreeIfNeeded()
 
-        var paragraphLocation = 0
-        while paragraphLocation < nsText.length {
-            let paragraphRange = nsText.paragraphRange(for: NSRange(location: paragraphLocation, length: 0))
-            let lineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
-            let lineText = nsText.substring(with: lineRange)
-
-            if !isCollapsedXMLTagContentRange(lineRange),
-               let imageLink = MarkdownImageLinkParser.parse(from: lineText) {
-                addImagePreview(imageLink, paragraphLocation: paragraphRange.location)
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.string,
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        )
+        for block in blocks where block.isNativeOverlayEligible {
+            if case .imageLink(let imageLink) = block.kind {
+                addImagePreview(imageLink, paragraphLocation: block.paragraphRange.location)
             }
-
-            let nextLocation = NSMaxRange(paragraphRange)
-            guard nextLocation > paragraphLocation else { break }
-            paragraphLocation = nextLocation
         }
     }
 
