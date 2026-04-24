@@ -9,11 +9,28 @@ import AppKit
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "TextKit2Editor")
 
+enum ReadableTextColumnLayout {
+    static func textHorizontalInset(
+        for availableWidth: CGFloat,
+        maximumTextWidth: CGFloat,
+        minimumHorizontalInset: CGFloat,
+        constrainsToReadableWidth: Bool
+    ) -> CGFloat {
+        guard constrainsToReadableWidth, availableWidth > 0 else {
+            return minimumHorizontalInset
+        }
+
+        let centeredInset = floor((availableWidth - maximumTextWidth) / 2)
+        return max(minimumHorizontalInset, centeredInset)
+    }
+}
+
 enum NoteEditorCommands {
     static let toggleStrikethrough = Notification.Name("NoteEditorCommands.toggleStrikethrough")
     static let toggleBold = Notification.Name("NoteEditorCommands.toggleBold")
     static let toggleItalic = Notification.Name("NoteEditorCommands.toggleItalic")
     static let toggleHyperlink = Notification.Name("NoteEditorCommands.toggleHyperlink")
+    static let showFind = Notification.Name("NoteEditorCommands.showFind")
 
     static func requestToggleStrikethrough() {
         NotificationCenter.default.post(name: toggleStrikethrough, object: nil)
@@ -30,6 +47,10 @@ enum NoteEditorCommands {
     static func requestToggleHyperlink() {
         NotificationCenter.default.post(name: toggleHyperlink, object: nil)
     }
+
+    static func requestShowFind() {
+        NotificationCenter.default.post(name: showFind, object: nil)
+    }
 }
 
 // MARK: - Platform Aliases
@@ -43,6 +64,21 @@ private typealias PlatformFont = NSFont
 private typealias PlatformColor = NSColor
 private typealias PlatformImage = NSImage
 #endif
+
+private struct EditorFindBackgroundSnapshot {
+    let range: NSRange
+    let value: Any?
+}
+
+private enum EditorFindHighlightPalette {
+    static var matchBackground: PlatformColor {
+        PlatformColor.yellow.withAlphaComponent(0.34)
+    }
+
+    static var currentMatchBackground: PlatformColor {
+        PlatformColor.yellow
+    }
+}
 
 // MARK: - MarkdownImageLink
 
@@ -1803,6 +1839,9 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     var onTextChange: ((String) -> Void)?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
+    var findQuery: String = ""
+    var findNavigationRequest: EditorFindNavigationRequest?
+    var onFindStatusChange: ((EditorFindStatus) -> Void)?
 
     func makeCoordinator() -> TextKit2EditorCoordinator {
         TextKit2EditorCoordinator(text: $text, onTextChange: onTextChange, autoFocus: autoFocus)
@@ -1813,6 +1852,11 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
         vc.coordinator = context.coordinator
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
+        vc.updateFind(
+            query: findQuery,
+            navigationRequest: findNavigationRequest,
+            onStatusChange: onFindStatusChange
+        )
         vc.loadText(text)
         return vc
     }
@@ -1820,6 +1864,11 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     func updateUIViewController(_ vc: TextKit2EditorViewController, context: Context) {
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
+        vc.updateFind(
+            query: findQuery,
+            navigationRequest: findNavigationRequest,
+            onStatusChange: onFindStatusChange
+        )
         guard !context.coordinator.isUpdatingText else { return }
         guard !vc.textView.isFirstResponder else { return }
         let currentText = vc.textView.text ?? ""
@@ -1836,6 +1885,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
     private(set) var textView: UITextView!
+    private let minimumHorizontalTextInset: CGFloat = 16
+    private let maximumTextWidth: CGFloat = 600
+    private let verticalTextInset: CGFloat = 16
     private let markdownDelegate = MarkdownTextDelegate()
     private var todoMarkerButtons: [Int: TodoMarkerButton] = [:]
     private var pendingText: String?
@@ -1856,6 +1908,17 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var keyboardObserverTokens: [NSObjectProtocol] = []
     private var keyboardFrameInScreen: CGRect?
     private var loadingImageURLs: Set<URL> = []
+    private var cachedRenderableBlocks: [MarkdownRenderableBlock] = []
+    private var cachedRenderableBlocksText = ""
+    private var cachedCollapsedXMLTagRanges: [NSRange] = []
+    private var findQuery = ""
+    private var findMatches: [NSRange] = []
+    private var selectedFindMatchIndex: Int?
+    private var lastFindNavigationRequestID: Int?
+    private var onFindStatusChange: ((EditorFindStatus) -> Void)?
+    private var lastPublishedFindStatus = EditorFindStatus()
+    private var findBackgroundSnapshots: [EditorFindBackgroundSnapshot] = []
+    private var findHighlightViews: [UIView] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -1879,7 +1942,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         textView.font = MarkdownTheme.bodyFont
         textView.textColor = MarkdownTheme.bodyColor
         textView.backgroundColor = AppTheme.uiBackground
-        textView.textContainerInset = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
+        textView.textContainerInset = UIEdgeInsets(
+            top: verticalTextInset,
+            left: minimumHorizontalTextInset,
+            bottom: verticalTextInset,
+            right: minimumHorizontalTextInset
+        )
         textView.keyboardDismissMode = .interactive
         textView.alwaysBounceVertical = true
         textView.inputAccessoryView = makeInputAccessoryView()
@@ -1922,8 +1990,10 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        let didUpdateReadableWidthInsets = syncReadableWidthInsets()
         updateKeyboardAvoidanceInsets()
-        refreshEditorOverlaysAfterLayoutChangeIfNeeded()
+        refreshEditorOverlaysAfterLayoutChangeIfNeeded(force: didUpdateReadableWidthInsets)
+        refreshFindHighlightOverlays()
         positionPageMentionSuggestions()
     }
 
@@ -1959,6 +2029,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
                 action: #selector(toggleSelectedHyperlink),
                 discoverabilityTitle: "Link"
             ),
+            UIKeyCommand(
+                input: "f",
+                modifierFlags: [.command],
+                action: #selector(showFind),
+                discoverabilityTitle: "Search in Note"
+            ),
         ]
 
         if isPageMentionPopoverVisible {
@@ -1987,6 +2063,11 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         return commands
     }
 
+    @objc
+    private func showFind() {
+        NoteEditorCommands.requestShowFind()
+    }
+
     func loadText(_ markdown: String) {
         guard isViewLoaded, textView != nil else {
             pendingText = markdown
@@ -2000,13 +2081,16 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         coordinator?.beginApplyingEditorText(markdown)
         textView.text = markdown
         coordinator?.finishApplyingEditorText()
+        invalidateRenderableBlockCache()
         updateTypingAttributes()
+        refreshFindMatches(preferredLocation: textView.selectedRange.location, scrollToSelection: false)
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in
                 guard let tv = self?.textView else { return }
                 tv.becomeFirstResponder()
                 let end = tv.endOfDocument
                 tv.selectedTextRange = tv.textRange(from: end, to: end)
+                self?.refreshFindMatches(preferredLocation: tv.selectedRange.location, scrollToSelection: false)
                 self?.scheduleEditorOverlayRefresh()
             }
         }
@@ -2510,6 +2594,190 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         textView.becomeFirstResponder()
     }
 
+    func updateFind(
+        query: String,
+        navigationRequest: EditorFindNavigationRequest?,
+        onStatusChange: ((EditorFindStatus) -> Void)?
+    ) {
+        self.onFindStatusChange = onStatusChange
+
+        let normalizedQuery = EditorFindMatcher.normalizedQuery(query)
+        let didChangeQuery = normalizedQuery != findQuery
+        if didChangeQuery {
+            findQuery = normalizedQuery
+            refreshFindMatches(
+                preferredLocation: textView?.selectedRange.location ?? 0,
+                scrollToSelection: !normalizedQuery.isEmpty
+            )
+        } else if isViewLoaded, textView != nil {
+            publishFindStatusIfNeeded()
+        }
+
+        guard let navigationRequest,
+              navigationRequest.id != lastFindNavigationRequestID else {
+            return
+        }
+
+        lastFindNavigationRequestID = navigationRequest.id
+        navigateFind(to: navigationRequest.direction)
+    }
+
+    private func refreshFindMatches(preferredLocation: Int, scrollToSelection: Bool) {
+        guard isViewLoaded, textView != nil else {
+            publishFindStatusIfNeeded()
+            return
+        }
+
+        restoreFindHighlightBackgrounds()
+        findMatches = EditorFindMatcher.ranges(in: textView.text ?? "", query: findQuery)
+        selectedFindMatchIndex = EditorFindMatcher.preferredIndex(
+            for: findMatches,
+            selectionLocation: preferredLocation
+        )
+        applyFindHighlights()
+        publishFindStatusIfNeeded()
+
+        if scrollToSelection {
+            scrollToSelectedFindMatch()
+        }
+    }
+
+    private func navigateFind(to direction: EditorFindNavigationDirection) {
+        selectedFindMatchIndex = EditorFindMatcher.navigatedIndex(
+            from: selectedFindMatchIndex,
+            matchCount: findMatches.count,
+            direction: direction
+        )
+        applyFindHighlights()
+        publishFindStatusIfNeeded()
+        scrollToSelectedFindMatch()
+    }
+
+    private func scrollToSelectedFindMatch() {
+        guard let selectedFindMatchIndex,
+              selectedFindMatchIndex < findMatches.count else {
+            return
+        }
+
+        let range = findMatches[selectedFindMatchIndex]
+        guard NSMaxRange(range) <= ((textView.text ?? "") as NSString).length else { return }
+        textView.selectedRange = range
+        textView.scrollRangeToVisible(range)
+    }
+
+    private func publishFindStatusIfNeeded() {
+        let status = EditorFindStatus(
+            matchCount: findMatches.count,
+            selectedMatchIndex: selectedFindMatchIndex
+        )
+        guard status != lastPublishedFindStatus else { return }
+
+        lastPublishedFindStatus = status
+        onFindStatusChange?(status)
+    }
+
+    private func applyFindHighlights() {
+        guard isViewLoaded, textView != nil else {
+            return
+        }
+        let textStorage = textView.textStorage
+
+        restoreFindHighlightBackgrounds()
+        guard !findMatches.isEmpty else { return }
+
+        textStorage.beginEditing()
+        for (index, range) in findMatches.enumerated() {
+            guard range.location >= 0,
+                  range.length > 0,
+                  NSMaxRange(range) <= textStorage.length else {
+                continue
+            }
+
+            snapshotFindBackgrounds(in: range, textStorage: textStorage)
+            let background = index == selectedFindMatchIndex
+                ? EditorFindHighlightPalette.currentMatchBackground
+                : EditorFindHighlightPalette.matchBackground
+            textStorage.addAttribute(.backgroundColor, value: background, range: range)
+        }
+        textStorage.endEditing()
+        textView.setNeedsDisplay()
+        refreshFindHighlightOverlays()
+    }
+
+    private func restoreFindHighlightBackgrounds() {
+        guard isViewLoaded,
+              textView != nil,
+              !findBackgroundSnapshots.isEmpty else {
+            findBackgroundSnapshots = []
+            return
+        }
+        let textStorage = textView.textStorage
+
+        textStorage.beginEditing()
+        for snapshot in findBackgroundSnapshots.reversed() where NSMaxRange(snapshot.range) <= textStorage.length {
+            if let value = snapshot.value {
+                textStorage.addAttribute(.backgroundColor, value: value, range: snapshot.range)
+            } else {
+                textStorage.removeAttribute(.backgroundColor, range: snapshot.range)
+            }
+        }
+        textStorage.endEditing()
+        findBackgroundSnapshots = []
+        textView.setNeedsDisplay()
+        clearFindHighlightOverlays()
+    }
+
+    private func snapshotFindBackgrounds(in range: NSRange, textStorage: NSTextStorage) {
+        textStorage.enumerateAttribute(.backgroundColor, in: range, options: []) { value, subrange, _ in
+            findBackgroundSnapshots.append(EditorFindBackgroundSnapshot(range: subrange, value: value))
+        }
+    }
+
+    private func refreshFindHighlightOverlays() {
+        guard isViewLoaded, textView != nil else { return }
+        clearFindHighlightOverlays()
+        guard !findMatches.isEmpty else { return }
+
+        let textLength = ((textView.text ?? "") as NSString).length
+        for (index, range) in findMatches.enumerated() {
+            guard range.location >= 0,
+                  range.length > 0,
+                  NSMaxRange(range) <= textLength,
+                  let start = textView.position(from: textView.beginningOfDocument, offset: range.location),
+                  let end = textView.position(from: start, offset: range.length) else {
+                continue
+            }
+
+            let startRect = textView.caretRect(for: start)
+            let endRect = textView.caretRect(for: end)
+            guard isFiniteRect(startRect), isFiniteRect(endRect) else { continue }
+
+            let height = max(12, min(startRect.height, 24))
+            let width = max(4, endRect.minX - startRect.minX)
+            let rect = CGRect(
+                x: startRect.minX - 1,
+                y: startRect.midY - height / 2,
+                width: width + 2,
+                height: height
+            )
+
+            let highlight = UIView(frame: rect)
+            highlight.isUserInteractionEnabled = false
+            highlight.layer.cornerRadius = 2
+            highlight.layer.cornerCurve = .continuous
+            highlight.backgroundColor = index == selectedFindMatchIndex
+                ? EditorFindHighlightPalette.currentMatchBackground.withAlphaComponent(0.82)
+                : EditorFindHighlightPalette.matchBackground
+            textView.insertSubview(highlight, at: 0)
+            findHighlightViews.append(highlight)
+        }
+    }
+
+    private func clearFindHighlightOverlays() {
+        findHighlightViews.forEach { $0.removeFromSuperview() }
+        findHighlightViews = []
+    }
+
     // MARK: UITextViewDelegate
 
     func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
@@ -2543,6 +2811,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     func textViewDidChange(_ textView: UITextView) {
         markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: textView.text ?? "")
+        invalidateRenderableBlockCache()
         if !isRestylingText {
             updateRevealedHyperlinkRangesForSelection(restyle: false)
         }
@@ -2551,6 +2820,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         scrollSelectionAboveKeyboard()
         scheduleEditorOverlayRefresh()
         updatePageMentionSuggestions()
+        refreshFindMatches(preferredLocation: textView.selectedRange.location, scrollToSelection: false)
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
@@ -2614,6 +2884,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func restyleTextPreservingSelection() {
         applyHyperlinkRenderAttributesToTextStorage()
+        applyFindHighlights()
         updateTypingAttributes()
         scheduleEditorOverlayRefresh()
     }
@@ -2786,6 +3057,33 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         textView.verticalScrollIndicatorInsets.bottom = bottomInset
     }
 
+    private func syncReadableWidthInsets() -> Bool {
+        guard isViewLoaded, textView != nil else { return false }
+
+        let constrainsToReadableWidth = traitCollection.userInterfaceIdiom == .pad
+        let availableWidth = textView.bounds.width
+        let horizontalTextInset = ReadableTextColumnLayout.textHorizontalInset(
+            for: availableWidth,
+            maximumTextWidth: maximumTextWidth,
+            minimumHorizontalInset: minimumHorizontalTextInset,
+            constrainsToReadableWidth: constrainsToReadableWidth
+        )
+        let targetTextContainerInset = UIEdgeInsets(
+            top: verticalTextInset,
+            left: horizontalTextInset,
+            bottom: verticalTextInset,
+            right: horizontalTextInset
+        )
+
+        var didUpdate = false
+        if textView.textContainerInset != targetTextContainerInset {
+            textView.textContainerInset = targetTextContainerInset
+            didUpdate = true
+        }
+
+        return didUpdate
+    }
+
     private func scrollSelectionAboveKeyboard() {
         guard textView.isFirstResponder else { return }
         DispatchQueue.main.async { [weak self] in
@@ -2809,6 +3107,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         refreshTodoMarkerButtons()
+        refreshFindHighlightOverlays()
     }
 
     private func scheduleEditorOverlayRefresh() {
@@ -2821,9 +3120,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         }
     }
 
-    private func refreshEditorOverlaysAfterLayoutChangeIfNeeded() {
+    private func refreshEditorOverlaysAfterLayoutChangeIfNeeded(force: Bool = false) {
         let size = textView.bounds.size
-        guard size != lastOverlayLayoutSize else { return }
+        guard force || size != lastOverlayLayoutSize else { return }
         lastOverlayLayoutSize = size
         refreshEditorOverlays()
     }
@@ -2835,6 +3134,31 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func syncCollapsedXMLTagState() {
         markdownDelegate.collapsedXMLTagRanges = []
+    }
+
+    private func invalidateRenderableBlockCache() {
+        cachedRenderableBlocks = []
+        cachedRenderableBlocksText = ""
+        cachedCollapsedXMLTagRanges = []
+    }
+
+    private func currentRenderableBlocks() -> [MarkdownRenderableBlock] {
+        let text = textView.text ?? ""
+        let collapsedXMLTagRanges = markdownDelegate.collapsedXMLTagRanges
+
+        if text == cachedRenderableBlocksText,
+           collapsedXMLTagRanges == cachedCollapsedXMLTagRanges {
+            return cachedRenderableBlocks
+        }
+
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: text,
+            collapsedXMLTagRanges: collapsedXMLTagRanges
+        )
+        cachedRenderableBlocks = blocks
+        cachedRenderableBlocksText = text
+        cachedCollapsedXMLTagRanges = collapsedXMLTagRanges
+        return blocks
     }
 
     private func requestImageLoad(for url: URL) {
@@ -2865,10 +3189,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private func refreshTodoMarkerButtons() {
         guard isViewLoaded, textView != nil else { return }
 
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.text ?? "",
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        )
+        let blocks = currentRenderableBlocks()
         let visibleRect = textView.bounds.insetBy(dx: -8, dy: -80)
         var activeLocations: Set<Int> = []
 
@@ -2919,10 +3240,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     @discardableResult
     func toggleTodoMarker(atTextViewPoint point: CGPoint) -> Bool {
         syncCollapsedXMLTagState()
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.text ?? "",
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        )
+        let blocks = currentRenderableBlocks()
 
         for block in blocks where !block.isCollapsedXMLTagContent {
             guard case .todo = block.kind,
@@ -2940,10 +3258,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     func todoMarkerHitRect(forParagraphLocation paragraphLocation: Int) -> CGRect? {
         syncCollapsedXMLTagState()
-        guard let block = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.text ?? "",
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        ).first(where: { $0.paragraphRange.location == paragraphLocation }),
+        guard let block = currentRenderableBlocks().first(where: { $0.paragraphRange.location == paragraphLocation }),
               !block.isCollapsedXMLTagContent,
               case .todo = block.kind else {
             return nil
@@ -3040,6 +3355,9 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     var onTextChange: ((String) -> Void)?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
+    var findQuery: String = ""
+    var findNavigationRequest: EditorFindNavigationRequest?
+    var onFindStatusChange: ((EditorFindStatus) -> Void)?
 
     func makeCoordinator() -> TextKit2EditorCoordinator {
         TextKit2EditorCoordinator(text: $text, onTextChange: onTextChange, autoFocus: autoFocus)
@@ -3050,6 +3368,11 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
         vc.coordinator = context.coordinator
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
+        vc.updateFind(
+            query: findQuery,
+            navigationRequest: findNavigationRequest,
+            onStatusChange: onFindStatusChange
+        )
         vc.loadText(text)
         return vc
     }
@@ -3057,6 +3380,11 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     func updateNSViewController(_ vc: TextKit2EditorViewController, context: Context) {
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
+        vc.updateFind(
+            query: findQuery,
+            navigationRequest: findNavigationRequest,
+            onStatusChange: onFindStatusChange
+        )
         guard !context.coordinator.isUpdatingText else { return }
         guard vc.textView.window?.firstResponder !== vc.textView else { return }
         if vc.textView.string != text {
@@ -3090,6 +3418,13 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private let maximumTextWidth: CGFloat = 600
     private let verticalTextInset: CGFloat = 16
     private var loadingImageURLs: Set<URL> = []
+    private var findQuery = ""
+    private var findMatches: [NSRange] = []
+    private var selectedFindMatchIndex: Int?
+    private var lastFindNavigationRequestID: Int?
+    private var onFindStatusChange: ((EditorFindStatus) -> Void)?
+    private var lastPublishedFindStatus = EditorFindStatus()
+    private var findBackgroundSnapshots: [EditorFindBackgroundSnapshot] = []
 
     override func loadView() {
         view = NSView()
@@ -3222,8 +3557,12 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         let visibleWidth = scrollView.contentView.bounds.width
         guard visibleWidth > 0 else { return false }
 
-        let centeredInset = floor((visibleWidth - maximumTextWidth) / 2)
-        let horizontalInset = max(minimumHorizontalTextInset, centeredInset)
+        let horizontalInset = ReadableTextColumnLayout.textHorizontalInset(
+            for: visibleWidth,
+            maximumTextWidth: maximumTextWidth,
+            minimumHorizontalInset: minimumHorizontalTextInset,
+            constrainsToReadableWidth: true
+        )
         let targetInset = NSSize(width: horizontalInset, height: verticalTextInset)
         guard textView.textContainerInset != targetInset else { return false }
 
@@ -3245,16 +3584,154 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         textView.string = markdown
         coordinator?.finishApplyingEditorText()
         updateTypingAttributes()
+        refreshFindMatches(preferredLocation: textView.selectedRange().location, scrollToSelection: false)
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in
                 guard let tv = self?.textView else { return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: tv.string.count, length: 0))
+                self?.refreshFindMatches(preferredLocation: tv.selectedRange().location, scrollToSelection: false)
                 self?.scheduleEditorOverlayRefresh()
             }
         }
         scheduleEditorOverlayRefresh()
         updatePageMentionSuggestions()
+    }
+
+    func updateFind(
+        query: String,
+        navigationRequest: EditorFindNavigationRequest?,
+        onStatusChange: ((EditorFindStatus) -> Void)?
+    ) {
+        self.onFindStatusChange = onStatusChange
+
+        let normalizedQuery = EditorFindMatcher.normalizedQuery(query)
+        let didChangeQuery = normalizedQuery != findQuery
+        if didChangeQuery {
+            findQuery = normalizedQuery
+            refreshFindMatches(
+                preferredLocation: textView?.selectedRange().location ?? 0,
+                scrollToSelection: !normalizedQuery.isEmpty
+            )
+        } else if isViewLoaded, textView != nil {
+            publishFindStatusIfNeeded()
+        }
+
+        guard let navigationRequest,
+              navigationRequest.id != lastFindNavigationRequestID else {
+            return
+        }
+
+        lastFindNavigationRequestID = navigationRequest.id
+        navigateFind(to: navigationRequest.direction)
+    }
+
+    private func refreshFindMatches(preferredLocation: Int, scrollToSelection: Bool) {
+        guard isViewLoaded, textView != nil else {
+            publishFindStatusIfNeeded()
+            return
+        }
+
+        restoreFindHighlightBackgrounds()
+        findMatches = EditorFindMatcher.ranges(in: textView.string, query: findQuery)
+        selectedFindMatchIndex = EditorFindMatcher.preferredIndex(
+            for: findMatches,
+            selectionLocation: preferredLocation
+        )
+        applyFindHighlights()
+        publishFindStatusIfNeeded()
+
+        if scrollToSelection {
+            scrollToSelectedFindMatch()
+        }
+    }
+
+    private func navigateFind(to direction: EditorFindNavigationDirection) {
+        selectedFindMatchIndex = EditorFindMatcher.navigatedIndex(
+            from: selectedFindMatchIndex,
+            matchCount: findMatches.count,
+            direction: direction
+        )
+        applyFindHighlights()
+        publishFindStatusIfNeeded()
+        scrollToSelectedFindMatch()
+    }
+
+    private func scrollToSelectedFindMatch() {
+        guard let selectedFindMatchIndex,
+              selectedFindMatchIndex < findMatches.count else {
+            return
+        }
+
+        let range = findMatches[selectedFindMatchIndex]
+        guard NSMaxRange(range) <= (textView.string as NSString).length else { return }
+        textView.setSelectedRange(range)
+        textView.scrollRangeToVisible(range)
+    }
+
+    private func publishFindStatusIfNeeded() {
+        let status = EditorFindStatus(
+            matchCount: findMatches.count,
+            selectedMatchIndex: selectedFindMatchIndex
+        )
+        guard status != lastPublishedFindStatus else { return }
+
+        lastPublishedFindStatus = status
+        onFindStatusChange?(status)
+    }
+
+    private func applyFindHighlights() {
+        guard isViewLoaded,
+              let textStorage = textView.textStorage else {
+            return
+        }
+
+        restoreFindHighlightBackgrounds()
+        guard !findMatches.isEmpty else { return }
+
+        textStorage.beginEditing()
+        for (index, range) in findMatches.enumerated() {
+            guard range.location >= 0,
+                  range.length > 0,
+                  NSMaxRange(range) <= textStorage.length else {
+                continue
+            }
+
+            snapshotFindBackgrounds(in: range, textStorage: textStorage)
+            let background = index == selectedFindMatchIndex
+                ? EditorFindHighlightPalette.currentMatchBackground
+                : EditorFindHighlightPalette.matchBackground
+            textStorage.addAttribute(.backgroundColor, value: background, range: range)
+        }
+        textStorage.endEditing()
+        textView.needsDisplay = true
+    }
+
+    private func restoreFindHighlightBackgrounds() {
+        guard isViewLoaded,
+              let textStorage = textView.textStorage,
+              !findBackgroundSnapshots.isEmpty else {
+            findBackgroundSnapshots = []
+            return
+        }
+
+        textStorage.beginEditing()
+        for snapshot in findBackgroundSnapshots.reversed() where NSMaxRange(snapshot.range) <= textStorage.length {
+            if let value = snapshot.value {
+                textStorage.addAttribute(.backgroundColor, value: value, range: snapshot.range)
+            } else {
+                textStorage.removeAttribute(.backgroundColor, range: snapshot.range)
+            }
+        }
+        textStorage.endEditing()
+        findBackgroundSnapshots = []
+        textView.needsDisplay = true
+    }
+
+    private func snapshotFindBackgrounds(in range: NSRange, textStorage: NSTextStorage) {
+        textStorage.enumerateAttribute(.backgroundColor, in: range, options: []) { value, subrange, _ in
+            findBackgroundSnapshots.append(EditorFindBackgroundSnapshot(range: subrange, value: value))
+        }
     }
 
     // MARK: NSTextViewDelegate
@@ -3269,6 +3746,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         updateTypingAttributes()
         scheduleEditorOverlayRefresh()
         updatePageMentionSuggestions()
+        refreshFindMatches(preferredLocation: textView.selectedRange().location, scrollToSelection: false)
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
@@ -3816,6 +4294,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     private func restyleTextPreservingSelection() {
         applyHyperlinkRenderAttributesToTextStorage()
+        applyFindHighlights()
         updateTypingAttributes()
         scheduleEditorOverlayRefresh()
     }

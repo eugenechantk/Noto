@@ -22,6 +22,11 @@ struct NoteEditorScreen: View {
     @State private var session: NoteEditorSession
     @State private var showDeleteConfirmation = false
     @State private var statusCount = WordCounter.Count(words: 0, characters: 0)
+    @State private var isFindVisible = false
+    @State private var findQuery = ""
+    @State private var findStatus = EditorFindStatus()
+    @State private var findNavigationRequest: EditorFindNavigationRequest?
+    @State private var findNavigationRequestID = 0
     private let wordCounter = WordCounter()
 
     init(
@@ -67,8 +72,13 @@ struct NoteEditorScreen: View {
     var body: some View {
         EditorContentView(
             session: session,
+            isFindVisible: $isFindVisible,
+            findQuery: $findQuery,
+            findNavigationRequest: $findNavigationRequest,
+            findStatus: $findStatus,
             pageMentionProvider: pageMentionDocuments(matching:),
-            onOpenDocumentLink: onOpenDocumentLink
+            onOpenDocumentLink: onOpenDocumentLink,
+            onFindNavigate: navigateFind
         )
         .background(AppTheme.background)
         .foregroundStyle(AppTheme.primaryText)
@@ -84,6 +94,7 @@ struct NoteEditorScreen: View {
             onOpenTodayNote: onOpenTodayNote,
             onCreateRootNote: onCreateRootNote,
             onDeleteRequested: { showDeleteConfirmation = true },
+            onSearchRequested: showFind,
             onDismiss: { dismiss() }
         ))
         .simultaneousGesture(navigationHistorySwipeGesture)
@@ -100,7 +111,8 @@ struct NoteEditorScreen: View {
             onNavigateForward: onNavigateForward,
             onOpenTodayNote: onOpenTodayNote,
             onTapBreadcrumbLevel: onTapBreadcrumbLevel,
-            onDeleteRequested: { showDeleteConfirmation = true }
+            onDeleteRequested: { showDeleteConfirmation = true },
+            onSearchRequested: showFind
         ))
         #endif
         .task {
@@ -127,6 +139,9 @@ struct NoteEditorScreen: View {
             guard let snapshot = notification.object as? NoteSyncSnapshot else { return }
             session.handleRemoteSnapshot(snapshot)
         }
+        .onReceive(NotificationCenter.default.publisher(for: NoteEditorCommands.showFind)) { _ in
+            showFind()
+        }
         .confirmationDialog("Delete this note?", isPresented: $showDeleteConfirmation) {
             Button("Delete Note", role: .destructive) {
                 deleteCurrentNote()
@@ -144,6 +159,21 @@ struct NoteEditorScreen: View {
         }
         onDelete?()
         dismiss()
+    }
+
+    private func showFind() {
+        withAnimation(.easeOut(duration: 0.16)) {
+            isFindVisible = true
+        }
+    }
+
+    private func navigateFind(_ direction: EditorFindNavigationDirection) {
+        guard findStatus.matchCount > 0 else { return }
+        findNavigationRequestID += 1
+        findNavigationRequest = EditorFindNavigationRequest(
+            id: findNavigationRequestID,
+            direction: direction
+        )
     }
 
     private func pageMentionDocuments(matching query: String) -> [PageMentionDocument] {

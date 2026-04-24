@@ -12,6 +12,7 @@ struct EditorNavigationChrome: ViewModifier {
     var onOpenTodayNote: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
     var onDeleteRequested: () -> Void
+    var onSearchRequested: () -> Void
     var onDismiss: () -> Void
 
     private static let countFormatter: NumberFormatter = {
@@ -62,6 +63,14 @@ struct EditorNavigationChrome: ViewModifier {
 
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Menu {
+                            Button(action: onSearchRequested) {
+                                Label("Search in Note", systemImage: "magnifyingglass")
+                            }
+                            .keyboardShortcut("f", modifiers: [.command])
+                            .accessibilityIdentifier("search_in_note_menu_item")
+
+                            Divider()
+
                             Button(role: .destructive, action: onDeleteRequested) {
                                 Label("Delete Note", systemImage: "trash")
                             }

@@ -1,10 +1,21 @@
 import SwiftUI
 import NotoVault
 
+#if os(iOS)
+import UIKit
+#endif
+
 struct EditorContentView: View {
     @Bindable var session: NoteEditorSession
+    @Binding var isFindVisible: Bool
+    @Binding var findQuery: String
+    @Binding var findNavigationRequest: EditorFindNavigationRequest?
+    @Binding var findStatus: EditorFindStatus
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
+    var onFindNavigate: (EditorFindNavigationDirection) -> Void
+
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         Group {
@@ -35,25 +46,91 @@ struct EditorContentView: View {
     }
 
     private var editorBody: some View {
-        VStack(spacing: 0) {
-            if session.pendingRemoteSnapshot != nil {
-                RemoteUpdateBanner(
-                    onKeepMine: session.discardRemoteConflict,
-                    onReload: session.reloadRemoteSnapshot
-                )
+        GeometryReader { geometry in
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 0) {
+                    if session.pendingRemoteSnapshot != nil {
+                        RemoteUpdateBanner(
+                            onKeepMine: session.discardRemoteConflict,
+                            onReload: session.reloadRemoteSnapshot
+                        )
+                    }
+                    TextKit2EditorView(
+                        text: $session.content,
+                        autoFocus: session.isNew,
+                        onTextChange: session.handleEditorChange,
+                        pageMentionProvider: pageMentionProvider,
+                        onOpenDocumentLink: onOpenDocumentLink,
+                        findQuery: findQuery,
+                        findNavigationRequest: findNavigationRequest,
+                        onFindStatusChange: { status in
+                            DispatchQueue.main.async {
+                                findStatus = status
+                            }
+                        }
+                    )
+                }
+
+                if isFindVisible {
+                    EditorFindBar(
+                        query: $findQuery,
+                        status: findStatus,
+                        onNavigate: onFindNavigate,
+                        onClose: closeFind
+                    )
+                    .padding(.top, findBarTopPadding(safeAreaTop: geometry.safeAreaInsets.top))
+                    .padding(.trailing, findBarTrailingPadding)
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.18, anchor: .topTrailing)),
+                        removal: .opacity.combined(with: .scale(scale: 0.92, anchor: .topTrailing))
+                    ))
+                    .zIndex(1)
+                }
             }
-            TextKit2EditorView(
-                text: $session.content,
-                autoFocus: session.isNew,
-                onTextChange: session.handleEditorChange,
-                pageMentionProvider: pageMentionProvider,
-                onOpenDocumentLink: onOpenDocumentLink
-            )
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .background(AppTheme.background)
         #if os(iOS)
         .ignoresSafeArea(edges: [.top, .bottom])
         #endif
+    }
+
+    private var findBarTrailingPadding: CGFloat {
+        #if os(iOS)
+        horizontalSizeClass == .regular ? 10 : 16
+        #else
+        16
+        #endif
+    }
+
+    private func findBarTopPadding(safeAreaTop: CGFloat) -> CGFloat {
+        #if os(iOS)
+        let topSafeArea = max(safeAreaTop, activeWindowSafeAreaTop)
+        let topBarHeight: CGFloat = horizontalSizeClass == .regular ? 54 : 44
+        let gapBelowTopBar: CGFloat = horizontalSizeClass == .regular ? 4 : 9
+        return topSafeArea + topBarHeight + gapBelowTopBar
+        #else
+        return 10
+        #endif
+    }
+
+    #if os(iOS)
+    private var activeWindowSafeAreaTop: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets.top ?? 0
+    }
+    #endif
+
+    private func closeFind() {
+        withAnimation(.easeInOut(duration: 0.14)) {
+            isFindVisible = false
+            findQuery = ""
+            findStatus = EditorFindStatus()
+            findNavigationRequest = nil
+        }
     }
 }
 

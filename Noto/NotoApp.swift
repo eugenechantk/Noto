@@ -93,6 +93,11 @@ struct NotoApp: App {
                 }
                 .keyboardShortcut("t", modifiers: [.command])
 
+                Button("Search in Note") {
+                    NoteEditorCommands.requestShowFind()
+                }
+                .keyboardShortcut("f", modifiers: [.command])
+
                 #if os(macOS)
                 Button("Toggle Sidebar") {
                     NotificationCenter.default.post(name: NotoAppCommands.toggleSidebar, object: nil)
