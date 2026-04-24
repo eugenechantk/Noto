@@ -17,6 +17,7 @@ DerivedData/
 
 # Secrets (API keys)
 Secrets.swift
+Config/LocalSecrets.xcconfig
 
 .flowdeck/
 .gstack/

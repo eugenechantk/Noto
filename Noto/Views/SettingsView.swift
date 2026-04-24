@@ -5,7 +5,9 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 
 struct SettingsView: View {
     var locationManager: VaultLocationManager
+    @ObservedObject var readwiseSyncController: ReadwiseSyncController
     @State private var showResetConfirmation = false
+    @State private var isTokenSheetPresented = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -31,6 +33,40 @@ struct SettingsView: View {
                 Text("Storage")
             } footer: {
                 Text("Changing your vault returns you to the welcome screen where you can create or open a different vault.")
+            }
+
+            Section {
+                Button("Set Token") {
+                    isTokenSheetPresented = true
+                }
+                .accessibilityIdentifier("readwise_set_token_button")
+
+                Button("Test Connection") {
+                    readwiseSyncController.testConnection()
+                }
+                .disabled(!readwiseSyncController.canRunActions || readwiseSyncController.isSyncing)
+                .accessibilityIdentifier("readwise_test_connection_button")
+
+                Button("Sync Now") {
+                    readwiseSyncController.syncNow(vaultURL: locationManager.vaultURL)
+                }
+                .disabled(!readwiseSyncController.canRunActions || readwiseSyncController.isSyncing || locationManager.vaultURL == nil)
+                .accessibilityIdentifier("readwise_sync_now_button")
+            } header: {
+                Text("Readwise Sync")
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(readwiseSyncController.tokenStatusMessage)
+                    Text(readwiseSyncController.syncStatusMessage)
+                    if let formattedLastSyncedAt = readwiseSyncController.formattedLastSyncedAt {
+                        Text("Last synced: \(formattedLastSyncedAt)")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(AppTheme.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 4)
+                .accessibilityIdentifier("readwise_status_caption_group")
             }
         }
         .scrollContentBackground(.hidden)
@@ -64,6 +100,20 @@ struct SettingsView: View {
         } message: {
             Text("This won't delete any files. You'll be returned to the welcome screen to choose a new vault.")
         }
+        .sheet(isPresented: $isTokenSheetPresented) {
+            ReadwiseTokenSheet(
+                token: $readwiseSyncController.tokenInput,
+                save: {
+                    if readwiseSyncController.saveToken() {
+                        isTokenSheetPresented = false
+                    }
+                },
+                cancel: {
+                    readwiseSyncController.tokenInput = ""
+                    isTokenSheetPresented = false
+                }
+            )
+        }
     }
 
     private var displayPath: String {
@@ -82,5 +132,48 @@ struct SettingsView: View {
             return "On This Device"
         }
         return url.lastPathComponent
+    }
+}
+
+private struct ReadwiseTokenSheet: View {
+    @Binding var token: String
+    let save: () -> Void
+    let cancel: () -> Void
+
+    private var canSave: Bool {
+        !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    #if os(iOS)
+                    SecureField("Readwise access token", text: $token)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("readwise_token_field")
+                    #else
+                    SecureField("Readwise access token", text: $token)
+                        .accessibilityIdentifier("readwise_token_field")
+                    #endif
+                }
+            }
+            .navigationTitle("Set Readwise Token")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: cancel)
+                        .accessibilityIdentifier("readwise_token_cancel_button")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save)
+                        .disabled(!canSave)
+                        .accessibilityIdentifier("readwise_token_save_button")
+                }
+            }
+        }
     }
 }

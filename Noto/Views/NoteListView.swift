@@ -190,6 +190,7 @@ struct NoteListView: View {
     var store: MarkdownNoteStore
     var locationManager: VaultLocationManager?
     var fileWatcher: VaultFileWatcher?
+    @ObservedObject var readwiseSyncController: ReadwiseSyncController
 
     #if os(iOS)
     @State private var path = NavigationPath()
@@ -221,7 +222,7 @@ struct NoteListView: View {
             .sheet(isPresented: $showSettings) {
                 if let locationManager {
                     NavigationStack {
-                        SettingsView(locationManager: locationManager)
+                        SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
                     }
                 }
             }
@@ -294,7 +295,7 @@ struct NoteListView: View {
                         )
                     case .settings:
                         if let locationManager {
-                            SettingsView(locationManager: locationManager)
+                            SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
                         }
                     case .todayNote:
                         TodayNoteDestination(
@@ -349,7 +350,7 @@ struct NoteListView: View {
         )
         .sheet(isPresented: $showSettings) {
             if let locationManager {
-                SettingsView(locationManager: locationManager)
+                SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
                     .frame(minWidth: 400, minHeight: 200)
             }
         }

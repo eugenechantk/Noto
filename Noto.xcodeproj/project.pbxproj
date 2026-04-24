@@ -10,6 +10,8 @@
 		5DB7BFB72F97BDEB0018E268 /* NotoIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */; };
 		5DFAED8F2F5F135300F3DACD /* NotoVault in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD000B000000000000000B /* NotoVault */; };
 		5DFAED902F5F135300F3DACD /* NotoVault in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF000B000000000000000B /* NotoVault */; };
+		58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */; };
+		58A1D0018A1D001000000002 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,6 +39,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/ReadwiseSecrets.xcconfig; sourceTree = "<group>"; };
 		5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = file; path = Noto.xctestplan; sourceTree = "<group>"; };
 		5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = NotoIcon.icon; sourceTree = "<group>"; };
 		5DE568F42F80191200EC8657 /* NotoMacOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoMacOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -88,6 +91,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5DFAED8F2F5F135300F3DACD /* NotoVault in Frameworks */,
+				58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -96,6 +100,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5DFAED902F5F135300F3DACD /* NotoVault in Frameworks */,
+				58A1D0018A1D001000000002 /* NotoReadwiseSyncCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -105,6 +110,7 @@
 		5DF5FAF52F0EC372008EDC76 = {
 			isa = PBXGroup;
 			children = (
+				58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */,
 				5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */,
 				5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */,
 				5DF5FB002F0EC372008EDC76 /* Noto */,
@@ -182,6 +188,7 @@
 				5DF5FAFA2F0EC372008EDC76 /* Sources */,
 				5DF5FAFB2F0EC372008EDC76 /* Frameworks */,
 				5DF5FAFC2F0EC372008EDC76 /* Resources */,
+				58A1D0018A1D001000000006 /* Generate Readwise Secrets */,
 			);
 			buildRules = (
 			);
@@ -193,6 +200,7 @@
 			name = Noto;
 			packageProductDependencies = (
 				CCDD000B000000000000000B /* NotoVault */,
+				58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */,
 			);
 			productName = Noto;
 			productReference = 5DF5FAFE2F0EC372008EDC76 /* Noto.app */;
@@ -217,6 +225,7 @@
 			name = NotoTests;
 			packageProductDependencies = (
 				EEFF000B000000000000000B /* NotoVault */,
+				58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */,
 			);
 			productName = NotoTests;
 			productReference = 5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */;
@@ -260,6 +269,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AABB000B000000000000000B /* XCLocalSwiftPackageReference "Packages/NotoVault" */,
+				5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "Packages/NotoReadwiseSync" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DF5FAFF2F0EC372008EDC76 /* Products */;
@@ -305,6 +315,29 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		58A1D0018A1D001000000006 /* Generate Readwise Secrets */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Generate Readwise Secrets";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ReadwiseDefaultToken.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nOUTPUT=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ReadwiseDefaultToken.txt\"\nrm -f \"$OUTPUT\"\nif [ -n \"${NOTO_READWISE_TOKEN:-}\" ]; then\n  mkdir -p \"$(dirname \"$OUTPUT\")\"\n  /usr/bin/printf \"%s\" \"$NOTO_READWISE_TOKEN\" > \"$OUTPUT\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		5DE568F02F80191200EC8657 /* Sources */ = {
@@ -561,6 +594,7 @@
 		};
 		5DF5FB232F0EC373008EDC76 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = NotoIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -603,6 +637,7 @@
 		};
 		5DF5FB242F0EC373008EDC76 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = NotoIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -740,6 +775,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "Packages/NotoReadwiseSync" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoReadwiseSync;
+		};
 		AABB000B000000000000000B /* XCLocalSwiftPackageReference "Packages/NotoVault" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoVault;
@@ -747,6 +786,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoReadwiseSyncCore;
+		};
+		58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoReadwiseSyncCore;
+		};
 		CCDD000B000000000000000B /* NotoVault */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoVault;

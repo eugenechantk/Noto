@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 @main
 struct NotoApp: App {
     @State private var locationManager = VaultLocationManager()
+    @State private var readwiseSyncController = ReadwiseSyncController()
     #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     #endif
@@ -75,7 +76,11 @@ struct NotoApp: App {
             if Self.isRunningTests {
                 Color.clear
             } else if locationManager.isVaultConfigured, let vaultURL = locationManager.vaultURL {
-                MainAppView(vaultURL: vaultURL, locationManager: locationManager)
+                MainAppView(
+                    vaultURL: vaultURL,
+                    locationManager: locationManager,
+                    readwiseSyncController: readwiseSyncController
+                )
             } else {
                 VaultSetupView(locationManager: locationManager)
             }
@@ -131,7 +136,7 @@ struct NotoApp: App {
 
         #if os(macOS)
         Settings {
-            SettingsView(locationManager: locationManager)
+            SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
                 .frame(minWidth: 400, minHeight: 200)
                 .environment(\.colorScheme, .dark)
                 .background(AppTheme.background)
@@ -159,23 +164,32 @@ struct NotoApp: App {
 struct MainAppView: View {
     let vaultURL: URL
     var locationManager: VaultLocationManager
+    @ObservedObject var readwiseSyncController: ReadwiseSyncController
     @State private var store: MarkdownNoteStore
     @State private var fileWatcher = VaultFileWatcher()
     @Environment(\.scenePhase) private var scenePhase
 
-    init(vaultURL: URL, locationManager: VaultLocationManager) {
+    init(vaultURL: URL, locationManager: VaultLocationManager, readwiseSyncController: ReadwiseSyncController) {
         self.vaultURL = vaultURL
         self.locationManager = locationManager
+        self.readwiseSyncController = readwiseSyncController
         _store = State(wrappedValue: MarkdownNoteStore(vaultURL: vaultURL, autoload: false))
     }
 
     var body: some View {
-        NoteListView(store: store, locationManager: locationManager, fileWatcher: fileWatcher)
+        NoteListView(
+            store: store,
+            locationManager: locationManager,
+            fileWatcher: fileWatcher,
+            readwiseSyncController: readwiseSyncController
+        )
             .background(AppTheme.background)
             .foregroundStyle(AppTheme.primaryText)
             .tint(AppTheme.primaryText)
             .task {
                 store.loadItemsInBackground()
+                readwiseSyncController.refreshSavedTokenState()
+                readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
             }
             .onAppear {
                 fileWatcher.watch(directory: vaultURL)
@@ -183,6 +197,7 @@ struct MainAppView: View {
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
                     store.refreshForForegroundActivation()
+                    readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
                 }
             }
             .onChange(of: fileWatcher.changeCount) { _, _ in
