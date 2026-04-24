@@ -146,6 +146,10 @@ struct ReadwiseSyncTests {
         #expect(existing.contains("> Reader-linked highlight."))
         #expect(existing.contains("# Long Reader Article"))
         #expect(existing.contains("First paragraph with **bold text**"))
+        #expect(existing.contains("capture_status: full"))
+        #expect(existing.contains("reader_url: \"https://read.readwise.io/read/01readerarticle\""))
+        #expect(existing.contains("readwise_url: \"https://read.readwise.io/read/01readerarticle\""))
+        #expect(existing.contains("readwise_bookreview_url: \"https://readwise.io/bookreview/123\""))
     }
 
     @Test func updateMigratesEmptyPlaceholdersToEmptyBlocks() throws {
@@ -346,6 +350,45 @@ struct ReadwiseSyncTests {
         #expect(updated.contains("  - \"manual/tag\""))
     }
 
+    @Test func readerUpdatePreservesManualFrontmatterFields() throws {
+        let document = try loadReaderFixtureDocuments()[0]
+        let existing = """
+        ---
+        id: 11111111-1111-1111-1111-111111111111
+        created: 2026-04-21T00:00:00Z
+        updated: 2026-04-21T00:00:00Z
+        type: source
+        canonical_key: "reader:01readerfullcontent"
+        mood: "keep"
+        aliases:
+          - "Long Form"
+        tags:
+          - "manual/tag"
+        ---
+        # Placeholder Note
+
+        Manual content before generated markers.
+
+        <!-- readwise:highlights:start -->
+        <!-- readwise:highlights:end -->
+
+        <!-- readwise:content:start -->
+        Old content.
+        <!-- readwise:content:end -->
+        """
+
+        let updated = SourceNoteRenderer.renderUpdatedNote(
+            existingMarkdown: existing,
+            document: document,
+            capturedAt: ISO8601DateFormatter.noto.date(from: "2026-04-22T00:00:00Z")!
+        )
+
+        #expect(updated.contains("mood: \"keep\""))
+        #expect(updated.contains("aliases:\n  - \"Long Form\""))
+        #expect(updated.contains("  - \"manual/tag\""))
+        #expect(updated.contains("reader_document_id: \"01readerfullcontent\""))
+    }
+
     @Test func syncCreatesFlatSourceNotesAndResolvesFilenameConflicts() throws {
         let books = try loadFixtureBooks()
         let tempVault = FileManager.default.temporaryDirectory
@@ -402,6 +445,50 @@ struct ReadwiseSyncTests {
         #expect(result.sourceDirectoryURL.lastPathComponent == "Captures")
         #expect(FileManager.default.fileExists(atPath: tempVault.appendingPathComponent("Captures").path))
         #expect(FileManager.default.fileExists(atPath: tempVault.appendingPathComponent("Captures/How to Do What You Love.md").path))
+    }
+
+    @Test func syncSkipsDeletedReadwiseSourceWithoutDeletingLocalNote() throws {
+        let tempVault = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NotoDeletedReadwiseSourceTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempVault) }
+
+        let capturesURL = tempVault.appendingPathComponent("Captures", isDirectory: true)
+        try FileManager.default.createDirectory(at: capturesURL, withIntermediateDirectories: true)
+        let existingBook = try loadFixtureBooks()[0]
+        let noteURL = capturesURL.appendingPathComponent("How to Do What You Love.md")
+        try SourceNoteRenderer.renderNewNote(
+            for: existingBook,
+            id: UUID(uuidString: "55555555-5555-5555-5555-555555555555")!,
+            createdAt: ISO8601DateFormatter.noto.date(from: "2026-04-21T00:00:00Z")!,
+            capturedAt: ISO8601DateFormatter.noto.date(from: "2026-04-21T00:00:00Z")!
+        ).write(to: noteURL, atomically: true, encoding: .utf8)
+
+        var deletedBook = existingBook
+        deletedBook = ReadwiseBook(
+            userBookID: existingBook.userBookID,
+            isDeleted: true,
+            title: existingBook.title,
+            readableTitle: existingBook.readableTitle,
+            author: existingBook.author,
+            source: existingBook.source,
+            category: existingBook.category,
+            readwiseURL: existingBook.readwiseURL,
+            sourceURL: existingBook.sourceURL,
+            externalID: existingBook.externalID,
+            highlights: existingBook.highlights
+        )
+
+        let result = try SourceNoteSyncEngine().sync(
+            books: [deletedBook],
+            vaultURL: tempVault,
+            dryRun: false,
+            syncedAt: ISO8601DateFormatter.noto.date(from: "2026-04-22T00:00:00Z")!
+        )
+
+        #expect(result.created == 0)
+        #expect(result.updated == 0)
+        #expect(result.skippedDeleted == 1)
+        #expect(FileManager.default.fileExists(atPath: noteURL.path))
     }
 
     @Test func syncReaderDocumentCreatesFullContentSourceNote() throws {
@@ -480,6 +567,246 @@ struct ReadwiseSyncTests {
         #expect(note.contains("# Long Reader Article"))
     }
 
+    @Test func joinedReaderDocumentFallsBackToReaderURLFromDocumentID() throws {
+        let data = Data("""
+        {
+          "count": 1,
+          "nextPageCursor": null,
+          "results": [
+            {
+              "id": "01readerwithouturl",
+              "source_url": "https://example.com/source",
+              "title": "Reader Without URL",
+              "category": "article",
+              "location": "later",
+              "tags": {},
+              "html_content": "<article><p>Reader body.</p></article>"
+            }
+          ]
+        }
+        """.utf8)
+        let document = try JSONDecoder.readwise.decode(ReaderListPage.self, from: data).results[0]
+        let matchedBook = ReadwiseBook(
+            userBookID: 988,
+            title: document.title,
+            readableTitle: document.title,
+            source: "reader",
+            category: "articles",
+            readwiseURL: "https://readwise.io/bookreview/988",
+            sourceURL: document.sourceURL,
+            externalID: document.id,
+            highlights: [
+                ReadwiseHighlight(id: 1, text: "Joined highlight.")
+            ]
+        )
+        let tempVault = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NotoReaderJoinFallbackTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempVault) }
+
+        _ = try SourceNoteSyncEngine().syncReaderDocuments(
+            [document],
+            matchedReadwiseBooks: [document.id: matchedBook],
+            vaultURL: tempVault,
+            sourceDirectory: "Sources",
+            dryRun: false,
+            syncedAt: ISO8601DateFormatter.noto.date(from: "2026-04-21T00:00:00Z")!
+        )
+        let note = try String(
+            contentsOf: tempVault.appendingPathComponent("Sources/Reader Without URL.md"),
+            encoding: .utf8
+        )
+
+        #expect(note.contains("reader_url: \"https://read.readwise.io/read/01readerwithouturl\""))
+        #expect(note.contains("readwise_url: \"https://read.readwise.io/read/01readerwithouturl\""))
+        #expect(note.contains("readwise_bookreview_url: \"https://readwise.io/bookreview/988\""))
+        #expect(note.contains("> Joined highlight."))
+    }
+
+    @Test func incrementalSyncDoesNotDeleteReaderNoteWhenReaderReturnsNoDocuments() async throws {
+        let document = try loadReaderFixtureDocuments()[0]
+        let tempVault = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NotoReaderNoDeleteTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempVault) }
+
+        let capturesURL = tempVault.appendingPathComponent("Captures", isDirectory: true)
+        try FileManager.default.createDirectory(at: capturesURL, withIntermediateDirectories: true)
+        let noteURL = capturesURL.appendingPathComponent("Long Reader Article.md")
+        try SourceNoteRenderer.renderNewNote(
+            for: document,
+            id: UUID(uuidString: "66666666-6666-6666-6666-666666666666")!,
+            createdAt: ISO8601DateFormatter.noto.date(from: "2026-04-20T00:00:00Z")!,
+            capturedAt: ISO8601DateFormatter.noto.date(from: "2026-04-20T00:00:00Z")!
+        ).write(to: noteURL, atomically: true, encoding: .utf8)
+
+        let client = MockReadwiseSyncClient(
+            readerDocuments: [],
+            incrementalReadwiseBooks: [],
+            exportBooksByID: [:]
+        )
+
+        _ = try await SourceLibrarySyncEngine(client: client).syncIncrementally(
+            vaultURL: tempVault,
+            syncedAt: ISO8601DateFormatter.noto.date(from: "2026-04-22T12:00:00Z")!
+        )
+
+        #expect(FileManager.default.fileExists(atPath: noteURL.path))
+    }
+
+    @Test func syncRecoversWhenSourceMapPathIsStale() throws {
+        let documents = try loadReaderFixtureDocuments()
+        let document = documents[0]
+        let tempVault = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NotoStaleMapSyncTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempVault) }
+
+        let capturesURL = tempVault.appendingPathComponent("Captures", isDirectory: true)
+        try FileManager.default.createDirectory(at: capturesURL, withIntermediateDirectories: true)
+        let existingNoteURL = capturesURL.appendingPathComponent("Existing Reader Note.md")
+        let capturedAt = ISO8601DateFormatter.noto.date(from: "2026-04-21T00:00:00Z")!
+        let existingMarkdown = SourceNoteRenderer.renderNewNote(
+            for: document,
+            id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+            createdAt: capturedAt,
+            capturedAt: capturedAt
+        )
+        try existingMarkdown.write(to: existingNoteURL, atomically: true, encoding: .utf8)
+        try SyncStateStore.save(
+            ReadwiseSyncState(
+                lastSuccessfulReaderSyncAt: "2026-04-21T00:00:00Z",
+                sources: [
+                    document.canonicalKey: SourceMapping(
+                        noteID: "33333333-3333-3333-3333-333333333333",
+                        relativePath: "Captures/Missing Note.md",
+                        generatedBlockHash: "abc123",
+                        readerDocumentID: document.id,
+                        updatedAt: "2026-04-21T00:00:00Z"
+                    )
+                ]
+            ),
+            to: tempVault
+        )
+
+        let result = try SourceNoteSyncEngine().syncReaderDocuments(
+            documents,
+            vaultURL: tempVault,
+            dryRun: false,
+            syncedAt: ISO8601DateFormatter.noto.date(from: "2026-04-22T00:00:00Z")!
+        )
+
+        #expect(result.created == 0)
+        #expect(result.updated == 1)
+        let captureFiles = try FileManager.default.contentsOfDirectory(at: capturesURL, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "md" }
+        #expect(captureFiles.count == 1)
+
+        let state = try SyncStateStore.load(from: tempVault)
+        #expect(state.sources[document.canonicalKey]?.relativePath == "Captures/Existing Reader Note.md")
+    }
+
+    @Test func incrementalSyncUsesSavedTimestampsAndJoinsKnownReaderHighlights() async throws {
+        let documents = try loadReaderFixtureDocuments()
+        let document = documents[0]
+        let tempVault = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NotoIncrementalSyncTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempVault) }
+
+        let existingReaderNote = SourceNoteRenderer.renderNewNote(
+            for: document,
+            id: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
+            createdAt: ISO8601DateFormatter.noto.date(from: "2026-04-20T00:00:00Z")!,
+            capturedAt: ISO8601DateFormatter.noto.date(from: "2026-04-20T00:00:00Z")!
+        ) + "\nManual note outside generated block.\n"
+        let capturesURL = tempVault.appendingPathComponent("Captures", isDirectory: true)
+        try FileManager.default.createDirectory(at: capturesURL, withIntermediateDirectories: true)
+        try existingReaderNote.write(
+            to: capturesURL.appendingPathComponent("Long Reader Article.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try SyncStateStore.save(
+            ReadwiseSyncState(
+                lastSuccessfulSyncAt: "2026-04-21T00:00:00Z",
+                lastSuccessfulReaderSyncAt: "2026-04-20T00:00:00Z",
+                sources: [
+                    document.canonicalKey: SourceMapping(
+                        noteID: "44444444-4444-4444-4444-444444444444",
+                        relativePath: "Captures/Long Reader Article.md",
+                        generatedBlockHash: "hash",
+                        readwiseUserBookID: 987,
+                        readerDocumentID: document.id,
+                        updatedAt: "2026-04-20T00:00:00Z"
+                    )
+                ]
+            ),
+            to: tempVault
+        )
+
+        let joinedBook = ReadwiseBook(
+            userBookID: 987,
+            title: document.title,
+            readableTitle: document.title,
+            author: document.author,
+            source: "reader",
+            category: "articles",
+            readwiseURL: "https://readwise.io/bookreview/987",
+            sourceURL: document.sourceURL,
+            externalID: document.id,
+            highlights: [ReadwiseHighlight(id: 111, text: "Joined during incremental sync.")]
+        )
+        let readwiseOnlyBook = ReadwiseBook(
+            userBookID: 555,
+            title: "Kindle Book",
+            readableTitle: "Kindle Book",
+            author: "Reader",
+            source: "kindle",
+            category: "books",
+            readwiseURL: "https://readwise.io/bookreview/555",
+            sourceURL: "https://example.com/kindle-book",
+            highlights: [ReadwiseHighlight(id: 222, text: "Kindle highlight")]
+        )
+
+        let client = MockReadwiseSyncClient(
+            readerDocuments: documents,
+            incrementalReadwiseBooks: [readwiseOnlyBook],
+            exportBooksByID: [987: joinedBook]
+        )
+        let syncedAt = ISO8601DateFormatter.noto.date(from: "2026-04-22T12:00:00Z")!
+
+        let result = try await SourceLibrarySyncEngine(client: client).syncIncrementally(
+            vaultURL: tempVault,
+            syncedAt: syncedAt
+        )
+
+        let requests = await client.requests
+        #expect(requests == [
+            .reader(updatedAfter: "2026-04-20T00:00:00Z"),
+            .export(updatedAfter: "2026-04-21T00:00:00Z", ids: nil),
+            .export(updatedAfter: nil, ids: [987])
+        ])
+        #expect(result.reader.created == 0)
+        #expect(result.reader.updated == 1)
+        #expect(result.readwise.created == 1)
+        #expect(result.readwise.updated == 0)
+
+        let updatedReaderNote = try String(
+            contentsOf: capturesURL.appendingPathComponent("Long Reader Article.md"),
+            encoding: .utf8
+        )
+        #expect(updatedReaderNote.contains("Manual note outside generated block."))
+        #expect(updatedReaderNote.contains("> Joined during incremental sync."))
+
+        let readwiseOnlyNote = try String(
+            contentsOf: capturesURL.appendingPathComponent("Kindle Book.md"),
+            encoding: .utf8
+        )
+        #expect(readwiseOnlyNote.contains("canonical_key: \"readwise-book:555\""))
+        #expect(readwiseOnlyNote.contains("> Kindle highlight"))
+
+        let state = try SyncStateStore.load(from: tempVault)
+        #expect(state.lastSuccessfulReaderSyncAt == "2026-04-22T12:00:00Z")
+        #expect(state.lastSuccessfulSyncAt == "2026-04-22T12:00:00Z")
+    }
+
     private func loadFixtureBooks() throws -> [ReadwiseBook] {
         let url = Bundle.module.url(forResource: "readwise-export", withExtension: "json", subdirectory: "Fixtures")!
         let data = try Data(contentsOf: url)
@@ -491,4 +818,124 @@ struct ReadwiseSyncTests {
         let data = try Data(contentsOf: url)
         return try JSONDecoder.readwise.decode(ReaderListPage.self, from: data).results
     }
+
+    @Test func saveDocumentRequestEncodesOnlyURLWhenOptionalFieldsAreNil() throws {
+        let request = SaveDocumentRequest(url: "https://example.com/article")
+        let data = try JSONEncoder.readwise.encode(request)
+        let object = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+
+        #expect(object["url"] as? String == "https://example.com/article")
+        #expect(object.keys.sorted() == ["url"])
+    }
+
+    @Test func saveDocumentRequestEncodesAllFieldsWithSnakeCaseKeys() throws {
+        let request = SaveDocumentRequest(
+            url: "https://example.com/article",
+            title: "An Article",
+            author: "Someone",
+            tags: ["ai", "economics"],
+            location: "new",
+            category: "article",
+            summary: "Short summary.",
+            notes: "My thoughts.",
+            publishedDate: "2026-04-21T00:00:00+00:00",
+            imageURL: "https://example.com/cover.png"
+        )
+        let data = try JSONEncoder.readwise.encode(request)
+        let object = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+
+        #expect(object["url"] as? String == "https://example.com/article")
+        #expect(object["title"] as? String == "An Article")
+        #expect(object["author"] as? String == "Someone")
+        #expect(object["tags"] as? [String] == ["ai", "economics"])
+        #expect(object["location"] as? String == "new")
+        #expect(object["category"] as? String == "article")
+        #expect(object["summary"] as? String == "Short summary.")
+        #expect(object["notes"] as? String == "My thoughts.")
+        #expect(object["published_date"] as? String == "2026-04-21T00:00:00+00:00")
+        #expect(object["image_url"] as? String == "https://example.com/cover.png")
+    }
+
+    @Test func saveDocumentResponseDecodes() throws {
+        let json = #"""
+        {"id":"0000ffff2222eeee3333dddd4444","url":"https://read.readwise.io/new/read/0000ffff2222eeee3333dddd4444"}
+        """#.data(using: .utf8)!
+
+        let response = try JSONDecoder.readwise.decode(SaveDocumentResponse.self, from: json)
+
+        #expect(response.id == "0000ffff2222eeee3333dddd4444")
+        #expect(response.url == "https://read.readwise.io/new/read/0000ffff2222eeee3333dddd4444")
+    }
+}
+
+private actor MockReadwiseSyncClient: ReadwiseSyncClient {
+    enum Request: Equatable {
+        case reader(updatedAfter: String?)
+        case export(updatedAfter: String?, ids: [Int]?)
+    }
+
+    private(set) var requests: [Request] = []
+    let readerDocuments: [ReaderDocument]
+    let incrementalReadwiseBooks: [ReadwiseBook]
+    let exportBooksByID: [Int: ReadwiseBook]
+
+    init(
+        readerDocuments: [ReaderDocument],
+        incrementalReadwiseBooks: [ReadwiseBook],
+        exportBooksByID: [Int: ReadwiseBook]
+    ) {
+        self.readerDocuments = readerDocuments
+        self.incrementalReadwiseBooks = incrementalReadwiseBooks
+        self.exportBooksByID = exportBooksByID
+    }
+
+    func fetchExport(
+        updatedAfter: String?,
+        includeDeleted: Bool,
+        ids: [Int]?,
+        limit: Int?
+    ) async throws -> [ReadwiseBook] {
+        requests.append(.export(updatedAfter: updatedAfter, ids: ids?.sorted()))
+        let books: [ReadwiseBook]
+        if let ids {
+            books = ids.compactMap { exportBooksByID[$0] }
+        } else {
+            books = incrementalReadwiseBooks
+        }
+        if let limit {
+            return Array(books.prefix(limit))
+        }
+        return books
+    }
+
+    func fetchReaderDocuments(
+        id: String?,
+        updatedAfter: String?,
+        location: String?,
+        category: String?,
+        tags: [String],
+        limit: Int?
+    ) async throws -> [ReaderDocument] {
+        requests.append(.reader(updatedAfter: updatedAfter))
+        let filtered = readerDocuments
+            .filter { id == nil || $0.id == id }
+            .filter { tags.isEmpty || $0.matchesAllTags(tags) }
+        if let limit {
+            return Array(filtered.prefix(limit))
+        }
+        return filtered
+    }
+
+    func saveReaderDocument(_ request: SaveDocumentRequest) async throws -> SaveOutcome {
+        SaveOutcome(
+            status: .created,
+            response: SaveDocumentResponse(id: "mock", url: "https://read.readwise.io/new/read/mock")
+        )
+    }
+
+    func validateToken() async throws {}
 }

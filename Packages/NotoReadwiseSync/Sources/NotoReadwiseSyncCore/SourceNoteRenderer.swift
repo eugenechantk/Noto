@@ -9,6 +9,30 @@ public enum SourceNoteRenderer {
     public static let highlightsEndMarker = "<!-- readwise:highlights:end -->"
     public static let contentStartMarker = "<!-- readwise:content:start -->"
     public static let contentEndMarker = "<!-- readwise:content:end -->"
+    private static let importerOwnedFrontmatterKeys: Set<String> = [
+        "id",
+        "created",
+        "updated",
+        "type",
+        "source_kind",
+        "capture_status",
+        "canonical_key",
+        "source_title",
+        "reader_document_id",
+        "readwise_user_book_id",
+        "source_url",
+        "reader_url",
+        "reader_location",
+        "readwise_url",
+        "readwise_bookreview_url",
+        "author",
+        "site_name",
+        "published",
+        "word_count",
+        "asin",
+        "readwise_source",
+        "tags",
+    ]
 
     public static func renderNewNote(
         for book: ReadwiseBook,
@@ -16,7 +40,7 @@ public enum SourceNoteRenderer {
         createdAt: Date,
         capturedAt: Date
     ) -> String {
-        frontmatter(for: book, id: id, createdAt: createdAt, updatedAt: capturedAt)
+        renderFrontmatter(frontmatterEntries(for: book, id: id, createdAt: createdAt, updatedAt: capturedAt))
             + "\n# \(book.displayTitle)\n\n"
             + generatedBlock(for: book, capturedAt: capturedAt)
             + "\n"
@@ -30,20 +54,31 @@ public enum SourceNoteRenderer {
         let metadata = parseFrontmatter(existingMarkdown)
         let id = metadata.id ?? UUID()
         let createdAt = metadata.createdAt ?? capturedAt
+        let contentBlock = normalizedExistingBlock(
+            in: existingMarkdown,
+            start: contentStartMarker,
+            end: contentEndMarker,
+            emptyBlock: emptyContentBlock(),
+            legacyPlaceholders: ["_No full content imported._", "_No Reader content available._"]
+        )
+        let captureStatus = generatedBlockHasBody(contentBlock, start: contentStartMarker, end: contentEndMarker)
+            ? "full"
+            : "highlights_only"
         let markdownWithUpdatedFrontmatter = replaceFrontmatter(
             in: existingMarkdown,
-            with: frontmatter(for: book, id: id, createdAt: createdAt, updatedAt: capturedAt, preservingTags: metadata.tags)
+            with: frontmatterEntries(
+                for: book,
+                id: id,
+                createdAt: createdAt,
+                updatedAt: capturedAt,
+                preservingTags: metadata.tags,
+                captureStatus: captureStatus
+            )
         )
         return replaceGeneratedSection(
             in: markdownWithUpdatedFrontmatter,
             highlightsBlock: highlightsBlock(for: book),
-            contentBlock: normalizedExistingBlock(
-                in: markdownWithUpdatedFrontmatter,
-                start: contentStartMarker,
-                end: contentEndMarker,
-                emptyBlock: emptyContentBlock(),
-                legacyPlaceholders: ["_No full content imported._", "_No Reader content available._"]
-            )
+            contentBlock: contentBlock
         )
     }
 
@@ -53,7 +88,7 @@ public enum SourceNoteRenderer {
         createdAt: Date,
         capturedAt: Date
     ) -> String {
-        frontmatter(for: document, id: id, createdAt: createdAt, updatedAt: capturedAt)
+        renderFrontmatter(frontmatterEntries(for: document, id: id, createdAt: createdAt, updatedAt: capturedAt))
             + "\n# \(document.displayTitle)\n\n"
             + generatedBlock(for: document, capturedAt: capturedAt)
             + "\n"
@@ -66,7 +101,7 @@ public enum SourceNoteRenderer {
         createdAt: Date,
         capturedAt: Date
     ) -> String {
-        frontmatter(for: document, matchedBook: matchedBook, id: id, createdAt: createdAt, updatedAt: capturedAt)
+        renderFrontmatter(frontmatterEntries(for: document, matchedBook: matchedBook, id: id, createdAt: createdAt, updatedAt: capturedAt))
             + "\n# \(document.displayTitle)\n\n"
             + generatedBlock(for: document, matchedBook: matchedBook, capturedAt: capturedAt)
             + "\n"
@@ -82,7 +117,7 @@ public enum SourceNoteRenderer {
         let createdAt = metadata.createdAt ?? capturedAt
         let markdownWithUpdatedFrontmatter = replaceFrontmatter(
             in: existingMarkdown,
-            with: frontmatter(for: document, id: id, createdAt: createdAt, updatedAt: capturedAt, preservingTags: metadata.tags)
+            with: frontmatterEntries(for: document, id: id, createdAt: createdAt, updatedAt: capturedAt, preservingTags: metadata.tags)
         )
         return replaceGeneratedSection(
             in: markdownWithUpdatedFrontmatter,
@@ -108,7 +143,7 @@ public enum SourceNoteRenderer {
         let createdAt = metadata.createdAt ?? capturedAt
         let markdownWithUpdatedFrontmatter = replaceFrontmatter(
             in: existingMarkdown,
-            with: frontmatter(for: document, matchedBook: matchedBook, id: id, createdAt: createdAt, updatedAt: capturedAt, preservingTags: metadata.tags)
+            with: frontmatterEntries(for: document, matchedBook: matchedBook, id: id, createdAt: createdAt, updatedAt: capturedAt, preservingTags: metadata.tags)
         )
         return replaceGeneratedSection(
             in: markdownWithUpdatedFrontmatter,
@@ -262,6 +297,13 @@ public enum SourceNoteRenderer {
         return block
     }
 
+    private static func generatedBlockHasBody(_ block: String, start: String, end: String) -> Bool {
+        var body = block
+        body = body.replacingOccurrences(of: start, with: "")
+        body = body.replacingOccurrences(of: end, with: "")
+        return body.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty != nil
+    }
+
     private static func replaceBlock(in markdown: String, start: String, end: String, with block: String) -> String {
         guard let startRange = markdown.range(of: start),
               let endRange = markdown.range(of: end, range: startRange.upperBound..<markdown.endIndex) else {
@@ -382,125 +424,129 @@ public enum SourceNoteRenderer {
         return range.lowerBound..<extendedEnd
     }
 
-    private static func frontmatter(
+    private static func frontmatterEntries(
         for book: ReadwiseBook,
         id: UUID,
         createdAt: Date,
         updatedAt: Date,
-        preservingTags existingTags: [String] = []
-    ) -> String {
-        var lines: [String] = [
-            "---",
-            "id: \(id.uuidString)",
-            "created: \(ISO8601DateFormatter.noto.string(from: createdAt))",
-            "updated: \(ISO8601DateFormatter.noto.string(from: updatedAt))",
-            "type: source",
-            "source_kind: \(yamlScalar(book.sourceKind))",
-            "capture_status: highlights_only",
-            "canonical_key: \(yamlScalar(book.canonicalKey))",
-            "source_title: \(yamlScalar(book.displayTitle))",
-            "readwise_user_book_id: \(book.userBookID)",
+        preservingTags existingTags: [String] = [],
+        captureStatus: String = "highlights_only"
+    ) -> [FrontmatterEntry] {
+        var entries: [FrontmatterEntry] = [
+            .literal("id", id.uuidString),
+            .literal("created", ISO8601DateFormatter.noto.string(from: createdAt)),
+            .literal("updated", ISO8601DateFormatter.noto.string(from: updatedAt)),
+            .literal("type", "source"),
+            .scalar("source_kind", yamlScalar(book.sourceKind)),
+            .literal("capture_status", captureStatus),
+            .scalar("canonical_key", yamlScalar(book.canonicalKey)),
+            .scalar("source_title", yamlScalar(book.displayTitle)),
+            .literal("readwise_user_book_id", "\(book.userBookID)"),
         ]
 
-        appendOptional("source_url", book.preferredSourceURL, to: &lines)
-        appendOptional("readwise_url", book.readwiseURL, to: &lines)
         if book.source == "reader" {
-            appendOptional("reader_document_id", book.externalID, to: &lines)
+            appendOptional("reader_document_id", book.externalID, to: &entries)
         }
-        appendOptional("author", book.author, to: &lines)
-        appendOptional("asin", book.asin, to: &lines)
-        appendOptional("readwise_source", book.source, to: &lines)
-        appendTags(["imported/readwise"], preserving: existingTags, to: &lines)
-        lines.append("---")
-        return lines.joined(separator: "\n")
+        appendOptional("source_url", book.preferredSourceURL, to: &entries)
+        if let readerWebURL = book.readerWebURL {
+            appendOptional("reader_url", readerWebURL, to: &entries)
+            appendOptional("readwise_url", readerWebURL, to: &entries)
+            if readerWebURL.nonEmpty != book.readwiseURL.nonEmpty {
+                appendOptional("readwise_bookreview_url", book.readwiseURL, to: &entries)
+            }
+        } else {
+            appendOptional("readwise_url", book.readwiseURL, to: &entries)
+        }
+        appendOptional("author", book.author, to: &entries)
+        appendOptional("asin", book.asin, to: &entries)
+        appendOptional("readwise_source", book.source, to: &entries)
+        appendTags(["imported/readwise"], preserving: existingTags, to: &entries)
+        return entries
     }
 
-    private static func frontmatter(
+    private static func frontmatterEntries(
         for document: ReaderDocument,
         id: UUID,
         createdAt: Date,
         updatedAt: Date,
         preservingTags existingTags: [String] = []
-    ) -> String {
-        var lines: [String] = [
-            "---",
-            "id: \(id.uuidString)",
-            "created: \(ISO8601DateFormatter.noto.string(from: createdAt))",
-            "updated: \(ISO8601DateFormatter.noto.string(from: updatedAt))",
-            "type: source",
-            "source_kind: \(yamlScalar(document.sourceKind))",
-            "capture_status: \(document.contentMarkdown.isEmpty ? "metadata_only" : "full")",
-            "canonical_key: \(yamlScalar(document.canonicalKey))",
-            "source_title: \(yamlScalar(document.displayTitle))",
-            "reader_document_id: \(yamlScalar(document.id))",
+    ) -> [FrontmatterEntry] {
+        var entries: [FrontmatterEntry] = [
+            .literal("id", id.uuidString),
+            .literal("created", ISO8601DateFormatter.noto.string(from: createdAt)),
+            .literal("updated", ISO8601DateFormatter.noto.string(from: updatedAt)),
+            .literal("type", "source"),
+            .scalar("source_kind", yamlScalar(document.sourceKind)),
+            .literal("capture_status", document.contentMarkdown.isEmpty ? "metadata_only" : "full"),
+            .scalar("canonical_key", yamlScalar(document.canonicalKey)),
+            .scalar("source_title", yamlScalar(document.displayTitle)),
+            .scalar("reader_document_id", yamlScalar(document.id)),
         ]
 
-        appendOptional("source_url", document.preferredSourceURL, to: &lines)
-        appendOptional("reader_url", document.url, to: &lines)
-        appendOptional("reader_location", document.location, to: &lines)
-        appendOptional("author", document.author, to: &lines)
-        appendOptional("site_name", document.siteName, to: &lines)
-        appendOptional("published", document.publishedDate, to: &lines)
+        appendOptional("source_url", document.preferredSourceURL, to: &entries)
+        appendOptional("reader_url", document.readerWebURL, to: &entries)
+        appendOptional("reader_location", document.location, to: &entries)
+        appendOptional("author", document.author, to: &entries)
+        appendOptional("site_name", document.siteName, to: &entries)
+        appendOptional("published", document.publishedDate, to: &entries)
         if let wordCount = document.wordCount {
-            lines.append("word_count: \(wordCount)")
+            entries.append(.literal("word_count", "\(wordCount)"))
         }
-        appendTags(["imported/reader"] + document.tags, preserving: existingTags, to: &lines)
-        lines.append("---")
-        return lines.joined(separator: "\n")
+        appendTags(["imported/reader"] + document.tags, preserving: existingTags, to: &entries)
+        return entries
     }
 
-    private static func frontmatter(
+    private static func frontmatterEntries(
         for document: ReaderDocument,
         matchedBook: ReadwiseBook,
         id: UUID,
         createdAt: Date,
         updatedAt: Date,
         preservingTags existingTags: [String] = []
-    ) -> String {
-        var lines: [String] = [
-            "---",
-            "id: \(id.uuidString)",
-            "created: \(ISO8601DateFormatter.noto.string(from: createdAt))",
-            "updated: \(ISO8601DateFormatter.noto.string(from: updatedAt))",
-            "type: source",
-            "source_kind: \(yamlScalar(document.sourceKind))",
-            "capture_status: \(document.contentMarkdown.isEmpty ? "highlights_only" : "full")",
-            "canonical_key: \(yamlScalar(document.canonicalKey))",
-            "source_title: \(yamlScalar(document.displayTitle))",
-            "reader_document_id: \(yamlScalar(document.id))",
-            "readwise_user_book_id: \(matchedBook.userBookID)",
+    ) -> [FrontmatterEntry] {
+        var entries: [FrontmatterEntry] = [
+            .literal("id", id.uuidString),
+            .literal("created", ISO8601DateFormatter.noto.string(from: createdAt)),
+            .literal("updated", ISO8601DateFormatter.noto.string(from: updatedAt)),
+            .literal("type", "source"),
+            .scalar("source_kind", yamlScalar(document.sourceKind)),
+            .literal("capture_status", document.contentMarkdown.isEmpty ? "highlights_only" : "full"),
+            .scalar("canonical_key", yamlScalar(document.canonicalKey)),
+            .scalar("source_title", yamlScalar(document.displayTitle)),
+            .scalar("reader_document_id", yamlScalar(document.id)),
+            .literal("readwise_user_book_id", "\(matchedBook.userBookID)"),
         ]
 
-        appendOptional("source_url", document.preferredSourceURL, to: &lines)
-        appendOptional("reader_url", document.url, to: &lines)
-        appendOptional("reader_location", document.location, to: &lines)
-        appendOptional("readwise_url", document.url.nonEmpty ?? matchedBook.readwiseURL, to: &lines)
-        if document.url.nonEmpty != matchedBook.readwiseURL.nonEmpty {
-            appendOptional("readwise_bookreview_url", matchedBook.readwiseURL, to: &lines)
+        appendOptional("source_url", document.preferredSourceURL, to: &entries)
+        appendOptional("reader_url", document.readerWebURL, to: &entries)
+        appendOptional("reader_location", document.location, to: &entries)
+        appendOptional("readwise_url", document.readerWebURL, to: &entries)
+        if document.readerWebURL.nonEmpty != matchedBook.readwiseURL.nonEmpty {
+            appendOptional("readwise_bookreview_url", matchedBook.readwiseURL, to: &entries)
         }
-        appendOptional("author", document.author ?? matchedBook.author, to: &lines)
-        appendOptional("site_name", document.siteName, to: &lines)
-        appendOptional("published", document.publishedDate, to: &lines)
+        appendOptional("author", document.author ?? matchedBook.author, to: &entries)
+        appendOptional("site_name", document.siteName, to: &entries)
+        appendOptional("published", document.publishedDate, to: &entries)
         if let wordCount = document.wordCount {
-            lines.append("word_count: \(wordCount)")
+            entries.append(.literal("word_count", "\(wordCount)"))
         }
-        appendTags(["imported/reader", "imported/readwise"] + document.tags, preserving: existingTags, to: &lines)
-        lines.append("---")
-        return lines.joined(separator: "\n")
+        appendTags(["imported/reader", "imported/readwise"] + document.tags, preserving: existingTags, to: &entries)
+        return entries
     }
 
-    private static func appendTags(_ generatedTags: [String], preserving existingTags: [String], to lines: inout [String]) {
-        lines.append("tags:")
+    private static func appendTags(_ generatedTags: [String], preserving existingTags: [String], to entries: inout [FrontmatterEntry]) {
         var seen = Set<String>()
+        var renderedTags: [String] = []
         for tag in generatedTags.compactMap(\.nonEmpty) + existingTags.compactMap(\.nonEmpty) {
             guard seen.insert(tag).inserted else { continue }
-            lines.append("  - \(tag.hasPrefix("imported/") ? tag : yamlScalar(tag))")
+            renderedTags.append(tag.hasPrefix("imported/") ? tag : yamlScalar(tag))
         }
+        entries.append(.list("tags", values: renderedTags))
     }
 
-    private static func appendOptional(_ key: String, _ value: String?, to lines: inout [String]) {
+    private static func appendOptional(_ key: String, _ value: String?, to entries: inout [FrontmatterEntry]) {
         guard let value = value.nonEmpty else { return }
-        lines.append("\(key): \(yamlScalar(value))")
+        entries.append(.scalar(key, yamlScalar(value)))
     }
 
     private static func yamlScalar(_ value: String) -> String {
@@ -516,78 +562,24 @@ public enum SourceNoteRenderer {
         }
     }
 
-    private static func replaceFrontmatter(in markdown: String, with frontmatter: String) -> String {
-        guard markdown.hasPrefix("---"),
-              let closeRange = markdown.range(
-                of: "\n---",
-                range: markdown.index(markdown.startIndex, offsetBy: 3)..<markdown.endIndex
-              ) else {
-            return frontmatter + "\n" + markdown
-        }
+    private static func renderFrontmatter(_ entries: [FrontmatterEntry]) -> String {
+        FrontmatterDocument.render(entries)
+    }
 
-        let afterClose = closeRange.upperBound
-        let bodyStart = markdown.index(afterClose, offsetBy: markdown[afterClose...].hasPrefix("\n") ? 1 : 0)
-        return frontmatter + "\n" + markdown[bodyStart...]
+    private static func replaceFrontmatter(in markdown: String, with importerEntries: [FrontmatterEntry]) -> String {
+        let document = FrontmatterDocument(markdown: markdown)
+        let mergedEntries = document.merging(
+            importerEntries: importerEntries,
+            importerOwnedKeys: importerOwnedFrontmatterKeys
+        )
+        return renderFrontmatter(mergedEntries) + "\n" + document.body
     }
 
     private static func parseFrontmatter(_ markdown: String) -> ExistingFrontmatter {
-        guard markdown.hasPrefix("---"),
-              let closeRange = markdown.range(
-                of: "\n---",
-                range: markdown.index(markdown.startIndex, offsetBy: 3)..<markdown.endIndex
-              ) else {
-            return ExistingFrontmatter(id: nil, createdAt: nil, tags: [])
-        }
-
-        let frontmatter = markdown[markdown.startIndex..<closeRange.upperBound]
-        var id: UUID?
-        var createdAt: Date?
-        var tags: [String] = []
-        var isReadingTags = false
-
-        for line in frontmatter.components(separatedBy: "\n") {
-            if line.trimmingCharacters(in: .whitespaces) == "tags:" {
-                isReadingTags = true
-                continue
-            }
-            if isReadingTags {
-                if let tag = parseTagLine(line) {
-                    tags.append(tag)
-                    continue
-                }
-                if line.hasPrefix(" ") || line.hasPrefix("\t") || line.trimmingCharacters(in: .whitespaces).isEmpty {
-                    continue
-                }
-                isReadingTags = false
-            }
-
-            let parts = line.split(separator: ":", maxSplits: 1)
-            guard parts.count == 2 else { continue }
-            let key = parts[0].trimmingCharacters(in: .whitespaces)
-            let value = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-                .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-            if key == "id" {
-                id = UUID(uuidString: value)
-            } else if key == "created" {
-                createdAt = ISO8601DateFormatter.noto.date(from: value)
-            }
-        }
-
-        return ExistingFrontmatter(id: id, createdAt: createdAt, tags: tags)
-    }
-
-    private static func parseTagLine(_ line: String) -> String? {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard trimmed.hasPrefix("- ") else { return nil }
-        var value = String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)
-        if value.hasPrefix("\""), value.hasSuffix("\""), value.count >= 2 {
-            value.removeFirst()
-            value.removeLast()
-            value = value
-                .replacingOccurrences(of: "\\\"", with: "\"")
-                .replacingOccurrences(of: "\\\\", with: "\\")
-        }
-        return value.nonEmpty
+        let frontmatter = FrontmatterDocument(markdown: markdown)
+        let id = frontmatter.scalarValue(for: "id").flatMap(UUID.init(uuidString:))
+        let createdAt = frontmatter.scalarValue(for: "created").flatMap(ISO8601DateFormatter.noto.date(from:))
+        return ExistingFrontmatter(id: id, createdAt: createdAt, tags: frontmatter.stringList(for: "tags"))
     }
 
     private static func insertGeneratedBlock(_ markdown: String, generatedBlock: String) -> String {

@@ -3,7 +3,10 @@ import PackageDescription
 
 let package = Package(
     name: "NotoReadwiseSync",
-    platforms: [.macOS(.v14)],
+    platforms: [
+        .iOS(.v16),
+        .macOS(.v14),
+    ],
     products: [
         .library(name: "NotoReadwiseSyncCore", targets: ["NotoReadwiseSyncCore"]),
         .executable(name: "noto-readwise-sync", targets: ["noto-readwise-sync"]),
@@ -21,4 +24,3 @@ let package = Package(
         ),
     ]
 )
-

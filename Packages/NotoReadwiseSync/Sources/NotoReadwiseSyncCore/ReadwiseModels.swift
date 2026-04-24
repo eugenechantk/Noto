@@ -141,6 +141,13 @@ public extension ReadwiseBook {
         sourceURL.nonEmpty ?? uniqueURL.nonEmpty
     }
 
+    var readerWebURL: String? {
+        guard source == "reader", let externalID = externalID.nonEmpty else {
+            return nil
+        }
+        return "https://read.readwise.io/read/\(externalID)"
+    }
+
     var activeHighlights: [ReadwiseHighlight] {
         highlights
             .filter { !$0.isDeleted }
@@ -212,6 +219,12 @@ public struct ReadwiseHighlight: Codable, Sendable {
 public extension JSONDecoder {
     static var readwise: JSONDecoder {
         JSONDecoder()
+    }
+}
+
+public extension JSONEncoder {
+    static var readwise: JSONEncoder {
+        JSONEncoder()
     }
 }
 

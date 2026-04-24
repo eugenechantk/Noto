@@ -7,6 +7,22 @@ public struct SourceNoteSyncResult: Sendable {
     public var skippedChildDocuments: Int
     public var dryRun: Bool
     public var sourceDirectoryURL: URL
+
+    public init(
+        created: Int,
+        updated: Int,
+        skippedDeleted: Int,
+        skippedChildDocuments: Int,
+        dryRun: Bool,
+        sourceDirectoryURL: URL
+    ) {
+        self.created = created
+        self.updated = updated
+        self.skippedDeleted = skippedDeleted
+        self.skippedChildDocuments = skippedChildDocuments
+        self.dryRun = dryRun
+        self.sourceDirectoryURL = sourceDirectoryURL
+    }
 }
 
 public struct SourceNoteSyncEngine: Sendable {
@@ -79,6 +95,7 @@ public struct SourceNoteSyncEngine: Sendable {
                 relativePath: relativePath,
                 generatedBlockHash: generatedHash,
                 readwiseUserBookID: book.userBookID,
+                readerDocumentID: book.source == "reader" ? book.externalID : nil,
                 updatedAt: ISO8601DateFormatter.noto.string(from: syncedAt)
             )
 

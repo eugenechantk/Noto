@@ -139,6 +139,13 @@ public extension ReaderDocument {
         sourceURL.nonEmpty ?? url.nonEmpty
     }
 
+    var readerWebURL: String {
+        if let url = url.nonEmpty, url.contains("read.readwise.io") || url.contains("readwise.io/reader") {
+            return url
+        }
+        return "https://read.readwise.io/read/\(id)"
+    }
+
     var isTopLevelDocument: Bool {
         parentID.nonEmpty == nil
     }

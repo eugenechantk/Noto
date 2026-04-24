@@ -14,7 +14,29 @@ public enum ReadwiseClientError: Error, CustomStringConvertible {
     }
 }
 
-public struct ReadwiseClient: Sendable {
+public protocol ReadwiseSyncClient: Sendable {
+    func fetchExport(
+        updatedAfter: String?,
+        includeDeleted: Bool,
+        ids: [Int]?,
+        limit: Int?
+    ) async throws -> [ReadwiseBook]
+
+    func fetchReaderDocuments(
+        id: String?,
+        updatedAfter: String?,
+        location: String?,
+        category: String?,
+        tags: [String],
+        limit: Int?
+    ) async throws -> [ReaderDocument]
+
+    func saveReaderDocument(_ request: SaveDocumentRequest) async throws -> SaveOutcome
+
+    func validateToken() async throws
+}
+
+public struct ReadwiseClient: ReadwiseSyncClient, Sendable {
     private let token: String
     private let session: URLSession
 
@@ -26,6 +48,7 @@ public struct ReadwiseClient: Sendable {
     public func fetchExport(
         updatedAfter: String? = nil,
         includeDeleted: Bool = true,
+        ids: [Int]? = nil,
         limit: Int? = nil
     ) async throws -> [ReadwiseBook] {
         var books: [ReadwiseBook] = []
@@ -35,6 +58,7 @@ public struct ReadwiseClient: Sendable {
             let page = try await fetchExportPage(
                 updatedAfter: updatedAfter,
                 includeDeleted: includeDeleted,
+                ids: ids,
                 pageCursor: nextPageCursor
             )
             if let limit {
@@ -46,7 +70,7 @@ public struct ReadwiseClient: Sendable {
                 books.append(contentsOf: page.results)
             }
             nextPageCursor = page.nextPageCursor
-        } while nextPageCursor != nil
+        } while nextPageCursor != nil && ids == nil
 
         return books
     }
@@ -86,9 +110,70 @@ public struct ReadwiseClient: Sendable {
         return documents
     }
 
+    public func saveReaderDocument(_ request: SaveDocumentRequest) async throws -> SaveOutcome {
+        guard let url = URL(string: "https://readwise.io/api/v3/save/") else {
+            throw ReadwiseClientError.invalidURL
+        }
+
+        var httpRequest = URLRequest(url: url)
+        httpRequest.httpMethod = "POST"
+        httpRequest.setValue("Token \(token)", forHTTPHeaderField: "Authorization")
+        httpRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        httpRequest.httpBody = try JSONEncoder.readwise.encode(request)
+
+        let (data, response) = try await session.data(for: httpRequest)
+        guard let http = response as? HTTPURLResponse else {
+            throw ReadwiseClientError.badStatus(-1, "Missing HTTP response")
+        }
+
+        if http.statusCode == 429,
+           let retryAfter = http.value(forHTTPHeaderField: "Retry-After"),
+           let seconds = Double(retryAfter) {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            return try await saveReaderDocument(request)
+        }
+
+        guard (200..<300).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? "<non-utf8 body>"
+            throw ReadwiseClientError.badStatus(http.statusCode, body)
+        }
+
+        let decoded = try JSONDecoder.readwise.decode(SaveDocumentResponse.self, from: data)
+        let status: SaveOutcome.Status = http.statusCode == 201 ? .created : .existing
+        return SaveOutcome(status: status, response: decoded)
+    }
+
+    public func validateToken() async throws {
+        guard let url = URL(string: "https://readwise.io/api/v2/auth/") else {
+            throw ReadwiseClientError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Token \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw ReadwiseClientError.badStatus(-1, "Missing HTTP response")
+        }
+
+        if http.statusCode == 429,
+           let retryAfter = http.value(forHTTPHeaderField: "Retry-After"),
+           let seconds = Double(retryAfter) {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            return try await validateToken()
+        }
+
+        guard (200..<300).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? "<non-utf8 body>"
+            throw ReadwiseClientError.badStatus(http.statusCode, body)
+        }
+    }
+
     private func fetchExportPage(
         updatedAfter: String?,
         includeDeleted: Bool,
+        ids: [Int]?,
         pageCursor: String?
     ) async throws -> ReadwiseExportPage {
         var components = URLComponents(string: "https://readwise.io/api/v2/export/")
@@ -98,6 +183,9 @@ public struct ReadwiseClient: Sendable {
         }
         if includeDeleted {
             items.append(URLQueryItem(name: "includeDeleted", value: "true"))
+        }
+        if let ids, !ids.isEmpty {
+            items.append(URLQueryItem(name: "ids", value: ids.map(String.init).joined(separator: ",")))
         }
         if let pageCursor {
             items.append(URLQueryItem(name: "pageCursor", value: pageCursor))
@@ -124,6 +212,7 @@ public struct ReadwiseClient: Sendable {
             return try await fetchExportPage(
                 updatedAfter: updatedAfter,
                 includeDeleted: includeDeleted,
+                ids: ids,
                 pageCursor: pageCursor
             )
         }

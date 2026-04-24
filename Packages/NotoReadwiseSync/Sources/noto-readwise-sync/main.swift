@@ -11,7 +11,59 @@ struct NotoReadwiseSyncCLI {
                 return
             }
 
-            if options.readerMode {
+            if options.saveMode {
+                guard !options.saveURLs.isEmpty else {
+                    throw CLIError.missingSaveURL
+                }
+
+                let requests = options.saveURLs.map { url in
+                    SaveDocumentRequest(
+                        url: url,
+                        title: options.saveTitle,
+                        author: options.saveAuthor,
+                        tags: options.saveTags.isEmpty ? nil : options.saveTags,
+                        location: options.saveLocation,
+                        category: options.saveCategory,
+                        summary: options.saveSummary,
+                        notes: options.saveNotes,
+                        publishedDate: options.savePublishedDate,
+                        imageURL: options.saveImageURL
+                    )
+                }
+
+                if options.dryRun {
+                    let encoder = JSONEncoder.readwise
+                    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                    print("Save dry run — \(requests.count) request(s):")
+                    for (index, request) in requests.enumerated() {
+                        let data = try encoder.encode(request)
+                        let body = String(data: data, encoding: .utf8) ?? "<non-utf8 body>"
+                        print("--- [\(index + 1)] POST https://readwise.io/api/v3/save/")
+                        print(body)
+                    }
+                } else {
+                    guard let token = options.token?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty else {
+                        throw CLIError.missingToken
+                    }
+                    let client = ReadwiseClient(token: token)
+                    var created = 0
+                    var existing = 0
+                    print("Saving \(requests.count) URL(s) to Reader...")
+                    for request in requests {
+                        let outcome = try await client.saveReaderDocument(request)
+                        switch outcome.status {
+                        case .created: created += 1
+                        case .existing: existing += 1
+                        }
+                        print("  [\(outcome.status.rawValue)] \(request.url) -> \(outcome.response.url)")
+                    }
+                    print("""
+                    Save complete.
+                    Created: \(created)
+                    Existing: \(existing)
+                    """)
+                }
+            } else if options.readerMode {
                 let fetchedDocuments: [ReaderDocument]
                 if let fixtureURL = options.fixtureURL {
                     let data = try Data(contentsOf: fixtureURL)
@@ -126,15 +178,31 @@ private struct CLIOptions {
     var readerTags: [String] = []
     var readerJoinHighlights: Bool = true
     var includeDeleted: Bool = true
+    var saveMode: Bool = false
+    var saveURLs: [String] = []
+    var saveTitle: String?
+    var saveAuthor: String?
+    var saveTags: [String] = []
+    var saveLocation: String?
+    var saveCategory: String?
+    var saveSummary: String?
+    var saveNotes: String?
+    var savePublishedDate: String?
+    var saveImageURL: String?
     var dryRun: Bool = false
     var help: Bool = false
 
     static let helpText = """
     Usage:
-      noto-readwise-sync --vault <vault-path> [options]
+      noto-readwise-sync --vault <vault-path> [options]          # Import from Readwise/Reader into the vault.
+      noto-readwise-sync --save <url> [options]                  # Save URL(s) to Reader.
 
-    Options:
+    Common options:
       --token <token>             Readwise access token. Defaults to READWISE_TOKEN.
+      --dry-run                   Plan without network writes. Import: no file writes. Save: no POST.
+      --help                      Show this help text.
+
+    Import options:
       --vault <path>              Noto vault path.
       --source-dir <path>         Source note directory, relative to vault unless absolute. Default: Captures.
       --updated-after <iso-date>  Fetch Readwise sources updated after this ISO 8601 date.
@@ -148,8 +216,18 @@ private struct CLIOptions {
       --include-deleted           Include deleted highlights from Readwise export, then omit them from generated notes. Default.
       --no-include-deleted        Do not ask Readwise for deleted highlights.
       --fixture <path>            Use a local Readwise export JSON fixture instead of the network.
-      --dry-run                   Fetch and plan without writing files.
-      --help                      Show this help text.
+
+    Save options:
+      --save <url>                URL to save to Reader. Repeat for multiple URLs.
+      --save-title <title>        Override detected title.
+      --save-author <author>      Override detected author.
+      --save-tag <tag>            Tag to attach. Repeat for multiple tags.
+      --save-location <value>     new | later | archive | feed. Default: new.
+      --save-category <type>      article | video | pdf | epub | tweet | rss | email.
+      --save-summary <text>       Document summary.
+      --save-notes <text>         Top-level document note.
+      --save-published-date <iso> Published date in ISO 8601 format.
+      --save-image-url <url>      Cover image URL.
 
     Environment:
       READWISE_TOKEN              Used when --token is omitted.
@@ -198,11 +276,45 @@ private struct CLIOptions {
                 options.includeDeleted = true
             case "--no-include-deleted":
                 options.includeDeleted = false
+            case "--save":
+                options.saveMode = true
+                options.saveURLs.append(try requiredValue(iterator.next(), option: arg))
+            case "--save-title":
+                options.saveMode = true
+                options.saveTitle = try requiredValue(iterator.next(), option: arg)
+            case "--save-author":
+                options.saveMode = true
+                options.saveAuthor = try requiredValue(iterator.next(), option: arg)
+            case "--save-tag":
+                options.saveMode = true
+                options.saveTags.append(try requiredValue(iterator.next(), option: arg))
+            case "--save-location":
+                options.saveMode = true
+                options.saveLocation = try requiredValue(iterator.next(), option: arg)
+            case "--save-category":
+                options.saveMode = true
+                options.saveCategory = try requiredValue(iterator.next(), option: arg)
+            case "--save-summary":
+                options.saveMode = true
+                options.saveSummary = try requiredValue(iterator.next(), option: arg)
+            case "--save-notes":
+                options.saveMode = true
+                options.saveNotes = try requiredValue(iterator.next(), option: arg)
+            case "--save-published-date":
+                options.saveMode = true
+                options.savePublishedDate = try requiredValue(iterator.next(), option: arg)
+            case "--save-image-url":
+                options.saveMode = true
+                options.saveImageURL = try requiredValue(iterator.next(), option: arg)
             case "--dry-run":
                 options.dryRun = true
             default:
                 throw CLIError.unknownOption(arg)
             }
+        }
+
+        if options.saveMode && options.readerMode {
+            throw CLIError.conflictingModes
         }
 
         return options
@@ -243,6 +355,8 @@ private enum CLIError: Error, CustomStringConvertible {
     case invalidPositiveInt(String, String)
     case tooManyReaderTags
     case unknownOption(String)
+    case conflictingModes
+    case missingSaveURL
 
     var description: String {
         switch self {
@@ -256,6 +370,10 @@ private enum CLIError: Error, CustomStringConvertible {
             "Reader API supports at most 5 --reader-tag filters."
         case .unknownOption(let option):
             "Unknown option: \(option)."
+        case .conflictingModes:
+            "--save cannot be combined with --reader / --reader-* options. Run them separately."
+        case .missingSaveURL:
+            "Save mode requires at least one --save <url>."
         }
     }
 }

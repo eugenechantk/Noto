@@ -276,11 +276,42 @@ Implemented Reader mode:
 Matching and update behavior:
 
 - Reader notes use `canonical_key: "reader:<reader_document_id>"`.
-- Readwise-only notes use a Readwise canonical key based on the Readwise source.
+- Readwise-only notes use `canonical_key: "readwise-book:<readwise_user_book_id>"`.
+- Readwise sources that came from Reader do not get their own separate `readwise-book:*` note. When `ReadwiseBook.source == "reader"` and `ReadwiseBook.external_id == ReaderDocument.id`, they reconcile onto the Reader identity and update the same `reader:<reader_document_id>` note.
 - On later runs, the CLI first checks `<vault>/.noto/sync/readwise.json`.
 - If the mapping is missing, it scans existing markdown files for `canonical_key`.
 - If a match exists, it replaces only the generated highlights/content blocks and refreshes frontmatter.
 - If no match exists, it creates a new markdown file under `Captures/` by default, or the directory passed through `--source-dir`.
+
+Sync state currently stored in `<vault>/.noto/sync/readwise.json`:
+
+- `lastSuccessfulSyncAt`: last successful Readwise export sync timestamp
+- `lastSuccessfulReaderSyncAt`: last successful Reader sync timestamp
+- `sources[canonical_key]`:
+  - `relativePath`
+  - `noteID`
+  - `generatedBlockHash`
+  - `readerDocumentID`
+  - `readwiseUserBookID`
+  - `updatedAt`
+
+How incremental sync should work:
+
+1. Use Reader API `updatedAfter=<lastSuccessfulReaderSyncAt>` so only changed Reader documents are fetched.
+2. Use Readwise export API `updatedAfter=<lastSuccessfulSyncAt>` so only changed highlighted sources are fetched.
+3. For each returned item, compute the canonical key:
+   - `reader:<reader_document_id>` for Reader documents
+   - `reader:<external_id>` for Readwise items whose `source == "reader"`
+   - `readwise-book:<user_book_id>` for Readwise-only items
+4. Use sync state to find the existing local note path quickly.
+5. If the mapping is missing, fall back to scanning frontmatter for `canonical_key`.
+6. Replace only importer-owned blocks:
+   - highlights block from Readwise
+   - content block from Reader
+   - importer-owned frontmatter fields
+7. Save the new successful sync timestamps back to `readwise.json`.
+
+This keeps steady-state sync proportional to changed upstream items rather than reprocessing the full library on every run.
 
 Useful backfill controls:
 
@@ -333,30 +364,56 @@ URL behavior for joined Reader plus Readwise notes:
 - `reader_url` stores the Reader document URL.
 - `readwise_url` also points to the Reader document URL, because Reader has the richer source context.
 - `readwise_bookreview_url` preserves the Readwise bookreview URL for debugging and future sync needs.
-- The visible body metadata line is `Readwise: [Open in Reader](...)`.
+- The note body no longer shows generated metadata lines such as `Source`, `Readwise`, or `Captured`; those fields live in frontmatter only.
 
 Important caveat: full content currently comes from Reader only. Highlights come from Readwise export. The richest backfill path is therefore Reader mode, because it can produce notes with both full content and highlights when the Reader document has a matching Readwise highlighted entity. Readwise-only mode remains necessary for Kindle, podcasts, books, and any source where Reader has no full document.
+
+Secret storage model:
+
+- The Readwise token must never be stored in the vault, frontmatter, `.noto/sync/readwise.json`, `.obsidian/`, or any other iCloud-synced markdown/config file.
+- macOS should store the token in Keychain. The current local CLI already uses:
+  - service: `com.noto.readwise`
+  - account: `readwise-token`
+- iPhone and iPad should store the token in the iOS Keychain through Noto app settings.
+- The vault stores only sync state, not secrets.
+- Cross-device availability should come from secure per-device storage first. If iCloud Keychain propagation works for the chosen keychain item configuration, treat that as a UX improvement, not a hard dependency.
+
+Recommended product behavior:
+
+1. Noto settings expose `Set Token`, `Test Connection`, and `Sync Now`.
+2. The token is written to secure platform storage:
+   - macOS Keychain on macOS
+   - iOS Keychain on iPhone/iPad
+3. Sync code reads the token from secure storage at runtime.
+4. Source notes and sync-state files remain portable and plain-text, with no embedded secrets.
 
 Still planned:
 
 1. Add automatic pagination coverage tests against larger fixture sets.
 2. Use Reader raw source URL when `html_content` is missing.
 3. Add Defuddle/direct web extraction fallback for sources that Reader cannot hydrate.
-4. Add app-open/app-visible incremental sync in Noto itself.
+4. Add incremental sync in Noto itself through app-launch sync plus a settings action.
 
 ### Incremental Sync
 
-Start with polling plus app lifecycle triggers:
+Start with app-launch sync plus an explicit settings action, but no periodic polling:
 
-1. Run sync when the app opens.
-2. Run sync when the app becomes visible/active after being backgrounded.
-3. Also run periodic polling while the app remains open.
-4. Call Readwise export with `updatedAfter=<last_successful_sync>`.
-5. Call Reader list with `updatedAfter=<last_successful_sync>`.
-6. Replace the generated highlights block and/or generated content block for affected source notes.
-7. If `includeDeleted=true` is enabled, remove deleted upstream highlights from the generated highlights block while preserving content and all user-owned markdown outside generated blocks.
+1. Run sync when Noto launches or opens.
+2. Also allow the user to tap `Sync now` in Noto settings.
+3. Call Readwise export with `updatedAfter=<last_successful_sync>`.
+4. Call Reader list with `updatedAfter=<last_successful_sync>`.
+5. Replace the generated highlights block and/or generated content block for affected source notes.
+6. If `includeDeleted=true` is enabled, remove deleted upstream highlights from the generated highlights block while preserving content and all user-owned markdown outside generated blocks.
 
-Polling plus app-open/app-visible sync is enough for a robust MVP and does not require a server.
+This keeps the product simple, avoids continuous background polling, and still gives predictable incremental updates without a server.
+
+Execution model:
+
+- The sync pipeline should run off the main thread: token lookup, network calls, JSON decoding, HTML-to-Markdown conversion, note rendering, and file writes are background work.
+- The UI should not block on sync completion. On app launch, Noto should render from the local vault first, then let sync run in the background.
+- Sync should write files into the vault and update `.noto/sync/readwise.json`; it should not manually mutate note-list UI state item-by-item.
+- Noto already observes vault filesystem changes for note-list/sidebar refresh. Sync should rely on that existing watcher path so newly created or updated source notes appear through normal vault observation.
+- The only direct UI state sync needs is lightweight status such as `syncing`, `last synced`, and `error`.
 
 ### Webhooks Later
 
@@ -381,7 +438,7 @@ Hydration priority:
 5. Site-specific extraction only where needed.
 6. Mark as `highlights_only` with a reason if no full content can be obtained.
 
-Use Defuddle in Node/TypeScript for the first implementation. It already supports HTML/URL to Markdown in a server or local CLI environment. Avoid a Swift rewrite until there is evidence the JS dependency is a real problem.
+Use Defuddle in Node/TypeScript as a later fallback for pages Reader cannot hydrate. The first sync implementation already exists as a Swift package in this repo; do not move core sync orchestration into app UI code.
 
 Privacy note: Defuddle async extractors can call third-party services for some client-rendered pages. This should be a setting, especially for private reading material.
 
@@ -389,13 +446,17 @@ Privacy note: Defuddle async extractors can call third-party services for some c
 
 ### Option A: Local Sync CLI First
 
-Build a small TypeScript CLI that:
+Use the existing Swift sync package and thin CLI wrapper:
 
-- Takes Readwise token and vault/source directory path.
-- Pulls Readwise and Reader APIs.
-- Runs Defuddle for content hydration.
-- Writes markdown files directly to the vault.
-- Stores cursors in `<vault>/.noto/sync/readwise.json`.
+- `Packages/NotoReadwiseSync` owns sync logic:
+  - Reader / Readwise API clients
+  - canonical-key reconciliation
+  - incremental cursor handling
+  - source-note rendering
+  - sync-state read/write
+  - highlight/delete reconciliation rules
+- `Sources/noto-readwise-sync` is only a CLI shell over the package.
+- The package writes markdown files directly to the vault and stores sync state in `<vault>/.noto/sync/readwise.json`.
 
 Recommendation: start here.
 
@@ -405,13 +466,27 @@ Reasons:
 - Avoids iOS background execution limits.
 - Avoids shipping token UI and OAuth immediately.
 - Easy to test against sample fixtures.
-- Can later be embedded in macOS app or wrapped by UI.
+- The same package can later be embedded in macOS/iOS Noto without duplicating sync behavior.
 
 ### Option B: Native Noto Importer
 
-Build token storage, sync settings, and import directly into Noto.
+Build token storage, sync settings, and import directly into Noto, but keep sync orchestration in `Packages/NotoReadwiseSync`.
 
-This is the right long-term experience, especially on macOS. It is more product-complete but slower because it needs UI, secure token storage, error handling, and background behavior.
+The app should only own:
+
+- secure token storage access
+- settings UI
+- launch / `Sync now` triggers
+- sync status and errors
+
+The package should continue to own:
+
+- API calls
+- merge logic
+- rendering and file writes
+- sync-state updates
+
+This is the right long-term experience, especially on macOS. It is more product-complete but slower because it needs UI, secure token storage, error handling, and launch-triggered background behavior.
 
 ### Option C: Hosted Sync Service
 
@@ -447,7 +522,7 @@ Success: all existing Readwise highlights become source notes in the vault.
 
 - Pull Reader documents with `withHtmlContent=true` and `withRawSourceUrl=true`.
 - Join Reader documents to Readwise highlight groups.
-- Use Defuddle for HTML to Markdown.
+- Convert Reader `html_content` to Markdown directly first; add Defuddle only as a fallback for sources Reader cannot hydrate.
 - Store capture status and hydration errors.
 - Avoid duplicate notes for the same article/tweet/video.
 
@@ -455,8 +530,9 @@ Success: Reader articles and many tweets/videos have full content plus highlight
 
 ### Phase 3: Incremental Sync
 
+- Keep incremental sync orchestration in `Packages/NotoReadwiseSync`.
 - Store sync state.
-- Sync on app open, app visible/active, and periodic polling with `updatedAfter`.
+- Sync when the app launches/opens, and also when the user taps `Sync now` in settings, using `updatedAfter`.
 - Support deleted highlights through `includeDeleted=true`.
 - Replace only the generated highlights/content blocks.
 - Preserve all markdown outside generated blocks.
@@ -467,6 +543,7 @@ Success: regular sync keeps source notes current without overwriting manual note
 ### Phase 4: Native Product UI
 
 - Add Noto settings for Readwise token and source directory.
+- Use the sync package from the app instead of reimplementing sync logic in the app target.
 - Show sync status and failures.
 - Let Eugene run sync manually.
 - Add macOS scheduled sync if useful.
