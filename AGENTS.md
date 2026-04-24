@@ -14,8 +14,9 @@
 - For bullet/list rendering changes, test and visually validate multiline wrapped bullets, not only single-line bullets; include nested levels when indent progression changes.
 - For keyboard toolbar visual changes, capture a keyboard-visible screenshot and check pill shape, translucency, and icon contrast before concluding.
 - Do not run multiple `flowdeck build`, `flowdeck run`, or `flowdeck test` invocations in parallel for this workspace; they share DerivedData and can lock the build database.
-- When the user asks to `install` without naming a narrower target, install the latest app on all regular test targets: iPhone, iPad, and macOS.
+- When the user asks to `install`, `install to all devices`, or `install on my devices` without naming a narrower target, install the latest app on Eugene's actual physical iPhone, actual physical iPad mini, and macOS. Do not use simulators for `install` requests unless the user explicitly says `simulator`.
 - When the user asks to test on simulator without naming a narrower device, install and launch the app on both an iPhone simulator and an iPad simulator.
+- For iPad simulator validation, prefer an iPad mini simulator unless the user asks for a different iPad size.
 - When the user asks to `install` the macOS app, always treat that as replacing `/Applications/Noto.app` with the latest macOS build, not merely running the app from DerivedData. Use the deterministic install flow: build with FlowDeck, stop running Noto processes, remove the existing `/Applications/Noto.app`, copy in the freshly built `Noto.app`, `touch` it, re-register it with Launch Services, launch `/Applications/Noto.app`, and verify the running process path is `/Applications/Noto.app/Contents/MacOS/Noto`.
 - At the end of any completed task, explicitly report:
   `1)` the actions taken, and
