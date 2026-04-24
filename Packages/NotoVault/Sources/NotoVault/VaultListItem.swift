@@ -19,12 +19,23 @@ public struct FolderSummary: Identifiable, Equatable, Hashable, Sendable {
     public let folderURL: URL
     public let name: String
     public let modifiedDate: Date
+    public let folderCount: Int
+    public let itemCount: Int
 
-    public init(id: UUID, folderURL: URL, name: String, modifiedDate: Date) {
+    public init(
+        id: UUID,
+        folderURL: URL,
+        name: String,
+        modifiedDate: Date,
+        folderCount: Int = 0,
+        itemCount: Int = 0
+    ) {
         self.id = id
         self.folderURL = folderURL.standardizedFileURL
         self.name = name
         self.modifiedDate = modifiedDate
+        self.folderCount = folderCount
+        self.itemCount = itemCount
     }
 }
 

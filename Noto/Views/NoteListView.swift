@@ -1051,12 +1051,18 @@ struct FolderRow: View {
                     .font(.headline)
                     .foregroundStyle(AppTheme.primaryText)
                     .lineLimit(1)
-                Text(folder.modifiedDate, style: .relative)
+                Text(folder.contentsSummary)
                     .font(.caption)
                     .foregroundStyle(AppTheme.secondaryText)
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+private extension NotoFolder {
+    var contentsSummary: String {
+        "\(itemCount) \(itemCount == 1 ? "file" : "files"), \(folderCount) \(folderCount == 1 ? "folder" : "folders")"
     }
 }
 

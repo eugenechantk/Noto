@@ -365,7 +365,9 @@ struct NotoSidebarView: View {
                 id: VaultDirectoryLoader.stableID(for: row.url),
                 folderURL: row.url,
                 name: row.name,
-                modifiedDate: row.modifiedAt
+                modifiedDate: row.modifiedAt,
+                folderCount: 0,
+                itemCount: 0
             ))
             expandedFolderURLs.remove(row.url.standardizedFileURL)
             persistExpansionState()

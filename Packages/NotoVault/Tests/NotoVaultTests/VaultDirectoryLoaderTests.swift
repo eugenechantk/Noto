@@ -78,6 +78,29 @@ struct VaultDirectoryLoaderTests {
         #expect(note.title == "Untitled")
     }
 
+    @Test
+    func foldersIncludeImmediateFolderAndItemCounts() throws {
+        let root = try makeVault { root in
+            let projects = root.appendingPathComponent("Projects")
+            try makeFolder(projects)
+            try makeFolder(projects.appendingPathComponent("Drafts"))
+            try makeFolder(projects.appendingPathComponent("Archive"))
+            try "# Brief".write(to: projects.appendingPathComponent("Brief.md"), atomically: true, encoding: .utf8)
+            try "# Notes".write(to: projects.appendingPathComponent("Notes.MD"), atomically: true, encoding: .utf8)
+            try "ignore".write(to: projects.appendingPathComponent("image.png"), atomically: true, encoding: .utf8)
+        }
+
+        let items = try VaultDirectoryLoader().loadItems(in: root)
+
+        guard case .folder(let folder) = items.first else {
+            Issue.record("Expected a folder")
+            return
+        }
+        #expect(folder.name == "Projects")
+        #expect(folder.folderCount == 2)
+        #expect(folder.itemCount == 2)
+    }
+
     private func makeVault(_ build: (URL) throws -> Void) throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("NotoVaultTests-\(UUID().uuidString)", isDirectory: true)

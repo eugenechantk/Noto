@@ -27,11 +27,14 @@ public struct VaultDirectoryLoader: Sendable {
             let normalizedURL = childURL.standardizedFileURL
 
             if values.isDirectory == true {
+                let contentCount = folderContentsCount(in: normalizedURL)
                 folders.append(FolderSummary(
                     id: Self.stableID(for: normalizedURL),
                     folderURL: normalizedURL,
                     name: normalizedURL.lastPathComponent,
-                    modifiedDate: modifiedAt
+                    modifiedDate: modifiedAt,
+                    folderCount: contentCount.folders,
+                    itemCount: contentCount.items
                 ))
             } else if normalizedURL.pathExtension == "md" {
                 notes.append(noteSummary(at: normalizedURL, modifiedAt: modifiedAt))
@@ -44,6 +47,30 @@ public struct VaultDirectoryLoader: Sendable {
         let sortedNotes = notes.sorted { $0.modifiedDate > $1.modifiedDate }
 
         return sortedFolders.map(VaultListItem.folder) + sortedNotes.map(VaultListItem.note)
+    }
+
+    private func folderContentsCount(in folderURL: URL) -> (folders: Int, items: Int) {
+        guard let children = try? FileManager.default.contentsOfDirectory(
+            at: folderURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return (0, 0)
+        }
+
+        var folderCount = 0
+        var itemCount = 0
+        for childURL in children {
+            guard let values = try? childURL.resourceValues(forKeys: [.isDirectoryKey]) else {
+                continue
+            }
+            if values.isDirectory == true {
+                folderCount += 1
+            } else if childURL.pathExtension.localizedCaseInsensitiveCompare("md") == .orderedSame {
+                itemCount += 1
+            }
+        }
+        return (folderCount, itemCount)
     }
 
     public static func stableID(for url: URL) -> UUID {

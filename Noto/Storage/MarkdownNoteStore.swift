@@ -97,6 +97,8 @@ struct NotoFolder: Identifiable, Hashable {
     let folderURL: URL
     var name: String
     var modifiedDate: Date
+    var folderCount: Int
+    var itemCount: Int
 }
 
 /// An item in a directory listing — either a folder or a note.
@@ -136,7 +138,9 @@ extension NotoFolder {
             id: summary.id,
             folderURL: summary.folderURL,
             name: summary.name,
-            modifiedDate: summary.modifiedDate
+            modifiedDate: summary.modifiedDate,
+            folderCount: summary.folderCount,
+            itemCount: summary.itemCount
         )
     }
 }
@@ -552,7 +556,9 @@ final class MarkdownNoteStore {
             id: folder.id,
             folderURL: destURL,
             name: destURL.lastPathComponent,
-            modifiedDate: folder.modifiedDate
+            modifiedDate: folder.modifiedDate,
+            folderCount: folder.folderCount,
+            itemCount: folder.itemCount
         )
     }
 
@@ -707,7 +713,9 @@ final class MarkdownNoteStore {
             id: VaultDirectoryLoader.stableID(for: folderURL),
             folderURL: folderURL,
             name: name,
-            modifiedDate: Date()
+            modifiedDate: Date(),
+            folderCount: 0,
+            itemCount: 0
         )
 
         // Insert in alphabetical order among existing folders
