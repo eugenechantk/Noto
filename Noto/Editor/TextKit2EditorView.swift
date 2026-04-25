@@ -3349,6 +3349,12 @@ private final class HyperlinkOpeningTextView: NSTextView {
     }
 }
 
+private final class FindHighlightOverlayView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+}
+
 struct TextKit2EditorView: NSViewControllerRepresentable {
     @Binding var text: String
     var autoFocus: Bool = false
@@ -3425,6 +3431,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var onFindStatusChange: ((EditorFindStatus) -> Void)?
     private var lastPublishedFindStatus = EditorFindStatus()
     private var findBackgroundSnapshots: [EditorFindBackgroundSnapshot] = []
+    private var findHighlightViews: [NSView] = []
 
     override func loadView() {
         view = NSView()
@@ -3667,6 +3674,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         guard NSMaxRange(range) <= (textView.string as NSString).length else { return }
         textView.setSelectedRange(range)
         textView.scrollRangeToVisible(range)
+        refreshFindHighlightOverlays()
     }
 
     private func publishFindStatusIfNeeded() {
@@ -3705,9 +3713,12 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
         textStorage.endEditing()
         textView.needsDisplay = true
+        refreshFindHighlightOverlays()
     }
 
     private func restoreFindHighlightBackgrounds() {
+        clearFindHighlightOverlays()
+
         guard isViewLoaded,
               let textStorage = textView.textStorage,
               !findBackgroundSnapshots.isEmpty else {
@@ -3732,6 +3743,61 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         textStorage.enumerateAttribute(.backgroundColor, in: range, options: []) { value, subrange, _ in
             findBackgroundSnapshots.append(EditorFindBackgroundSnapshot(range: subrange, value: value))
         }
+    }
+
+    private func refreshFindHighlightOverlays() {
+        guard isViewLoaded, textView != nil else { return }
+        clearFindHighlightOverlays()
+        guard !findMatches.isEmpty,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else {
+            return
+        }
+
+        layoutManager.ensureLayout(for: textContainer)
+        let textLength = (textView.string as NSString).length
+        let textContainerOrigin = textView.textContainerOrigin
+        for (index, range) in findMatches.enumerated() {
+            guard range.location >= 0,
+                  range.length > 0,
+                  NSMaxRange(range) <= textLength else {
+                continue
+            }
+
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            guard glyphRange.location != NSNotFound, glyphRange.length > 0 else { continue }
+
+            layoutManager.enumerateEnclosingRects(
+                forGlyphRange: glyphRange,
+                withinSelectedGlyphRange: NSRange(location: NSNotFound, length: 0),
+                in: textContainer
+            ) { [weak self] rect, _ in
+                guard let self else { return }
+                let highlightRect = NSRect(
+                    x: rect.minX + textContainerOrigin.x - 1,
+                    y: rect.minY + textContainerOrigin.y - 1,
+                    width: max(4, rect.width + 2),
+                    height: max(12, rect.height + 2)
+                )
+                guard self.isFiniteRect(highlightRect) else { return }
+
+                let highlight = FindHighlightOverlayView(frame: highlightRect)
+                highlight.wantsLayer = true
+                highlight.layer?.cornerRadius = 2
+                highlight.layer?.cornerCurve = .continuous
+                highlight.layer?.backgroundColor = (index == selectedFindMatchIndex
+                    ? EditorFindHighlightPalette.currentMatchBackground.withAlphaComponent(0.68)
+                    : EditorFindHighlightPalette.matchBackground
+                ).cgColor
+                textView.addSubview(highlight)
+                findHighlightViews.append(highlight)
+            }
+        }
+    }
+
+    private func clearFindHighlightOverlays() {
+        findHighlightViews.forEach { $0.removeFromSuperview() }
+        findHighlightViews = []
     }
 
     // MARK: NSTextViewDelegate
@@ -4367,6 +4433,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
+        refreshFindHighlightOverlays()
     }
 
     private func syncCollapsedXMLTagState() {
