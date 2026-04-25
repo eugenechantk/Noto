@@ -5,9 +5,9 @@ import Testing
 @Suite("Note Editor Session")
 struct NoteEditorSessionTests {
 
-    @Test("Final snapshot renames a note even when edits were already saved")
+    @Test("Title edit debounces note rename")
     @MainActor
-    func finalSnapshotRenamesAlreadySavedNote() {
+    func titleEditDebouncesNoteRename() async {
         let vault = makeTempVault()
         defer { cleanupVault(vault) }
         let store = MarkdownNoteStore(vaultURL: vault)
@@ -20,12 +20,30 @@ struct NoteEditorSessionTests {
         #expect(session.note.title == "First Sentence")
         #expect(session.note.fileURL.lastPathComponent == note.fileURL.lastPathComponent)
 
-        session.cancelBackgroundWork()
-        session.persistFinalSnapshotIfNeeded(isExternallyDeleting: false)
+        try? await Task.sleep(for: .milliseconds(900))
 
         #expect(session.note.fileURL.lastPathComponent == "First Sentence.md")
         #expect(FileManager.default.fileExists(atPath: session.note.fileURL.path))
         #expect(!FileManager.default.fileExists(atPath: note.fileURL.path))
+    }
+
+    @Test("Final snapshot does not rename note on disappear")
+    @MainActor
+    func finalSnapshotDoesNotRenameOnDisappear() {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        let note = store.createNote()
+        let editedContent = MarkdownNote.makeFrontmatter(id: note.id) + "# First Sentence"
+        let session = NoteEditorSession(store: store, note: note, isNew: true)
+
+        session.handleEditorChange(editedContent)
+        session.cancelBackgroundWork()
+        session.persistFinalSnapshotIfNeeded(isExternallyDeleting: false)
+
+        #expect(session.note.fileURL.lastPathComponent == note.fileURL.lastPathComponent)
+        #expect(FileManager.default.fileExists(atPath: note.fileURL.path))
     }
 }
 

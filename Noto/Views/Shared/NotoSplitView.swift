@@ -223,6 +223,11 @@ struct NotoSplitView: View {
     }
 
     private func updateSelectedNote(_ note: MarkdownNote) {
+        noteHistory.replaceEntries(for: note)
+        #if os(iOS)
+        noteStackNavigation.replaceEntries(for: note)
+        #endif
+
         guard selectedNote?.id == note.id else { return }
         selectedNote = note
         if let currentStackEntry {
@@ -275,6 +280,7 @@ struct NotoSplitView: View {
     }
 
     private func selectHistoryEntry(_ entry: NoteStackEntry, recordsVisit: Bool) {
+        let entry = resolvedHistoryEntry(entry)
         if recordsVisit {
             noteHistory.visit(entry)
             selectedNoteStore = entry.store
@@ -289,6 +295,11 @@ struct NotoSplitView: View {
         DispatchQueue.main.async {
             isApplyingHistoryNavigation = false
         }
+    }
+
+    private func resolvedHistoryEntry(_ entry: NoteStackEntry) -> NoteStackEntry {
+        guard let resolved = store.note(withID: entry.note.id) else { return entry }
+        return NoteStackEntry(note: resolved.note, store: resolved.store, isNew: entry.isNew)
     }
 
     private var isSidebarVisible: Bool {
@@ -316,12 +327,7 @@ struct NotoSplitView: View {
 
     #if os(macOS)
     private func handlesWindowScopedCommand(_ notification: Notification) -> Bool {
-        if let targetWindow = notification.object as? NSWindow {
-            return targetWindow === hostingWindow
-        }
-
-        guard let hostingWindow else { return false }
-        return hostingWindow.isKeyWindow || hostingWindow.isMainWindow
+        NotoCommandTarget.matches(notification, window: hostingWindow)
     }
     #endif
 

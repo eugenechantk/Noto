@@ -3,6 +3,8 @@ import os.log
 
 #if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
 #endif
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NotoApp")
@@ -13,6 +15,23 @@ enum NotoAppCommands {
     static let toggleSidebar = Notification.Name("NotoAppCommands.toggleSidebar")
     static let showSearch = Notification.Name("NotoAppCommands.showSearch")
 }
+
+#if os(macOS)
+enum NotoCommandTarget {
+    static var activeWindow: NSWindow? {
+        NSApp.keyWindow ?? NSApp.mainWindow
+    }
+
+    static func matches(_ notification: Notification, window: NSWindow?) -> Bool {
+        if let targetWindow = notification.object as? NSWindow {
+            return targetWindow === window
+        }
+
+        guard let window else { return false }
+        return window.isKeyWindow || window.isMainWindow
+    }
+}
+#endif
 
 #if os(macOS)
 /// Hides the app instead of closing the window when the user clicks the red X.
@@ -89,7 +108,11 @@ struct NotoApp: App {
         .commands {
             CommandMenu("Noto") {
                 Button("Today") {
+                    #if os(macOS)
+                    NotificationCenter.default.post(name: NotoAppCommands.openToday, object: NotoCommandTarget.activeWindow)
+                    #else
                     NotificationCenter.default.post(name: NotoAppCommands.openToday, object: nil)
+                    #endif
                 }
                 .keyboardShortcut("t", modifiers: [.command])
 
@@ -100,12 +123,12 @@ struct NotoApp: App {
 
                 #if os(macOS)
                 Button("Toggle Sidebar") {
-                    NotificationCenter.default.post(name: NotoAppCommands.toggleSidebar, object: nil)
+                    NotificationCenter.default.post(name: NotoAppCommands.toggleSidebar, object: NotoCommandTarget.activeWindow)
                 }
                 .keyboardShortcut("b", modifiers: [.command, .shift])
 
                 Button("Search") {
-                    NotificationCenter.default.post(name: NotoAppCommands.showSearch, object: nil)
+                    NotificationCenter.default.post(name: NotoAppCommands.showSearch, object: NotoCommandTarget.activeWindow)
                 }
                 .keyboardShortcut("k", modifiers: [.command])
 

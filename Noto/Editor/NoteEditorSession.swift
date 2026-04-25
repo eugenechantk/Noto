@@ -22,6 +22,8 @@ final class NoteEditorSession {
 
     let editorSessionID = UUID()
 
+    private static let titleRenameDebounce: Duration = .milliseconds(800)
+
     private var renameTask: Task<Void, Never>?
 
     init(store: MarkdownNoteStore, note: MarkdownNote, isNew: Bool = false) {
@@ -138,7 +140,6 @@ final class NoteEditorSession {
             DebugTrace.record("editor final persist note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(latestEditorText))")
             persistEditorText(latestEditorText)
         }
-        note = store.renameFileIfNeeded(for: note)
     }
 
     func markDeleting() {
@@ -158,7 +159,7 @@ final class NoteEditorSession {
         guard !isDeleting else { return }
         renameTask?.cancel()
         renameTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: Self.titleRenameDebounce)
             guard let self else { return }
             guard !Task.isCancelled, !self.isDeleting else { return }
             self.note = self.store.renameFileIfNeeded(for: self.note)
@@ -175,12 +176,13 @@ final class NoteEditorSession {
     }
 
     private func applyEditorText(_ newText: String, scheduleRename shouldScheduleRename: Bool) {
+        let previousTitle = note.title
         latestEditorText = newText
         content = newText
         hasPendingLocalEdits = true
         DebugTrace.record("editor apply text note=\(note.fileURL.lastPathComponent) scheduleRename=\(shouldScheduleRename)")
         persistEditorText(newText)
-        if shouldScheduleRename {
+        if shouldScheduleRename, note.title != previousTitle {
             scheduleRename()
         }
     }

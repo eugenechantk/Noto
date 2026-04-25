@@ -1,5 +1,8 @@
 import SwiftUI
 import NotoVault
+#if os(macOS)
+import AppKit
+#endif
 
 struct NoteEditorScreen: View {
     var store: MarkdownNoteStore
@@ -27,6 +30,9 @@ struct NoteEditorScreen: View {
     @State private var findStatus = EditorFindStatus()
     @State private var findNavigationRequest: EditorFindNavigationRequest?
     @State private var findNavigationRequestID = 0
+    #if os(macOS)
+    @State private var hostingWindow: NSWindow?
+    #endif
     private let wordCounter = WordCounter()
 
     init(
@@ -81,6 +87,12 @@ struct NoteEditorScreen: View {
             onFindNavigate: navigateFind
         )
         .background(AppTheme.background)
+        #if os(macOS)
+        .background {
+            NoteEditorWindowReader(window: $hostingWindow)
+                .frame(width: 0, height: 0)
+        }
+        #endif
         .foregroundStyle(AppTheme.primaryText)
         .tint(AppTheme.primaryText)
         #if os(iOS)
@@ -125,6 +137,7 @@ struct NoteEditorScreen: View {
         .onDisappear {
             session.cancelBackgroundWork()
             session.persistFinalSnapshotIfNeeded(isExternallyDeleting: externallyDeletingNoteID?.wrappedValue == session.note.id)
+            onNoteUpdated?(session.note)
             if externallyDeletingNoteID?.wrappedValue == session.note.id {
                 externallyDeletingNoteID?.wrappedValue = nil
             }
@@ -139,7 +152,10 @@ struct NoteEditorScreen: View {
             guard let snapshot = notification.object as? NoteSyncSnapshot else { return }
             session.handleRemoteSnapshot(snapshot)
         }
-        .onReceive(NotificationCenter.default.publisher(for: NoteEditorCommands.showFind)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: NoteEditorCommands.showFind)) { notification in
+            #if os(macOS)
+            guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
+            #endif
             showFind()
         }
         .confirmationDialog("Delete this note?", isPresented: $showDeleteConfirmation) {
@@ -208,3 +224,25 @@ struct NoteEditorScreen: View {
     }
     #endif
 }
+
+#if os(macOS)
+private struct NoteEditorWindowReader: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            window = view.window
+        }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if window !== view.window {
+                window = view.window
+            }
+        }
+    }
+}
+#endif

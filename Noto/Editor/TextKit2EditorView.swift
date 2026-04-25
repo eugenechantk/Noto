@@ -34,27 +34,35 @@ enum NoteEditorCommands {
     static let closeFind = Notification.Name("NoteEditorCommands.closeFind")
 
     static func requestToggleStrikethrough() {
-        NotificationCenter.default.post(name: toggleStrikethrough, object: nil)
+        NotificationCenter.default.post(name: toggleStrikethrough, object: commandTarget)
     }
 
     static func requestToggleBold() {
-        NotificationCenter.default.post(name: toggleBold, object: nil)
+        NotificationCenter.default.post(name: toggleBold, object: commandTarget)
     }
 
     static func requestToggleItalic() {
-        NotificationCenter.default.post(name: toggleItalic, object: nil)
+        NotificationCenter.default.post(name: toggleItalic, object: commandTarget)
     }
 
     static func requestToggleHyperlink() {
-        NotificationCenter.default.post(name: toggleHyperlink, object: nil)
+        NotificationCenter.default.post(name: toggleHyperlink, object: commandTarget)
     }
 
     static func requestShowFind() {
-        NotificationCenter.default.post(name: showFind, object: nil)
+        NotificationCenter.default.post(name: showFind, object: commandTarget)
     }
 
     static func requestCloseFind() {
-        NotificationCenter.default.post(name: closeFind, object: nil)
+        NotificationCenter.default.post(name: closeFind, object: commandTarget)
+    }
+
+    private static var commandTarget: Any? {
+        #if os(macOS)
+        NotoCommandTarget.activeWindow
+        #else
+        nil
+        #endif
     }
 }
 
@@ -3743,7 +3751,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             forName: NoteEditorCommands.toggleStrikethrough,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
+            guard self?.handlesWindowScopedCommand(notification) == true else { return }
             self?.handleStrikethroughCommand()
         }
 
@@ -3751,7 +3760,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             forName: NoteEditorCommands.toggleBold,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
+            guard self?.handlesWindowScopedCommand(notification) == true else { return }
             self?.handleBoldCommand()
         }
 
@@ -3759,7 +3769,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             forName: NoteEditorCommands.toggleItalic,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
+            guard self?.handlesWindowScopedCommand(notification) == true else { return }
             self?.handleItalicCommand()
         }
 
@@ -3767,7 +3778,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             forName: NoteEditorCommands.toggleHyperlink,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
+            guard self?.handlesWindowScopedCommand(notification) == true else { return }
             self?.handleHyperlinkCommand()
         }
     }
@@ -4031,6 +4043,10 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private func flushTextToBinding() {
         DebugTrace.record("mac flushTextToBinding \(DebugTrace.textSummary(textView.textStorage?.string ?? textView.string))")
         coordinator?.publishEditorText(textView.textStorage?.string ?? textView.string)
+    }
+
+    private func handlesWindowScopedCommand(_ notification: Notification) -> Bool {
+        NotoCommandTarget.matches(notification, window: textView.window)
     }
 
     private func handleStrikethroughCommand() {

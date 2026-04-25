@@ -305,6 +305,44 @@ final class MarkdownNoteStore {
         return (noteStore, note)
     }
 
+    func note(withID noteID: UUID) -> (store: MarkdownNoteStore, note: MarkdownNote)? {
+        if FileManager.default.fileExists(atPath: vaultRootURL.path) {
+            guard let enumerator = FileManager.default.enumerator(
+                at: vaultRootURL.standardizedFileURL,
+                includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) else {
+                return nil
+            }
+
+            for case let fileURL as URL in enumerator {
+                let normalizedURL = fileURL.standardizedFileURL
+                guard normalizedURL.pathExtension.localizedCaseInsensitiveCompare("md") == .orderedSame,
+                      let content = CoordinatedFileManager.readString(from: normalizedURL),
+                      MarkdownNote.idFromFrontmatter(content) == noteID else {
+                    continue
+                }
+
+                let modifiedDate = (try? normalizedURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+                    ?? Date()
+                let note = MarkdownNote(
+                    id: noteID,
+                    fileURL: normalizedURL,
+                    title: Self.displayTitle(for: normalizedURL, content: content),
+                    modifiedDate: modifiedDate
+                )
+                let noteStore = MarkdownNoteStore(
+                    directoryURL: normalizedURL.deletingLastPathComponent(),
+                    vaultRootURL: vaultRootURL,
+                    autoload: false
+                )
+                return (noteStore, note)
+            }
+        }
+
+        return nil
+    }
+
     func pageMentionDocuments(
         matching query: String,
         excluding excludedURL: URL? = nil,
@@ -431,18 +469,15 @@ final class MarkdownNoteStore {
             return note
         }
 
-        let newURL = note.fileURL.deletingLastPathComponent()
-            .appendingPathComponent(sanitized)
-            .appendingPathExtension("md")
-
-        guard !FileManager.default.fileExists(atPath: newURL.path) else { return note }
+        let directoryURL = note.fileURL.deletingLastPathComponent()
+        let newURL = Self.resolveConflict(for: "\(sanitized).md", in: directoryURL)
 
         guard CoordinatedFileManager.move(from: note.fileURL, to: newURL) else {
-            logger.error("Failed to rename note to \(sanitized).md")
+            logger.error("Failed to rename note to \(newURL.lastPathComponent)")
             return note
         }
 
-        logger.info("Renamed note to \(sanitized).md")
+        logger.info("Renamed note to \(newURL.lastPathComponent)")
 
         let updated = MarkdownNote(
             id: note.id,

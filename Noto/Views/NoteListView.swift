@@ -3,6 +3,8 @@ import os.log
 import NotoVault
 #if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
 #endif
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NoteListView")
@@ -44,9 +46,23 @@ struct NoteStackEntry: Equatable, Hashable {
     }
 
     func hasSameNavigationTarget(as other: NoteStackEntry) -> Bool {
-        note.fileURL.standardizedFileURL == other.note.fileURL.standardizedFileURL &&
+        if note.id == other.note.id &&
+            vaultRootURL.standardizedFileURL == other.vaultRootURL.standardizedFileURL {
+            return true
+        }
+
+        return note.fileURL.standardizedFileURL == other.note.fileURL.standardizedFileURL &&
             directoryURL.standardizedFileURL == other.directoryURL.standardizedFileURL &&
             vaultRootURL.standardizedFileURL == other.vaultRootURL.standardizedFileURL
+    }
+
+    func replacingNote(_ updatedNote: MarkdownNote) -> NoteStackEntry {
+        NoteStackEntry(
+            note: updatedNote,
+            directoryURL: updatedNote.fileURL.deletingLastPathComponent(),
+            vaultRootURL: vaultRootURL,
+            isNew: isNew
+        )
     }
 
     static func == (lhs: NoteStackEntry, rhs: NoteStackEntry) -> Bool {
@@ -90,6 +106,16 @@ struct NoteStackNavigationState: Equatable {
             root = entry
         } else {
             path[path.index(before: path.endIndex)] = entry
+        }
+    }
+
+    mutating func replaceEntries(for updatedNote: MarkdownNote) {
+        if let currentRoot = root, currentRoot.note.id == updatedNote.id {
+            root = currentRoot.replacingNote(updatedNote)
+        }
+
+        path = path.map { entry in
+            entry.note.id == updatedNote.id ? entry.replacingNote(updatedNote) : entry
         }
     }
 
@@ -141,6 +167,12 @@ struct NoteNavigationHistory: Equatable {
             return
         }
         entries[currentIndex] = entry
+    }
+
+    mutating func replaceEntries(for updatedNote: MarkdownNote) {
+        entries = entries.map { entry in
+            entry.note.id == updatedNote.id ? entry.replacingNote(updatedNote) : entry
+        }
     }
 
     mutating func goBack() -> NoteStackEntry? {
@@ -209,6 +241,9 @@ struct NoteListView: View {
     @State private var externallyDeletingNoteID: UUID?
     @State private var showSettings = false
     @State private var hasRestoredSelection = false
+    #if os(macOS)
+    @State private var hostingWindow: NSWindow?
+    #endif
 
     private static let lastOpenedNoteKey = "lastOpenedNoteURL"
 
@@ -366,16 +401,22 @@ struct NoteListView: View {
             externallyDeletingNoteID: $externallyDeletingNoteID,
             onOpenTodayNote: openTodayNote
         )
+        .background {
+            WindowCommandReader(window: $hostingWindow)
+                .frame(width: 0, height: 0)
+        }
         .sheet(isPresented: $showSettings) {
             if let locationManager {
                 SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
                     .frame(minWidth: 400, minHeight: 200)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { notification in
+            guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
             openTodayNote()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openSettings)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openSettings)) { notification in
+            guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
             if locationManager != nil {
                 showSettings = true
             }
@@ -1264,6 +1305,28 @@ extension View {
             self.presentationSizing(.page)
         } else {
             self
+        }
+    }
+}
+#endif
+
+#if os(macOS)
+private struct WindowCommandReader: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            window = view.window
+        }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if window !== view.window {
+                window = view.window
+            }
         }
     }
 }

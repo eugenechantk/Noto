@@ -26,6 +26,8 @@
 ///
 /// ## File Rename
 /// - `testRenameFileIfNeeded` — File renamed to match title
+/// - `testRenameFileConflictAppendsSuffix` — Appends (2) when title filename exists
+/// - `testRenameFileMultipleConflictsAppendsFirstAvailableSuffix` — Appends first available suffix for repeated title filename conflicts
 /// - `testDailyNoteNotRenamed` — Daily notes (YYYY-MM-DD.md) keep ISO date filename
 ///
 /// ## Folders
@@ -146,6 +148,30 @@ struct NoteNavigationHistoryTests {
         #expect(!history.canGoBack)
     }
 
+    @Test("Replaces visible visit when note is renamed")
+    @MainActor
+    func noteNavigationHistoryReplacesVisibleVisitWhenNoteIsRenamed() {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+        let created = makeHistoryEntry(title: "Untitled", fileName: "Original.md", in: store)
+        let renamedNote = MarkdownNote(
+            id: created.note.id,
+            fileURL: store.vaultRootURL.appendingPathComponent("Renamed.md"),
+            title: "Renamed",
+            modifiedDate: Date()
+        )
+        let renamed = NoteStackEntry(note: renamedNote, store: store, isNew: true)
+        var history = NoteNavigationHistory()
+
+        history.visit(created)
+        history.visit(renamed)
+
+        #expect(history.entries.count == 1)
+        #expect(history.currentEntry?.note.fileURL.lastPathComponent == "Renamed.md")
+        #expect(!history.canGoBack)
+    }
+
     @Test("Drops forward entries after a new visit")
     @MainActor
     func noteNavigationHistoryDropsForwardEntriesAfterNewVisit() {
@@ -166,6 +192,31 @@ struct NoteNavigationHistoryTests {
         #expect(history.currentEntry?.hasSameNavigationTarget(as: third) == true)
         #expect(!history.canGoForward)
         #expect(history.goBack()?.hasSameNavigationTarget(as: first) == true)
+    }
+
+    @Test("Updates renamed note entries even when they are not current")
+    @MainActor
+    func noteNavigationHistoryUpdatesRenamedNonCurrentEntries() {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+        let first = makeHistoryEntry(title: "Untitled", fileName: "Original.md", in: store)
+        let second = makeHistoryEntry(title: "Second", fileName: "Second.md", in: store)
+        let renamedFirst = MarkdownNote(
+            id: first.note.id,
+            fileURL: store.vaultRootURL.appendingPathComponent("Renamed.md"),
+            title: "Renamed",
+            modifiedDate: Date()
+        )
+        var history = NoteNavigationHistory()
+
+        history.visit(first)
+        history.visit(second)
+        history.replaceEntries(for: renamedFirst)
+
+        let previous = history.goBack()
+        #expect(previous?.note.fileURL.lastPathComponent == "Renamed.md")
+        #expect(previous?.note.title == "Renamed")
     }
 }
 
@@ -558,6 +609,76 @@ struct FileRenameTests {
         let renamed = store.renameFileIfNeeded(for: note)
 
         #expect(renamed.fileURL.lastPathComponent == "My Custom Title.md")
+    }
+
+    @Test("Rename file conflict appends (2)")
+    @MainActor
+    func testRenameFileConflictAppendsSuffix() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        try "existing".write(
+            to: vault.appendingPathComponent("Shared Title.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        var note = store.createNote()
+        let content = MarkdownNote.makeFrontmatter(id: note.id) + "# Shared Title"
+        note = store.saveContent(content, for: note).note
+        let renamed = store.renameFileIfNeeded(for: note)
+
+        #expect(renamed.fileURL.lastPathComponent == "Shared Title(2).md")
+        #expect(FileManager.default.fileExists(atPath: renamed.fileURL.path))
+        #expect(!FileManager.default.fileExists(atPath: note.fileURL.path))
+    }
+
+    @Test("Resolve note by id finds renamed file")
+    @MainActor
+    func testResolveNoteByIDFindsRenamedFile() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        var note = store.createNote()
+        let originalURL = note.fileURL
+        let content = MarkdownNote.makeFrontmatter(id: note.id) + "# Resolved Title\nBody"
+        note = store.saveContent(content, for: note).note
+        let renamed = store.renameFileIfNeeded(for: note)
+
+        let resolved = try #require(store.note(withID: note.id))
+        #expect(resolved.note.fileURL == renamed.fileURL)
+        #expect(resolved.note.title == "Resolved Title")
+        #expect(!FileManager.default.fileExists(atPath: originalURL.path))
+    }
+
+    @Test("Rename file with multiple conflicts appends first available suffix")
+    @MainActor
+    func testRenameFileMultipleConflictsAppendsFirstAvailableSuffix() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        try "existing".write(
+            to: vault.appendingPathComponent("Shared Title.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "existing 2".write(
+            to: vault.appendingPathComponent("Shared Title(2).md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        var note = store.createNote()
+        let content = MarkdownNote.makeFrontmatter(id: note.id) + "# Shared Title"
+        note = store.saveContent(content, for: note).note
+        let renamed = store.renameFileIfNeeded(for: note)
+
+        #expect(renamed.fileURL.lastPathComponent == "Shared Title(3).md")
+        #expect(FileManager.default.fileExists(atPath: renamed.fileURL.path))
+        #expect(!FileManager.default.fileExists(atPath: note.fileURL.path))
     }
 
     @Test("Daily notes keep ISO date filename")
