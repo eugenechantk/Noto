@@ -542,6 +542,28 @@ struct TextKit2EditorLifecycleMacTests {
     }
 
     @MainActor
+    @Test("Escape closes visible find while editor is focused")
+    func escapeClosesVisibleFindWhileEditorIsFocused() {
+        let controller = TextKit2EditorViewController()
+        controller.loadViewIfNeeded()
+        controller.loadText("Find me")
+        controller.isFindVisible = true
+
+        var didCloseFind = false
+        controller.onCloseFind = {
+            didCloseFind = true
+        }
+
+        let handled = controller.textView(
+            controller.textView,
+            doCommandBy: #selector(NSResponder.cancelOperation(_:))
+        )
+
+        #expect(handled)
+        #expect(didCloseFind)
+    }
+
+    @MainActor
     @Test("Cursor on a hyperlink line reveals markdown and leaving the line renders the title")
     func cursorOnHyperlinkLineRevealsMarkdownUntilLeavingLine() throws {
         let controller = TextKit2EditorViewController()

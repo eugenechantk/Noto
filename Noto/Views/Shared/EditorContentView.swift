@@ -32,6 +32,10 @@ struct EditorContentView: View {
             }
         }
         .background(AppTheme.background)
+        .onReceive(NotificationCenter.default.publisher(for: NoteEditorCommands.closeFind)) { _ in
+            guard isFindVisible else { return }
+            closeFind()
+        }
     }
 
     private var downloadingView: some View {
@@ -61,13 +65,15 @@ struct EditorContentView: View {
                         onTextChange: session.handleEditorChange,
                         pageMentionProvider: pageMentionProvider,
                         onOpenDocumentLink: onOpenDocumentLink,
+                        isFindVisible: isFindVisible,
                         findQuery: findQuery,
                         findNavigationRequest: findNavigationRequest,
                         onFindStatusChange: { status in
                             DispatchQueue.main.async {
                                 findStatus = status
                             }
-                        }
+                        },
+                        onCloseFind: closeFind
                     )
                 }
 

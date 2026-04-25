@@ -31,6 +31,7 @@ enum NoteEditorCommands {
     static let toggleItalic = Notification.Name("NoteEditorCommands.toggleItalic")
     static let toggleHyperlink = Notification.Name("NoteEditorCommands.toggleHyperlink")
     static let showFind = Notification.Name("NoteEditorCommands.showFind")
+    static let closeFind = Notification.Name("NoteEditorCommands.closeFind")
 
     static func requestToggleStrikethrough() {
         NotificationCenter.default.post(name: toggleStrikethrough, object: nil)
@@ -50,6 +51,10 @@ enum NoteEditorCommands {
 
     static func requestShowFind() {
         NotificationCenter.default.post(name: showFind, object: nil)
+    }
+
+    static func requestCloseFind() {
+        NotificationCenter.default.post(name: closeFind, object: nil)
     }
 }
 
@@ -1839,9 +1844,11 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     var onTextChange: ((String) -> Void)?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
+    var isFindVisible: Bool = false
     var findQuery: String = ""
     var findNavigationRequest: EditorFindNavigationRequest?
     var onFindStatusChange: ((EditorFindStatus) -> Void)?
+    var onCloseFind: (() -> Void)?
 
     func makeCoordinator() -> TextKit2EditorCoordinator {
         TextKit2EditorCoordinator(text: $text, onTextChange: onTextChange, autoFocus: autoFocus)
@@ -1852,6 +1859,8 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
         vc.coordinator = context.coordinator
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
+        vc.isFindVisible = isFindVisible
+        vc.onCloseFind = onCloseFind
         vc.updateFind(
             query: findQuery,
             navigationRequest: findNavigationRequest,
@@ -1864,6 +1873,8 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     func updateUIViewController(_ vc: TextKit2EditorViewController, context: Context) {
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
+        vc.isFindVisible = isFindVisible
+        vc.onCloseFind = onCloseFind
         vc.updateFind(
             query: findQuery,
             navigationRequest: findNavigationRequest,
@@ -1884,6 +1895,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     var coordinator: TextKit2EditorCoordinator?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
+    var isFindVisible = false
+    var onCloseFind: (() -> Void)?
     private(set) var textView: UITextView!
     private let minimumHorizontalTextInset: CGFloat = 16
     private let maximumTextWidth: CGFloat = 600
@@ -2060,12 +2073,26 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             ])
         }
 
+        if isFindVisible {
+            commands.append(UIKeyCommand(
+                input: UIKeyCommand.inputEscape,
+                modifierFlags: [],
+                action: #selector(closeFind),
+                discoverabilityTitle: "Close Search"
+            ))
+        }
+
         return commands
     }
 
     @objc
     private func showFind() {
         NoteEditorCommands.requestShowFind()
+    }
+
+    @objc
+    private func closeFind() {
+        onCloseFind?()
     }
 
     func loadText(_ markdown: String) {
@@ -3362,9 +3389,11 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     var onTextChange: ((String) -> Void)?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
+    var isFindVisible: Bool = false
     var findQuery: String = ""
     var findNavigationRequest: EditorFindNavigationRequest?
     var onFindStatusChange: ((EditorFindStatus) -> Void)?
+    var onCloseFind: (() -> Void)?
 
     func makeCoordinator() -> TextKit2EditorCoordinator {
         TextKit2EditorCoordinator(text: $text, onTextChange: onTextChange, autoFocus: autoFocus)
@@ -3375,6 +3404,8 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
         vc.coordinator = context.coordinator
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
+        vc.isFindVisible = isFindVisible
+        vc.onCloseFind = onCloseFind
         vc.updateFind(
             query: findQuery,
             navigationRequest: findNavigationRequest,
@@ -3387,6 +3418,8 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     func updateNSViewController(_ vc: TextKit2EditorViewController, context: Context) {
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
+        vc.isFindVisible = isFindVisible
+        vc.onCloseFind = onCloseFind
         vc.updateFind(
             query: findQuery,
             navigationRequest: findNavigationRequest,
@@ -3404,6 +3437,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     var coordinator: TextKit2EditorCoordinator?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
+    var isFindVisible = false
+    var onCloseFind: (() -> Void)?
     private(set) var textView: NSTextView!
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
@@ -4215,6 +4250,12 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
                 hidePageMentionSuggestions()
                 return true
             }
+        }
+
+        if commandSelector == #selector(NSResponder.cancelOperation(_:)),
+           isFindVisible {
+            onCloseFind?()
+            return true
         }
 
         if commandSelector == #selector(NSResponder.deleteBackward(_:)),
