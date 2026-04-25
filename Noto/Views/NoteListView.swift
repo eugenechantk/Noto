@@ -1,5 +1,9 @@
 import SwiftUI
 import os.log
+import NotoVault
+#if os(iOS)
+import UIKit
+#endif
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NoteListView")
 
@@ -195,6 +199,7 @@ struct NoteListView: View {
     #if os(iOS)
     @State private var path = NavigationPath()
     @State private var compactNoteHistory = NoteNavigationHistory()
+    @State private var isNoteSearchPresented = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
@@ -326,11 +331,24 @@ struct NoteListView: View {
             }
             .notoAppBottomToolbar(
                 onOpenTodayNote: { path.append(NoteRoute.todayNote) },
-                onSearch: {},
+                onSearch: { isNoteSearchPresented = true },
                 onCreateRootNote: createRootNoteAndPush
             )
+            .sheet(isPresented: $isNoteSearchPresented) {
+                NavigationStack {
+                    IOSNoteSearchSheet(rootStore: store) { result in
+                        openCompactNote(result.note, in: result.store, isNew: false)
+                    }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .noteSearchSheetPresentationStyle()
+            }
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { _ in
                 path.append(NoteRoute.todayNote)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.showSearch)) { _ in
+                isNoteSearchPresented = true
             }
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openSettings)) { _ in
                 if locationManager != nil {
@@ -944,28 +962,71 @@ struct FolderContentView: View {
 // MARK: - Shared iOS Bottom Toolbar
 
 #if os(iOS)
+enum NotoAppBottomToolbarKeyboardVisibility {
+    static let minimumVisibleHeight: CGFloat = 100
+
+    static func isSoftwareKeyboardVisible(frameInScreen: CGRect?, screenBounds: CGRect) -> Bool {
+        guard let frameInScreen, !frameInScreen.isNull, !frameInScreen.isEmpty else {
+            return false
+        }
+
+        let visibleFrame = frameInScreen.intersection(screenBounds)
+        guard !visibleFrame.isNull, !visibleFrame.isEmpty else {
+            return false
+        }
+
+        return visibleFrame.height > minimumVisibleHeight
+    }
+}
+
 private struct NotoAppBottomToolbarModifier: ViewModifier {
     var onOpenTodayNote: (() -> Void)?
     var onSearch: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
+    @State private var isSoftwareKeyboardVisible = false
 
     func body(content: Content) -> some View {
-        if onOpenTodayNote == nil && onSearch == nil && onCreateRootNote == nil {
+        if !showsToolbar {
             content
         } else {
             content.overlay(alignment: .bottom) {
-                HStack {
-                    Spacer(minLength: 0)
-                    NotoAppBottomToolbar(
-                        onOpenTodayNote: onOpenTodayNote,
-                        onSearch: onSearch,
-                        onCreateRootNote: onCreateRootNote
-                    )
-                    Spacer(minLength: 0)
+                if !isSoftwareKeyboardVisible {
+                    HStack {
+                        Spacer(minLength: 0)
+                        NotoAppBottomToolbar(
+                            onOpenTodayNote: onOpenTodayNote,
+                            onSearch: onSearch,
+                            onCreateRootNote: onCreateRootNote
+                        )
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 8)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 8)
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+                updateKeyboardVisibility(from: notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
+                updateKeyboardVisibility(from: notification)
+            }
+        }
+    }
+
+    private var showsToolbar: Bool {
+        onOpenTodayNote != nil || onSearch != nil || onCreateRootNote != nil
+    }
+
+    private func updateKeyboardVisibility(from notification: Notification) {
+        let frameInScreen = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+        let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+        let isVisible = NotoAppBottomToolbarKeyboardVisibility.isSoftwareKeyboardVisible(
+            frameInScreen: frameInScreen,
+            screenBounds: UIScreen.main.bounds
+        )
+
+        withAnimation(.easeOut(duration: duration)) {
+            isSoftwareKeyboardVisible = isVisible
         }
     }
 }
@@ -1032,6 +1093,178 @@ extension View {
             onSearch: onSearch,
             onCreateRootNote: onCreateRootNote
         ))
+    }
+}
+#endif
+
+// MARK: - iOS Note Search Sheet
+
+#if os(iOS)
+struct IOSNoteSearchResult: Identifiable {
+    let id: String
+    let note: MarkdownNote
+    let store: MarkdownNoteStore
+    let relativePath: String
+}
+
+struct IOSNoteSearchSheet: View {
+    var rootStore: MarkdownNoteStore
+    var onSelect: (IOSNoteSearchResult) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isSearchFocused: Bool
+    @State private var query = ""
+    @State private var rows: [SidebarTreeNode] = []
+    @State private var isLoading = true
+    @State private var didFail = false
+
+    private var searchRows: [SidebarTreeNode] {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return [] }
+        return rows.filter { row in
+            guard case .note = row.kind else { return false }
+            return row.name.localizedCaseInsensitiveContains(trimmedQuery)
+        }
+    }
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if didFail {
+                ContentUnavailableView(
+                    "Search Unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text("Noto could not load notes from this vault.")
+                )
+            } else {
+                resultsList
+            }
+        }
+        .background(AppTheme.background)
+        .navigationTitle("Search")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    dismiss()
+                } label: {
+                    Label("Close", systemImage: "xmark")
+                }
+                .labelStyle(.iconOnly)
+                .accessibilityIdentifier("note_search_cancel_button")
+                .accessibilityLabel("Close")
+            }
+        }
+        .searchable(
+            text: $query,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search notes"
+        )
+        .searchFocused($isSearchFocused)
+        .accessibilityIdentifier("note_search_sheet")
+        .task {
+            await loadRows()
+            isSearchFocused = true
+        }
+    }
+
+    private var resultsList: some View {
+        List {
+            ForEach(Array(searchRows.enumerated()), id: \.element.id) { index, row in
+                Button {
+                    onSelect(result(for: row))
+                    dismiss()
+                } label: {
+                    MarkdownNoteRow(note: note(for: row))
+                }
+                .accessibilityIdentifier("note_search_result_\(index)")
+                .accessibilityLabel(row.name)
+                .listRowBackground(AppTheme.background)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.background)
+        .foregroundStyle(AppTheme.primaryText)
+        .tint(AppTheme.primaryText)
+        .accessibilityIdentifier("note_search_results_list")
+        .overlay {
+            if searchRows.isEmpty {
+                ContentUnavailableView(
+                    emptyTitle,
+                    systemImage: "magnifyingglass",
+                    description: Text(emptyDescription)
+                )
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("note_search_empty_state")
+            }
+        }
+    }
+
+    private var emptyTitle: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Search Notes" : "No Matching Notes"
+    }
+
+    private var emptyDescription: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Type a note title to search this vault."
+            : "Try another title."
+    }
+
+    private func loadRows() async {
+        isLoading = true
+        didFail = false
+        let rootURL = rootStore.vaultRootURL
+        let result = await Task.detached(priority: .userInitiated) {
+            Result {
+                try SidebarTreeLoader().loadRows(rootURL: rootURL)
+            }
+        }.value
+
+        switch result {
+        case .success(let loadedRows):
+            rows = loadedRows
+            didFail = false
+        case .failure:
+            rows = []
+            didFail = true
+        }
+        isLoading = false
+    }
+
+    private func result(for row: SidebarTreeNode) -> IOSNoteSearchResult {
+        IOSNoteSearchResult(
+            id: row.id,
+            note: note(for: row),
+            store: MarkdownNoteStore(
+                directoryURL: row.url.deletingLastPathComponent(),
+                vaultRootURL: rootStore.vaultRootURL,
+                autoload: false
+            ),
+            relativePath: rootStore.vaultRelativePath(for: row.url) ?? row.url.lastPathComponent
+        )
+    }
+
+    private func note(for row: SidebarTreeNode) -> MarkdownNote {
+        MarkdownNote(
+            id: row.noteID ?? VaultDirectoryLoader.stableID(for: row.url),
+            fileURL: row.url,
+            title: row.name,
+            modifiedDate: row.modifiedAt
+        )
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func noteSearchSheetPresentationStyle() -> some View {
+        if #available(iOS 18.0, *) {
+            self.presentationSizing(.page)
+        } else {
+            self
+        }
     }
 }
 #endif

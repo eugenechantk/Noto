@@ -15,6 +15,7 @@ struct NotoSidebarView: View {
     @Binding var searchText: String
     @Binding var isSearchPresented: Bool
     var onSelectNote: (() -> Void)? = nil
+    var onToggleSidebar: (() -> Void)? = nil
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var rows: [SidebarTreeNode] = []
@@ -135,7 +136,7 @@ struct NotoSidebarView: View {
     #if os(macOS)
     private var sidebarToggleButton: some View {
         Button {
-            NotificationCenter.default.post(name: NotoAppCommands.toggleSidebar, object: nil)
+            onToggleSidebar?()
         } label: {
             Label("Toggle Sidebar", systemImage: "sidebar.left")
         }

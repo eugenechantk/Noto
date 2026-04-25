@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+#endif
+
 struct NotoSplitView: View {
     var store: MarkdownNoteStore
     var fileWatcher: VaultFileWatcher?
@@ -19,10 +23,12 @@ struct NotoSplitView: View {
     @State private var isSearchPresented = false
     @State private var noteHistory = NoteNavigationHistory()
     @State private var isApplyingHistoryNavigation = false
+    #if os(macOS)
+    @State private var hostingWindow: NSWindow?
+    #endif
     #if os(iOS)
     @State private var noteStackNavigation = NoteStackNavigationState()
     @State private var isSyncingSelectionFromNativeStack = false
-    @FocusState private var isSearchFocused: Bool
     #endif
 
     var body: some View {
@@ -37,10 +43,22 @@ struct NotoSplitView: View {
         }
         .navigationSplitViewStyle(.prominentDetail)
         .navigationTitle("Noto")
-        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.toggleSidebar)) { _ in
+        .background {
+            #if os(macOS)
+            WindowReader(window: $hostingWindow)
+                .frame(width: 0, height: 0)
+            #endif
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.toggleSidebar)) { notification in
+            #if os(macOS)
+            guard handlesWindowScopedCommand(notification) else { return }
+            #endif
             toggleSidebar()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.showSearch)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.showSearch)) { notification in
+            #if os(macOS)
+            guard handlesWindowScopedCommand(notification) else { return }
+            #endif
             showSearch()
         }
         .onAppear {
@@ -62,7 +80,10 @@ struct NotoSplitView: View {
             externallyDeletingNoteID: $externallyDeletingNoteID,
             searchText: $sidebarSearchText,
             isSearchPresented: $isSearchPresented,
-            onSelectNote: sidebarSelectNoteAction
+            onSelectNote: sidebarSelectNoteAction,
+            onToggleSidebar: {
+                toggleSidebar()
+            }
         )
         #if os(macOS)
         .toolbar(removing: .sidebarToggle)
@@ -91,8 +112,15 @@ struct NotoSplitView: View {
             onSearch: { isSearchPresented.toggle() },
             onCreateRootNote: createRootNote
         )
-        .popover(isPresented: $isSearchPresented, arrowEdge: .bottom) {
-            iOSSearchPopover
+        .sheet(isPresented: $isSearchPresented) {
+            NavigationStack {
+                IOSNoteSearchSheet(rootStore: store) { result in
+                    selectSearchResult(result)
+                }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .noteSearchSheetPresentationStyle()
         }
         .background {
             AppTheme.background
@@ -127,33 +155,6 @@ struct NotoSplitView: View {
         }
     }
 
-    private var iOSSearchPopover: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(AppTheme.mutedText)
-            TextField("Search", text: $sidebarSearchText)
-                .textFieldStyle(.plain)
-                .focused($isSearchFocused)
-                .accessibilityIdentifier("sidebar_search_field")
-            if !sidebarSearchText.isEmpty {
-                Button {
-                    sidebarSearchText = ""
-                } label: {
-                    Label("Clear Search", systemImage: "xmark.circle.fill")
-                }
-                .buttonStyle(.plain)
-                .labelStyle(.iconOnly)
-                .foregroundStyle(AppTheme.mutedText)
-                .accessibilityIdentifier("clear_search_button")
-                .accessibilityLabel("Clear Search")
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(width: 240, height: 32)
-        .onAppear {
-            isSearchFocused = true
-        }
-    }
     #endif
 
     @ViewBuilder
@@ -303,11 +304,26 @@ struct NotoSplitView: View {
     }
 
     private func showSearch() {
+        #if os(iOS)
+        isSearchPresented = true
+        #else
         columnVisibility = .all
         DispatchQueue.main.async {
             isSearchPresented = true
         }
+        #endif
     }
+
+    #if os(macOS)
+    private func handlesWindowScopedCommand(_ notification: Notification) -> Bool {
+        if let targetWindow = notification.object as? NSWindow {
+            return targetWindow === hostingWindow
+        }
+
+        guard let hostingWindow else { return false }
+        return hostingWindow.isKeyWindow || hostingWindow.isMainWindow
+    }
+    #endif
 
     private var splitEditorLeadingChromeControls: EditorLeadingChromeControls {
         #if os(iOS)
@@ -343,6 +359,11 @@ struct NotoSplitView: View {
     private func createRootNote() {
         let note = store.createNote()
         selectHistoryEntry(NoteStackEntry(note: note, store: store, isNew: true), recordsVisit: true)
+    }
+
+    private func selectSearchResult(_ result: IOSNoteSearchResult) {
+        selectHistoryEntry(NoteStackEntry(note: result.note, store: result.store, isNew: false), recordsVisit: true)
+        columnVisibility = .detailOnly
     }
 
     private func syncCurrentSelectionIntoNativeStack() {
@@ -393,3 +414,25 @@ private extension View {
         }
     }
 }
+
+#if os(macOS)
+private struct WindowReader: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            window = view.window
+        }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if window !== view.window {
+                window = view.window
+            }
+        }
+    }
+}
+#endif
