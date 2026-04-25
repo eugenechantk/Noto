@@ -315,6 +315,10 @@ struct NotoSidebarView: View {
         selectedNoteStore = noteStore
         selectedNote = note
         selectedIsNew = false
+        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            searchText = ""
+            isSearchPresented = false
+        }
         onSelectNote?()
     }
 
