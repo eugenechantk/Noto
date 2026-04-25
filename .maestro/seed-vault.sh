@@ -1,6 +1,9 @@
 #!/bin/bash
 # Seed a Noto vault on an iOS simulator with folders and sample notes.
-# Usage: ./seed-vault.sh <simulator-udid> [--scale small|large]
+# Usage:
+#   ./seed-vault.sh <simulator-udid> [--scale small|large]
+#   ./seed-vault.sh <simulator-udid> --current-vault
+#   ./seed-vault.sh <simulator-udid> --source-vault <path>
 #
 # Small scale creates Documents/Noto/ with:
 #   - Projects/ (empty folder)
@@ -20,17 +23,81 @@
 
 set -euo pipefail
 
+usage() {
+    cat <<USAGE
+Usage:
+  $0 <simulator-udid> [--scale small|large]
+  $0 <simulator-udid> --current-vault
+  $0 <simulator-udid> --source-vault <path>
+
+Options:
+  --scale small|large    Generate the built-in seed vault. Default: small.
+  --current-vault        Copy Eugene's current iCloud Noto vault into the simulator.
+  --source-vault <path>  Copy an arbitrary local Noto vault into the simulator.
+  --help                 Show this help.
+USAGE
+}
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    usage
+    exit 0
+fi
+
 UDID="${1:?Usage: $0 <simulator-udid> [--scale small|large]}"
 SCALE="small"
-if [ "${2:-}" = "--scale" ]; then
-    SCALE="${3:?Usage: $0 <simulator-udid> [--scale small|large]}"
-elif [ -n "${2:-}" ]; then
-    SCALE="$2"
-fi
+MODE="generated"
+SOURCE_VAULT=""
+CURRENT_VAULT="/Users/eugenechan/Library/Mobile Documents/com~apple~CloudDocs/Noto"
+
+shift
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --scale)
+            SCALE="${2:?Error: --scale requires small or large.}"
+            MODE="generated"
+            shift 2
+            ;;
+        --current-vault)
+            SOURCE_VAULT="$CURRENT_VAULT"
+            MODE="source"
+            shift
+            ;;
+        --source-vault)
+            SOURCE_VAULT="${2:?Error: --source-vault requires a path.}"
+            MODE="source"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        small|large)
+            SCALE="$1"
+            MODE="generated"
+            shift
+            ;;
+        *)
+            echo "Error: unknown option '$1'."
+            usage
+            exit 1
+            ;;
+    esac
+done
 
 if [ "$SCALE" != "small" ] && [ "$SCALE" != "large" ]; then
     echo "Error: scale must be 'small' or 'large'."
     exit 1
+fi
+
+if [ "$MODE" = "source" ]; then
+    if [ -z "$SOURCE_VAULT" ]; then
+        echo "Error: source vault path is empty."
+        exit 1
+    fi
+    if [ ! -d "$SOURCE_VAULT" ]; then
+        echo "Error: source vault does not exist: $SOURCE_VAULT"
+        exit 1
+    fi
 fi
 
 BUNDLE_ID="com.eugenechan.Noto"
@@ -311,12 +378,32 @@ seed_large_vault() {
     echo "Done. Vault seeded with $folder_count folders and $total_notes notes."
 }
 
-case "$SCALE" in
-    small)
-        seed_small_vault
+seed_from_source_vault() {
+    echo "Copying source vault from: $SOURCE_VAULT"
+    rsync -a \
+        --exclude ".DS_Store" \
+        --exclude ".noto/search.sqlite*" \
+        "$SOURCE_VAULT"/ \
+        "$VAULT_DIR"/
+
+    local note_count
+    note_count=$(find "$VAULT_DIR" -type f -name "*.md" | wc -l | tr -d " ")
+    echo "Done. Vault seeded from source with $note_count markdown notes."
+}
+
+case "$MODE" in
+    generated)
+        case "$SCALE" in
+            small)
+                seed_small_vault
+                ;;
+            large)
+                seed_large_vault
+                ;;
+        esac
         ;;
-    large)
-        seed_large_vault
+    source)
+        seed_from_source_vault
         ;;
 esac
 
