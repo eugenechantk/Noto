@@ -69,6 +69,46 @@ struct TextKit2MarkdownLayoutTests {
         #expect(MarkdownBlockKind.detect(from: "- [x] ") == .todo(checked: true, indent: 0))
     }
 
+    @Test("Three dash lines are detected as divider blocks")
+    func threeDashLinesAreDetectedAsDividerBlocks() {
+        #expect(MarkdownBlockKind.detect(from: "---") == .divider)
+        #expect(MarkdownBlockKind.detect(from: "  ---") == .divider)
+        #expect(MarkdownBlockKind.detect(from: "----") == .paragraph)
+    }
+
+    @Test("Divider markdown is hidden until the cursor is on the divider line")
+    func dividerMarkdownHidesUntilSelected() throws {
+        let text = "---"
+        let kind = MarkdownBlockKind.detect(from: text)
+        let hidden = MarkdownParagraphStyler.style(text: text, kind: kind)
+        let revealed = MarkdownParagraphStyler.style(
+            text: text,
+            kind: kind,
+            revealedDividerRanges: [NSRange(location: 0, length: 3)]
+        )
+        let hiddenColor = try #require(hidden.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        let revealedColor = try #require(revealed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        let lightTrait = UITraitCollection(userInterfaceStyle: .light)
+
+        #expect(hiddenColor.resolvedColor(with: lightTrait) == UIColor.clear.resolvedColor(with: lightTrait))
+        #expect(revealedColor.resolvedColor(with: lightTrait) == AppTheme.uiPrimaryText.resolvedColor(with: lightTrait))
+    }
+
+    @Test("Selected divider line discovery skips frontmatter")
+    func selectedDividerLineDiscoverySkipsFrontmatter() {
+        let text = "---\ntitle: Draft\n---\nBody\n---"
+        let nsText = text as NSString
+        let frontmatterSelection = NSRange(location: 0, length: 0)
+        let dividerSelection = NSRange(location: nsText.range(of: "---", options: .backwards).location, length: 0)
+
+        let frontmatterRanges = DividerMarkdown.rangesOnSelectedLines(in: text, selection: frontmatterSelection)
+        let dividerRanges = DividerMarkdown.rangesOnSelectedLines(in: text, selection: dividerSelection)
+
+        #expect(frontmatterRanges.isEmpty)
+        #expect(dividerRanges.count == 1)
+        #expect(nsText.substring(with: dividerRanges[0]) == "---")
+    }
+
     @Test("Todo wrapped lines align with first-line text after the circle")
     func todoWrappedLinesAlignWithTextAfterCircle() {
         let text = "- [ ] A long todo that wraps onto another visual line"
@@ -495,6 +535,23 @@ import Testing
 
 @Suite("TextKit 2 Markdown Layout macOS")
 struct TextKit2MarkdownLayoutMacTests {
+
+    @Test("Divider markdown is hidden until the cursor is on the divider line")
+    func dividerMarkdownHidesUntilSelected() throws {
+        let text = "---"
+        let kind = MarkdownBlockKind.detect(from: text)
+        let hidden = MarkdownParagraphStyler.style(text: text, kind: kind)
+        let revealed = MarkdownParagraphStyler.style(
+            text: text,
+            kind: kind,
+            revealedDividerRanges: [NSRange(location: 0, length: 3)]
+        )
+        let hiddenColor = try #require(hidden.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+        let revealedColor = try #require(revealed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+
+        #expect(hiddenColor == NSColor.clear)
+        #expect(revealedColor == AppTheme.nsPrimaryText)
+    }
 
     @Test("Empty todo prefix keeps trailing space at body size for insertion point height")
     func emptyTodoPrefixKeepsTrailingSpaceAtBodySizeForInsertionPointHeight() throws {
