@@ -119,6 +119,7 @@ struct TextKit2EditorLifecycleTests {
         let todoButton = try #require(accessoryView.descendant(withAccessibilityIdentifier: "toggle_todo_button") as? UIButton)
         let strikethroughButton = try #require(accessoryView.descendant(withAccessibilityIdentifier: "toggle_strikethrough_button") as? UIButton)
         let hyperlinkButton = try #require(accessoryView.descendant(withAccessibilityIdentifier: "toggle_hyperlink_button") as? UIButton)
+        let hideKeyboardButton = try #require(accessoryView.descendant(withAccessibilityIdentifier: "hide_keyboard_button") as? UIButton)
 
         #expect(todoButton.actions(forTarget: controller, forControlEvent: .touchUpInside) == ["toggleTodoForSelectedLines"])
         #expect(todoButton.actions(forTarget: controller, forControlEvent: .primaryActionTriggered) == nil)
@@ -126,6 +127,8 @@ struct TextKit2EditorLifecycleTests {
         #expect(strikethroughButton.actions(forTarget: controller, forControlEvent: .primaryActionTriggered) == nil)
         #expect(hyperlinkButton.actions(forTarget: controller, forControlEvent: .touchUpInside) == ["toggleSelectedHyperlink"])
         #expect(hyperlinkButton.actions(forTarget: controller, forControlEvent: .primaryActionTriggered) == nil)
+        #expect(hideKeyboardButton.actions(forTarget: controller, forControlEvent: .touchUpInside) == ["hideSoftwareKeyboard"])
+        #expect(hideKeyboardButton.actions(forTarget: controller, forControlEvent: .primaryActionTriggered) == nil)
 
         let keyCommandActions = Set((controller.keyCommands ?? []).compactMap { command in
             command.action.map(NSStringFromSelector)

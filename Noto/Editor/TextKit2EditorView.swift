@@ -2170,6 +2170,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
                 accessibilityLabel: "Link",
                 action: #selector(toggleSelectedHyperlink)
             ),
+            makeToolbarButton(
+                systemName: "keyboard.chevron.compact.down",
+                accessibilityIdentifier: "hide_keyboard_button",
+                accessibilityLabel: "Hide Keyboard",
+                action: #selector(hideSoftwareKeyboard)
+            ),
         ])
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.axis = .horizontal
@@ -2209,6 +2215,11 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             button.heightAnchor.constraint(equalToConstant: 28),
         ])
         return button
+    }
+
+    @objc
+    private func hideSoftwareKeyboard() {
+        textView.resignFirstResponder()
     }
 
     @objc
