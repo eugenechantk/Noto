@@ -72,11 +72,11 @@ private struct EditorFindBackgroundSnapshot {
 
 private enum EditorFindHighlightPalette {
     static var matchBackground: PlatformColor {
-        PlatformColor.yellow.withAlphaComponent(0.34)
+        PlatformColor.white.withAlphaComponent(0.34)
     }
 
     static var currentMatchBackground: PlatformColor {
-        PlatformColor.yellow
+        PlatformColor.systemYellow.withAlphaComponent(0.62)
     }
 }
 
@@ -2761,12 +2761,13 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
                 height: height
             )
 
+            let isActiveMatch = index == selectedFindMatchIndex
             let highlight = UIView(frame: rect)
             highlight.isUserInteractionEnabled = false
             highlight.layer.cornerRadius = 2
             highlight.layer.cornerCurve = .continuous
-            highlight.backgroundColor = index == selectedFindMatchIndex
-                ? EditorFindHighlightPalette.currentMatchBackground.withAlphaComponent(0.82)
+            highlight.backgroundColor = isActiveMatch
+                ? EditorFindHighlightPalette.currentMatchBackground
                 : EditorFindHighlightPalette.matchBackground
             textView.insertSubview(highlight, at: 0)
             findHighlightViews.append(highlight)
@@ -3430,7 +3431,6 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var lastFindNavigationRequestID: Int?
     private var onFindStatusChange: ((EditorFindStatus) -> Void)?
     private var lastPublishedFindStatus = EditorFindStatus()
-    private var findBackgroundSnapshots: [EditorFindBackgroundSnapshot] = []
     private var findHighlightViews: [NSView] = []
 
     override func loadView() {
@@ -3672,9 +3672,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
         let range = findMatches[selectedFindMatchIndex]
         guard NSMaxRange(range) <= (textView.string as NSString).length else { return }
-        textView.setSelectedRange(range)
         textView.scrollRangeToVisible(range)
         refreshFindHighlightOverlays()
+        scheduleEditorOverlayRefresh()
     }
 
     private func publishFindStatusIfNeeded() {
@@ -3689,29 +3689,12 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     }
 
     private func applyFindHighlights() {
-        guard isViewLoaded,
-              let textStorage = textView.textStorage else {
+        guard isViewLoaded, textView != nil else {
             return
         }
 
         restoreFindHighlightBackgrounds()
         guard !findMatches.isEmpty else { return }
-
-        textStorage.beginEditing()
-        for (index, range) in findMatches.enumerated() {
-            guard range.location >= 0,
-                  range.length > 0,
-                  NSMaxRange(range) <= textStorage.length else {
-                continue
-            }
-
-            snapshotFindBackgrounds(in: range, textStorage: textStorage)
-            let background = index == selectedFindMatchIndex
-                ? EditorFindHighlightPalette.currentMatchBackground
-                : EditorFindHighlightPalette.matchBackground
-            textStorage.addAttribute(.backgroundColor, value: background, range: range)
-        }
-        textStorage.endEditing()
         textView.needsDisplay = true
         refreshFindHighlightOverlays()
     }
@@ -3719,44 +3702,18 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private func restoreFindHighlightBackgrounds() {
         clearFindHighlightOverlays()
 
-        guard isViewLoaded,
-              let textStorage = textView.textStorage,
-              !findBackgroundSnapshots.isEmpty else {
-            findBackgroundSnapshots = []
+        guard isViewLoaded, textView != nil else {
             return
         }
-
-        textStorage.beginEditing()
-        for snapshot in findBackgroundSnapshots.reversed() where NSMaxRange(snapshot.range) <= textStorage.length {
-            if let value = snapshot.value {
-                textStorage.addAttribute(.backgroundColor, value: value, range: snapshot.range)
-            } else {
-                textStorage.removeAttribute(.backgroundColor, range: snapshot.range)
-            }
-        }
-        textStorage.endEditing()
-        findBackgroundSnapshots = []
         textView.needsDisplay = true
-    }
-
-    private func snapshotFindBackgrounds(in range: NSRange, textStorage: NSTextStorage) {
-        textStorage.enumerateAttribute(.backgroundColor, in: range, options: []) { value, subrange, _ in
-            findBackgroundSnapshots.append(EditorFindBackgroundSnapshot(range: subrange, value: value))
-        }
     }
 
     private func refreshFindHighlightOverlays() {
         guard isViewLoaded, textView != nil else { return }
         clearFindHighlightOverlays()
-        guard !findMatches.isEmpty,
-              let layoutManager = textView.layoutManager,
-              let textContainer = textView.textContainer else {
-            return
-        }
+        guard !findMatches.isEmpty else { return }
 
-        layoutManager.ensureLayout(for: textContainer)
         let textLength = (textView.string as NSString).length
-        let textContainerOrigin = textView.textContainerOrigin
         for (index, range) in findMatches.enumerated() {
             guard range.location >= 0,
                   range.length > 0,
@@ -3764,35 +3721,37 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
                 continue
             }
 
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-            guard glyphRange.location != NSNotFound, glyphRange.length > 0 else { continue }
-
-            layoutManager.enumerateEnclosingRects(
-                forGlyphRange: glyphRange,
-                withinSelectedGlyphRange: NSRange(location: NSNotFound, length: 0),
-                in: textContainer
-            ) { [weak self] rect, _ in
-                guard let self else { return }
-                let highlightRect = NSRect(
-                    x: rect.minX + textContainerOrigin.x - 1,
-                    y: rect.minY + textContainerOrigin.y - 1,
-                    width: max(4, rect.width + 2),
-                    height: max(12, rect.height + 2)
-                )
-                guard self.isFiniteRect(highlightRect) else { return }
-
-                let highlight = FindHighlightOverlayView(frame: highlightRect)
-                highlight.wantsLayer = true
-                highlight.layer?.cornerRadius = 2
-                highlight.layer?.cornerCurve = .continuous
-                highlight.layer?.backgroundColor = (index == selectedFindMatchIndex
-                    ? EditorFindHighlightPalette.currentMatchBackground.withAlphaComponent(0.68)
-                    : EditorFindHighlightPalette.matchBackground
-                ).cgColor
-                textView.addSubview(highlight)
-                findHighlightViews.append(highlight)
-            }
+            guard let highlightRect = textViewRectForFindRange(range) else { continue }
+            let isActiveMatch = index == selectedFindMatchIndex
+            let highlight = FindHighlightOverlayView(frame: highlightRect)
+            highlight.wantsLayer = true
+            highlight.layer?.cornerRadius = 2
+            highlight.layer?.cornerCurve = .continuous
+            highlight.layer?.backgroundColor = (isActiveMatch
+                ? EditorFindHighlightPalette.currentMatchBackground
+                : EditorFindHighlightPalette.matchBackground
+            ).cgColor
+            textView.addSubview(highlight)
+            findHighlightViews.append(highlight)
         }
+    }
+
+    private func textViewRectForFindRange(_ range: NSRange) -> NSRect? {
+        guard let window = textView.window else { return nil }
+
+        let screenRect = textView.firstRect(forCharacterRange: range, actualRange: nil)
+        guard !screenRect.isNull, isFiniteRect(screenRect) else { return nil }
+
+        let windowRect = window.convertFromScreen(screenRect)
+        let localRect = textView.convert(windowRect, from: nil)
+        let highlightRect = NSRect(
+            x: localRect.minX - 1,
+            y: localRect.minY - 1,
+            width: max(4, localRect.width + 2),
+            height: max(12, localRect.height + 2)
+        )
+        guard isFiniteRect(highlightRect) else { return nil }
+        return highlightRect
     }
 
     private func clearFindHighlightOverlays() {

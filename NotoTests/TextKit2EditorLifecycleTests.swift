@@ -407,6 +407,37 @@ struct TextKit2EditorLifecycleTests {
         #expect(buttonFrameInStack.maxX <= stackView.bounds.width - stackView.layoutMargins.right - 9)
     }
 
+    @Test("Readable width layout centers iPad text around a 600 point column")
+    func readableWidthLayoutCentersIPadText() {
+        let textInset = ReadableTextColumnLayout.textHorizontalInset(
+            for: 1024,
+            maximumTextWidth: 600,
+            minimumHorizontalInset: 16,
+            constrainsToReadableWidth: true
+        )
+
+        #expect(textInset == 212)
+    }
+
+    @Test("Readable width layout keeps narrow and unconstrained editors edge aligned")
+    func readableWidthLayoutKeepsNarrowAndUnconstrainedEditorsEdgeAligned() {
+        let narrowInset = ReadableTextColumnLayout.textHorizontalInset(
+            for: 550,
+            maximumTextWidth: 600,
+            minimumHorizontalInset: 16,
+            constrainsToReadableWidth: true
+        )
+        let phoneInset = ReadableTextColumnLayout.textHorizontalInset(
+            for: 1024,
+            maximumTextWidth: 600,
+            minimumHorizontalInset: 16,
+            constrainsToReadableWidth: false
+        )
+
+        #expect(narrowInset == 16)
+        #expect(phoneInset == 16)
+    }
+
     @Test("Frontmatter range covers the YAML metadata block only")
     func detectsFrontmatterRange() throws {
         let markdown = """
@@ -491,6 +522,23 @@ struct TextKit2EditorLifecycleMacTests {
         #expect(handled)
         #expect(controller.textView.string == "- Parent\n- ")
         #expect(controller.textView.selectedRange() == NSRange(location: 11, length: 0))
+    }
+
+    @MainActor
+    @Test("Find query does not move editor selection or mutate backing attributes")
+    func findQueryDoesNotMoveEditorSelectionOrMutateBackingAttributes() throws {
+        let controller = TextKit2EditorViewController()
+        controller.loadViewIfNeeded()
+        controller.loadText("# Shopping List\n- Fruits")
+        controller.textView.setSelectedRange(NSRange(location: controller.textView.string.count, length: 0))
+        let attributesBeforeFind = try #require(controller.textView.textStorage?.attributes(at: 0, effectiveRange: nil))
+
+        controller.updateFind(query: "Shop", navigationRequest: nil, onStatusChange: nil)
+
+        #expect(controller.textView.selectedRange() == NSRange(location: controller.textView.string.count, length: 0))
+        #expect(controller.textView.textStorage?.attribute(.backgroundColor, at: 0, effectiveRange: nil) == nil)
+        let attributesAfterFind = try #require(controller.textView.textStorage?.attributes(at: 0, effectiveRange: nil))
+        #expect(NSDictionary(dictionary: attributesAfterFind).isEqual(to: attributesBeforeFind))
     }
 
     @MainActor
