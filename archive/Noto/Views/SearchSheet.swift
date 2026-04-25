@@ -10,7 +10,7 @@ import SwiftUI
 import SwiftData
 import os.log
 import NotoCore
-import NotoSearch
+import NotoSearchLegacy
 import NotoAIChat
 import NotoDirtyTracker
 

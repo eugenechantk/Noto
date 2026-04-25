@@ -8,7 +8,7 @@ import SwiftData
 import Testing
 import NotoModels
 import NotoCore
-import NotoSearch
+import NotoSearchLegacy
 import NotoClaudeAPI
 @testable import NotoAIChat
 

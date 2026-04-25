@@ -1,6 +1,6 @@
 //
 //  DateFilterParser.swift
-//  NotoSearch
+//  NotoSearchLegacy
 //
 //  Extracts temporal phrases from query strings and returns
 //  a cleaned query with an optional date range.

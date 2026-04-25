@@ -1,6 +1,6 @@
 //
 //  SearchTypes.swift
-//  NotoSearch
+//  NotoSearchLegacy
 //
 //  Shared types for the hybrid search pipeline.
 //

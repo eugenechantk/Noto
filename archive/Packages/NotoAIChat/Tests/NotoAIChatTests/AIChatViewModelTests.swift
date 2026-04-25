@@ -11,7 +11,7 @@ import SwiftData
 import Synchronization
 import Testing
 import NotoModels
-import NotoSearch
+import NotoSearchLegacy
 import NotoClaudeAPI
 import NotoDirtyTracker
 @testable import NotoAIChat

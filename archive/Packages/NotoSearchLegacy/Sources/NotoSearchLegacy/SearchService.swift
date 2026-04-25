@@ -1,6 +1,6 @@
 //
 //  SearchService.swift
-//  NotoSearch
+//  NotoSearchLegacy
 //
 //  Orchestrates the full search pipeline: flush dirty -> parse date ->
 //  parallel FTS5 (+ semantic when available) -> hybrid rank -> build results.

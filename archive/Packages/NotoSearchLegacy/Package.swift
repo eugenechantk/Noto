@@ -2,10 +2,10 @@
 import PackageDescription
 
 let package = Package(
-    name: "NotoSearch",
+    name: "NotoSearchLegacy",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
-        .library(name: "NotoSearch", targets: ["NotoSearch"]),
+        .library(name: "NotoSearchLegacy", targets: ["NotoSearchLegacy"]),
     ],
     dependencies: [
         .package(path: "../NotoModels"),
@@ -16,7 +16,7 @@ let package = Package(
         .package(path: "../NotoEmbedding"),
     ],
     targets: [
-        .target(name: "NotoSearch", dependencies: [
+        .target(name: "NotoSearchLegacy", dependencies: [
             "NotoModels",
             "NotoCore",
             "NotoDirtyTracker",
@@ -25,9 +25,9 @@ let package = Package(
             "NotoEmbedding",
         ]),
         .testTarget(
-            name: "NotoSearchTests",
+            name: "NotoSearchLegacyTests",
             dependencies: [
-                "NotoSearch",
+                "NotoSearchLegacy",
                 "NotoModels",
                 "NotoCore",
                 "NotoDirtyTracker",

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import NotoSearch
+import NotoSearchLegacy
 
 struct SearchPackageTests {
     @Test

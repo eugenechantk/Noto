@@ -16,7 +16,7 @@ import NotoDirtyTracker
 
 // MARK: - Non-core imports (commented out for minimal app)
 // import NotoFTS5
-// import NotoSearch
+// import NotoSearchLegacy
 // import NotoTodayNotes
 // import NotoEmbedding
 // #if canImport(USearch)

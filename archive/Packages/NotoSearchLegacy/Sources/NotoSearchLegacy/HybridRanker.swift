@@ -1,6 +1,6 @@
 //
 //  HybridRanker.swift
-//  NotoSearch
+//  NotoSearchLegacy
 //
 //  Score normalization and combination for hybrid search ranking.
 //  Normalizes BM25 (negative) and cosine similarity scores to [0,1],

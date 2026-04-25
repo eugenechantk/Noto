@@ -4,7 +4,7 @@
 //
 
 import Foundation
-import NotoSearch
+import NotoSearchLegacy
 
 /// Protocol abstraction over SearchService for testability.
 public protocol SearchServiceProtocol {

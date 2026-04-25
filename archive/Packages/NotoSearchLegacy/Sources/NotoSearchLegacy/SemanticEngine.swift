@@ -1,6 +1,6 @@
 //
 //  SemanticEngine.swift
-//  NotoSearch
+//  NotoSearchLegacy
 //
 //  Query execution for semantic search. Embeds query text, searches HNSW,
 //  applies similarity threshold and optional date post-filtering.

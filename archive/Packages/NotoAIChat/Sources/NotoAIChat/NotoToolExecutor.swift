@@ -9,7 +9,7 @@ import os.log
 import NotoModels
 import NotoCore
 import NotoClaudeAPI
-import NotoSearch
+import NotoSearchLegacy
 
 private let logger = Logger(subsystem: "com.noto", category: "NotoToolExecutor")
 

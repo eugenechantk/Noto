@@ -12,7 +12,7 @@ let package = Package(
         .package(path: "../NotoCore"),
         .package(path: "../NotoDirtyTracker"),
         .package(path: "../NotoClaudeAPI"),
-        .package(path: "../NotoSearch"),
+        .package(path: "../NotoSearchLegacy"),
     ],
     targets: [
         .target(name: "NotoAIChat", dependencies: [
@@ -20,11 +20,11 @@ let package = Package(
             "NotoCore",
             "NotoDirtyTracker",
             "NotoClaudeAPI",
-            "NotoSearch",
+            "NotoSearchLegacy",
         ]),
         .testTarget(
             name: "NotoAIChatTests",
-            dependencies: ["NotoAIChat", "NotoModels", "NotoCore", "NotoDirtyTracker", "NotoClaudeAPI", "NotoSearch"]
+            dependencies: ["NotoAIChat", "NotoModels", "NotoCore", "NotoDirtyTracker", "NotoClaudeAPI", "NotoSearchLegacy"]
         ),
     ]
 )
