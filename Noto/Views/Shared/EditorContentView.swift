@@ -59,22 +59,7 @@ struct EditorContentView: View {
                             onReload: session.reloadRemoteSnapshot
                         )
                     }
-                    TextKit2EditorView(
-                        text: $session.content,
-                        autoFocus: session.isNew,
-                        onTextChange: session.handleEditorChange,
-                        pageMentionProvider: pageMentionProvider,
-                        onOpenDocumentLink: onOpenDocumentLink,
-                        isFindVisible: isFindVisible,
-                        findQuery: findQuery,
-                        findNavigationRequest: findNavigationRequest,
-                        onFindStatusChange: { status in
-                            DispatchQueue.main.async {
-                                findStatus = status
-                            }
-                        },
-                        onCloseFind: closeFind
-                    )
+                    editorView
                 }
 
                 if isFindVisible {
@@ -99,6 +84,47 @@ struct EditorContentView: View {
         #if os(iOS)
         .ignoresSafeArea(edges: [.top, .bottom])
         #endif
+    }
+
+    @ViewBuilder
+    private var editorView: some View {
+        #if os(iOS)
+        TextKit2EditorView(
+            text: $session.content,
+            autoFocus: session.isNew,
+            onTextChange: session.handleEditorChange,
+            vaultRootURL: session.store.vaultRootURL,
+            onImportImageData: session.importImageAttachment(data:suggestedFilename:),
+            pageMentionProvider: pageMentionProvider,
+            onOpenDocumentLink: onOpenDocumentLink,
+            isFindVisible: isFindVisible,
+            findQuery: findQuery,
+            findNavigationRequest: findNavigationRequest,
+            onFindStatusChange: handleFindStatusChange,
+            onCloseFind: closeFind
+        )
+        #elseif os(macOS)
+        TextKit2EditorView(
+            text: $session.content,
+            autoFocus: session.isNew,
+            onTextChange: session.handleEditorChange,
+            vaultRootURL: session.store.vaultRootURL,
+            onImportImageFile: session.importImageAttachment(fileURL:),
+            pageMentionProvider: pageMentionProvider,
+            onOpenDocumentLink: onOpenDocumentLink,
+            isFindVisible: isFindVisible,
+            findQuery: findQuery,
+            findNavigationRequest: findNavigationRequest,
+            onFindStatusChange: handleFindStatusChange,
+            onCloseFind: closeFind
+        )
+        #endif
+    }
+
+    private func handleFindStatusChange(_ status: EditorFindStatus) {
+        DispatchQueue.main.async {
+            findStatus = status
+        }
     }
 
     private var findBarTrailingPadding: CGFloat {

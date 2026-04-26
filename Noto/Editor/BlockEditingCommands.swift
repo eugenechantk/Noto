@@ -16,6 +16,26 @@ struct TextReplacement: Equatable {
     let replacement: String
 }
 
+enum MarkdownImageInsertion {
+    static func transform(in text: String, selection: NSRange, markdown: String) -> TextSelectionTransform {
+        let nsText = text as NSString
+        let safeLocation = max(0, min(selection.location, nsText.length))
+        let safeLength = max(0, min(selection.length, nsText.length - safeLocation))
+        let replacementRange = NSRange(location: safeLocation, length: safeLength)
+
+        let needsLeadingNewline = safeLocation > 0 && nsText.character(at: safeLocation - 1) != 10
+        let replacementEnd = safeLocation + safeLength
+        let needsTrailingNewline = replacementEnd < nsText.length && nsText.character(at: replacementEnd) != 10
+
+        let insertion = "\(needsLeadingNewline ? "\n" : "")\(markdown)\(needsTrailingNewline ? "\n" : "\n")"
+        let updatedText = nsText.replacingCharacters(in: replacementRange, with: insertion)
+        return TextSelectionTransform(
+            text: updatedText,
+            selection: NSRange(location: safeLocation + (insertion as NSString).length, length: 0)
+        )
+    }
+}
+
 struct HyperlinkMarkdown {
     enum Target: Equatable {
         case external(URL)

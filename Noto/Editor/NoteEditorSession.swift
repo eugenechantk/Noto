@@ -80,6 +80,14 @@ final class NoteEditorSession {
         applyEditorText(newText, scheduleRename: true)
     }
 
+    func importImageAttachment(data: Data, suggestedFilename: String?) throws -> VaultImageAttachment {
+        try store.importImageAttachment(data: data, suggestedFilename: suggestedFilename)
+    }
+
+    func importImageAttachment(fileURL: URL) throws -> VaultImageAttachment {
+        try store.importImageAttachment(fileURL: fileURL)
+    }
+
     func handleExternalChange(changedURL: URL?) {
         guard hasLoaded, !isDownloading else { return }
         if let changedURL, changedURL != note.fileURL {

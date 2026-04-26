@@ -276,6 +276,22 @@ struct TextKit2MarkdownLayoutTests {
         #expect(imageLink.urlString.contains("substackcdn.com/image/fetch"))
     }
 
+    @Test("Relative vault image links resolve against the vault root")
+    func relativeVaultImageLinksResolveAgainstVaultRoot() throws {
+        let vaultRoot = URL(fileURLWithPath: "/tmp/Noto Vault")
+        let text = "![Camera Roll](.attachments/Camera%20Roll.jpg)"
+        let kind = MarkdownBlockKind.detect(from: text, vaultRootURL: vaultRoot)
+
+        guard case .imageLink(let imageLink) = kind else {
+            Issue.record("Expected image-link block kind")
+            return
+        }
+
+        let url = try #require(imageLink.url)
+        #expect(url.isFileURL)
+        #expect(url.path == "/tmp/Noto Vault/.attachments/Camera Roll.jpg")
+    }
+
     @Test("Non-image empty links stay regular paragraphs")
     func nonImageEmptyLinksStayRegularParagraphs() {
         let text = "[](https://example.com/article)"
@@ -284,7 +300,7 @@ struct TextKit2MarkdownLayoutTests {
         #expect(kind == .paragraph)
     }
 
-    @Test("Image links reserve vertical preview space")
+    @Test("Image links reserve placeholder vertical preview space until dimensions are cached")
     func imageLinksReserveVerticalPreviewSpace() {
         let text = "![](https://example.com/chart.png)"
         let kind = MarkdownBlockKind.detect(from: text)
@@ -292,6 +308,70 @@ struct TextKit2MarkdownLayoutTests {
 
         #expect(paragraphStyle.minimumLineHeight == MarkdownVisualSpec.imagePreviewReservedHeight)
         #expect(paragraphStyle.maximumLineHeight == MarkdownVisualSpec.imagePreviewReservedHeight)
+    }
+
+    @Test("Image dimension cache stores and returns sizes per URL")
+    func imageDimensionCacheStoresAndReturnsSizesPerURL() throws {
+        let url = try #require(URL(string: "https://example.com/dim-cache-test-ios.png"))
+        MarkdownImageDimensionCache.removeSize(for: url)
+
+        #expect(MarkdownImageDimensionCache.cachedSize(for: url) == nil)
+
+        MarkdownImageDimensionCache.setSize(CGSize(width: 1200, height: 800), for: url)
+        let cached = try #require(MarkdownImageDimensionCache.cachedSize(for: url))
+        #expect(abs(cached.width - 1200) < 0.5)
+        #expect(abs(cached.height - 800) < 0.5)
+
+        MarkdownImageDimensionCache.removeSize(for: url)
+        #expect(MarkdownImageDimensionCache.cachedSize(for: url) == nil)
+    }
+
+    @Test("Aspect-adjusted fragment height scales image to container width preserving ratio")
+    func aspectAdjustedFragmentHeightScalesToContainerWidth() throws {
+        let imageSize = CGSize(width: 1200, height: 800)
+        let containerWidth: CGFloat = 600
+
+        let height = try #require(ImageFragmentGeometry.aspectAdjustedFragmentHeight(
+            imageSize: imageSize,
+            containerWidth: containerWidth
+        ))
+
+        let expectedImageHeight = containerWidth * (imageSize.height / imageSize.width)
+        let expectedFragmentHeight =
+            expectedImageHeight + MarkdownVisualSpec.imagePreviewVerticalPadding * 2
+
+        #expect(abs(height - expectedFragmentHeight) < 0.5)
+    }
+
+    @Test("Aspect-adjusted fragment height returns nil when inputs are invalid")
+    func aspectAdjustedFragmentHeightReturnsNilForInvalidInputs() {
+        #expect(ImageFragmentGeometry.aspectAdjustedFragmentHeight(
+            imageSize: CGSize(width: 0, height: 100),
+            containerWidth: 600
+        ) == nil)
+        #expect(ImageFragmentGeometry.aspectAdjustedFragmentHeight(
+            imageSize: CGSize(width: 100, height: 0),
+            containerWidth: 600
+        ) == nil)
+        #expect(ImageFragmentGeometry.aspectAdjustedFragmentHeight(
+            imageSize: CGSize(width: 100, height: 100),
+            containerWidth: 0
+        ) == nil)
+    }
+
+    @Test("Aspect-fit rect contains the image inside the bounds without overflowing")
+    func aspectFitRectContainsImageWithoutOverflow() {
+        let bounds = CGRect(x: 10, y: 20, width: 600, height: 400)
+        let portrait = CGSize(width: 1200, height: 1600)
+        let landscape = CGSize(width: 1600, height: 800)
+
+        let portraitRect = ImageFragmentGeometry.aspectFitRect(imageSize: portrait, in: bounds)
+        let landscapeRect = ImageFragmentGeometry.aspectFitRect(imageSize: landscape, in: bounds)
+
+        #expect(portraitRect.width <= bounds.width + 0.5)
+        #expect(portraitRect.height <= bounds.height + 0.5)
+        #expect(landscapeRect.width <= bounds.width + 0.5)
+        #expect(landscapeRect.height <= bounds.height + 0.5)
     }
 
     @Test("Image links hide backing markdown text")
@@ -513,17 +593,30 @@ struct TextKit2MarkdownLayoutTests {
         #expect(rect.height == MarkdownVisualSpec.imagePreviewReservedHeight - MarkdownVisualSpec.imagePreviewVerticalPadding * 2)
     }
 
-    @Test("Image fragment uses aspect fill sizing")
-    func imageFragmentUsesAspectFillSizing() {
-        let drawRect = ImageFragmentGeometry.aspectFillRect(
+    @Test("Image fragment rect expands to available note width")
+    func imageFragmentRectExpandsToAvailableNoteWidth() {
+        let rect = ImageFragmentGeometry.imageRect(
+            fragmentFrame: CGRect(x: 0, y: 100, width: 2, height: MarkdownVisualSpec.imagePreviewReservedHeight),
+            point: CGPoint(x: 16, y: 12),
+            availableContentWidth: 400
+        )
+
+        #expect(rect.minX == 16)
+        #expect(rect.width == 400)
+        #expect(rect.maxX == 416)
+    }
+
+    @Test("Image fragment uses aspect fit sizing without overflowing the rect")
+    func imageFragmentUsesAspectFitSizing() {
+        let drawRect = ImageFragmentGeometry.aspectFitRect(
             imageSize: CGSize(width: 400, height: 200),
             in: CGRect(x: 0, y: 0, width: 100, height: 100)
         )
 
-        #expect(drawRect.width == 200)
-        #expect(drawRect.height == 100)
-        #expect(drawRect.minX == -50)
-        #expect(drawRect.minY == 0)
+        #expect(drawRect.width == 100)
+        #expect(drawRect.height == 50)
+        #expect(drawRect.minX == 0)
+        #expect(drawRect.minY == 25)
     }
 }
 #endif

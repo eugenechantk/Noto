@@ -1,7 +1,9 @@
 import SwiftUI
 import os.log
+import UniformTypeIdentifiers
 
 #if os(iOS)
+import PhotosUI
 import UIKit
 #elseif os(macOS)
 import AppKit
@@ -98,9 +100,47 @@ private enum EditorFindHighlightPalette {
 struct MarkdownImageLink: Equatable {
     let urlString: String
     let altText: String
+    var resolvedURL: URL? = nil
 
     var url: URL? {
-        URL(string: urlString)
+        if let resolvedURL {
+            return resolvedURL
+        }
+
+        guard let url = URL(string: urlString),
+              url.scheme != nil else {
+            return nil
+        }
+        return url
+    }
+
+    func resolving(relativeTo vaultRootURL: URL?) -> MarkdownImageLink {
+        guard let vaultRootURL,
+              resolvedURL == nil,
+              !urlString.hasPrefix("/") else {
+            return self
+        }
+
+        if let absoluteURL = URL(string: urlString),
+           absoluteURL.scheme != nil {
+            return self
+        }
+
+        let decodedPath = urlString.removingPercentEncoding ?? urlString
+        let components = decodedPath.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard !components.isEmpty,
+              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+            return self
+        }
+
+        var fileURL = vaultRootURL
+        for component in components {
+            fileURL.appendPathComponent(component)
+        }
+
+        var resolved = self
+        resolved.resolvedURL = fileURL.standardizedFileURL
+        return resolved
     }
 }
 
@@ -287,13 +327,13 @@ enum MarkdownBlockKind: Equatable {
     case xmlTag
     case collapsedXMLTagContent
 
-    static func detect(from text: String) -> MarkdownBlockKind {
+    static func detect(from text: String, vaultRootURL: URL? = nil) -> MarkdownBlockKind {
         let indentCount = text.prefix(while: { $0 == " " }).count
         let indent = indentCount / 2
         let stripped = String(text.dropFirst(indentCount))
 
         if let imageLink = MarkdownImageLinkParser.parse(from: stripped) {
-            return .imageLink(imageLink)
+            return .imageLink(imageLink.resolving(relativeTo: vaultRootURL))
         }
 
         if stripped == "---" {
@@ -1263,13 +1303,10 @@ enum ImageFragmentGeometry {
     static func imageRect(
         fragmentFrame: CGRect,
         point: CGPoint = .zero,
-        availableWidth: CGFloat? = nil
+        availableContentWidth: CGFloat? = nil
     ) -> CGRect {
         let verticalPadding = MarkdownVisualSpec.imagePreviewVerticalPadding
-        let resolvedWidth = max(
-            fragmentFrame.width,
-            max(0, (availableWidth ?? fragmentFrame.width) - point.x)
-        )
+        let resolvedWidth = max(fragmentFrame.width, availableContentWidth ?? fragmentFrame.width)
         return CGRect(
             x: point.x,
             y: point.y + verticalPadding,
@@ -1278,7 +1315,7 @@ enum ImageFragmentGeometry {
         ).integral
     }
 
-    static func aspectFillRect(
+    static func aspectFitRect(
         imageSize: CGSize,
         in bounds: CGRect
     ) -> CGRect {
@@ -1289,7 +1326,7 @@ enum ImageFragmentGeometry {
             return bounds
         }
 
-        let scale = max(bounds.width / imageSize.width, bounds.height / imageSize.height)
+        let scale = min(bounds.width / imageSize.width, bounds.height / imageSize.height)
         let drawSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
         return CGRect(
             x: bounds.midX - drawSize.width / 2,
@@ -1298,104 +1335,249 @@ enum ImageFragmentGeometry {
             height: drawSize.height
         )
     }
+
+    static func aspectAdjustedFragmentHeight(
+        imageSize: CGSize,
+        containerWidth: CGFloat
+    ) -> CGFloat? {
+        guard imageSize.width > 0,
+              imageSize.height > 0,
+              containerWidth > 0,
+              containerWidth.isFinite else {
+            return nil
+        }
+
+        let imageHeight = containerWidth * (imageSize.height / imageSize.width)
+        return imageHeight + MarkdownVisualSpec.imagePreviewVerticalPadding * 2
+    }
 }
 
 final class ImageLayoutFragment: NSTextLayoutFragment {
+    private var cachedComputedHeight: CGFloat?
+    private var cachedComputedHeightContainerWidth: CGFloat?
+
+    override var layoutFragmentFrame: CGRect {
+        let base = super.layoutFragmentFrame
+        guard let height = aspectAdjustedHeight() else { return base }
+        return CGRect(origin: base.origin, size: CGSize(width: base.width, height: height))
+    }
+
     override var renderingSurfaceBounds: CGRect {
         let baseBounds = super.renderingSurfaceBounds
+        let frameHeight = layoutFragmentFrame.height
         let targetWidth = max(baseBounds.width, expandedRenderingWidth())
-        let targetHeight = max(baseBounds.height, layoutFragmentFrame.height)
+        let targetHeight = max(baseBounds.height, frameHeight)
         return CGRect(x: 0, y: baseBounds.minY, width: targetWidth, height: targetHeight)
     }
 
     override func draw(at point: CGPoint, in context: CGContext) {
         super.draw(at: point, in: context)
-        guard let paragraph = textElement as? MarkdownParagraph,
-              case .imageLink(let imageLink) = paragraph.blockKind else {
-            return
+        // Visuals (placeholder background + loaded image) are rendered by a
+        // CALayer-backed overlay view managed by the editor view controller.
+        // This fragment exists only to reserve the right amount of vertical
+        // space via `layoutFragmentFrame`.
+    }
+
+    private func aspectAdjustedHeight() -> CGFloat? {
+        let containerWidth = availableImageContentWidth() ?? 0
+        if let cached = cachedComputedHeight,
+           let cachedWidth = cachedComputedHeightContainerWidth,
+           abs(cachedWidth - containerWidth) < 0.5 {
+            return cached
         }
 
-        let imageRect = ImageFragmentGeometry.imageRect(
-            fragmentFrame: layoutFragmentFrame,
-            point: point,
-            availableWidth: textLayoutManager?.usageBoundsForTextContainer.width
+        let computed = computeAspectAdjustedHeight(containerWidth: containerWidth)
+        cachedComputedHeight = computed
+        cachedComputedHeightContainerWidth = containerWidth
+        return computed
+    }
+
+    private func computeAspectAdjustedHeight(containerWidth: CGFloat) -> CGFloat? {
+        guard containerWidth > 0,
+              let paragraph = textElement as? MarkdownParagraph,
+              case .imageLink(let imageLink) = paragraph.blockKind,
+              let url = imageLink.url,
+              let imageSize = MarkdownImageDimensionCache.cachedSize(for: url)
+        else { return nil }
+
+        return ImageFragmentGeometry.aspectAdjustedFragmentHeight(
+            imageSize: imageSize,
+            containerWidth: containerWidth
         )
-        guard imageRect.width > 0, imageRect.height > 0 else { return }
-
-        context.saveGState()
-        defer { context.restoreGState() }
-
-        let clipPath = CGPath(
-            roundedRect: imageRect,
-            cornerWidth: MarkdownVisualSpec.imagePreviewCornerRadius,
-            cornerHeight: MarkdownVisualSpec.imagePreviewCornerRadius,
-            transform: nil
-        )
-        context.addPath(clipPath)
-        context.clip()
-
-        #if os(iOS)
-        context.setFillColor(AppTheme.uiCodeBackground.cgColor)
-        #elseif os(macOS)
-        context.setFillColor(AppTheme.nsCodeBackground.cgColor)
-        #endif
-        context.fill(imageRect)
-
-        guard let url = imageLink.url,
-              let image = MarkdownImageLoader.cachedImage(for: url) else {
-            return
-        }
-
-        let drawRect = ImageFragmentGeometry.aspectFillRect(imageSize: image.size, in: imageRect)
-        #if os(iOS)
-        image.draw(in: drawRect)
-        #elseif os(macOS)
-        NSGraphicsContext.current?.imageInterpolation = .high
-        image.draw(
-            in: drawRect,
-            from: NSRect(origin: .zero, size: image.size),
-            operation: .sourceOver,
-            fraction: 1,
-            respectFlipped: true,
-            hints: nil
-        )
-        #endif
     }
 
     private func expandedRenderingWidth() -> CGFloat {
-        let usageWidth = textLayoutManager?.usageBoundsForTextContainer.width ?? 0
-        if usageWidth > 0 {
-            return max(layoutFragmentFrame.width, usageWidth - layoutFragmentFrame.minX)
+        let frame = layoutFragmentFrame
+        if let contentWidth = availableImageContentWidth() {
+            return max(frame.width, frame.minX + contentWidth)
         }
 
+        let usageWidth = textLayoutManager?.usageBoundsForTextContainer.width ?? 0
+        if usageWidth.isFinite && usageWidth > 0 {
+            return max(frame.width, frame.minX + usageWidth)
+        }
+
+        return frame.width
+    }
+
+    private func availableImageContentWidth() -> CGFloat? {
         let containerWidth = textLayoutManager?.textContainer?.size.width ?? 0
         if containerWidth.isFinite && containerWidth > 0 {
-            return max(layoutFragmentFrame.width, containerWidth - layoutFragmentFrame.minX)
+            return containerWidth
         }
 
-        return layoutFragmentFrame.width
+        let usageWidth = textLayoutManager?.usageBoundsForTextContainer.width ?? 0
+        if usageWidth.isFinite && usageWidth > 0 {
+            return usageWidth
+        }
+
+        return nil
+    }
+}
+
+// MARK: - MarkdownImageDimensionCache
+
+enum MarkdownImageDimensionCache {
+    private static let cache = NSCache<NSURL, NSValue>()
+
+    static func cachedSize(for url: URL) -> CGSize? {
+        guard let value = cache.object(forKey: url as NSURL) else { return nil }
+        #if os(iOS)
+        return value.cgSizeValue
+        #elseif os(macOS)
+        return value.sizeValue
+        #endif
+    }
+
+    static func setSize(_ size: CGSize, for url: URL) {
+        guard size.width > 0, size.height > 0 else { return }
+        #if os(iOS)
+        cache.setObject(NSValue(cgSize: size), forKey: url as NSURL)
+        #elseif os(macOS)
+        cache.setObject(NSValue(size: size), forKey: url as NSURL)
+        #endif
+    }
+
+    static func removeSize(for url: URL) {
+        cache.removeObject(forKey: url as NSURL)
     }
 }
 
 // MARK: - MarkdownImageLoader
 
-private enum MarkdownImageLoader {
+fileprivate enum MarkdownImageLoader {
     private static let cache = NSCache<NSURL, PlatformImage>()
+    private static let displayCache = NSCache<NSString, PlatformImage>()
+    private static let displayBucketSize: CGFloat = 64
 
     static func cachedImage(for url: URL) -> PlatformImage? {
         cache.object(forKey: url as NSURL)
     }
 
+    /// Returns a downsampled variant suitable for drawing at the given pixel size.
+    /// Multiple call sites with similar sizes hit the same cache bucket.
+    static func cachedDisplayImage(for url: URL, maxPixelSize: CGFloat) -> PlatformImage? {
+        guard let source = cachedImage(for: url) else { return nil }
+        let bucket = displayBucket(for: maxPixelSize)
+        let key = displayCacheKey(url: url, bucket: bucket)
+        if let cached = displayCache.object(forKey: key) {
+            return cached
+        }
+        let downsampled = downsample(source, maxPixelSize: bucket)
+        displayCache.setObject(downsampled, forKey: key)
+        return downsampled
+    }
+
+    private static func store(image: PlatformImage, for url: URL) {
+        cache.setObject(image, forKey: url as NSURL)
+        MarkdownImageDimensionCache.setSize(image.size, for: url)
+    }
+
+    private static func displayBucket(for maxPixelSize: CGFloat) -> CGFloat {
+        let clamped = max(displayBucketSize, maxPixelSize)
+        return ceil(clamped / displayBucketSize) * displayBucketSize
+    }
+
+    private static func displayCacheKey(url: URL, bucket: CGFloat) -> NSString {
+        "\(url.absoluteString)|\(Int(bucket))" as NSString
+    }
+
+    private static func downsample(_ image: PlatformImage, maxPixelSize: CGFloat) -> PlatformImage {
+        guard maxPixelSize > 0 else { return image }
+        let sourceSize = image.size
+        guard sourceSize.width > 0, sourceSize.height > 0 else { return image }
+
+        #if os(iOS)
+        let sourcePixelMax = max(sourceSize.width, sourceSize.height) * image.scale
+        if sourcePixelMax <= maxPixelSize { return image }
+
+        let renderScale = image.scale > 0 ? image.scale : UIScreen.main.scale
+        let pointMax = maxPixelSize / renderScale
+        let scale = pointMax / max(sourceSize.width, sourceSize.height)
+        let targetPointSize = CGSize(
+            width: max(1, sourceSize.width * scale),
+            height: max(1, sourceSize.height * scale)
+        )
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = renderScale
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: targetPointSize, format: format)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetPointSize))
+        }
+        #elseif os(macOS)
+        let sourcePixelMax = max(sourceSize.width, sourceSize.height)
+        if sourcePixelMax <= maxPixelSize { return image }
+
+        let scale = maxPixelSize / max(sourceSize.width, sourceSize.height)
+        let targetSize = CGSize(
+            width: max(1, sourceSize.width * scale),
+            height: max(1, sourceSize.height * scale)
+        )
+
+        let scaled = NSImage(size: targetSize)
+        scaled.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .default
+        image.draw(
+            in: NSRect(origin: .zero, size: targetSize),
+            from: NSRect(origin: .zero, size: sourceSize),
+            operation: .copy,
+            fraction: 1,
+            respectFlipped: true,
+            hints: nil
+        )
+        scaled.unlockFocus()
+        return scaled
+        #endif
+    }
+
     static func load(url: URL, completion: @escaping (PlatformImage?) -> Void) {
         if let cached = cachedImage(for: url) {
+            MarkdownImageDimensionCache.setSize(cached.size, for: url)
             completion(cached)
+            return
+        }
+
+        if url.isFileURL {
+            if let data = CoordinatedFileManager.readData(from: url),
+               let image = PlatformImage(data: data) {
+                store(image: image, for: url)
+                completion(image)
+                return
+            }
+
+            if !CoordinatedFileManager.isDownloaded(at: url) {
+                CoordinatedFileManager.startDownloading(at: url)
+            }
+            completion(nil)
             return
         }
 
         URLSession.shared.dataTask(with: url) { data, _, _ in
             let image = data.flatMap { PlatformImage(data: $0) }
             if let image {
-                cache.setObject(image, forKey: url as NSURL)
+                store(image: image, for: url)
             }
             DispatchQueue.main.async {
                 completion(image)
@@ -1417,6 +1599,7 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
     var revealedDividerRanges: [NSRange] = []
     var collapsedXMLTagRanges: [NSRange] = []
     var frontmatterRange: NSRange?
+    var vaultRootURL: URL?
     var requestImageLoad: ((URL) -> Void)?
 
     func textContentStorage(
@@ -1438,7 +1621,7 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
         } else if MarkdownFrontmatter.contains(position: range.location, inRange: frontmatterRange) {
             kind = .frontmatter
         } else {
-            kind = MarkdownBlockKind.detect(from: text)
+            kind = MarkdownBlockKind.detect(from: text, vaultRootURL: vaultRootURL)
         }
 
         // Style the visible text
@@ -1913,6 +2096,8 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     @Binding var text: String
     var autoFocus: Bool = false
     var onTextChange: ((String) -> Void)?
+    var vaultRootURL: URL?
+    var onImportImageData: ((Data, String?) throws -> VaultImageAttachment)?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
     var isFindVisible: Bool = false
@@ -1928,6 +2113,8 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> TextKit2EditorViewController {
         let vc = TextKit2EditorViewController()
         vc.coordinator = context.coordinator
+        vc.vaultRootURL = vaultRootURL
+        vc.onImportImageData = onImportImageData
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
         vc.isFindVisible = isFindVisible
@@ -1943,6 +2130,8 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
 
     func updateUIViewController(_ vc: TextKit2EditorViewController, context: Context) {
         vc.pageMentionProvider = pageMentionProvider
+        vc.vaultRootURL = vaultRootURL
+        vc.onImportImageData = onImportImageData
         vc.onOpenDocumentLink = onOpenDocumentLink
         vc.isFindVisible = isFindVisible
         vc.onCloseFind = onCloseFind
@@ -1960,10 +2149,16 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     }
 }
 
-final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, UIGestureRecognizerDelegate {
+final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, UIGestureRecognizerDelegate, PHPickerViewControllerDelegate {
     private static let parentBottomToolbarClearance: CGFloat = 72
 
     var coordinator: TextKit2EditorCoordinator?
+    var vaultRootURL: URL? {
+        didSet {
+            markdownDelegate.vaultRootURL = vaultRootURL
+        }
+    }
+    var onImportImageData: ((Data, String?) throws -> VaultImageAttachment)?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
     var isFindVisible = false
@@ -1988,7 +2183,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private weak var hyperlinkTapRecognizer: UITapGestureRecognizer?
     private var isRestylingText = false
     private var isOverlayRefreshScheduled = false
-    private var isImageFragmentRedrawScheduled = false
+    private var isImageLayoutInvalidationScheduled = false
     private var lastOverlayLayoutSize: CGSize = .zero
     private var keyboardObserverTokens: [NSObjectProtocol] = []
     private var keyboardFrameInScreen: CGRect?
@@ -2005,6 +2200,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var findBackgroundSnapshots: [EditorFindBackgroundSnapshot] = []
     private var findHighlightViews: [UIView] = []
     private var dividerLineViews: [Int: UIView] = [:]
+    private var imageOverlayViews: [Int: UIImageView] = [:]
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -2018,6 +2214,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
            let contentStorage = layoutManager.textContentManager as? NSTextContentStorage {
             contentStorage.delegate = markdownDelegate
             layoutManager.delegate = markdownDelegate
+            markdownDelegate.vaultRootURL = vaultRootURL
             markdownDelegate.requestImageLoad = { [weak self] url in
                 self?.requestImageLoad(for: url)
             }
@@ -2245,6 +2442,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
                 action: #selector(toggleSelectedHyperlink)
             ),
             makeToolbarButton(
+                systemName: "photo",
+                accessibilityIdentifier: "insert_image_button",
+                accessibilityLabel: "Insert Image",
+                action: #selector(insertImageFromPhotoLibrary)
+            ),
+            makeToolbarButton(
                 systemName: "keyboard.chevron.compact.down",
                 accessibilityIdentifier: "hide_keyboard_button",
                 accessibilityLabel: "Hide Keyboard",
@@ -2294,6 +2497,88 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     @objc
     private func hideSoftwareKeyboard() {
         textView.resignFirstResponder()
+    }
+
+    @objc
+    private func insertImageFromPhotoLibrary() {
+        var configuration = PHPickerConfiguration(photoLibrary: .shared())
+        configuration.filter = .images
+        configuration.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        picker.view.accessibilityIdentifier = "image_picker"
+        present(picker, animated: true)
+    }
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        guard let result = results.first else { return }
+
+        let provider = result.itemProvider
+        guard let typeIdentifier = provider.registeredTypeIdentifiers.first(where: { identifier in
+            UTType(identifier)?.conforms(to: .image) == true
+        }) else {
+            showImageImportError()
+            return
+        }
+
+        provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { [weak self] data, _ in
+            DispatchQueue.main.async {
+                guard let self, let data else {
+                    self?.showImageImportError()
+                    return
+                }
+
+                self.importAndInsertImage(
+                    data: data,
+                    suggestedFilename: self.suggestedFilename(
+                        from: provider,
+                        typeIdentifier: typeIdentifier
+                    )
+                )
+            }
+        }
+    }
+
+    private func suggestedFilename(from provider: NSItemProvider, typeIdentifier: String) -> String {
+        let trimmedName = provider.suggestedName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let base = trimmedName.isEmpty ? "Image" : trimmedName
+        guard URL(fileURLWithPath: base).pathExtension.isEmpty,
+              let fileExtension = UTType(typeIdentifier)?.preferredFilenameExtension else {
+            return base
+        }
+        return "\(base).\(fileExtension)"
+    }
+
+    private func importAndInsertImage(data: Data, suggestedFilename: String?) {
+        guard let onImportImageData else { return }
+        do {
+            let attachment = try onImportImageData(data, suggestedFilename)
+            insertImageMarkdown(attachment.markdown)
+        } catch {
+            showImageImportError()
+        }
+    }
+
+    private func insertImageMarkdown(_ markdown: String) {
+        let transform = MarkdownImageInsertion.transform(
+            in: textView.text ?? "",
+            selection: textView.selectedRange,
+            markdown: markdown
+        )
+        applySelectionTransform(transform)
+        textView.becomeFirstResponder()
+    }
+
+    private func showImageImportError() {
+        guard presentedViewController == nil else { return }
+        let alert = UIAlertController(
+            title: "Image Not Added",
+            message: "Noto could not import this image.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 
     @objc
@@ -3260,6 +3545,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         refreshTodoMarkerButtons()
+        refreshImageOverlayViews()
         refreshFindHighlightOverlays()
     }
 
@@ -3284,6 +3570,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         syncCollapsedXMLTagState()
         refreshTodoMarkerButtons()
         refreshDividerLineViews()
+        refreshImageOverlayViews()
     }
 
     private func syncCollapsedXMLTagState() {
@@ -3318,26 +3605,135 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private func requestImageLoad(for url: URL) {
         guard loadingImageURLs.insert(url).inserted else { return }
 
-        MarkdownImageLoader.load(url: url) { [weak self] _ in
+        MarkdownImageLoader.load(url: url) { [weak self] image in
             guard let self else { return }
             self.loadingImageURLs.remove(url)
-            self.scheduleImageFragmentRedraw()
+            if image != nil {
+                self.scheduleImageLayoutInvalidation()
+            }
         }
     }
 
-    private func scheduleImageFragmentRedraw() {
-        guard !isImageFragmentRedrawScheduled else { return }
-        isImageFragmentRedrawScheduled = true
+    private func scheduleImageLayoutInvalidation() {
+        guard !isImageLayoutInvalidationScheduled else { return }
+        isImageLayoutInvalidationScheduled = true
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.isImageFragmentRedrawScheduled = false
-            self.redrawVisibleImageFragments()
+            self.isImageLayoutInvalidationScheduled = false
+            self.invalidateImageLayouts()
         }
     }
 
-    private func redrawVisibleImageFragments() {
+    private func invalidateImageLayouts() {
+        guard isViewLoaded,
+              let textView,
+              let textLayoutManager = textView.textLayoutManager else {
+            return
+        }
+        textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
+        refreshImageOverlayViews()
+    }
+
+    private func refreshImageOverlayViews() {
         guard isViewLoaded, textView != nil else { return }
-        textView.setNeedsDisplay(textView.bounds)
+
+        let blocks = currentRenderableBlocks()
+        let visibleRect = textView.bounds.insetBy(dx: -8, dy: -200)
+        var activeLocations: Set<Int> = []
+
+        for block in blocks {
+            guard case .imageLink(let imageLink) = block.kind,
+                  !block.isCollapsedXMLTagContent,
+                  let rect = imageOverlayRect(for: block),
+                  rect.intersects(visibleRect) else {
+                continue
+            }
+
+            activeLocations.insert(block.paragraphRange.location)
+
+            let view = imageOverlayViews[block.paragraphRange.location] ?? makeImageOverlayView()
+            view.frame = rect.integral
+            applyImage(to: view, imageLink: imageLink, displayRect: rect)
+            if view.superview !== textView {
+                textView.addSubview(view)
+            }
+            imageOverlayViews[block.paragraphRange.location] = view
+        }
+
+        for (location, view) in imageOverlayViews where !activeLocations.contains(location) {
+            view.removeFromSuperview()
+            imageOverlayViews.removeValue(forKey: location)
+        }
+    }
+
+    private func makeImageOverlayView() -> UIImageView {
+        let view = UIImageView(frame: .zero)
+        view.layer.cornerRadius = MarkdownVisualSpec.imagePreviewCornerRadius
+        view.layer.masksToBounds = true
+        view.backgroundColor = AppTheme.uiCodeBackground
+        view.contentMode = .scaleAspectFit
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    private func applyImage(to view: UIImageView, imageLink: MarkdownImageLink, displayRect: CGRect) {
+        guard let url = imageLink.url else {
+            view.image = nil
+            return
+        }
+
+        let scale = UIScreen.main.scale
+        let maxPixel = ceil(max(displayRect.width, displayRect.height) * scale)
+        if let displayImage = MarkdownImageLoader.cachedDisplayImage(for: url, maxPixelSize: maxPixel) {
+            if view.image !== displayImage {
+                view.image = displayImage
+            }
+        } else {
+            view.image = nil
+        }
+    }
+
+    private func imageOverlayRect(for block: MarkdownRenderableBlock) -> CGRect? {
+        guard let position = textView.position(
+            from: textView.beginningOfDocument,
+            offset: block.visibleLineRange.location
+        ) else {
+            return nil
+        }
+
+        let caretRect = textView.caretRect(for: position)
+        guard isFiniteRect(caretRect) else { return nil }
+
+        let leading = textView.textContainerInset.left + textView.textContainer.lineFragmentPadding
+        let trailing = textView.bounds.width
+            - textView.textContainerInset.right
+            - textView.textContainer.lineFragmentPadding
+        let width = max(0, trailing - leading)
+        guard width > 0 else { return nil }
+
+        let verticalPadding = MarkdownVisualSpec.imagePreviewVerticalPadding
+        let totalHeight: CGFloat
+        if let url = imageLink(in: block)?.url,
+           let imageSize = MarkdownImageDimensionCache.cachedSize(for: url),
+           imageSize.width > 0 {
+            totalHeight = width * (imageSize.height / imageSize.width)
+        } else {
+            totalHeight = max(0, MarkdownVisualSpec.imagePreviewReservedHeight - verticalPadding * 2)
+        }
+
+        return CGRect(
+            x: leading,
+            y: caretRect.minY + verticalPadding,
+            width: width,
+            height: totalHeight
+        )
+    }
+
+    private func imageLink(in block: MarkdownRenderableBlock) -> MarkdownImageLink? {
+        if case .imageLink(let link) = block.kind {
+            return link
+        }
+        return nil
     }
 
     private func refreshTodoMarkerButtons() {
@@ -3548,6 +3944,7 @@ private final class HyperlinkOpeningTextView: NSTextView {
     var openHyperlinkTarget: ((HyperlinkMarkdown.Target) -> Void)?
     var shouldOpenHyperlinkAtIndex: ((Int) -> Bool)?
     var toggleTodoMarkerAtPoint: ((NSPoint) -> Bool)?
+    var importImageFiles: (([URL], Int) -> Bool)?
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
@@ -3565,6 +3962,36 @@ private final class HyperlinkOpeningTextView: NSTextView {
 
         super.mouseDown(with: event)
     }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        if !imageFileURLs(from: sender.draggingPasteboard).isEmpty {
+            return .copy
+        }
+        return super.draggingEntered(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = imageFileURLs(from: sender.draggingPasteboard)
+        guard !urls.isEmpty else {
+            return super.performDragOperation(sender)
+        }
+
+        let point = convert(sender.draggingLocation, from: nil)
+        let characterIndex = characterIndexForInsertion(at: point)
+        return importImageFiles?(urls, characterIndex) ?? false
+    }
+
+    private func imageFileURLs(from pasteboard: NSPasteboard) -> [URL] {
+        let urls = pasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: [.urlReadingFileURLsOnly: true]
+        ) as? [URL] ?? []
+
+        return urls.filter { url in
+            guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
+            return type.conforms(to: .image)
+        }
+    }
 }
 
 private final class FindHighlightOverlayView: NSView {
@@ -3577,6 +4004,8 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     @Binding var text: String
     var autoFocus: Bool = false
     var onTextChange: ((String) -> Void)?
+    var vaultRootURL: URL?
+    var onImportImageFile: ((URL) throws -> VaultImageAttachment)?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
     var isFindVisible: Bool = false
@@ -3592,6 +4021,8 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     func makeNSViewController(context: Context) -> TextKit2EditorViewController {
         let vc = TextKit2EditorViewController()
         vc.coordinator = context.coordinator
+        vc.vaultRootURL = vaultRootURL
+        vc.onImportImageFile = onImportImageFile
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
         vc.isFindVisible = isFindVisible
@@ -3607,6 +4038,8 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
 
     func updateNSViewController(_ vc: TextKit2EditorViewController, context: Context) {
         vc.pageMentionProvider = pageMentionProvider
+        vc.vaultRootURL = vaultRootURL
+        vc.onImportImageFile = onImportImageFile
         vc.onOpenDocumentLink = onOpenDocumentLink
         vc.isFindVisible = isFindVisible
         vc.onCloseFind = onCloseFind
@@ -3625,6 +4058,12 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
 
 final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, NSTextStorageDelegate {
     var coordinator: TextKit2EditorCoordinator?
+    var vaultRootURL: URL? {
+        didSet {
+            markdownDelegate.vaultRootURL = vaultRootURL
+        }
+    }
+    var onImportImageFile: ((URL) throws -> VaultImageAttachment)?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
     var isFindVisible = false
@@ -3645,7 +4084,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var revealedDividerRanges: [NSRange] = []
     private var isRestylingText = false
     private var isOverlayRefreshScheduled = false
-    private var isImageFragmentRedrawScheduled = false
+    private var isImageLayoutInvalidationScheduled = false
     private var lastOverlayLayoutSize: NSSize = .zero
     private let minimumHorizontalTextInset: CGFloat = 48
     private let maximumTextWidth: CGFloat = 600
@@ -3659,6 +4098,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var lastPublishedFindStatus = EditorFindStatus()
     private var findHighlightViews: [NSView] = []
     private var dividerLineViews: [Int: NSView] = [:]
+    private var imageOverlayViews: [Int: NSImageView] = [:]
 
     override func loadView() {
         view = NSView()
@@ -3680,6 +4120,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         // Set our delegate on the content storage
         contentStorage.delegate = markdownDelegate
         layoutManager.delegate = markdownDelegate
+        markdownDelegate.vaultRootURL = vaultRootURL
         markdownDelegate.requestImageLoad = { [weak self] url in
             self?.requestImageLoad(for: url)
         }
@@ -3727,6 +4168,10 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         (textView as? HyperlinkOpeningTextView)?.toggleTodoMarkerAtPoint = { [weak self] point in
             self?.toggleTodoMarker(atTextViewPoint: point) ?? false
         }
+        (textView as? HyperlinkOpeningTextView)?.importImageFiles = { [weak self] urls, characterIndex in
+            self?.importAndInsertImages(fileURLs: urls, characterIndex: characterIndex) ?? false
+        }
+        textView.registerForDraggedTypes([.fileURL])
 
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
@@ -4119,6 +4564,32 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
 
         applySelectionTransform(transform)
+    }
+
+    private func importAndInsertImages(fileURLs: [URL], characterIndex: Int) -> Bool {
+        guard let onImportImageFile else { return false }
+
+        var markdownLines: [String] = []
+        for fileURL in fileURLs {
+            do {
+                let attachment = try onImportImageFile(fileURL)
+                markdownLines.append(attachment.markdown)
+            } catch {
+                logger.error("Failed to import dropped image \(fileURL.lastPathComponent): \(error)")
+            }
+        }
+
+        guard !markdownLines.isEmpty else { return false }
+        let markdown = markdownLines.joined(separator: "\n")
+        let safeLocation = max(0, min(characterIndex, (textView.string as NSString).length))
+        let transform = MarkdownImageInsertion.transform(
+            in: textView.string,
+            selection: NSRange(location: safeLocation, length: 0),
+            markdown: markdown
+        )
+        applySelectionTransform(transform)
+        textView.window?.makeFirstResponder(textView)
+        return true
     }
 
     private func applySelectionTransform(_ transform: TextSelectionTransform) {
@@ -4678,6 +5149,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
         refreshDividerLineViews()
+        refreshImageOverlayViews()
         refreshFindHighlightOverlays()
     }
 
@@ -4688,26 +5160,143 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private func requestImageLoad(for url: URL) {
         guard loadingImageURLs.insert(url).inserted else { return }
 
-        MarkdownImageLoader.load(url: url) { [weak self] _ in
+        MarkdownImageLoader.load(url: url) { [weak self] image in
             guard let self else { return }
             self.loadingImageURLs.remove(url)
-            self.scheduleImageFragmentRedraw()
+            if image != nil {
+                self.scheduleImageLayoutInvalidation()
+            }
         }
     }
 
-    private func scheduleImageFragmentRedraw() {
-        guard !isImageFragmentRedrawScheduled else { return }
-        isImageFragmentRedrawScheduled = true
+    private func scheduleImageLayoutInvalidation() {
+        guard !isImageLayoutInvalidationScheduled else { return }
+        isImageLayoutInvalidationScheduled = true
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.isImageFragmentRedrawScheduled = false
-            self.redrawVisibleImageFragments()
+            self.isImageLayoutInvalidationScheduled = false
+            self.invalidateImageLayouts()
         }
     }
 
-    private func redrawVisibleImageFragments() {
+    private func invalidateImageLayouts() {
+        guard isViewLoaded,
+              let textView,
+              let textLayoutManager = textView.textLayoutManager else {
+            return
+        }
+        textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
+        refreshImageOverlayViews()
+    }
+
+    private func refreshImageOverlayViews() {
         guard isViewLoaded, textView != nil else { return }
-        textView.setNeedsDisplay(textView.visibleRect)
+
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: textView.string,
+            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
+        )
+        let visibleRect = textView.visibleRect.insetBy(dx: -8, dy: -200)
+        var activeLocations: Set<Int> = []
+
+        for block in blocks {
+            guard case .imageLink(let imageLink) = block.kind,
+                  !block.isCollapsedXMLTagContent,
+                  let rect = imageOverlayRect(for: block),
+                  rect.intersects(visibleRect) else {
+                continue
+            }
+
+            activeLocations.insert(block.paragraphRange.location)
+
+            let view = imageOverlayViews[block.paragraphRange.location] ?? makeImageOverlayView()
+            view.frame = rect.integral
+            applyImage(to: view, imageLink: imageLink, displayRect: rect)
+            if view.superview !== textView {
+                textView.addSubview(view)
+            }
+            imageOverlayViews[block.paragraphRange.location] = view
+        }
+
+        for (location, view) in imageOverlayViews where !activeLocations.contains(location) {
+            view.removeFromSuperview()
+            imageOverlayViews.removeValue(forKey: location)
+        }
+    }
+
+    private func makeImageOverlayView() -> NSImageView {
+        let view = NSImageView(frame: .zero)
+        view.wantsLayer = true
+        view.layer?.cornerRadius = MarkdownVisualSpec.imagePreviewCornerRadius
+        view.layer?.masksToBounds = true
+        view.layer?.backgroundColor = AppTheme.nsCodeBackground.cgColor
+        view.imageScaling = .scaleProportionallyUpOrDown
+        view.imageAlignment = .alignCenter
+        view.isEditable = false
+        return view
+    }
+
+    private func applyImage(to view: NSImageView, imageLink: MarkdownImageLink, displayRect: CGRect) {
+        guard let url = imageLink.url else {
+            view.image = nil
+            return
+        }
+
+        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+        let maxPixel = ceil(max(displayRect.width, displayRect.height) * scale)
+        if let displayImage = MarkdownImageLoader.cachedDisplayImage(for: url, maxPixelSize: maxPixel) {
+            if view.image !== displayImage {
+                view.image = displayImage
+            }
+        } else {
+            view.image = nil
+        }
+    }
+
+    private func imageOverlayRect(for block: MarkdownRenderableBlock) -> NSRect? {
+        let screenRect = textView.firstRect(
+            forCharacterRange: NSRange(location: block.visibleLineRange.location, length: 0),
+            actualRange: nil
+        )
+        guard let window = textView.window,
+              isFiniteRect(screenRect) else {
+            return nil
+        }
+
+        let windowRect = window.convertFromScreen(screenRect)
+        let caretRect = textView.convert(windowRect, from: nil)
+        guard isFiniteRect(caretRect) else { return nil }
+
+        let inset = textView.textContainerInset.width
+        let padding = textView.textContainer?.lineFragmentPadding ?? 0
+        let leading = inset + padding
+        let trailing = textView.bounds.width - inset - padding
+        let width = max(0, trailing - leading)
+        guard width > 0 else { return nil }
+
+        let verticalPadding = MarkdownVisualSpec.imagePreviewVerticalPadding
+        let totalHeight: CGFloat
+        if let url = imageLink(in: block)?.url,
+           let imageSize = MarkdownImageDimensionCache.cachedSize(for: url),
+           imageSize.width > 0 {
+            totalHeight = width * (imageSize.height / imageSize.width)
+        } else {
+            totalHeight = max(0, MarkdownVisualSpec.imagePreviewReservedHeight - verticalPadding * 2)
+        }
+
+        return NSRect(
+            x: leading,
+            y: caretRect.minY + verticalPadding,
+            width: width,
+            height: totalHeight
+        )
+    }
+
+    private func imageLink(in block: MarkdownRenderableBlock) -> MarkdownImageLink? {
+        if case .imageLink(let link) = block.kind {
+            return link
+        }
+        return nil
     }
 
     private func refreshDividerLineViews() {
