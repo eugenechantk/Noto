@@ -43,6 +43,14 @@ struct NotoSplitView: View {
         }
         .navigationSplitViewStyle(.prominentDetail)
         .navigationTitle("Noto")
+        .sheet(isPresented: $isSearchPresented) {
+            NavigationStack {
+                NoteSearchSheet(rootStore: store) { result in
+                    selectSearchResult(result)
+                }
+            }
+            .noteSearchSheetPresentationStyle()
+        }
         .background {
             #if os(macOS)
             WindowReader(window: $hostingWindow)
@@ -114,7 +122,7 @@ struct NotoSplitView: View {
         )
         .sheet(isPresented: $isSearchPresented) {
             NavigationStack {
-                IOSNoteSearchSheet(rootStore: store) { result in
+                NoteSearchSheet(rootStore: store) { result in
                     selectSearchResult(result)
                 }
             }
@@ -298,6 +306,13 @@ struct NotoSplitView: View {
     }
 
     private func resolvedHistoryEntry(_ entry: NoteStackEntry) -> NoteStackEntry {
+        // Fast path: file still exists where the entry says it should — no need
+        // to walk the vault. Without this, every search-result tap triggers a
+        // full-vault content scan on the main thread (sluggish, can hit the
+        // iOS watchdog and crash on large/iCloud-backed vaults).
+        if FileManager.default.fileExists(atPath: entry.note.fileURL.standardizedFileURL.path) {
+            return entry
+        }
         guard let resolved = store.note(withID: entry.note.id) else { return entry }
         return NoteStackEntry(note: resolved.note, store: resolved.store, isNew: entry.isNew)
     }
@@ -352,6 +367,13 @@ struct NotoSplitView: View {
         #endif
     }
 
+    private func selectSearchResult(_ result: NoteSearchResult) {
+        selectHistoryEntry(NoteStackEntry(note: result.note, store: result.store, isNew: false), recordsVisit: true)
+        #if os(iOS)
+        columnVisibility = .detailOnly
+        #endif
+    }
+
     #if os(iOS)
     private var canNavigateNativeStackBack: Bool {
         !noteStackNavigation.path.isEmpty
@@ -365,11 +387,6 @@ struct NotoSplitView: View {
     private func createRootNote() {
         let note = store.createNote()
         selectHistoryEntry(NoteStackEntry(note: note, store: store, isNew: true), recordsVisit: true)
-    }
-
-    private func selectSearchResult(_ result: IOSNoteSearchResult) {
-        selectHistoryEntry(NoteStackEntry(note: result.note, store: result.store, isNew: false), recordsVisit: true)
-        columnVisibility = .detailOnly
     }
 
     private func syncCurrentSelectionIntoNativeStack() {

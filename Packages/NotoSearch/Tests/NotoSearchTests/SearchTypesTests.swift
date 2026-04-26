@@ -52,4 +52,43 @@ struct SearchTypesTests {
         #expect(document.sections == [section])
         #expect(document.sections.first?.heading == "Pricing")
     }
+
+    @Test("Display policy hides note matches when a section from the same note matches")
+    func displayPolicyHidesNoteMatchesCoveredBySections() {
+        let firstNoteID = UUID()
+        let secondNoteID = UUID()
+        let firstNote = makeResult(kind: .note, id: UUID(), noteID: firstNoteID, title: "Meeting Notes")
+        let firstSection = makeResult(kind: .section, id: UUID(), noteID: firstNoteID, title: "Agenda")
+        let secondNote = makeResult(kind: .note, id: UUID(), noteID: secondNoteID, title: "Project Plan")
+
+        let visible = SearchResultDisplayPolicy.hidingNoteMatchesCoveredBySections([
+            firstSection,
+            firstNote,
+            secondNote,
+        ])
+
+        #expect(visible == [firstSection, secondNote])
+    }
+
+    @Test("Display policy keeps note matches when there is no section match")
+    func displayPolicyKeepsStandaloneNoteMatches() {
+        let note = makeResult(kind: .note, id: UUID(), noteID: UUID(), title: "Meeting Notes")
+
+        #expect(SearchResultDisplayPolicy.hidingNoteMatchesCoveredBySections([note]) == [note])
+    }
+
+    private func makeResult(kind: SearchResultKind, id: UUID, noteID: UUID, title: String) -> SearchResult {
+        SearchResult(
+            id: id,
+            kind: kind,
+            noteID: noteID,
+            fileURL: URL(fileURLWithPath: "/tmp/\(title).md"),
+            title: title,
+            breadcrumb: "",
+            snippet: "",
+            lineStart: kind == .section ? 10 : nil,
+            score: 1,
+            updatedAt: nil
+        )
+    }
 }

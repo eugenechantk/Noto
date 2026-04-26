@@ -9,8 +9,8 @@ public struct MarkdownSearchEngine {
         self.vaultURL = vaultURL.standardizedFileURL
     }
 
-    public func search(_ query: String, limit: Int = 50) throws -> [SearchResult] {
-        try store.search(query: query, vaultURL: vaultURL, limit: limit)
+    public func search(_ query: String, scope: SearchScope = .titleAndContent, limit: Int = 50) throws -> [SearchResult] {
+        try store.search(query: query, scope: scope, vaultURL: vaultURL, limit: limit)
     }
 
     public static func ftsQuery(for query: String) -> String {
@@ -61,15 +61,23 @@ public struct MarkdownSearchEngine {
             .filter { !$0.isEmpty }
     }
 
+    static func titleOnlyFTSQuery(for query: String) -> String {
+        let ftsQuery = ftsQuery(for: query)
+        guard !ftsQuery.isEmpty else { return "" }
+        return "{title} : (\(ftsQuery))"
+    }
+
     private static func tokenQuery(_ query: String) -> String {
         let tokens = query
             .components(separatedBy: .whitespacesAndNewlines)
             .map(cleanToken)
             .filter { !$0.isEmpty }
         guard !tokens.isEmpty else { return "" }
-        return tokens.enumerated().map { index, token in
-            index == tokens.count - 1 && token.count >= 2 ? "\(token)*" : token
-        }.joined(separator: " ")
+        guard tokens.count > 1 else {
+            let token = tokens[0]
+            return token.count >= 2 ? "\(token)*" : token
+        }
+        return #""\#(tokens.joined(separator: " "))""#
     }
 
     private static func cleanToken(_ token: String) -> String {

@@ -7,11 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */; };
+		58A1D0018A1D001000000002 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */; };
+		58A1D0018A1D001000000007 /* NotoSearch in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000008 /* NotoSearch */; };
 		5DB7BFB72F97BDEB0018E268 /* NotoIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */; };
 		5DFAED8F2F5F135300F3DACD /* NotoVault in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD000B000000000000000B /* NotoVault */; };
 		5DFAED902F5F135300F3DACD /* NotoVault in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF000B000000000000000B /* NotoVault */; };
-		58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */; };
-		58A1D0018A1D001000000002 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -39,7 +40,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/ReadwiseSecrets.xcconfig; sourceTree = "<group>"; };
+		58A1D0018A1D001000000005 /* Config/ReadwiseSecrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/ReadwiseSecrets.xcconfig; sourceTree = "<group>"; };
 		5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = file; path = Noto.xctestplan; sourceTree = "<group>"; };
 		5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = NotoIcon.icon; sourceTree = "<group>"; };
 		5DE568F42F80191200EC8657 /* NotoMacOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoMacOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -92,6 +93,7 @@
 			files = (
 				5DFAED8F2F5F135300F3DACD /* NotoVault in Frameworks */,
 				58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */,
+				58A1D0018A1D001000000007 /* NotoSearch in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -110,7 +112,7 @@
 		5DF5FAF52F0EC372008EDC76 = {
 			isa = PBXGroup;
 			children = (
-				58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */,
+				58A1D0018A1D001000000005 /* Config/ReadwiseSecrets.xcconfig */,
 				5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */,
 				5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */,
 				5DF5FB002F0EC372008EDC76 /* Noto */,
@@ -201,6 +203,7 @@
 			packageProductDependencies = (
 				CCDD000B000000000000000B /* NotoVault */,
 				58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */,
+				58A1D0018A1D001000000008 /* NotoSearch */,
 			);
 			productName = Noto;
 			productReference = 5DF5FAFE2F0EC372008EDC76 /* Noto.app */;
@@ -270,6 +273,7 @@
 			packageReferences = (
 				AABB000B000000000000000B /* XCLocalSwiftPackageReference "Packages/NotoVault" */,
 				5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "Packages/NotoReadwiseSync" */,
+				DD2E424822EC2E30DB9B7950 /* XCLocalSwiftPackageReference "Packages/NotoSearch" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DF5FAFF2F0EC372008EDC76 /* Products */;
@@ -594,7 +598,7 @@
 		};
 		5DF5FB232F0EC373008EDC76 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */;
+			baseConfigurationReference = 58A1D0018A1D001000000005 /* Config/ReadwiseSecrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = NotoIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -637,7 +641,7 @@
 		};
 		5DF5FB242F0EC373008EDC76 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */;
+			baseConfigurationReference = 58A1D0018A1D001000000005 /* Config/ReadwiseSecrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = NotoIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -783,6 +787,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoVault;
 		};
+		DD2E424822EC2E30DB9B7950 /* XCLocalSwiftPackageReference "Packages/NotoSearch" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoSearch;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -793,6 +801,10 @@
 		58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoReadwiseSyncCore;
+		};
+		58A1D0018A1D001000000008 /* NotoSearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoSearch;
 		};
 		CCDD000B000000000000000B /* NotoVault */ = {
 			isa = XCSwiftPackageProductDependency;

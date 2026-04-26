@@ -32,7 +32,7 @@ struct LiveVaultSearchTests {
         _ = try indexer.rebuild()
         let engine = MarkdownSearchEngine(store: try indexer.openStore(), vaultURL: liveVaultURL)
         let appStoreResults = try engine.search("\"App Store\"", limit: 20)
-        let captureResults = try engine.search("How I Built App Store", limit: 20)
+        let captureResults = try engine.search("How I Built", limit: 20)
 
         #expect(!appStoreResults.isEmpty)
         #expect(captureResults.contains { $0.fileURL.path.contains("Captures") || $0.title.localizedCaseInsensitiveContains("App") })

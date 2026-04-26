@@ -5,6 +5,11 @@ public enum SearchResultKind: Sendable, Equatable {
     case section
 }
 
+public enum SearchScope: Sendable, Equatable, Hashable {
+    case title
+    case titleAndContent
+}
+
 public struct SearchDocument: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let relativePath: String
@@ -125,5 +130,15 @@ public struct SearchResult: Identifiable, Sendable, Equatable {
         self.lineStart = lineStart
         self.score = score
         self.updatedAt = updatedAt
+    }
+}
+
+public enum SearchResultDisplayPolicy {
+    public static func hidingNoteMatchesCoveredBySections(_ results: [SearchResult]) -> [SearchResult] {
+        let noteIDsWithSectionMatches = Set(results.filter { $0.kind == .section }.map(\.noteID))
+        guard !noteIDsWithSectionMatches.isEmpty else { return results }
+        return results.filter { result in
+            !(result.kind == .note && noteIDsWithSectionMatches.contains(result.noteID))
+        }
     }
 }

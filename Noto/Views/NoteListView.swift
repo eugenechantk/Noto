@@ -1,5 +1,6 @@
 import SwiftUI
 import os.log
+import NotoSearch
 import NotoVault
 #if os(iOS)
 import UIKit
@@ -299,7 +300,12 @@ struct NoteListView: View {
                     switch route {
                     case .note(let note, let directoryURL, let vaultRootURL, let isNew):
                         NoteEditorScreen(
-                            store: MarkdownNoteStore(directoryURL: directoryURL, vaultRootURL: vaultRootURL, autoload: false),
+                            store: MarkdownNoteStore(
+                                directoryURL: directoryURL,
+                                vaultRootURL: vaultRootURL,
+                                autoload: false,
+                                directoryLoader: store.directoryLoader
+                            ),
                             note: note,
                             isNew: isNew,
                             fileWatcher: fileWatcher,
@@ -325,7 +331,12 @@ struct NoteListView: View {
                         )
                     case .folder(let folderURL, let name, let vaultRootURL):
                         FolderContentView(
-                            store: MarkdownNoteStore(directoryURL: folderURL, vaultRootURL: vaultRootURL, autoload: false),
+                            store: MarkdownNoteStore(
+                                directoryURL: folderURL,
+                                vaultRootURL: vaultRootURL,
+                                autoload: false,
+                                directoryLoader: store.directoryLoader
+                            ),
                             title: name,
                             fileWatcher: fileWatcher,
                             path: $path,
@@ -371,7 +382,7 @@ struct NoteListView: View {
             )
             .sheet(isPresented: $isNoteSearchPresented) {
                 NavigationStack {
-                    IOSNoteSearchSheet(rootStore: store) { result in
+                    NoteSearchSheet(rootStore: store) { result in
                         openCompactNote(result.note, in: result.store, isNew: false)
                     }
                 }
@@ -540,7 +551,11 @@ struct NoteListView: View {
            FileManager.default.fileExists(atPath: savedPath) {
             let fileURL = URL(fileURLWithPath: savedPath)
             let directoryURL = fileURL.deletingLastPathComponent()
-            let noteStore = MarkdownNoteStore(directoryURL: directoryURL, vaultRootURL: store.vaultRootURL)
+            let noteStore = MarkdownNoteStore(
+                directoryURL: directoryURL,
+                vaultRootURL: store.vaultRootURL,
+                directoryLoader: store.directoryLoader
+            )
 
             if let note = noteStore.notes.first(where: { $0.fileURL.path == savedPath }) {
                 selectNote(note, in: noteStore, isNew: false)
@@ -717,7 +732,8 @@ struct SidebarView: View {
                 onNavigate: { folder in
                     let subStore = MarkdownNoteStore(
                         directoryURL: folder.folderURL,
-                        vaultRootURL: rootStore.vaultRootURL
+                        vaultRootURL: rootStore.vaultRootURL,
+                        directoryLoader: rootStore.directoryLoader
                     )
                     folderStack.append((store: subStore, title: folder.name))
                 },
@@ -849,7 +865,8 @@ private struct SidebarFolderRow: View {
             if expanded, childStore == nil {
                 childStore = MarkdownNoteStore(
                     directoryURL: folder.folderURL,
-                    vaultRootURL: rootStore.vaultRootURL
+                    vaultRootURL: rootStore.vaultRootURL,
+                    directoryLoader: rootStore.directoryLoader
                 )
             }
         }
@@ -1138,42 +1155,38 @@ extension View {
 }
 #endif
 
-// MARK: - iOS Note Search Sheet
+// MARK: - Note Search Sheet
 
-#if os(iOS)
-struct IOSNoteSearchResult: Identifiable {
+struct NoteSearchResult: Identifiable {
     let id: String
     let note: MarkdownNote
     let store: MarkdownNoteStore
     let relativePath: String
+    let title: String
+    let breadcrumb: String
+    let snippet: String
+    let kind: SearchResultKind
 }
 
-struct IOSNoteSearchSheet: View {
+struct NoteSearchSheet: View {
     var rootStore: MarkdownNoteStore
-    var onSelect: (IOSNoteSearchResult) -> Void
+    var onSelect: (NoteSearchResult) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isSearchFocused: Bool
     @State private var query = ""
-    @State private var rows: [SidebarTreeNode] = []
-    @State private var isLoading = true
+    @State private var scope: SearchScope = .titleAndContent
+    @State private var results: [NoteSearchResult] = []
+    @State private var isPreparingIndex = true
+    @State private var isSearching = false
     @State private var didFail = false
+    @State private var searchTask: Task<Void, Never>?
 
-    private var searchRows: [SidebarTreeNode] {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedQuery.isEmpty else { return [] }
-        return rows.filter { row in
-            guard case .note = row.kind else { return false }
-            return row.name.localizedCaseInsensitiveContains(trimmedQuery)
-        }
-    }
+    private var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
         Group {
-            if isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if didFail {
+            if didFail {
                 ContentUnavailableView(
                     "Search Unavailable",
                     systemImage: "exclamationmark.triangle",
@@ -1185,130 +1198,304 @@ struct IOSNoteSearchSheet: View {
         }
         .background(AppTheme.background)
         .navigationTitle("Search")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
+            #if os(iOS)
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    dismiss()
-                } label: {
-                    Label("Close", systemImage: "xmark")
-                }
-                .labelStyle(.iconOnly)
-                .accessibilityIdentifier("note_search_cancel_button")
-                .accessibilityLabel("Close")
+                closeButton
             }
+            #else
+            ToolbarItem(placement: .cancellationAction) {
+                closeButton
+            }
+            #endif
         }
-        .searchable(
-            text: $query,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search notes"
-        )
-        .searchFocused($isSearchFocused)
+        .noteSearchField(text: $query)
+        .noteSearchFocused($isSearchFocused)
         .accessibilityIdentifier("note_search_sheet")
         .task {
-            await loadRows()
             isSearchFocused = true
+            await prepareIndex()
         }
+        .onChange(of: query) { _, _ in
+            scheduleSearch()
+        }
+        .onChange(of: scope) { _, _ in
+            scheduleSearch()
+        }
+        .onDisappear {
+            searchTask?.cancel()
+        }
+    }
+
+    private var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Label("Close", systemImage: "xmark")
+        }
+        .labelStyle(.iconOnly)
+        .accessibilityIdentifier("note_search_cancel_button")
+        .accessibilityLabel("Close")
     }
 
     private var resultsList: some View {
-        List {
-            ForEach(Array(searchRows.enumerated()), id: \.element.id) { index, row in
-                Button {
-                    onSelect(result(for: row))
-                    dismiss()
-                } label: {
-                    MarkdownNoteRow(note: note(for: row))
+        VStack(spacing: 0) {
+            Picker("Search Scope", selection: $scope) {
+                Text("Title + Content").tag(SearchScope.titleAndContent)
+                Text("Title").tag(SearchScope.title)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .accessibilityIdentifier("note_search_scope_picker")
+
+            List {
+                ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
+                    Button {
+                        onSelect(result)
+                        dismiss()
+                    } label: {
+                        NoteSearchResultRow(result: result)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("note_search_result_\(index)")
+                    .accessibilityLabel(result.title)
+                    .listRowBackground(AppTheme.background)
                 }
-                .accessibilityIdentifier("note_search_result_\(index)")
-                .accessibilityLabel(row.name)
-                .listRowBackground(AppTheme.background)
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.background)
+            .foregroundStyle(AppTheme.primaryText)
+            .tint(AppTheme.primaryText)
+            .accessibilityIdentifier("note_search_results_list")
+            .overlay {
+                if isPreparingIndex && results.isEmpty {
+                    searchProgressIndicator(
+                        title: "Indexing notes",
+                        message: "Checking this vault for new, edited, moved, or deleted notes.",
+                        accessibilityIdentifier: "note_search_indexing_indicator"
+                    )
+                } else if results.isEmpty {
+                    ContentUnavailableView(
+                        emptyTitle,
+                        systemImage: "magnifyingglass",
+                        description: Text(emptyDescription)
+                    )
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("note_search_empty_state")
+                } else if isSearching {
+                    searchProgressIndicator(
+                        title: "Searching notes",
+                        message: "Looking through the search index.",
+                        accessibilityIdentifier: "note_search_loading_indicator"
+                    )
+                }
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(AppTheme.background)
-        .foregroundStyle(AppTheme.primaryText)
-        .tint(AppTheme.primaryText)
-        .accessibilityIdentifier("note_search_results_list")
-        .overlay {
-            if searchRows.isEmpty {
-                ContentUnavailableView(
-                    emptyTitle,
-                    systemImage: "magnifyingglass",
-                    description: Text(emptyDescription)
-                )
-                .allowsHitTesting(false)
-                .accessibilityIdentifier("note_search_empty_state")
-            }
+    }
+
+    private func searchProgressIndicator(
+        title: String,
+        message: String,
+        accessibilityIdentifier: String
+    ) -> some View {
+        VStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.primaryText)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(AppTheme.secondaryText)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
         }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .frame(maxWidth: 260)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 
     private var emptyTitle: String {
-        query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Search Notes" : "No Matching Notes"
+        trimmedQuery.isEmpty ? "Search Notes" : "No Matching Notes"
     }
 
     private var emptyDescription: String {
-        query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "Type a note title to search this vault."
-            : "Try another title."
+        if trimmedQuery.isEmpty {
+            return scope == .title
+                ? "Type a note title to search this vault."
+                : "Type to search note titles and content."
+        }
+        return scope == .title
+            ? "Try another title."
+            : "Try another title or keyword."
     }
 
-    private func loadRows() async {
-        isLoading = true
+    private func prepareIndex() async {
+        isPreparingIndex = true
         didFail = false
         let rootURL = rootStore.vaultRootURL
-        let result = await Task.detached(priority: .userInitiated) {
-            Result {
-                try SidebarTreeLoader().loadRows(rootURL: rootURL)
-            }
-        }.value
 
-        switch result {
-        case .success(let loadedRows):
-            rows = loadedRows
-            didFail = false
-        case .failure:
-            rows = []
-            didFail = true
+        do {
+            _ = try await SearchIndexRefreshCoordinator.shared.refresh(vaultURL: rootURL)
+        } catch {
+            logger.error("Search index refresh failed: \(error.localizedDescription)")
         }
-        isLoading = false
+        isPreparingIndex = false
+        scheduleSearch()
     }
 
-    private func result(for row: SidebarTreeNode) -> IOSNoteSearchResult {
-        IOSNoteSearchResult(
-            id: row.id,
-            note: note(for: row),
-            store: MarkdownNoteStore(
-                directoryURL: row.url.deletingLastPathComponent(),
-                vaultRootURL: rootStore.vaultRootURL,
-                autoload: false
-            ),
-            relativePath: rootStore.vaultRelativePath(for: row.url) ?? row.url.lastPathComponent
-        )
+    private func scheduleSearch() {
+        searchTask?.cancel()
+        guard !didFail else { return }
+        guard !trimmedQuery.isEmpty else {
+            results = []
+            isSearching = false
+            return
+        }
+
+        let requestQuery = trimmedQuery
+        let requestScope = scope
+        let rootURL = rootStore.vaultRootURL
+        let rootStore = rootStore
+        isSearching = true
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard !Task.isCancelled else { return }
+
+            let searchResult = await Task.detached(priority: .userInitiated) {
+                Result {
+                    let indexer = MarkdownSearchIndexer(vaultURL: rootURL)
+                    let engine = MarkdownSearchEngine(store: try indexer.openStore(), vaultURL: rootURL)
+                    return try engine.search(requestQuery, scope: requestScope, limit: 60)
+                }
+            }.value
+
+            guard !Task.isCancelled else { return }
+            switch searchResult {
+            case .success(let searchResults):
+                let displayResults = SearchResultDisplayPolicy.hidingNoteMatchesCoveredBySections(searchResults)
+                results = displayResults.map { result in
+                    appResult(for: result, rootStore: rootStore)
+                }
+                didFail = false
+            case .failure:
+                results = []
+                didFail = true
+            }
+            isSearching = false
+        }
     }
 
-    private func note(for row: SidebarTreeNode) -> MarkdownNote {
-        MarkdownNote(
-            id: row.noteID ?? VaultDirectoryLoader.stableID(for: row.url),
-            fileURL: row.url,
-            title: row.name,
-            modifiedDate: row.modifiedAt
+    private func appResult(for result: SearchResult, rootStore: MarkdownNoteStore) -> NoteSearchResult {
+        let relativePath = rootStore.vaultRelativePath(for: result.fileURL) ?? result.fileURL.lastPathComponent
+        let resolved = rootStore.note(atVaultRelativePath: relativePath)
+        let note = resolved?.note ?? MarkdownNote(
+            id: result.noteID,
+            fileURL: result.fileURL,
+            title: result.fileURL.deletingPathExtension().lastPathComponent,
+            modifiedDate: result.updatedAt ?? Date()
         )
+        let store = resolved?.store ?? MarkdownNoteStore(
+            directoryURL: result.fileURL.deletingLastPathComponent(),
+            vaultRootURL: rootStore.vaultRootURL,
+            autoload: false,
+            directoryLoader: rootStore.directoryLoader
+        )
+
+        return NoteSearchResult(
+            id: "\(result.id.uuidString)-\(result.lineStart ?? 0)",
+            note: note,
+            store: store,
+            relativePath: relativePath,
+            title: result.title,
+            breadcrumb: result.breadcrumb.isEmpty ? relativePath : result.breadcrumb,
+            snippet: result.snippet,
+            kind: result.kind
+        )
+    }
+}
+
+private struct NoteSearchResultRow: View {
+    let result: NoteSearchResult
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: result.kind == .section ? "text.alignleft" : "doc.text")
+                .foregroundStyle(AppTheme.secondaryText)
+                .font(.title3)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(result.title)
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.primaryText)
+                    .lineLimit(1)
+                if !result.breadcrumb.isEmpty {
+                    Text(result.breadcrumb)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryText)
+                        .lineLimit(1)
+                }
+                if !result.snippet.isEmpty, result.snippet != result.title {
+                    Text(result.snippet)
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.secondaryText)
+                        .lineLimit(2)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func noteSearchField(text: Binding<String>) -> some View {
+        #if os(iOS)
+        self.searchable(
+            text: text,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search notes"
+        )
+        #else
+        self.searchable(
+            text: text,
+            prompt: "Search notes"
+        )
+        #endif
+    }
+
+    @ViewBuilder
+    func noteSearchFocused(_ isFocused: FocusState<Bool>.Binding) -> some View {
+        #if os(iOS)
+        self.searchFocused(isFocused)
+        #else
+        self
+        #endif
     }
 }
 
 extension View {
     @ViewBuilder
     func noteSearchSheetPresentationStyle() -> some View {
+        #if os(iOS)
         if #available(iOS 18.0, *) {
             self.presentationSizing(.page)
         } else {
             self
         }
+        #else
+        self.frame(minWidth: 620, minHeight: 560)
+        #endif
     }
 }
-#endif
 
 #if os(macOS)
 private struct WindowCommandReader: NSViewRepresentable {

@@ -139,14 +139,22 @@ public final class SearchIndexStore {
         )
     }
 
-    public func search(query: String, vaultURL: URL, limit: Int = 50) throws -> [SearchResult] {
-        let ftsQuery = MarkdownSearchEngine.ftsQuery(for: query)
+    public func search(query: String, scope: SearchScope = .titleAndContent, vaultURL: URL, limit: Int = 50) throws -> [SearchResult] {
+        let ftsQuery = switch scope {
+        case .title:
+            MarkdownSearchEngine.titleOnlyFTSQuery(for: query)
+        case .titleAndContent:
+            MarkdownSearchEngine.ftsQuery(for: query)
+        }
         guard !ftsQuery.isEmpty else { return [] }
 
         var results: [(result: SearchResult, rank: Double)] = []
         let terms = MarkdownSearchEngine.boostTerms(for: query)
-        try searchNotes(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: limit, results: &results)
-        try searchSections(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: limit, results: &results)
+        let candidateLimit = max(limit * 4, limit)
+        try searchNotes(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, results: &results)
+        if scope == .titleAndContent {
+            try searchSections(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, results: &results)
+        }
 
         return results
             .sorted { lhs, rhs in
@@ -248,7 +256,10 @@ public final class SearchIndexStore {
             }
             let rank = sqlite3_column_double(stmt, 5)
             let snippet = textColumn(stmt, 6) ?? ""
-            let adjustedRank = rank + noteBoost(title: title, folderPath: folderPath, query: rawQuery, terms: terms)
+            let modifiedAt = SearchUtilities.iso8601.date(from: modifiedAtText)
+            let adjustedRank = rank
+                + noteBoost(title: title, folderPath: folderPath, query: rawQuery, terms: terms)
+                + recencyBoost(updatedAt: modifiedAt)
             let fileURL = vaultURL.appendingPathComponent(relativePath)
             results.append((
                 SearchResult(
@@ -261,7 +272,7 @@ public final class SearchIndexStore {
                     snippet: snippet.isEmpty ? title : snippet,
                     lineStart: nil,
                     score: -adjustedRank,
-                    updatedAt: SearchUtilities.iso8601.date(from: modifiedAtText)
+                    updatedAt: modifiedAt
                 ),
                 adjustedRank
             ))
@@ -278,7 +289,7 @@ public final class SearchIndexStore {
     ) throws {
         try query(
             """
-            SELECT s.section_id, s.note_id, s.heading, s.line_start, n.relative_path, n.title, n.folder_path, n.file_modified_at,
+            SELECT s.section_id, s.note_id, s.heading, s.level, s.line_start, n.relative_path, n.title, n.folder_path, n.file_modified_at,
                    bm25(section_fts, 5.0, 1.0) AS rank,
                    snippet(section_fts, 1, '', '', '...', 24) AS snippet
             FROM section_fts
@@ -293,34 +304,44 @@ public final class SearchIndexStore {
             guard let sectionIDText = textColumn(stmt, 0), let sectionID = UUID(uuidString: sectionIDText),
                   let noteIDText = textColumn(stmt, 1), let noteID = UUID(uuidString: noteIDText),
                   let heading = textColumn(stmt, 2),
-                  let relativePath = textColumn(stmt, 4),
-                  let noteTitle = textColumn(stmt, 5),
-                  let folderPath = textColumn(stmt, 6),
-                  let modifiedAtText = textColumn(stmt, 7) else {
+                  let relativePath = textColumn(stmt, 5),
+                  let noteTitle = textColumn(stmt, 6),
+                  let folderPath = textColumn(stmt, 7),
+                  let modifiedAtText = textColumn(stmt, 8) else {
                 return
             }
-            let lineStart = Int(sqlite3_column_int(stmt, 3))
-            let rank = sqlite3_column_double(stmt, 8)
-            let snippet = textColumn(stmt, 9) ?? ""
-            let adjustedRank = rank + sectionBoost(heading: heading, noteTitle: noteTitle, folderPath: folderPath, query: rawQuery, terms: terms)
+            let level: Int? = sqlite3_column_type(stmt, 3) == SQLITE_NULL ? nil : Int(sqlite3_column_int(stmt, 3))
+            let lineStart = Int(sqlite3_column_int(stmt, 4))
+            let rank = sqlite3_column_double(stmt, 9)
+            let snippet = textColumn(stmt, 10) ?? ""
+            let modifiedAt = SearchUtilities.iso8601.date(from: modifiedAtText)
+            let adjustedRank = rank
+                + sectionBoost(heading: heading, noteTitle: noteTitle, folderPath: folderPath, query: rawQuery, terms: terms)
+                + recencyBoost(updatedAt: modifiedAt)
             let fileURL = vaultURL.appendingPathComponent(relativePath)
-            let breadcrumb = [folderPath, noteTitle].filter { !$0.isEmpty }.joined(separator: " / ")
+            let breadcrumb = sectionBreadcrumb(relativePath: relativePath, heading: heading, level: level)
             results.append((
                 SearchResult(
                     id: sectionID,
                     kind: .section,
                     noteID: noteID,
                     fileURL: fileURL,
-                    title: heading,
+                    title: noteTitle,
                     breadcrumb: breadcrumb,
                     snippet: snippet.isEmpty ? heading : snippet,
                     lineStart: lineStart,
                     score: -adjustedRank,
-                    updatedAt: SearchUtilities.iso8601.date(from: modifiedAtText)
+                    updatedAt: modifiedAt
                 ),
                 adjustedRank
             ))
         }
+    }
+
+    private func sectionBreadcrumb(relativePath: String, heading: String, level: Int?) -> String {
+        guard let level, level > 0 else { return relativePath }
+        let headingPrefix = String(repeating: "#", count: min(level, 6))
+        return "\(relativePath)/\(headingPrefix) \(heading)"
     }
 
     private func noteBoost(title: String, folderPath: String, query: String, terms: [String]) -> Double {
@@ -356,6 +377,13 @@ public final class SearchIndexStore {
             boost -= 0.5
         }
         return boost
+    }
+
+    private func recencyBoost(updatedAt: Date?, now: Date = Date()) -> Double {
+        guard let updatedAt else { return 0 }
+        let age = max(0, now.timeIntervalSince(updatedAt))
+        let ageInDays = age / 86_400
+        return -1.5 * exp(-ageInDays / 30)
     }
 
     private func setMetadata(_ key: String, value: String) throws {

@@ -1,5 +1,7 @@
 import SwiftUI
 import os.log
+import NotoSearch
+import NotoVault
 
 #if os(iOS)
 import UIKit
@@ -34,32 +36,9 @@ enum NotoCommandTarget {
 #endif
 
 #if os(macOS)
-/// Hides the app instead of closing the window when the user clicks the red X.
-/// Clicking the dock icon unhides it — window size and position are preserved automatically.
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        // Set ourselves as delegate on all windows so we intercept close
-        for window in NSApp.windows {
-            window.delegate = self
-        }
-    }
-
-    func applicationDidBecomeActive(_ notification: Notification) {
-        // Ensure any new windows also get our delegate
-        for window in NSApp.windows where window.delegate == nil {
-            window.delegate = self
-        }
-        // If no windows are visible (user closed via red X then clicked dock), show them
-        if NSApp.windows.allSatisfy({ !$0.isVisible }) {
-            for window in NSApp.windows {
-                window.makeKeyAndOrderFront(nil)
-            }
-        }
-    }
-
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        NSApp.hide(nil)
-        return false
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 }
 #endif
@@ -201,7 +180,11 @@ struct MainAppView: View {
         self.vaultURL = vaultURL
         self.locationManager = locationManager
         self.readwiseSyncController = readwiseSyncController
-        _store = State(wrappedValue: MarkdownNoteStore(vaultURL: vaultURL, autoload: false))
+        _store = State(wrappedValue: MarkdownNoteStore(
+            vaultURL: vaultURL,
+            autoload: false,
+            directoryLoader: VaultDirectoryLoader(noteMetadataStrategy: .fileOnly)
+        ))
     }
 
     var body: some View {
@@ -218,6 +201,7 @@ struct MainAppView: View {
                 store.loadItemsInBackground()
                 readwiseSyncController.refreshSavedTokenState()
                 readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
+                await refreshSearchIndex()
             }
             .onAppear {
                 fileWatcher.watch(directory: vaultURL)
@@ -226,10 +210,24 @@ struct MainAppView: View {
                 if newPhase == .active {
                     store.refreshForForegroundActivation()
                     readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
+                    Task {
+                        await refreshSearchIndex()
+                    }
                 }
             }
             .onChange(of: fileWatcher.changeCount) { _, _ in
                 store.loadItemsInBackground()
+                Task {
+                    await refreshSearchIndex()
+                }
             }
+    }
+
+    private func refreshSearchIndex() async {
+        do {
+            _ = try await SearchIndexRefreshCoordinator.shared.refresh(vaultURL: vaultURL)
+        } catch {
+            logger.error("Search index refresh failed: \(error.localizedDescription)")
+        }
     }
 }

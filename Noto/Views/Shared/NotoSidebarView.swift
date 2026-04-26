@@ -27,9 +27,10 @@ struct NotoSidebarView: View {
     @State private var newFolderParentURL: URL?
     @State private var searchLoadTask: Task<Void, Never>?
     @State private var reloadTreeTask: Task<Void, Never>?
-    @FocusState private var isSearchFocused: Bool
 
-    private let loader = SidebarTreeLoader()
+    private var loader: SidebarTreeLoader {
+        SidebarTreeLoader(directoryLoader: rootStore.directoryLoader)
+    }
 
     var body: some View {
         sidebarRows
@@ -128,9 +129,6 @@ struct NotoSidebarView: View {
         .accessibilityIdentifier("search_button")
         .accessibilityLabel("Search")
         .help("Search")
-        .popover(isPresented: $isSearchPresented, arrowEdge: .top) {
-            searchPopover
-        }
     }
 
     #if os(macOS)
@@ -146,34 +144,6 @@ struct NotoSidebarView: View {
         .help("Toggle Sidebar")
     }
     #endif
-
-    private var searchPopover: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(AppTheme.mutedText)
-            TextField("Search", text: $searchText)
-                .textFieldStyle(.plain)
-                .focused($isSearchFocused)
-                .accessibilityIdentifier("sidebar_search_field")
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Label("Clear Search", systemImage: "xmark.circle.fill")
-                }
-                .buttonStyle(.plain)
-                .labelStyle(.iconOnly)
-                .foregroundStyle(AppTheme.mutedText)
-                .accessibilityIdentifier("clear_search_button")
-                .accessibilityLabel("Clear Search")
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(width: 240, height: 32)
-        .onAppear {
-            isSearchFocused = true
-        }
-    }
 
     private var rowHeight: CGFloat {
         #if os(macOS)
@@ -304,7 +274,8 @@ struct NotoSidebarView: View {
         let noteStore = MarkdownNoteStore(
             directoryURL: row.url.deletingLastPathComponent(),
             vaultRootURL: rootStore.vaultRootURL,
-            autoload: false
+            autoload: false,
+            directoryLoader: rootStore.directoryLoader
         )
         let note = MarkdownNote(
             id: row.noteID ?? VaultDirectoryLoader.stableID(for: row.url),
@@ -323,7 +294,11 @@ struct NotoSidebarView: View {
     }
 
     private func createNote(in directoryURL: URL) {
-        let noteStore = MarkdownNoteStore(directoryURL: directoryURL, vaultRootURL: rootStore.vaultRootURL)
+        let noteStore = MarkdownNoteStore(
+            directoryURL: directoryURL,
+            vaultRootURL: rootStore.vaultRootURL,
+            directoryLoader: rootStore.directoryLoader
+        )
         let note = noteStore.createNote()
         expandedFolderURLs.insert(directoryURL.standardizedFileURL)
         persistExpansionState()
@@ -348,7 +323,11 @@ struct NotoSidebarView: View {
         }
 
         let parentURL = newFolderParentURL ?? rootStore.vaultRootURL
-        let parentStore = MarkdownNoteStore(directoryURL: parentURL, vaultRootURL: rootStore.vaultRootURL)
+        let parentStore = MarkdownNoteStore(
+            directoryURL: parentURL,
+            vaultRootURL: rootStore.vaultRootURL,
+            directoryLoader: rootStore.directoryLoader
+        )
         let folder = parentStore.createFolder(name: name)
         expandedFolderURLs.insert(parentURL.standardizedFileURL)
         expandedFolderURLs.insert(folder.folderURL.standardizedFileURL)
@@ -365,7 +344,11 @@ struct NotoSidebarView: View {
     private func delete(_ row: SidebarTreeNode) {
         switch row.kind {
         case .folder:
-            let parentStore = MarkdownNoteStore(directoryURL: row.url.deletingLastPathComponent(), vaultRootURL: rootStore.vaultRootURL)
+            let parentStore = MarkdownNoteStore(
+                directoryURL: row.url.deletingLastPathComponent(),
+                vaultRootURL: rootStore.vaultRootURL,
+                directoryLoader: rootStore.directoryLoader
+            )
             parentStore.deleteFolder(NotoFolder(
                 id: VaultDirectoryLoader.stableID(for: row.url),
                 folderURL: row.url,
@@ -377,7 +360,11 @@ struct NotoSidebarView: View {
             expandedFolderURLs.remove(row.url.standardizedFileURL)
             persistExpansionState()
         case .note:
-            let parentStore = MarkdownNoteStore(directoryURL: row.url.deletingLastPathComponent(), vaultRootURL: rootStore.vaultRootURL)
+            let parentStore = MarkdownNoteStore(
+                directoryURL: row.url.deletingLastPathComponent(),
+                vaultRootURL: rootStore.vaultRootURL,
+                directoryLoader: rootStore.directoryLoader
+            )
             let note = markdownNote(for: row.url, modifiedAt: row.modifiedAt)
             externallyDeletingNoteID = note.id
             if selectedNote?.fileURL.standardizedFileURL == row.url.standardizedFileURL {
@@ -469,11 +456,12 @@ struct NotoSidebarView: View {
         reloadTreeTask?.cancel()
         let rootURL = rootStore.vaultRootURL
         let expandedFolders = expandedFolderURLs
+        let treeLoader = loader
 
         reloadTreeTask = Task {
             let result = await Task.detached(priority: .userInitiated) {
                 Result {
-                    try SidebarTreeLoader().loadRows(
+                    try treeLoader.loadRows(
                         rootURL: rootURL,
                         expandedFolderURLs: expandedFolders
                     )
@@ -507,9 +495,10 @@ struct NotoSidebarView: View {
     private func reloadSearchableRows() {
         searchLoadTask?.cancel()
         let rootURL = rootStore.vaultRootURL
+        let treeLoader = loader
         searchLoadTask = Task {
             let loadedRows = await Task.detached(priority: .userInitiated) {
-                (try? SidebarTreeLoader().loadRows(rootURL: rootURL)) ?? []
+                (try? treeLoader.loadRows(rootURL: rootURL)) ?? []
             }.value
 
             guard !Task.isCancelled else { return }
