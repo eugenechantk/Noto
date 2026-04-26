@@ -212,6 +212,24 @@ struct TextKit2MarkdownLayoutTests {
         #expect(url.query?.contains("Folder/Project%20Brief.md") == true)
     }
 
+    @Test("Renderable block discovery can be limited to an affected range")
+    func renderableBlockDiscoveryCanBeLimitedToAffectedRange() {
+        let text = """
+        - [ ] Top todo
+        Plain body
+        ---
+        - [ ] Bottom todo
+        """
+        let nsText = text as NSString
+        let bottomRange = nsText.range(of: "Bottom")
+
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(in: text, intersecting: bottomRange)
+
+        #expect(blocks.count == 1)
+        #expect(blocks.first?.lineText == "- [ ] Bottom todo")
+        #expect(blocks.first?.kind == .todo(checked: false, indent: 0))
+    }
+
     @Test("Deleting a rendered hyperlink can reveal the full markdown syntax")
     func deletingRenderedHyperlinkCanRevealFullMarkdownSyntax() throws {
         let text = "[Example](https://example.com)"

@@ -440,15 +440,43 @@ enum MarkdownSemanticAnalyzer {
         in text: String,
         collapsedXMLTagRanges: [NSRange] = []
     ) -> [MarkdownRenderableBlock] {
+        renderableBlocks(in: text, collapsedXMLTagRanges: collapsedXMLTagRanges, intersecting: nil)
+    }
+
+    static func renderableBlocks(
+        in text: String,
+        collapsedXMLTagRanges: [NSRange] = [],
+        intersecting targetRange: NSRange?
+    ) -> [MarkdownRenderableBlock] {
         let nsText = text as NSString
         guard nsText.length > 0 else { return [] }
         let frontmatterRange = MarkdownFrontmatter.range(in: text)
 
         var blocks: [MarkdownRenderableBlock] = []
-        var paragraphLocation = 0
-        while paragraphLocation < nsText.length {
+        let safeTargetRange = targetRange.flatMap { range -> NSRange? in
+            guard range.location != NSNotFound else { return nil }
+            let safeLocation = max(0, min(range.location, nsText.length))
+            let safeLength = max(0, min(range.length, nsText.length - safeLocation))
+            return NSRange(location: safeLocation, length: safeLength)
+        }
+        let scanLimit = safeTargetRange.map(NSMaxRange) ?? nsText.length
+        let initialLocation = safeTargetRange?.location ?? 0
+        var paragraphLocation = nsText.paragraphRange(
+            for: NSRange(location: min(initialLocation, max(nsText.length - 1, 0)), length: 0)
+        ).location
+
+        while paragraphLocation < nsText.length, paragraphLocation <= scanLimit {
             let paragraphRange = nsText.paragraphRange(for: NSRange(location: paragraphLocation, length: 0))
             let visibleLineRange = MarkdownLineRanges.visibleLineRange(from: paragraphRange, in: nsText)
+            if let safeTargetRange,
+               NSIntersectionRange(paragraphRange, safeTargetRange).length == 0,
+               !(safeTargetRange.length == 0 && NSLocationInRange(safeTargetRange.location, paragraphRange)) {
+                let nextLocation = NSMaxRange(paragraphRange)
+                guard nextLocation > paragraphLocation else { break }
+                paragraphLocation = nextLocation
+                continue
+            }
+
             let lineText = nsText.substring(with: visibleLineRange)
             let isCollapsed = collapsedXMLTagRanges.contains { collapsedRange in
                 NSIntersectionRange(visibleLineRange, collapsedRange).length > 0
@@ -3212,7 +3240,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         invalidateRenderableBlockCache()
         if !isRestylingText {
             updateRevealedMarkdownRangesForSelection(restyle: false)
-            applyDividerRenderAttributesToTextStorage()
+            applyDividerRenderAttributesToTextStorage(in: dividerRefreshRangesForCurrentSelection())
         }
         coordinator?.publishEditorText(textView.text ?? "")
         updateTypingAttributes()
@@ -3269,6 +3297,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         let text = textView.text ?? ""
         let hyperlinkRanges = hyperlinkRangesOnSelectedLines(in: text, selection: textView.selectedRange)
         let dividerRanges = dividerRangesOnSelectedLines(in: text, selection: textView.selectedRange)
+        let previousDividerRanges = revealedDividerRanges
         let changed = !nsRangesEqual(hyperlinkRanges, revealedHyperlinkRanges)
             || !nsRangesEqual(dividerRanges, revealedDividerRanges)
         guard changed else { return }
@@ -3276,9 +3305,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         setRevealedHyperlinkRanges(hyperlinkRanges)
         setRevealedDividerRanges(dividerRanges)
         if restyle {
-            restyleTextPreservingSelection()
+            restyleTextPreservingSelection(affectedDividerRanges: previousDividerRanges + dividerRanges)
         } else {
-            applyDividerRenderAttributesToTextStorage()
+            applyDividerRenderAttributesToTextStorage(in: previousDividerRanges + dividerRanges)
             scheduleEditorOverlayRefresh()
         }
     }
@@ -3299,9 +3328,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         return true
     }
 
-    private func restyleTextPreservingSelection() {
+    private func restyleTextPreservingSelection(affectedDividerRanges: [NSRange]? = nil) {
         applyHyperlinkRenderAttributesToTextStorage()
-        applyDividerRenderAttributesToTextStorage()
+        applyDividerRenderAttributesToTextStorage(in: affectedDividerRanges)
         applyFindHighlights()
         updateTypingAttributes()
         scheduleEditorOverlayRefresh()
@@ -3356,9 +3385,20 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         ]
     }
 
-    private func applyDividerRenderAttributesToTextStorage() {
+    private func applyDividerRenderAttributesToTextStorage(in affectedRanges: [NSRange]? = nil) {
         let textStorage = textView.textStorage
-        for block in currentRenderableBlocks() where block.kind == .divider && !block.isCollapsedXMLTagContent {
+        let blocks: [MarkdownRenderableBlock]
+        if let affectedRanges {
+            blocks = renderableBlocks(intersecting: affectedRanges)
+        } else {
+            blocks = currentRenderableBlocks()
+        }
+        var styledLocations: Set<Int> = []
+
+        for block in blocks where block.kind == .divider && !block.isCollapsedXMLTagContent {
+            guard styledLocations.insert(block.paragraphRange.location).inserted else {
+                continue
+            }
             guard block.visibleLineRange.length > 0,
                   NSMaxRange(block.visibleLineRange) <= textStorage.length else {
                 continue
@@ -3374,6 +3414,14 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
                 ),
             ], range: block.visibleLineRange)
         }
+    }
+
+    private func dividerRefreshRangesForCurrentSelection() -> [NSRange] {
+        var ranges = revealedDividerRanges
+        if let selectedLineRange = selectedLineRange() {
+            ranges.append(selectedLineRange)
+        }
+        return ranges
     }
 
     private func installHyperlinkTapRecognizer() {
@@ -3602,6 +3650,59 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         return blocks
     }
 
+    private func renderableBlocks(intersecting ranges: [NSRange]) -> [MarkdownRenderableBlock] {
+        let text = textView.text ?? ""
+        let collapsedXMLTagRanges = markdownDelegate.collapsedXMLTagRanges
+        var blocks: [MarkdownRenderableBlock] = []
+        var seenLocations: Set<Int> = []
+
+        for range in ranges {
+            for block in MarkdownSemanticAnalyzer.renderableBlocks(
+                in: text,
+                collapsedXMLTagRanges: collapsedXMLTagRanges,
+                intersecting: range
+            ) where seenLocations.insert(block.paragraphRange.location).inserted {
+                blocks.append(block)
+            }
+        }
+
+        return blocks
+    }
+
+    private func visibleRenderableBlocks() -> [MarkdownRenderableBlock] {
+        guard let visibleTextRange = visibleTextRange() else {
+            return currentRenderableBlocks()
+        }
+        return renderableBlocks(intersecting: [visibleTextRange])
+    }
+
+    private func selectedLineRange() -> NSRange? {
+        let nsText = (textView.text ?? "") as NSString
+        guard nsText.length > 0, textView.selectedRange.location != NSNotFound else { return nil }
+
+        let safeLocation = max(0, min(textView.selectedRange.location, nsText.length))
+        let safeLength = max(0, min(textView.selectedRange.length, nsText.length - safeLocation))
+        return nsText.lineRange(for: NSRange(location: safeLocation, length: safeLength))
+    }
+
+    private func visibleTextRange() -> NSRange? {
+        let expandedBounds = textView.bounds.insetBy(dx: 0, dy: -120)
+        let leadingX = textView.textContainerInset.left + textView.textContainer.lineFragmentPadding
+        guard let startPosition = textView.closestPosition(to: CGPoint(x: leadingX, y: expandedBounds.minY)),
+              let endPosition = textView.closestPosition(to: CGPoint(x: leadingX, y: expandedBounds.maxY)) else {
+            return nil
+        }
+
+        let start = textView.offset(from: textView.beginningOfDocument, to: startPosition)
+        let end = textView.offset(from: textView.beginningOfDocument, to: endPosition)
+        let nsText = (textView.text ?? "") as NSString
+        guard nsText.length > 0 else { return nil }
+
+        let lowerBound = max(0, min(start, end, nsText.length))
+        let upperBound = max(0, min(max(start, end), nsText.length))
+        return nsText.lineRange(for: NSRange(location: lowerBound, length: upperBound - lowerBound))
+    }
+
     private func requestImageLoad(for url: URL) {
         guard loadingImageURLs.insert(url).inserted else { return }
 
@@ -3637,7 +3738,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private func refreshImageOverlayViews() {
         guard isViewLoaded, textView != nil else { return }
 
-        let blocks = currentRenderableBlocks()
+        let blocks = visibleRenderableBlocks()
         let visibleRect = textView.bounds.insetBy(dx: -8, dy: -200)
         var activeLocations: Set<Int> = []
 
@@ -3739,7 +3840,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private func refreshTodoMarkerButtons() {
         guard isViewLoaded, textView != nil else { return }
 
-        let blocks = currentRenderableBlocks()
+        let blocks = visibleRenderableBlocks()
         let visibleRect = textView.bounds.insetBy(dx: -8, dy: -80)
         var activeLocations: Set<Int> = []
 
@@ -3788,7 +3889,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         let visibleRect = textView.bounds.insetBy(dx: -8, dy: -80)
         var activeLocations: Set<Int> = []
 
-        for block in currentRenderableBlocks() {
+        for block in visibleRenderableBlocks() {
             guard block.kind == .divider,
                   !block.isCollapsedXMLTagContent,
                   !revealedDividerRanges.contains(where: { NSEqualRanges($0, block.visibleLineRange) }),

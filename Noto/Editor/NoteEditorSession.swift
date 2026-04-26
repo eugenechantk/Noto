@@ -23,8 +23,10 @@ final class NoteEditorSession {
     let editorSessionID = UUID()
 
     private static let titleRenameDebounce: Duration = .milliseconds(800)
+    private static let autosaveDebounce: Duration = .milliseconds(500)
 
     private var renameTask: Task<Void, Never>?
+    private var autosaveTask: Task<Void, Never>?
 
     init(store: MarkdownNoteStore, note: MarkdownNote, isNew: Bool = false) {
         self.store = store
@@ -144,6 +146,8 @@ final class NoteEditorSession {
 
     func persistFinalSnapshotIfNeeded(isExternallyDeleting: Bool) {
         guard !isDownloading, !downloadFailed, !isDeleting, !isExternallyDeleting else { return }
+        autosaveTask?.cancel()
+        autosaveTask = nil
         if hasPendingLocalEdits || latestEditorText != lastPersistedText {
             DebugTrace.record("editor final persist note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(latestEditorText))")
             persistEditorText(latestEditorText)
@@ -152,6 +156,7 @@ final class NoteEditorSession {
 
     func markDeleting() {
         renameTask?.cancel()
+        autosaveTask?.cancel()
         isDeleting = true
     }
 
@@ -161,6 +166,7 @@ final class NoteEditorSession {
 
     func cancelBackgroundWork() {
         renameTask?.cancel()
+        autosaveTask?.cancel()
     }
 
     private func scheduleRename() {
@@ -171,6 +177,18 @@ final class NoteEditorSession {
             guard let self else { return }
             guard !Task.isCancelled, !self.isDeleting else { return }
             self.note = self.store.renameFileIfNeeded(for: self.note)
+        }
+    }
+
+    private func scheduleAutosave() {
+        guard !isDeleting else { return }
+        autosaveTask?.cancel()
+        autosaveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.autosaveDebounce)
+            guard let self else { return }
+            guard !Task.isCancelled, !self.isDeleting else { return }
+            self.persistEditorText(self.latestEditorText)
+            self.autosaveTask = nil
         }
     }
 
@@ -189,7 +207,8 @@ final class NoteEditorSession {
         content = newText
         hasPendingLocalEdits = true
         DebugTrace.record("editor apply text note=\(note.fileURL.lastPathComponent) scheduleRename=\(shouldScheduleRename)")
-        persistEditorText(newText)
+        note = store.updateTitleFromContent(newText, for: note)
+        scheduleAutosave()
         if shouldScheduleRename, note.title != previousTitle {
             scheduleRename()
         }

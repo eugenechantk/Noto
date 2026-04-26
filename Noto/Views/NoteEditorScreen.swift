@@ -30,6 +30,7 @@ struct NoteEditorScreen: View {
     @State private var findStatus = EditorFindStatus()
     @State private var findNavigationRequest: EditorFindNavigationRequest?
     @State private var findNavigationRequestID = 0
+    @State private var wordCountTask: Task<Void, Never>?
     #if os(macOS)
     @State private var hostingWindow: NSWindow?
     #endif
@@ -132,10 +133,11 @@ struct NoteEditorScreen: View {
             await session.loadNoteContent()
         }
         .onChange(of: session.content, initial: true) { _, updatedContent in
-            statusCount = wordCounter.count(in: updatedContent)
+            scheduleStatusCountUpdate(for: updatedContent)
         }
         .onDisappear {
             session.cancelBackgroundWork()
+            wordCountTask?.cancel()
             session.persistFinalSnapshotIfNeeded(isExternallyDeleting: externallyDeletingNoteID?.wrappedValue == session.note.id)
             onNoteUpdated?(session.note)
             if externallyDeletingNoteID?.wrappedValue == session.note.id {
@@ -190,6 +192,21 @@ struct NoteEditorScreen: View {
             id: findNavigationRequestID,
             direction: direction
         )
+    }
+
+    private func scheduleStatusCountUpdate(for content: String) {
+        wordCountTask?.cancel()
+        let wordCounter = wordCounter
+        wordCountTask = Task {
+            try? await Task.sleep(for: .milliseconds(250))
+            let count = await Task.detached {
+                wordCounter.count(in: content)
+            }.value
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                statusCount = count
+            }
+        }
     }
 
     private func pageMentionDocuments(matching query: String) -> [PageMentionDocument] {

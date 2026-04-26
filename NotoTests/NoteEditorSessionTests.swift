@@ -45,6 +45,27 @@ struct NoteEditorSessionTests {
         #expect(session.note.fileURL.lastPathComponent == note.fileURL.lastPathComponent)
         #expect(FileManager.default.fileExists(atPath: note.fileURL.path))
     }
+
+    @Test("Editor autosave is debounced while typing")
+    @MainActor
+    func editorAutosaveIsDebouncedWhileTyping() async {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        let note = store.createNote()
+        let editedContent = MarkdownNote.makeFrontmatter(id: note.id) + "# \nDelayed body"
+        let session = NoteEditorSession(store: store, note: note, isNew: true)
+
+        session.handleEditorChange(editedContent)
+        let immediateContent = CoordinatedFileManager.readString(from: note.fileURL) ?? ""
+        #expect(!immediateContent.contains("Delayed body"))
+
+        try? await Task.sleep(for: .milliseconds(650))
+
+        let savedContent = CoordinatedFileManager.readString(from: note.fileURL) ?? ""
+        #expect(savedContent.contains("Delayed body"))
+    }
 }
 
 private func makeTempVault() -> URL {
