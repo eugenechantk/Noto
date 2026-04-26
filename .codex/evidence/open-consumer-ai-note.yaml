@@ -1,0 +1,7 @@
+appId: com.eugenechan.Noto
+name: Open Consumer AI Note
+---
+- tapOn:
+    id: "note_The State of Consumer AI - Usage"
+- waitForAnimationToEnd:
+    timeout: 1500

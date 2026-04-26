@@ -1,0 +1,101 @@
+11:06:48.790 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: /Users/eugenechan/dev/personal/Noto/.codex/evidence/maestro-open-captures/.maestro/tests/2026-04-23_110648
+11:06:48.791 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+11:06:48.791 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.3.0
+11:06:48.792 [ INFO] MAESTRO.logSystemInfo: CI: Undefined
+11:06:48.792 [ INFO] MAESTRO.logSystemInfo: OS Name: Mac OS X
+11:06:48.792 [ INFO] MAESTRO.logSystemInfo: OS Version: 15.7.4
+11:06:48.792 [ INFO] MAESTRO.logSystemInfo: Architecture: aarch64
+11:06:48.793 [ INFO] MAESTRO.logSystemInfo: Java Version: 21
+11:06:48.860 [ INFO] MAESTRO.logSystemInfo: Xcode Version: 26.3
+11:06:48.863 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+11:06:48.866 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+11:06:48.866 [ INFO] MAESTRO.logSystemInfo: ---------------------
+11:06:49.238 [DEBUG] io.micrometer.common.util.internal.logging.InternalLoggerFactory.newDefaultFactory: Using SLF4J as the default logging framework
+11:06:49.445 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device C9484291-0C9C-4CC9-A0D6-3986C819E56D using port 7001 with execution plan ExecutionPlan(flowsToRun=[/Users/eugenechan/dev/personal/Noto/.codex/evidence/open-captures.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+11:06:49.612 [TRACE] ios.xctest.XCTestIOSDevice.open: Opening a connection
+11:06:49.612 [TRACE] xcuitest.XCTestDriverClient.restartXCTestRunner: Restarting XCTest Runner (uninstalling, installing and starting)
+11:06:49.612 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:49.613 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:06:49.613 [TRACE] xcuitest.XCTestDriverClient.restartXCTestRunner: XCTest Runner uninstalled, will install and start it
+11:06:49.614 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: start()
+11:06:49.614 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: [Start] Install XCUITest runner on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:49.614 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:49.614 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:06:49.614 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing build products
+11:06:49.652 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing build products
+11:06:49.652 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing maestro-driver-iosUITests-Runner app
+11:06:49.840 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing maestro-driver-iosUITests-Runner app
+11:06:49.840 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing maestro-driver-ios app
+11:06:49.848 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing maestro-driver-ios app
+11:06:49.848 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: Installing driver with xcodebuild
+11:06:49.849 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: [Start] Running XcUITest with `xcodebuild test-without-building` with 7001 and config: IOSDriverConfig(prebuiltRunner=false, sourceDirectory=driver-iPhoneSimulator, context=CLI, snapshotKeyHonorModalViews=null)
+11:06:49.850 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcodebuild, test-without-building, -xctestrun, /var/folders/cd/_rd32xx17dv8ltmf4ctm5wn40000gn/T/C9484291-0C9C-4CC9-A0D6-3986C819E56D8203318881449504251/maestro-driver-ios-config.xctestrun, -destination, id=C9484291-0C9C-4CC9-A0D6-3986C819E56D, -derivedDataPath, /var/folders/cd/_rd32xx17dv8ltmf4ctm5wn40000gn/T/maestro_xctestrunner_xcodebuild_output222618918707700559] with {TEST_RUNNER_PORT=7001}
+11:06:49.853 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: [Done] Running XcUITest with `xcodebuild test-without-building`
+11:06:49.853 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: [Done] Install XCUITest runner on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:49.853 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:49.854 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:06:50.360 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:50.361 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:06:50.866 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:50.867 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:06:51.372 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:51.373 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:06:51.878 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:51.878 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:06:52.379 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:52.390 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Done] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:06:52.395 [ INFO] maestro.cli.runner.TestRunner.runSingle$lambda$0: Running flow open-captures.yaml...
+11:06:52.403 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+11:06:52.538 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=IOS, widthPixels=1206, heightPixels=2622, widthGrid=402, heightGrid=874)
+11:06:52.576 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Define variables RUNNING
+11:06:52.579 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Define variables metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(defineVariablesCommand=DefineVariablesCommand(env={MAESTRO_FILENAME=open-captures, MAESTRO_DEVICE_UDID=C9484291-0C9C-4CC9-A0D6-3986C819E56D, MAESTRO_SHARD_ID=1, MAESTRO_SHARD_INDEX=0}, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:06:52.579 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Define variables COMPLETED
+11:06:52.579 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Apply configuration RUNNING
+11:06:52.580 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Apply configuration metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(applyConfigurationCommand=ApplyConfigurationCommand(config=MaestroConfig(appId=com.eugenechan.Noto, name=Open Captures Folder, tags=[], ext={}, onFlowStart=null, onFlowComplete=null, properties={}), label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:06:52.580 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Apply configuration COMPLETED
+11:06:52.580 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Launch app "com.eugenechan.Noto" RUNNING
+11:06:52.581 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Launch app "com.eugenechan.Noto" metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(launchAppCommand=LaunchAppCommand(appId=com.eugenechan.Noto, clearState=null, clearKeychain=null, stopApp=null, permissions=null, launchArguments=null, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:06:52.582 [ INFO] device.SimctlIOSDevice.setPermissions: [Start] Setting permissions all=allow through applesimutils
+11:06:52.582 [ INFO] util.LocalSimulatorUtils.setAppleSimutilsPermissions: [Start] Setting permissions via pinned applesimutils
+11:06:52.582 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [/Users/eugenechan/.maestro/deps/applesimutils, --byId, C9484291-0C9C-4CC9-A0D6-3986C819E56D, --bundle, com.eugenechan.Noto, --setPermissions, calendar=YES,camera=YES,contacts=YES,faceid=YES,homekit=YES,medialibrary=YES,microphone=YES,motion=YES,photos=YES,reminders=YES,siri=YES,speech=YES,userTracking=YES] with {}
+11:06:52.759 [ INFO] util.LocalSimulatorUtils.setAppleSimutilsPermissions: [Done] Setting permissions pinned applesimutils
+11:06:52.759 [ INFO] device.SimctlIOSDevice.setPermissions: [Done] Setting permissions through applesimutils
+11:06:52.760 [ INFO] device.SimctlIOSDevice.setPermissions: [Start] Setting Permissions all=allow through simctl
+11:06:52.760 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcrun, simctl, privacy, C9484291-0C9C-4CC9-A0D6-3986C819E56D, grant, location-always, com.eugenechan.Noto] with {}
+11:06:52.854 [ INFO] device.SimctlIOSDevice.setPermissions: [Done] Setting Permissions all=allow through simctl
+11:06:52.866 [ INFO] maestro.Maestro.launchApp: Launching app com.eugenechan.Noto
+11:06:52.866 [ INFO] maestro.Maestro.launchApp: Stopping com.eugenechan.Noto app during launch
+11:06:53.907 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcrun, simctl, launch, C9484291-0C9C-4CC9-A0D6-3986C819E56D, com.eugenechan.Noto] with {}
+11:06:54.119 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Launch app "com.eugenechan.Noto" COMPLETED
+11:06:54.119 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Tap on id: folder_Captures RUNNING
+11:06:54.123 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Tap on id: folder_Captures metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(tapOnElementCommand=TapOnElementCommand(selector=ElementSelector(textRegex=null, idRegex=folder_Captures, size=null, below=null, above=null, leftOf=null, rightOf=null, containsChild=null, containsDescendants=null, traits=null, index=null, enabled=null, optional=false, selected=null, checked=null, focused=null, childOf=null, css=null), retryIfNoChange=false, waitUntilVisible=false, longPress=false, repeat=null, waitToSettleTimeoutMs=null, relativePoint=null, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:06:56.004 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Tap on id: folder_Captures metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(tapOnElementCommand=TapOnElementCommand(selector=ElementSelector(textRegex=null, idRegex=folder_Captures, size=null, below=null, above=null, leftOf=null, rightOf=null, containsChild=null, containsDescendants=null, traits=null, index=null, enabled=null, optional=false, selected=null, checked=null, focused=null, childOf=null, css=null), retryIfNoChange=false, waitUntilVisible=false, longPress=false, repeat=null, waitToSettleTimeoutMs=null, relativePoint=null, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:06:56.015 [ INFO] maestro.Maestro.tap-BUbHBYE: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Captures, 3 min, 30 sec, title=, value=, text=, hintText=, resource-id=folder_Captures, bounds=[0,192][402,269], enabled=true, focused=false, selected=false, checked=false}, children=[TreeNode(attributes={accessibilityText=Move, title=, value=, text=, hintText=, resource-id=folder.fill, bounds=[18,222][40,240], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), TreeNode(attributes={accessibilityText=Captures, title=, value=, text=, hintText=, resource-id=, bounds=[53,211][126,232], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), TreeNode(attributes={accessibilityText=3 min, 30 sec, title=, value=, text=, hintText=, resource-id=, bounds=[53,236][129,250], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false)], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=0, y=192, width=402, height=77))
+11:06:56.016 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+11:06:56.175 [ INFO] maestro.Maestro.tap-BUbHBYE: Refreshed element
+11:06:56.176 [ INFO] maestro.Maestro.screenshotBasedTap-hbl3e4M: Try tapping at (201, 230) using hierarchy based logic for wait
+11:06:56.177 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:06:56.177 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:06:56.853 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+11:06:58.038 [ INFO] maestro.Maestro.screenshotBasedTap-hbl3e4M: Something have changed in the UI judging by view hierarchy. Proceed.
+11:06:58.039 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Tap on id: folder_Captures COMPLETED
+11:06:58.039 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Wait for animation to end RUNNING
+11:06:58.039 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Wait for animation to end metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(waitForAnimationToEndCommand=WaitForAnimationToEndCommand(timeout=1500, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:06:58.040 [ INFO] maestro.Maestro.waitForAnimationToEnd: Waiting for animation to end with timeout 1500
+11:06:58.041 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:06:58.041 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:06:58.157 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:06:58.157 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:06:58.716 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Wait for animation to end COMPLETED
+11:06:58.861 [ INFO] maestro.cli.report.TestDebugReporter.deleteOldFiles: Performing purge of logs older than 14 days from /Users/eugenechan/dev/personal/Noto/.codex/evidence/maestro-open-captures/.maestro/tests
+11:06:59.884 [ERROR] maestro.cli.session.MaestroSessionManager.newSession$lambda$0: Failed to record heartbeat
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep0(Native Method)
+	at java.base/java.lang.Thread.sleep(Thread.java:509)
+	at maestro.cli.session.MaestroSessionManager.newSession$lambda$0(MaestroSessionManager.kt:95)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:358)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:305)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)

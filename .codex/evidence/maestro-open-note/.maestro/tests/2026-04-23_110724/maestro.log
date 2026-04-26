@@ -1,0 +1,76 @@
+11:07:24.100 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: /Users/eugenechan/dev/personal/Noto/.codex/evidence/maestro-open-note/.maestro/tests/2026-04-23_110724
+11:07:24.101 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+11:07:24.102 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.3.0
+11:07:24.102 [ INFO] MAESTRO.logSystemInfo: CI: Undefined
+11:07:24.102 [ INFO] MAESTRO.logSystemInfo: OS Name: Mac OS X
+11:07:24.102 [ INFO] MAESTRO.logSystemInfo: OS Version: 15.7.4
+11:07:24.102 [ INFO] MAESTRO.logSystemInfo: Architecture: aarch64
+11:07:24.103 [ INFO] MAESTRO.logSystemInfo: Java Version: 21
+11:07:24.166 [ INFO] MAESTRO.logSystemInfo: Xcode Version: 26.3
+11:07:24.169 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+11:07:24.172 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+11:07:24.173 [ INFO] MAESTRO.logSystemInfo: ---------------------
+11:07:24.708 [DEBUG] io.micrometer.common.util.internal.logging.InternalLoggerFactory.newDefaultFactory: Using SLF4J as the default logging framework
+11:07:24.715 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device C9484291-0C9C-4CC9-A0D6-3986C819E56D using port 7001 with execution plan ExecutionPlan(flowsToRun=[/Users/eugenechan/dev/personal/Noto/.codex/evidence/open-consumer-ai-note.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+11:07:24.888 [TRACE] ios.xctest.XCTestIOSDevice.open: Opening a connection
+11:07:24.888 [TRACE] xcuitest.XCTestDriverClient.restartXCTestRunner: Restarting XCTest Runner (uninstalling, installing and starting)
+11:07:24.888 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:24.890 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:07:24.890 [TRACE] xcuitest.XCTestDriverClient.restartXCTestRunner: XCTest Runner uninstalled, will install and start it
+11:07:24.890 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: start()
+11:07:24.890 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: [Start] Install XCUITest runner on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:24.890 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:24.891 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:07:24.891 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing build products
+11:07:24.926 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing build products
+11:07:24.926 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing maestro-driver-iosUITests-Runner app
+11:07:25.105 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing maestro-driver-iosUITests-Runner app
+11:07:25.105 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing maestro-driver-ios app
+11:07:25.112 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing maestro-driver-ios app
+11:07:25.112 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: Installing driver with xcodebuild
+11:07:25.113 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: [Start] Running XcUITest with `xcodebuild test-without-building` with 7001 and config: IOSDriverConfig(prebuiltRunner=false, sourceDirectory=driver-iPhoneSimulator, context=CLI, snapshotKeyHonorModalViews=null)
+11:07:25.114 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcodebuild, test-without-building, -xctestrun, /var/folders/cd/_rd32xx17dv8ltmf4ctm5wn40000gn/T/C9484291-0C9C-4CC9-A0D6-3986C819E56D18264176533893871371/maestro-driver-ios-config.xctestrun, -destination, id=C9484291-0C9C-4CC9-A0D6-3986C819E56D, -derivedDataPath, /var/folders/cd/_rd32xx17dv8ltmf4ctm5wn40000gn/T/maestro_xctestrunner_xcodebuild_output2400589067441250292] with {TEST_RUNNER_PORT=7001}
+11:07:25.117 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: [Done] Running XcUITest with `xcodebuild test-without-building`
+11:07:25.117 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: [Done] Install XCUITest runner on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:25.118 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:25.118 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:07:25.623 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:25.624 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:07:26.129 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:26.130 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:07:26.635 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:26.636 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:07:27.140 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:27.141 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:07:27.646 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:27.656 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Done] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:07:27.661 [ INFO] maestro.cli.runner.TestRunner.runSingle$lambda$0: Running flow open-consumer-ai-note.yaml...
+11:07:27.668 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+11:07:27.732 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=IOS, widthPixels=1206, heightPixels=2622, widthGrid=402, heightGrid=874)
+11:07:27.765 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Define variables RUNNING
+11:07:27.768 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Define variables metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(defineVariablesCommand=DefineVariablesCommand(env={MAESTRO_FILENAME=open-consumer-ai-note, MAESTRO_DEVICE_UDID=C9484291-0C9C-4CC9-A0D6-3986C819E56D, MAESTRO_SHARD_ID=1, MAESTRO_SHARD_INDEX=0}, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:07:27.768 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Define variables COMPLETED
+11:07:27.768 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Apply configuration RUNNING
+11:07:27.769 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Apply configuration metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(applyConfigurationCommand=ApplyConfigurationCommand(config=MaestroConfig(appId=com.eugenechan.Noto, name=Open Consumer AI Note, tags=[], ext={}, onFlowStart=null, onFlowComplete=null, properties={}), label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:07:27.769 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Apply configuration COMPLETED
+11:07:27.769 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Tap on id: note_The State of Consumer AI - Usage RUNNING
+11:07:27.771 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Tap on id: note_The State of Consumer AI - Usage metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(tapOnElementCommand=TapOnElementCommand(selector=ElementSelector(textRegex=null, idRegex=note_The State of Consumer AI - Usage, size=null, below=null, above=null, leftOf=null, rightOf=null, containsChild=null, containsDescendants=null, traits=null, index=null, enabled=null, optional=false, selected=null, checked=null, focused=null, childOf=null, css=null), retryIfNoChange=false, waitUntilVisible=false, longPress=false, repeat=null, waitToSettleTimeoutMs=null, relativePoint=null, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:07:28.004 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Tap on id: note_The State of Consumer AI - Usage metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(tapOnElementCommand=TapOnElementCommand(selector=ElementSelector(textRegex=null, idRegex=note_The State of Consumer AI - Usage, size=null, below=null, above=null, leftOf=null, rightOf=null, containsChild=null, containsDescendants=null, traits=null, index=null, enabled=null, optional=false, selected=null, checked=null, focused=null, childOf=null, css=null), retryIfNoChange=false, waitUntilVisible=false, longPress=false, repeat=null, waitToSettleTimeoutMs=null, relativePoint=null, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:07:28.009 [ INFO] maestro.Maestro.tap-BUbHBYE: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=The State of Consumer AI - Usage, 4 min, 2 sec, title=, value=, text=, hintText=, resource-id=note_The State of Consumer AI - Usage, bounds=[0,116][402,192], enabled=true, focused=false, selected=false, checked=false}, children=[TreeNode(attributes={accessibilityText=Plain Text Document, title=, value=, text=, hintText=, resource-id=doc.text, bounds=[18,144][35,165], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), TreeNode(attributes={accessibilityText=The State of Consumer AI - Usage, title=, value=, text=, hintText=, resource-id=, bounds=[47,135][317,155], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), TreeNode(attributes={accessibilityText=4 min, 2 sec, title=, value=, text=, hintText=, resource-id=, bounds=[47,159][116,173], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false)], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=0, y=116, width=402, height=76))
+11:07:28.009 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+11:07:28.188 [ INFO] maestro.Maestro.tap-BUbHBYE: Refreshed element
+11:07:28.189 [ INFO] maestro.Maestro.screenshotBasedTap-hbl3e4M: Try tapping at (201, 154) using hierarchy based logic for wait
+11:07:28.190 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:07:28.190 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:07:28.692 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+11:07:29.636 [ INFO] maestro.Maestro.screenshotBasedTap-hbl3e4M: Something have changed in the UI judging by view hierarchy. Proceed.
+11:07:29.636 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Tap on id: note_The State of Consumer AI - Usage COMPLETED
+11:07:29.637 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Wait for animation to end RUNNING
+11:07:29.637 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Wait for animation to end metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(waitForAnimationToEndCommand=WaitForAnimationToEndCommand(timeout=1500, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:07:29.638 [ INFO] maestro.Maestro.waitForAnimationToEnd: Waiting for animation to end with timeout 1500
+11:07:29.638 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:07:29.638 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:07:29.767 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:07:29.767 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:07:30.058 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Wait for animation to end COMPLETED
+11:07:30.215 [ INFO] maestro.cli.report.TestDebugReporter.deleteOldFiles: Performing purge of logs older than 14 days from /Users/eugenechan/dev/personal/Noto/.codex/evidence/maestro-open-note/.maestro/tests

@@ -1,0 +1,21 @@
+{
+  "interval_ms" : 500,
+  "latest_screenshot" : "\/Users\/eugenechan\/dev\/personal\/Noto\/.flowdeck\/automation\/sessions\/5A541FE0\/latest.jpg",
+  "latest_tree" : "\/Users\/eugenechan\/dev\/personal\/Noto\/.flowdeck\/automation\/sessions\/5A541FE0\/latest-tree.json",
+  "pid" : 25074,
+  "retention_seconds" : 60,
+  "root" : "\/Users\/eugenechan\/dev\/personal\/Noto\/.flowdeck\/automation\/sessions",
+  "schemaVersion" : "1.0.0",
+  "screen" : {
+    "height" : 874,
+    "unit" : "points",
+    "width" : 402
+  },
+  "screens_dir" : "\/Users\/eugenechan\/dev\/personal\/Noto\/.flowdeck\/automation\/sessions\/5A541FE0\/screens",
+  "session_dir" : "\/Users\/eugenechan\/dev\/personal\/Noto\/.flowdeck\/automation\/sessions\/5A541FE0",
+  "session_id" : "5A541FE0-FCFD-44AD-B539-D3B17712464B",
+  "success" : true,
+  "trees_dir" : "\/Users\/eugenechan\/dev\/personal\/Noto\/.flowdeck\/automation\/sessions\/5A541FE0\/trees",
+  "type" : "ui_session_start",
+  "udid" : "A191DEF2-4816-48D4-B59F-DED26FFAD8A6"
+}

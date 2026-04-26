@@ -381,6 +381,7 @@ seed_large_vault() {
 seed_from_source_vault() {
     echo "Copying source vault from: $SOURCE_VAULT"
     rsync -a \
+        --inplace \
         --exclude ".DS_Store" \
         --exclude ".noto/search.sqlite*" \
         "$SOURCE_VAULT"/ \
@@ -409,3 +410,4 @@ esac
 
 # Set UserDefaults so the app uses local vault (skips setup screen)
 xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" vaultIsLocal -bool true
+xcrun simctl spawn "$UDID" defaults delete "$BUNDLE_ID" lastOpenedNoteURL >/dev/null 2>&1 || true

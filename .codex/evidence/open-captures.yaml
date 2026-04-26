@@ -1,0 +1,8 @@
+appId: com.eugenechan.Noto
+name: Open Captures Folder
+---
+- launchApp
+- tapOn:
+    id: "folder_Captures"
+- waitForAnimationToEnd:
+    timeout: 1500

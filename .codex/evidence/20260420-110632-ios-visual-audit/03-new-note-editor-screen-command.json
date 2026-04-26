@@ -1,0 +1,95 @@
+{
+  "accessibility" : {
+    "element_count" : 4,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 89
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 54,
+          "width" : 402,
+          "x" : 0,
+          "y" : 62
+        },
+        "id" : "_TtGC7SwiftUI32NavigationStackHosting",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "id" : "note_editor",
+        "role" : "TextArea",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 831
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 86,
+          "width" : 402,
+          "x" : 0,
+          "y" : 788
+        },
+        "id" : "Toolbar",
+        "label" : "Toolbar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20260420-110632-ios-visual-audit\/03-new-note-editor-screen-command.jpg",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 13032,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "A191DEF2-4816-48D4-B59F-DED26FFAD8A6"
+  },
+  "success" : true,
+  "timestamp" : "2026-04-20T03:08:28Z",
+  "type" : "ui_snapshot"
+}

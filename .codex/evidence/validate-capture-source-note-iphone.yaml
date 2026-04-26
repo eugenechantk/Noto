@@ -1,0 +1,66 @@
+appId: com.eugenechan.Noto
+name: Validate Capture Source Note iPhone
+---
+- launchApp
+- tapOn:
+    id: "folder_Captures"
+- waitForAnimationToEnd:
+    timeout: 1500
+- tapOn:
+    id: "note_The State of Consumer AI - Usage"
+- waitForAnimationToEnd:
+    timeout: 1500
+- assertVisible:
+    id: "xml_tag_collapse_1013"
+- assertVisible:
+    id: "xml_tag_collapse_1309"
+- assertVisible:
+    id: "markdown_image_preview_1337"
+- takeScreenshot: .codex/evidence/capture-source-iphone-expanded
+- tapOn:
+    id: "xml_tag_collapse_1013"
+- waitForAnimationToEnd:
+    timeout: 1000
+- assertVisible: "Expand noto:highlights"
+- tapOn:
+    id: "xml_tag_collapse_1013"
+- waitForAnimationToEnd:
+    timeout: 1000
+- assertVisible: "Collapse noto:highlights"
+- tapOn:
+    id: "xml_tag_collapse_1309"
+- waitForAnimationToEnd:
+    timeout: 1000
+- assertVisible: "Expand noto:content"
+- assertNotVisible:
+    id: "markdown_image_preview_1337"
+- takeScreenshot: .codex/evidence/capture-source-iphone-collapsed
+- tapOn:
+    id: "xml_tag_collapse_1309"
+- waitForAnimationToEnd:
+    timeout: 1000
+- assertVisible: "Collapse noto:content"
+- assertVisible:
+    id: "markdown_image_preview_1337"
+- swipe:
+    start: 50%,84%
+    end: 50%,45%
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 1000
+- swipe:
+    start: 50%,84%
+    end: 50%,45%
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 1000
+- swipe:
+    start: 50%,84%
+    end: 50%,45%
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 1000
+- assertVisible:
+    id: "todo_checkbox_2291"
+- takeScreenshot: .codex/evidence/capture-source-iphone-capture-checks-after-highlight-toggle
+- takeScreenshot: .codex/evidence/capture-source-iphone-after-image-scroll

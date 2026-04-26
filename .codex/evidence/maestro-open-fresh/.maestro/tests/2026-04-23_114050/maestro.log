@@ -1,0 +1,121 @@
+11:40:50.829 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: /Users/eugenechan/dev/personal/Noto/.codex/evidence/maestro-open-fresh/.maestro/tests/2026-04-23_114050
+11:40:50.833 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+11:40:50.833 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.3.0
+11:40:50.834 [ INFO] MAESTRO.logSystemInfo: CI: Undefined
+11:40:50.835 [ INFO] MAESTRO.logSystemInfo: OS Name: Mac OS X
+11:40:50.835 [ INFO] MAESTRO.logSystemInfo: OS Version: 15.7.4
+11:40:50.835 [ INFO] MAESTRO.logSystemInfo: Architecture: aarch64
+11:40:50.837 [ INFO] MAESTRO.logSystemInfo: Java Version: 21
+11:40:51.009 [ INFO] MAESTRO.logSystemInfo: Xcode Version: 26.3
+11:40:51.015 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+11:40:51.021 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+11:40:51.021 [ INFO] MAESTRO.logSystemInfo: ---------------------
+11:40:51.270 [ INFO] maestro.orchestra.workspace.WorkspaceExecutionPlanner.plan: Created execution plan: ExecutionPlan(flowsToRun=[/Users/eugenechan/dev/personal/Noto/.codex/evidence/open-captures.yaml, /Users/eugenechan/dev/personal/Noto/.codex/evidence/open-consumer-ai-note.yaml], sequence=FlowSequence(flows=[], continueOnFailure=null), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+11:40:51.614 [DEBUG] io.micrometer.common.util.internal.logging.InternalLoggerFactory.newDefaultFactory: Using SLF4J as the default logging framework
+11:40:52.900 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device C9484291-0C9C-4CC9-A0D6-3986C819E56D using port 7001 with execution plan ExecutionPlan(flowsToRun=[/Users/eugenechan/dev/personal/Noto/.codex/evidence/open-captures.yaml, /Users/eugenechan/dev/personal/Noto/.codex/evidence/open-consumer-ai-note.yaml], sequence=FlowSequence(flows=[], continueOnFailure=null), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+11:40:53.144 [TRACE] ios.xctest.XCTestIOSDevice.open: Opening a connection
+11:40:53.145 [TRACE] xcuitest.XCTestDriverClient.restartXCTestRunner: Restarting XCTest Runner (uninstalling, installing and starting)
+11:40:53.145 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:53.146 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:53.146 [TRACE] xcuitest.XCTestDriverClient.restartXCTestRunner: XCTest Runner uninstalled, will install and start it
+11:40:53.147 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: start()
+11:40:53.147 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: [Start] Install XCUITest runner on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:53.147 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:53.147 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:53.147 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing build products
+11:40:53.201 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing build products
+11:40:53.201 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing maestro-driver-iosUITests-Runner app
+11:40:53.417 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing maestro-driver-iosUITests-Runner app
+11:40:53.417 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing maestro-driver-ios app
+11:40:53.425 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing maestro-driver-ios app
+11:40:53.425 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: Installing driver with xcodebuild
+11:40:53.427 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: [Start] Running XcUITest with `xcodebuild test-without-building` with 7001 and config: IOSDriverConfig(prebuiltRunner=false, sourceDirectory=driver-iPhoneSimulator, context=CLI, snapshotKeyHonorModalViews=null)
+11:40:53.428 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcodebuild, test-without-building, -xctestrun, /var/folders/cd/_rd32xx17dv8ltmf4ctm5wn40000gn/T/C9484291-0C9C-4CC9-A0D6-3986C819E56D842197627343731142/maestro-driver-ios-config.xctestrun, -destination, id=C9484291-0C9C-4CC9-A0D6-3986C819E56D, -derivedDataPath, /var/folders/cd/_rd32xx17dv8ltmf4ctm5wn40000gn/T/maestro_xctestrunner_xcodebuild_output13648033720728518529] with {TEST_RUNNER_PORT=7001}
+11:40:53.432 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: [Done] Running XcUITest with `xcodebuild test-without-building`
+11:40:53.432 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: [Done] Install XCUITest runner on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:53.432 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:53.433 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:53.935 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:53.936 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:54.441 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:54.442 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:54.947 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:54.948 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:55.450 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:55.451 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:55.956 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:55.957 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:56.462 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:56.463 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:56.969 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:56.970 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:57.471 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:57.473 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:57.976 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:57.977 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:58.482 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:58.482 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:58.988 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:58.989 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:7001
+11:40:59.493 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:59.503 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Done] Perform XCUITest driver status check on C9484291-0C9C-4CC9-A0D6-3986C819E56D
+11:40:59.526 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow:  Running flow Open Captures Folder
+11:40:59.532 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+11:40:59.755 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=IOS, widthPixels=1206, heightPixels=2622, widthGrid=402, heightGrid=874)
+11:40:59.791 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Define variables RUNNING
+11:40:59.793 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Define variables COMPLETED
+11:40:59.793 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Apply configuration RUNNING
+11:40:59.793 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Apply configuration COMPLETED
+11:40:59.793 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Launch app "com.eugenechan.Noto" RUNNING
+11:40:59.794 [ INFO] device.SimctlIOSDevice.setPermissions: [Start] Setting permissions all=allow through applesimutils
+11:40:59.794 [ INFO] util.LocalSimulatorUtils.setAppleSimutilsPermissions: [Start] Setting permissions via pinned applesimutils
+11:40:59.794 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [/Users/eugenechan/.maestro/deps/applesimutils, --byId, C9484291-0C9C-4CC9-A0D6-3986C819E56D, --bundle, com.eugenechan.Noto, --setPermissions, calendar=YES,camera=YES,contacts=YES,faceid=YES,homekit=YES,medialibrary=YES,microphone=YES,motion=YES,photos=YES,reminders=YES,siri=YES,speech=YES,userTracking=YES] with {}
+11:40:59.984 [ INFO] util.LocalSimulatorUtils.setAppleSimutilsPermissions: [Done] Setting permissions pinned applesimutils
+11:40:59.984 [ INFO] device.SimctlIOSDevice.setPermissions: [Done] Setting permissions through applesimutils
+11:40:59.985 [ INFO] device.SimctlIOSDevice.setPermissions: [Start] Setting Permissions all=allow through simctl
+11:40:59.985 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcrun, simctl, privacy, C9484291-0C9C-4CC9-A0D6-3986C819E56D, grant, location-always, com.eugenechan.Noto] with {}
+11:41:00.077 [ INFO] device.SimctlIOSDevice.setPermissions: [Done] Setting Permissions all=allow through simctl
+11:41:00.097 [ INFO] maestro.Maestro.launchApp: Launching app com.eugenechan.Noto
+11:41:00.097 [ INFO] maestro.Maestro.launchApp: Stopping com.eugenechan.Noto app during launch
+11:41:01.152 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcrun, simctl, launch, C9484291-0C9C-4CC9-A0D6-3986C819E56D, com.eugenechan.Noto] with {}
+11:41:01.374 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Launch app "com.eugenechan.Noto" COMPLETED
+11:41:01.374 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Tap on id: folder_Captures RUNNING
+11:41:03.274 [ INFO] maestro.Maestro.tap-BUbHBYE: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Captures, 32 sec, title=, value=, text=, hintText=, resource-id=folder_Captures, bounds=[0,192][402,269], enabled=true, focused=false, selected=false, checked=false}, children=[TreeNode(attributes={accessibilityText=Move, title=, value=, text=, hintText=, resource-id=folder.fill, bounds=[18,222][40,240], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), TreeNode(attributes={accessibilityText=Captures, title=, value=, text=, hintText=, resource-id=, bounds=[53,211][126,232], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), TreeNode(attributes={accessibilityText=32 sec, title=, value=, text=, hintText=, resource-id=, bounds=[53,236][91,250], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false)], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=0, y=192, width=402, height=77))
+11:41:03.274 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+11:41:03.439 [ INFO] maestro.Maestro.tap-BUbHBYE: Refreshed element
+11:41:03.441 [ INFO] maestro.Maestro.screenshotBasedTap-hbl3e4M: Try tapping at (201, 230) using hierarchy based logic for wait
+11:41:03.442 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:41:03.442 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:41:04.094 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+11:41:05.201 [ INFO] maestro.Maestro.screenshotBasedTap-hbl3e4M: Something have changed in the UI judging by view hierarchy. Proceed.
+11:41:05.201 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Tap on id: folder_Captures COMPLETED
+11:41:05.201 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Wait for animation to end RUNNING
+11:41:05.202 [ INFO] maestro.Maestro.waitForAnimationToEnd: Waiting for animation to end with timeout 1500
+11:41:05.202 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:41:05.202 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:41:05.314 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:41:05.314 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:41:05.591 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Wait for animation to end COMPLETED
+11:41:05.721 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow:  Running flow Open Consumer AI Note
+11:41:05.722 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Define variables RUNNING
+11:41:05.722 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Define variables COMPLETED
+11:41:05.722 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Apply configuration RUNNING
+11:41:05.722 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Apply configuration COMPLETED
+11:41:05.722 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Tap on id: note_The State of Consumer AI - Usage RUNNING
+11:41:05.875 [ INFO] maestro.Maestro.tap-BUbHBYE: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=The State of Consumer AI - Usage, 35 sec, title=, value=, text=, hintText=, resource-id=note_The State of Consumer AI - Usage, bounds=[0,116][402,192], enabled=true, focused=false, selected=false, checked=false}, children=[TreeNode(attributes={accessibilityText=Plain Text Document, title=, value=, text=, hintText=, resource-id=doc.text, bounds=[18,144][35,165], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), TreeNode(attributes={accessibilityText=The State of Consumer AI - Usage, title=, value=, text=, hintText=, resource-id=, bounds=[47,135][317,155], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), TreeNode(attributes={accessibilityText=35 sec, title=, value=, text=, hintText=, resource-id=, bounds=[47,159][85,173], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false)], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=0, y=116, width=402, height=76))
+11:41:05.875 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+11:41:06.022 [ INFO] maestro.Maestro.tap-BUbHBYE: Refreshed element
+11:41:06.022 [ INFO] maestro.Maestro.screenshotBasedTap-hbl3e4M: Try tapping at (201, 154) using hierarchy based logic for wait
+11:41:06.022 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:41:06.023 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:41:06.576 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+11:41:07.549 [ INFO] maestro.Maestro.screenshotBasedTap-hbl3e4M: Something have changed in the UI judging by view hierarchy. Proceed.
+11:41:07.550 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Tap on id: note_The State of Consumer AI - Usage COMPLETED
+11:41:07.550 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Wait for animation to end RUNNING
+11:41:07.550 [ INFO] maestro.Maestro.waitForAnimationToEnd: Waiting for animation to end with timeout 1500
+11:41:07.550 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:41:07.550 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:41:07.694 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+11:41:07.694 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:41:07.995 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Wait for animation to end COMPLETED
+11:41:08.023 [ INFO] maestro.cli.report.TestDebugReporter.deleteOldFiles: Performing purge of logs older than 14 days from /Users/eugenechan/dev/personal/Noto/.codex/evidence/maestro-open-fresh/.maestro/tests

@@ -1,0 +1,35 @@
+appId: com.eugenechan.Noto
+name: Validate Editor Overlays
+---
+- takeScreenshot: .codex/evidence/editor-before-collapse
+- assertVisible:
+    id: "markdown_image_preview_1337"
+- tapOn:
+    id: "xml_tag_collapse_1309"
+- waitForAnimationToEnd:
+    timeout: 1000
+- assertVisible: "Expand noto:content"
+- assertNotVisible:
+    id: "markdown_image_preview_1337"
+- takeScreenshot: .codex/evidence/editor-content-collapsed
+- tapOn:
+    id: "xml_tag_collapse_1309"
+- waitForAnimationToEnd:
+    timeout: 1000
+- assertVisible: "Collapse noto:content"
+- assertVisible:
+    id: "markdown_image_preview_1337"
+- takeScreenshot: .codex/evidence/editor-content-expanded
+- swipe:
+    start: 50%,84%
+    end: 50%,45%
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 1000
+- swipe:
+    start: 50%,84%
+    end: 50%,45%
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 1000
+- takeScreenshot: .codex/evidence/editor-after-image-scroll
