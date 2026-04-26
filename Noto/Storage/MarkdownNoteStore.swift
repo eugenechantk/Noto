@@ -1,6 +1,8 @@
 import Foundation
+import ImageIO
 import NotoVault
 import os.log
+import UniformTypeIdentifiers
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "MarkdownNoteStore")
 
@@ -91,6 +93,158 @@ struct PageMentionDocument: Identifiable, Equatable {
     let fileURL: URL
 }
 
+struct VaultImageAttachment: Equatable {
+    let fileURL: URL
+    let relativePath: String
+    let markdownPath: String
+    let altText: String
+
+    var markdown: String {
+        "![\(altText)](\(markdownPath))"
+    }
+}
+
+struct VaultImageAttachmentStore {
+    enum ImportError: Error, Equatable {
+        case unsupportedImage
+        case createAttachmentDirectoryFailed
+        case writeFailed
+    }
+
+    static let attachmentDirectoryName = ".attachments"
+
+    let vaultRootURL: URL
+    var maxPixelSize: CGFloat = 2400
+    var jpegCompressionQuality: CGFloat = 0.82
+
+    func importImageFile(at sourceURL: URL) throws -> VaultImageAttachment {
+        let data = try Data(contentsOf: sourceURL)
+        return try importImageData(data, suggestedFilename: sourceURL.lastPathComponent)
+    }
+
+    func importImageData(_ data: Data, suggestedFilename: String?) throws -> VaultImageAttachment {
+        let encoded = try encodeImage(data)
+        let attachmentsURL = vaultRootURL.appendingPathComponent(Self.attachmentDirectoryName, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: attachmentsURL.path) || CoordinatedFileManager.createDirectory(at: attachmentsURL) else {
+            throw ImportError.createAttachmentDirectoryFailed
+        }
+
+        let stem = Self.sanitizedStem(from: suggestedFilename)
+        let filename = "\(stem).\(encoded.fileExtension)"
+        let destinationURL = Self.resolveConflict(for: filename, in: attachmentsURL)
+
+        guard CoordinatedFileManager.writeData(encoded.data, to: destinationURL) else {
+            throw ImportError.writeFailed
+        }
+
+        let relativePath = "\(Self.attachmentDirectoryName)/\(destinationURL.lastPathComponent)"
+        return VaultImageAttachment(
+            fileURL: destinationURL,
+            relativePath: relativePath,
+            markdownPath: Self.markdownPath(for: relativePath),
+            altText: destinationURL.deletingPathExtension().lastPathComponent
+        )
+    }
+
+    private func encodeImage(_ data: Data) throws -> (data: Data, fileExtension: String) {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            throw ImportError.unsupportedImage
+        }
+
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+        ]
+
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary)
+            ?? CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw ImportError.unsupportedImage
+        }
+
+        let preservesAlpha = image.hasMeaningfulAlpha
+        let outputType = preservesAlpha ? UTType.png : UTType.jpeg
+        let outputExtension = preservesAlpha ? "png" : "jpg"
+        let outputData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            outputData,
+            outputType.identifier as CFString,
+            1,
+            nil
+        ) else {
+            throw ImportError.unsupportedImage
+        }
+
+        let properties: [CFString: Any]
+        if preservesAlpha {
+            properties = [:]
+        } else {
+            properties = [kCGImageDestinationLossyCompressionQuality: jpegCompressionQuality]
+        }
+
+        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else {
+            throw ImportError.unsupportedImage
+        }
+
+        return (outputData as Data, outputExtension)
+    }
+
+    private static func sanitizedStem(from suggestedFilename: String?) -> String {
+        let fallback = "Image"
+        guard let suggestedFilename, !suggestedFilename.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return fallback
+        }
+
+        let base = URL(fileURLWithPath: suggestedFilename).deletingPathExtension().lastPathComponent
+        let illegal = CharacterSet(charactersIn: "/\\:?\"<>|*")
+        let sanitized = base
+            .components(separatedBy: illegal)
+            .joined()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sanitized.isEmpty else { return fallback }
+        return String(sanitized.prefix(80))
+    }
+
+    private static func markdownPath(for relativePath: String) -> String {
+        relativePath
+            .split(separator: "/", omittingEmptySubsequences: false)
+            .map { component in
+                String(component).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String(component)
+            }
+            .joined(separator: "/")
+    }
+
+    private static func resolveConflict(for filename: String, in directory: URL) -> URL {
+        let fm = FileManager.default
+        var candidate = directory.appendingPathComponent(filename)
+        guard fm.fileExists(atPath: candidate.path) else { return candidate }
+
+        let stem = candidate.deletingPathExtension().lastPathComponent
+        let ext = candidate.pathExtension
+        var counter = 2
+        while fm.fileExists(atPath: candidate.path) {
+            candidate = directory.appendingPathComponent("\(stem)(\(counter)).\(ext)")
+            counter += 1
+        }
+        return candidate
+    }
+}
+
+private extension CGImage {
+    var hasMeaningfulAlpha: Bool {
+        switch alphaInfo {
+        case .alphaOnly, .first, .last, .premultipliedFirst, .premultipliedLast:
+            return true
+        case .none, .noneSkipFirst, .noneSkipLast:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+}
+
 /// Represents a folder on disk.
 struct NotoFolder: Identifiable, Hashable {
     let id: UUID
@@ -173,11 +327,18 @@ final class MarkdownNoteStore {
 
     let directoryURL: URL
     let vaultRootURL: URL
+    let directoryLoader: VaultDirectoryLoader
 
     /// Initialize for a specific directory within the vault.
-    init(directoryURL: URL, vaultRootURL: URL? = nil, autoload: Bool = true) {
+    init(
+        directoryURL: URL,
+        vaultRootURL: URL? = nil,
+        autoload: Bool = true,
+        directoryLoader: VaultDirectoryLoader = VaultDirectoryLoader()
+    ) {
         self.directoryURL = directoryURL
         self.vaultRootURL = vaultRootURL ?? directoryURL
+        self.directoryLoader = directoryLoader
         ensureDirectoryExists()
         if autoload {
             loadItems()
@@ -185,8 +346,17 @@ final class MarkdownNoteStore {
     }
 
     /// Convenience: initialize for the vault root.
-    convenience init(vaultURL: URL, autoload: Bool = true) {
-        self.init(directoryURL: vaultURL, vaultRootURL: vaultURL, autoload: autoload)
+    convenience init(
+        vaultURL: URL,
+        autoload: Bool = true,
+        directoryLoader: VaultDirectoryLoader = VaultDirectoryLoader()
+    ) {
+        self.init(
+            directoryURL: vaultURL,
+            vaultRootURL: vaultURL,
+            autoload: autoload,
+            directoryLoader: directoryLoader
+        )
     }
 
     deinit {
@@ -206,7 +376,7 @@ final class MarkdownNoteStore {
         defer { isLoadingItems = false }
 
         do {
-            items = try VaultDirectoryLoader()
+            items = try directoryLoader
                 .loadItems(in: directoryURL)
                 .map { DirectoryItem(item: $0) }
         } catch {
@@ -223,12 +393,13 @@ final class MarkdownNoteStore {
         loadItemsTask?.cancel()
 
         let directoryURL = directoryURL
+        let directoryLoader = directoryLoader
         isLoadingItems = true
 
         loadItemsTask = Task { [weak self] in
             let result = await Task.detached(priority: .userInitiated) {
                 Result {
-                    try VaultDirectoryLoader().loadItems(in: directoryURL)
+                    try directoryLoader.loadItems(in: directoryURL)
                 }
             }.value
 
@@ -255,6 +426,16 @@ final class MarkdownNoteStore {
         let content = CoordinatedFileManager.readString(from: note.fileURL) ?? ""
         DebugTrace.record("store read note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(content))")
         return content
+    }
+
+    func importImageAttachment(data: Data, suggestedFilename: String?) throws -> VaultImageAttachment {
+        try VaultImageAttachmentStore(vaultRootURL: vaultRootURL)
+            .importImageData(data, suggestedFilename: suggestedFilename)
+    }
+
+    func importImageAttachment(fileURL: URL) throws -> VaultImageAttachment {
+        try VaultImageAttachmentStore(vaultRootURL: vaultRootURL)
+            .importImageFile(at: fileURL)
     }
 
     func vaultRelativePath(for fileURL: URL) -> String? {
@@ -300,7 +481,8 @@ final class MarkdownNoteStore {
         let noteStore = MarkdownNoteStore(
             directoryURL: fileURL.deletingLastPathComponent(),
             vaultRootURL: vaultRootURL,
-            autoload: false
+            autoload: false,
+            directoryLoader: directoryLoader
         )
         return (noteStore, note)
     }
@@ -315,11 +497,19 @@ final class MarkdownNoteStore {
                 return nil
             }
 
+            // Read only the frontmatter prefix to find the matching ID — reading
+            // every full file on the main thread can stall for seconds on large
+            // or iCloud-backed vaults and trip the iOS watchdog.
+            let frontmatterByteLimit = 64 * 1024
             for case let fileURL as URL in enumerator {
                 let normalizedURL = fileURL.standardizedFileURL
                 guard normalizedURL.pathExtension.localizedCaseInsensitiveCompare("md") == .orderedSame,
-                      let content = CoordinatedFileManager.readString(from: normalizedURL),
-                      MarkdownNote.idFromFrontmatter(content) == noteID else {
+                      let prefixData = CoordinatedFileManager.readPrefix(from: normalizedURL, maxBytes: frontmatterByteLimit) else {
+                    continue
+                }
+                let prefix = String(decoding: prefixData, as: UTF8.self)
+                guard MarkdownNote.idFromFrontmatter(prefix) == noteID,
+                      let content = CoordinatedFileManager.readString(from: normalizedURL) else {
                     continue
                 }
 
@@ -334,7 +524,8 @@ final class MarkdownNoteStore {
                 let noteStore = MarkdownNoteStore(
                     directoryURL: normalizedURL.deletingLastPathComponent(),
                     vaultRootURL: vaultRootURL,
-                    autoload: false
+                    autoload: false,
+                    directoryLoader: directoryLoader
                 )
                 return (noteStore, note)
             }
@@ -398,17 +589,30 @@ final class MarkdownNoteStore {
 
     @discardableResult
     func updateTitleFromContent(_ content: String, for note: MarkdownNote) -> MarkdownNote {
+        updateMetadataFromContent(content, for: note)
+    }
+
+    @discardableResult
+    func updateMetadataFromContent(_ content: String, for note: MarkdownNote) -> MarkdownNote {
         let newTitle = MarkdownNote.titleFrom(content)
-        guard newTitle != note.title else { return note }
+        let newID = MarkdownNote.idFromFrontmatter(content) ?? note.id
+        guard newTitle != note.title || newID != note.id else { return note }
 
         let updated = MarkdownNote(
-            id: note.id,
+            id: newID,
             fileURL: note.fileURL,
             title: newTitle,
             modifiedDate: note.modifiedDate
         )
 
-        if let idx = items.firstIndex(where: { $0.id == note.id }) {
+        if let idx = items.firstIndex(where: { item in
+            switch item {
+            case .note(let candidate):
+                candidate.id == note.id || candidate.fileURL.standardizedFileURL == note.fileURL.standardizedFileURL
+            case .folder:
+                false
+            }
+        }) {
             items[idx] = .note(updated)
         }
 

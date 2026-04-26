@@ -43,6 +43,22 @@ enum CoordinatedFileManager {
         return result
     }
 
+    /// Reads the full contents of a file using coordinated access.
+    static func readData(from url: URL) -> Data? {
+        var result: Data?
+        var coordinationError: NSError?
+        let coordinator = NSFileCoordinator()
+
+        coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
+            result = try? Data(contentsOf: coordinatedURL)
+        }
+
+        if let error = coordinationError {
+            logger.error("Coordinated data read failed for \(url.lastPathComponent): \(error)")
+        }
+        return result
+    }
+
     // MARK: - Write
 
     /// Writes a string to a file using coordinated access.
@@ -73,6 +89,34 @@ enum CoordinatedFileManager {
         }
         if let writeErrorDescription {
             DebugTrace.record("coord write writeError file=\(url.lastPathComponent) error=\(writeErrorDescription)")
+        }
+        return success
+    }
+
+    /// Writes data to a file using coordinated access.
+    @discardableResult
+    static func writeData(_ data: Data, to url: URL) -> Bool {
+        var success = false
+        var coordinationError: NSError?
+        var writeErrorDescription: String?
+        let coordinator = NSFileCoordinator()
+
+        coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { coordinatedURL in
+            do {
+                try data.write(to: coordinatedURL, options: [])
+                success = true
+            } catch {
+                logger.error("Data write failed for \(url.lastPathComponent): \(error)")
+                writeErrorDescription = String(describing: error)
+            }
+        }
+
+        if let error = coordinationError {
+            logger.error("Coordinated data write failed for \(url.lastPathComponent): \(error)")
+            DebugTrace.record("coord data write coordinationError file=\(url.lastPathComponent) error=\(String(describing: error))")
+        }
+        if let writeErrorDescription {
+            DebugTrace.record("coord data write writeError file=\(url.lastPathComponent) error=\(writeErrorDescription)")
         }
         return success
     }

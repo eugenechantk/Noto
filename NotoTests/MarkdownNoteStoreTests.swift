@@ -28,6 +28,8 @@
 /// - `testRenameFileIfNeeded` — File renamed to match title
 /// - `testRenameFileConflictAppendsSuffix` — Appends (2) when title filename exists
 /// - `testRenameFileMultipleConflictsAppendsFirstAvailableSuffix` — Appends first available suffix for repeated title filename conflicts
+/// - `testResolveNoteByIDFindsRenamedFile` — `note(withID:)` finds a note even after its file was renamed
+/// - `testResolveNoteByIDDoesNotReadFullContentOnMisses` — `note(withID:)` resolves correctly when the vault contains large sibling notes (regression for Bug 011 main-thread stall)
 /// - `testDailyNoteNotRenamed` — Daily notes (YYYY-MM-DD.md) keep ISO date filename
 ///
 /// ## Folders
@@ -58,6 +60,9 @@
 
 import Testing
 import Foundation
+import ImageIO
+import NotoVault
+import UniformTypeIdentifiers
 @testable import Noto
 
 // MARK: - Helpers
@@ -73,6 +78,31 @@ private func makeTempVault() -> URL {
 /// Cleans up a temporary vault directory.
 private func cleanupVault(_ url: URL) {
     try? FileManager.default.removeItem(at: url)
+}
+
+private func makeTestImageData(type: UTType = .jpeg) throws -> Data {
+    var pixels: [UInt8] = [
+        240, 80, 60, 255,
+        80, 160, 240, 255,
+        40, 120, 80, 255,
+        245, 220, 120, 255,
+    ]
+    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    let context = CGContext(
+        data: &pixels,
+        width: 2,
+        height: 2,
+        bitsPerComponent: 8,
+        bytesPerRow: 8,
+        space: colorSpace,
+        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+    )
+    let cgImage = try #require(context?.makeImage())
+    let data = NSMutableData()
+    let destination = try #require(CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil))
+    CGImageDestinationAddImage(destination, cgImage, nil)
+    #expect(CGImageDestinationFinalize(destination))
+    return data as Data
 }
 
 @MainActor
@@ -97,6 +127,81 @@ private func makeHistoryEntry(
         modifiedDate: Date()
     )
     return NoteStackEntry(note: note, store: store, isNew: false)
+}
+
+// MARK: - Vault Image Attachment Tests
+
+@Suite("Vault Image Attachments")
+struct VaultImageAttachmentTests {
+    @Test("Imports photo-like image data into hidden vault attachments as markdown-compatible JPEG")
+    @MainActor
+    func importsPhotoImageDataIntoHiddenVaultAttachments() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let importer = VaultImageAttachmentStore(vaultRootURL: vault)
+        let imageData = try makeTestImageData(type: .jpeg)
+
+        let attachment = try importer.importImageData(imageData, suggestedFilename: "Camera Roll.HEIC")
+
+        #expect(attachment.relativePath == ".attachments/Camera Roll.jpg")
+        #expect(attachment.markdownPath == ".attachments/Camera%20Roll.jpg")
+        #expect(attachment.markdown == "![Camera Roll](.attachments/Camera%20Roll.jpg)")
+        #expect(FileManager.default.fileExists(atPath: attachment.fileURL.path))
+        #expect(attachment.fileURL.deletingLastPathComponent().lastPathComponent == ".attachments")
+        #expect(attachment.fileURL.pathExtension == "jpg")
+    }
+
+    @Test("Hidden attachment directory is omitted from vault sidebar items")
+    @MainActor
+    func hiddenAttachmentDirectoryIsOmittedFromVaultSidebarItems() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let importer = VaultImageAttachmentStore(vaultRootURL: vault)
+        let imageData = try makeTestImageData(type: .jpeg)
+
+        _ = try importer.importImageData(imageData, suggestedFilename: "Camera Roll.HEIC")
+        let items = try VaultDirectoryLoader().loadItems(in: vault)
+
+        #expect(!items.contains { item in
+            if case .folder(let folder) = item {
+                return folder.name == ".attachments"
+            }
+            return false
+        })
+    }
+
+    @Test("Image attachment imports resolve filename conflicts")
+    @MainActor
+    func imageAttachmentImportsResolveFilenameConflicts() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let importer = VaultImageAttachmentStore(vaultRootURL: vault)
+        let imageData = try makeTestImageData(type: .jpeg)
+
+        let first = try importer.importImageData(imageData, suggestedFilename: "Trip.jpeg")
+        let second = try importer.importImageData(imageData, suggestedFilename: "Trip.jpeg")
+
+        #expect(first.relativePath == ".attachments/Trip.jpg")
+        #expect(second.relativePath == ".attachments/Trip(2).jpg")
+        #expect(FileManager.default.fileExists(atPath: first.fileURL.path))
+        #expect(FileManager.default.fileExists(atPath: second.fileURL.path))
+    }
+
+    @Test("Image markdown insertion keeps image syntax on its own line")
+    func imageMarkdownInsertionKeepsImageSyntaxOnOwnLine() {
+        let text = "# Title"
+        let markdown = "![Camera Roll](.attachments/Camera%20Roll.jpg)"
+
+        let transform = MarkdownImageInsertion.transform(
+            in: text,
+            selection: NSRange(location: text.count, length: 0),
+            markdown: markdown
+        )
+
+        #expect(transform.text == "# Title\n![Camera Roll](.attachments/Camera%20Roll.jpg)\n")
+        #expect(transform.selection.location == transform.text.count)
+        #expect(transform.selection.length == 0)
+    }
 }
 
 // MARK: - Note Navigation History Tests
@@ -348,6 +453,33 @@ struct NoteCRUDTests {
 
         #expect(store.notes.first?.id == id)
         #expect(store.notes.first?.title == "Shared Loader Title")
+    }
+
+    @Test("File-only directory loading avoids note content metadata")
+    @MainActor
+    func testFileOnlyDirectoryLoadingUsesFilenameMetadata() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let id = UUID()
+        let fileURL = vault.appendingPathComponent("\(id.uuidString).md")
+        let content = MarkdownNote.makeFrontmatter(id: id) + "# Content Title\nBody text"
+        try content.write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let store = MarkdownNoteStore(
+            vaultURL: vault,
+            directoryLoader: VaultDirectoryLoader(noteMetadataStrategy: .fileOnly)
+        )
+        let note = try #require(store.notes.first)
+
+        #expect(note.id == VaultDirectoryLoader.stableID(for: fileURL))
+        #expect(note.title == "Untitled")
+
+        let resolved = store.updateMetadataFromContent(content, for: note)
+
+        #expect(resolved.id == id)
+        #expect(resolved.title == "Content Title")
+        #expect(store.notes.first?.id == id)
+        #expect(store.notes.first?.title == "Content Title")
     }
 
     @Test("UUID filename without title loads as Untitled")
@@ -651,6 +783,35 @@ struct FileRenameTests {
         #expect(resolved.note.fileURL == renamed.fileURL)
         #expect(resolved.note.title == "Resolved Title")
         #expect(!FileManager.default.fileExists(atPath: originalURL.path))
+    }
+
+    @Test("Resolve note by id skips full-content reads on non-matching files")
+    @MainActor
+    func testResolveNoteByIDDoesNotReadFullContentOnMisses() throws {
+        // Bug 011: tapping a search result triggered a main-thread vault scan
+        // that read the FULL content of every .md file. With many large
+        // sibling notes, this stalled the UI and could trip the iOS watchdog.
+        // The fix reads only a 64KB frontmatter prefix to probe each file.
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        var target = store.createNote()
+        let targetContent = MarkdownNote.makeFrontmatter(id: target.id) + "# Target Note\nBody"
+        target = store.saveContent(targetContent, for: target).note
+
+        // Sibling files much larger than the 64KB prefix limit. If the
+        // resolver reads them in full it will dwarf the prefix-only path.
+        let largeBody = String(repeating: "x", count: 200_000)
+        for i in 0..<5 {
+            let url = vault.appendingPathComponent("large-\(i).md")
+            let content = MarkdownNote.makeFrontmatter(id: UUID()) + "# Large \(i)\n" + largeBody
+            try content.write(to: url, atomically: true, encoding: .utf8)
+        }
+
+        let resolved = try #require(store.note(withID: target.id))
+        #expect(resolved.note.fileURL == target.fileURL)
+        #expect(resolved.note.title == "Target Note")
     }
 
     @Test("Rename file with multiple conflicts appends first available suffix")

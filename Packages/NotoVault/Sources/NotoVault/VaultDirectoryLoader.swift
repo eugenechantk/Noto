@@ -1,12 +1,23 @@
 import Foundation
 
 public struct VaultDirectoryLoader: Sendable {
+    public enum NoteMetadataStrategy: Equatable, Sendable {
+        case resolveFromContent
+        case fileOnly
+    }
+
     private static let maxFrontmatterBytes = 64 * 1024
+    private static let legacyAttachmentDirectoryName = "Attachments"
 
     private let titleResolver: NoteTitleResolver
+    private let noteMetadataStrategy: NoteMetadataStrategy
 
-    public init(titleResolver: NoteTitleResolver = NoteTitleResolver()) {
+    public init(
+        titleResolver: NoteTitleResolver = NoteTitleResolver(),
+        noteMetadataStrategy: NoteMetadataStrategy = .resolveFromContent
+    ) {
         self.titleResolver = titleResolver
+        self.noteMetadataStrategy = noteMetadataStrategy
     }
 
     public func loadItems(in directoryURL: URL) throws -> [VaultListItem] {
@@ -27,6 +38,7 @@ public struct VaultDirectoryLoader: Sendable {
             let normalizedURL = childURL.standardizedFileURL
 
             if values.isDirectory == true {
+                guard !Self.isHiddenAttachmentDirectory(normalizedURL) else { continue }
                 let contentCount = folderContentsCount(in: normalizedURL)
                 folders.append(FolderSummary(
                     id: Self.stableID(for: normalizedURL),
@@ -65,12 +77,17 @@ public struct VaultDirectoryLoader: Sendable {
                 continue
             }
             if values.isDirectory == true {
+                guard !Self.isHiddenAttachmentDirectory(childURL) else { continue }
                 folderCount += 1
             } else if childURL.pathExtension.localizedCaseInsensitiveCompare("md") == .orderedSame {
                 itemCount += 1
             }
         }
         return (folderCount, itemCount)
+    }
+
+    private static func isHiddenAttachmentDirectory(_ url: URL) -> Bool {
+        url.lastPathComponent == legacyAttachmentDirectoryName
     }
 
     public static func stableID(for url: URL) -> UUID {
@@ -81,6 +98,15 @@ public struct VaultDirectoryLoader: Sendable {
 
     private func noteSummary(at url: URL, modifiedAt: Date) -> NoteSummary {
         let fallbackTitle = titleResolver.fallbackTitle(for: url)
+        if noteMetadataStrategy == .fileOnly {
+            return NoteSummary(
+                id: Self.stableID(for: url),
+                fileURL: url,
+                title: fallbackTitle,
+                modifiedDate: modifiedAt
+            )
+        }
+
         guard let markdown = MarkdownPrefixReader.readPrefix(from: url, maxBytes: Self.maxFrontmatterBytes) else {
             return NoteSummary(
                 id: Self.stableID(for: url),

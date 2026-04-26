@@ -63,6 +63,32 @@ struct VaultDirectoryLoaderTests {
     }
 
     @Test
+    func fileOnlyMetadataUsesFilenameWithoutReadingNoteContent() throws {
+        let noteID = "F28A576E-2004-4FBF-81C6-8F41DD03737C"
+        let root = try makeVault { root in
+            let noteURL = root.appendingPathComponent("Capture Title.md")
+            let markdown = """
+            ---
+            id: \(noteID)
+            ---
+
+            # Content Title
+            """
+            try markdown.write(to: noteURL, atomically: true, encoding: .utf8)
+        }
+
+        let items = try VaultDirectoryLoader(noteMetadataStrategy: .fileOnly)
+            .loadItems(in: root)
+
+        guard case .note(let note) = items.first else {
+            Issue.record("Expected a note")
+            return
+        }
+        #expect(note.title == "Capture Title")
+        #expect(note.id == VaultDirectoryLoader.stableID(for: note.fileURL))
+    }
+
+    @Test
     func uuidNoteWithoutTitleDisplaysUntitled() throws {
         let root = try makeVault { root in
             let noteURL = root.appendingPathComponent("F28A576E-2004-4FBF-81C6-8F41DD03737C.md")
@@ -99,6 +125,35 @@ struct VaultDirectoryLoaderTests {
         #expect(folder.name == "Projects")
         #expect(folder.folderCount == 2)
         #expect(folder.itemCount == 2)
+    }
+
+    @Test
+    func legacyAttachmentsFolderIsHiddenFromSidebarItemsAndCounts() throws {
+        let root = try makeVault { root in
+            try makeFolder(root.appendingPathComponent("Attachments"))
+            let projects = root.appendingPathComponent("Projects")
+            try makeFolder(projects)
+            try makeFolder(projects.appendingPathComponent("Attachments"))
+            try makeFolder(projects.appendingPathComponent("Drafts"))
+            try "# Brief".write(to: projects.appendingPathComponent("Brief.md"), atomically: true, encoding: .utf8)
+        }
+
+        let items = try VaultDirectoryLoader().loadItems(in: root)
+
+        #expect(!items.contains { item in
+            if case .folder(let folder) = item {
+                return folder.name == "Attachments"
+            }
+            return false
+        })
+
+        guard case .folder(let folder) = items.first else {
+            Issue.record("Expected Projects folder")
+            return
+        }
+        #expect(folder.name == "Projects")
+        #expect(folder.folderCount == 1)
+        #expect(folder.itemCount == 1)
     }
 
     private func makeVault(_ build: (URL) throws -> Void) throws -> URL {
