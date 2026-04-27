@@ -232,7 +232,7 @@ sequenceDiagram
     Session->>FS: detached coordinated read
     alt readable
         FS-->>Session: markdown content
-        Session->>Session: applyLoadedContent; update title metadata
+        Session->>Session: applyLoadedContent and update title metadata
         Session-->>Content: content, hasLoaded=true
         Content->>TextKit: bind text + callbacks
     else iCloud needs download
@@ -263,7 +263,7 @@ sequenceDiagram
     TextKit->>TextKit: update TextKit text, markdown attributes, overlays
     TextKit->>Coord: updateText(newText)
     Coord->>Session: onTextChange -> handleEditorChange(newText)
-    Session->>Session: content/latestEditorText updated; pendingLocalEdits=true
+    Session->>Session: update content/latestEditorText and set pendingLocalEdits
     Session->>Store: updateTitleFromContent()
     Session->>Session: debounce autosave 500ms
     opt title changed
