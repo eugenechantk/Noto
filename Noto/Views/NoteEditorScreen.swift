@@ -31,6 +31,10 @@ struct NoteEditorScreen: View {
     @State private var findNavigationRequest: EditorFindNavigationRequest?
     @State private var findNavigationRequestID = 0
     @State private var wordCountTask: Task<Void, Never>?
+    #if os(iOS)
+    @SceneStorage("noto.editorScrollNotePath") private var persistedScrollNotePath = ""
+    @SceneStorage("noto.editorScrollOffsetY") private var persistedScrollOffsetY = 0.0
+    #endif
     #if os(macOS)
     @State private var hostingWindow: NSWindow?
     #endif
@@ -85,7 +89,10 @@ struct NoteEditorScreen: View {
             findStatus: $findStatus,
             pageMentionProvider: pageMentionDocuments(matching:),
             onOpenDocumentLink: onOpenDocumentLink,
-            onFindNavigate: navigateFind
+            onFindNavigate: navigateFind,
+            scrollRestorationID: session.note.fileURL.path,
+            initialContentOffsetY: initialEditorContentOffsetY,
+            onContentOffsetYChange: persistEditorContentOffsetY
         )
         .background(AppTheme.background)
         #if os(macOS)
@@ -108,9 +115,15 @@ struct NoteEditorScreen: View {
             onCreateRootNote: onCreateRootNote,
             onDeleteRequested: { showDeleteConfirmation = true },
             onSearchRequested: showFind,
+            canNavigateBack: canNavigateBack,
+            canNavigateForward: canNavigateForward,
+            onNavigateBack: onNavigateBack,
+            onNavigateForward: onNavigateForward,
             onDismiss: { dismiss() }
         ))
-        .simultaneousGesture(navigationHistorySwipeGesture)
+        .overlay {
+            navigationHistorySwipeEdges
+        }
         #elseif os(macOS)
         .modifier(EditorNavigationChrome(
             mode: chromeMode,
@@ -221,26 +234,87 @@ struct NoteEditorScreen: View {
         #endif
     }
 
-    #if os(iOS)
-    private var navigationHistorySwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 36, coordinateSpace: .local)
-            .onEnded { value in
-                let horizontalDistance = value.translation.width
-                let verticalDistance = value.translation.height
-                guard abs(horizontalDistance) >= 80,
-                      abs(horizontalDistance) > abs(verticalDistance) * 1.4 else {
-                    return
-                }
+    private var initialEditorContentOffsetY: CGFloat? {
+        #if os(iOS)
+        persistedScrollNotePath == session.note.fileURL.path
+            ? CGFloat(persistedScrollOffsetY)
+            : nil
+        #else
+        nil
+        #endif
+    }
 
-                if horizontalDistance > 0, canNavigateBack {
-                    onNavigateBack?()
-                } else if horizontalDistance < 0, canNavigateForward {
-                    onNavigateForward?()
-                }
+    private func persistEditorContentOffsetY(_ offsetY: CGFloat) {
+        #if os(iOS)
+        persistedScrollNotePath = session.note.fileURL.path
+        persistedScrollOffsetY = Double(offsetY)
+        #endif
+    }
+
+    #if os(iOS)
+    private var navigationHistorySwipeEdges: some View {
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                navigationHistorySwipeEdge(direction: .back, width: edgeSwipeWidth(for: geometry.size.width))
+                Spacer(minLength: 0)
+                navigationHistorySwipeEdge(direction: .forward, width: edgeSwipeWidth(for: geometry.size.width))
             }
+        }
+        .allowsHitTesting(canNavigateBack || canNavigateForward)
+    }
+
+    private func edgeSwipeWidth(for containerWidth: CGFloat) -> CGFloat {
+        min(28, max(20, containerWidth * 0.045))
+    }
+
+    private func navigationHistorySwipeEdge(direction: NavigationHistorySwipeDirection, width: CGFloat) -> some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .frame(width: width)
+            .gesture(
+                DragGesture(minimumDistance: 44, coordinateSpace: .local)
+                    .onEnded { value in
+                        handleNavigationHistoryEdgeSwipe(value, direction: direction)
+                    }
+            )
+            .allowsHitTesting(direction.isAvailable(canNavigateBack: canNavigateBack, canNavigateForward: canNavigateForward))
+    }
+
+    private func handleNavigationHistoryEdgeSwipe(_ value: DragGesture.Value, direction: NavigationHistorySwipeDirection) {
+        let horizontalDistance = value.translation.width
+        let verticalDistance = value.translation.height
+        guard abs(horizontalDistance) >= 96,
+              abs(horizontalDistance) > abs(verticalDistance) * 1.8 else {
+            return
+        }
+
+        switch direction {
+        case .back where horizontalDistance > 0 && canNavigateBack:
+            onNavigateBack?()
+        case .forward where horizontalDistance < 0 && canNavigateForward:
+            onNavigateForward?()
+        default:
+            break
+        }
     }
     #endif
 }
+
+#if os(iOS)
+private enum NavigationHistorySwipeDirection {
+    case back
+    case forward
+
+    func isAvailable(canNavigateBack: Bool, canNavigateForward: Bool) -> Bool {
+        switch self {
+        case .back:
+            canNavigateBack
+        case .forward:
+            canNavigateForward
+        }
+    }
+}
+#endif
 
 #if os(macOS)
 private struct NoteEditorWindowReader: NSViewRepresentable {

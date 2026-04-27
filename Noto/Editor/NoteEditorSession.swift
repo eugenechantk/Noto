@@ -38,42 +38,31 @@ final class NoteEditorSession {
         downloadFailed = false
         isDownloading = false
 
-        // In security-scoped iCloud folders, ubiquitous metadata can lag behind
-        // actual file availability. Prefer a real coordinated read first.
-        if let readableContent = CoordinatedFileManager.readString(from: note.fileURL) {
-            DebugTrace.record("editor load readable note=\(note.fileURL.lastPathComponent)")
+        let fileURL = note.fileURL
+        switch await Self.loadReadableContent(from: fileURL) {
+        case .readable(let readableContent):
+            DebugTrace.record("editor load readable note=\(fileURL.lastPathComponent)")
             applyLoadedContent(readableContent)
             hasLoaded = true
-            return
-        }
-
-        guard !CoordinatedFileManager.isDownloaded(at: note.fileURL) else {
+        case .unreadableCurrent:
             DebugTrace.record("editor load unreadable-current note=\(note.fileURL.lastPathComponent)")
             downloadFailed = true
-            return
-        }
+        case .needsDownload:
+            isDownloading = true
+            let downloadedContent = await Self.downloadReadableContent(from: fileURL)
+            guard !Task.isCancelled else { return }
 
-        isDownloading = true
-        CoordinatedFileManager.startDownloading(at: note.fileURL)
-        let deadline = Date().addingTimeInterval(30)
-
-        while Date() <= deadline {
-            if Task.isCancelled { return }
-
-            if let readableContent = CoordinatedFileManager.readString(from: note.fileURL) {
-                DebugTrace.record("editor load downloaded note=\(note.fileURL.lastPathComponent)")
-                applyLoadedContent(readableContent)
+            if let downloadedContent {
+                DebugTrace.record("editor load downloaded note=\(fileURL.lastPathComponent)")
+                applyLoadedContent(downloadedContent)
                 hasLoaded = true
                 isDownloading = false
-                return
+            } else {
+                DebugTrace.record("editor load download-timeout note=\(fileURL.lastPathComponent)")
+                downloadFailed = true
+                isDownloading = false
             }
-
-            try? await Task.sleep(for: .milliseconds(500))
         }
-
-        DebugTrace.record("editor load download-timeout note=\(note.fileURL.lastPathComponent)")
-        downloadFailed = true
-        isDownloading = false
     }
 
     func handleEditorChange(_ newText: String) {
@@ -240,5 +229,55 @@ final class NoteEditorSession {
         DebugTrace.record("editor remote applied note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(snapshot.text))")
         pendingRemoteSnapshot = nil
         applyLoadedContent(snapshot.text)
+    }
+}
+
+private extension NoteEditorSession {
+    enum ContentLoadProbe: Sendable {
+        case readable(String)
+        case unreadableCurrent
+        case needsDownload
+    }
+
+    static nonisolated func loadReadableContent(from fileURL: URL) async -> ContentLoadProbe {
+        let task = Task<ContentLoadProbe, Never>.detached(priority: .userInitiated) {
+            // In security-scoped iCloud folders, ubiquitous metadata can lag
+            // behind actual file availability. Prefer a real read first.
+            if let readableContent = CoordinatedFileManager.readString(from: fileURL) {
+                return ContentLoadProbe.readable(readableContent)
+            }
+            return CoordinatedFileManager.isDownloaded(at: fileURL)
+                ? ContentLoadProbe.unreadableCurrent
+                : ContentLoadProbe.needsDownload
+        }
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    static nonisolated func downloadReadableContent(from fileURL: URL) async -> String? {
+        let task = Task<String?, Never>.detached(priority: .userInitiated) {
+            CoordinatedFileManager.startDownloading(at: fileURL)
+            let deadline = Date().addingTimeInterval(30)
+
+            while Date() <= deadline {
+                if Task.isCancelled { return nil }
+
+                if let readableContent = CoordinatedFileManager.readString(from: fileURL) {
+                    return readableContent
+                }
+
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+
+            return nil
+        }
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 }

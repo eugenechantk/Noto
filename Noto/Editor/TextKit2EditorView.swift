@@ -1400,11 +1400,70 @@ final class ImageLayoutFragment: NSTextLayoutFragment {
 
     override func draw(at point: CGPoint, in context: CGContext) {
         super.draw(at: point, in: context)
-        // Visuals (placeholder background + loaded image) are rendered by a
-        // CALayer-backed overlay view managed by the editor view controller.
-        // This fragment exists only to reserve the right amount of vertical
-        // space via `layoutFragmentFrame`.
+        #if os(macOS)
+        drawMacImagePreview(at: point, in: context)
+        #endif
     }
+
+    #if os(macOS)
+    private func drawMacImagePreview(at point: CGPoint, in context: CGContext) {
+        guard let paragraph = textElement as? MarkdownParagraph,
+              case .imageLink(let imageLink) = paragraph.blockKind else {
+            return
+        }
+
+        let previewRect = ImageFragmentGeometry.imageRect(
+            fragmentFrame: layoutFragmentFrame,
+            point: point,
+            availableContentWidth: availableImageContentWidth()
+        )
+        guard previewRect.width > 0,
+              previewRect.height > 0,
+              previewRect.origin.x.isFinite,
+              previewRect.origin.y.isFinite,
+              previewRect.size.width.isFinite,
+              previewRect.size.height.isFinite else {
+            return
+        }
+
+        context.saveGState()
+        let backgroundPath = CGPath(
+            roundedRect: previewRect,
+            cornerWidth: MarkdownVisualSpec.imagePreviewCornerRadius,
+            cornerHeight: MarkdownVisualSpec.imagePreviewCornerRadius,
+            transform: nil
+        )
+        context.addPath(backgroundPath)
+        context.setFillColor(AppTheme.nsCodeBackground.cgColor)
+        context.fillPath()
+        context.restoreGState()
+
+        guard let url = imageLink.url else { return }
+
+        let maxPixel = ceil(max(previewRect.width, previewRect.height) * 2)
+        guard let image = MarkdownImageLoader.cachedDisplayImage(for: url, maxPixelSize: maxPixel) else {
+            return
+        }
+
+        let imageRect = ImageFragmentGeometry.aspectFitRect(
+            imageSize: image.size,
+            in: previewRect
+        ).integral
+        guard imageRect.width > 0, imageRect.height > 0 else { return }
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+        image.draw(
+            in: imageRect,
+            from: NSRect(origin: .zero, size: image.size),
+            operation: .sourceOver,
+            fraction: 1,
+            respectFlipped: true,
+            hints: [.interpolation: NSImageInterpolation.high]
+        )
+        NSGraphicsContext.restoreGraphicsState()
+    }
+    #endif
 
     private func aspectAdjustedHeight() -> CGFloat? {
         let containerWidth = availableImageContentWidth() ?? 0
@@ -2133,6 +2192,9 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     var findNavigationRequest: EditorFindNavigationRequest?
     var onFindStatusChange: ((EditorFindStatus) -> Void)?
     var onCloseFind: (() -> Void)?
+    var scrollRestorationID: String?
+    var initialContentOffsetY: CGFloat?
+    var onContentOffsetYChange: ((CGFloat) -> Void)?
 
     func makeCoordinator() -> TextKit2EditorCoordinator {
         TextKit2EditorCoordinator(text: $text, onTextChange: onTextChange, autoFocus: autoFocus)
@@ -2147,12 +2209,14 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
         vc.onOpenDocumentLink = onOpenDocumentLink
         vc.isFindVisible = isFindVisible
         vc.onCloseFind = onCloseFind
+        vc.onContentOffsetYChange = onContentOffsetYChange
         vc.updateFind(
             query: findQuery,
             navigationRequest: findNavigationRequest,
             onStatusChange: onFindStatusChange
         )
         vc.loadText(text)
+        vc.restoreInitialContentOffsetIfNeeded(id: scrollRestorationID, offsetY: initialContentOffsetY)
         return vc
     }
 
@@ -2163,17 +2227,19 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
         vc.onOpenDocumentLink = onOpenDocumentLink
         vc.isFindVisible = isFindVisible
         vc.onCloseFind = onCloseFind
+        vc.onContentOffsetYChange = onContentOffsetYChange
         vc.updateFind(
             query: findQuery,
             navigationRequest: findNavigationRequest,
             onStatusChange: onFindStatusChange
         )
-        guard !context.coordinator.isUpdatingText else { return }
-        guard !vc.textView.isFirstResponder else { return }
-        let currentText = vc.textView.text ?? ""
-        if currentText != text {
-            vc.loadText(text)
+        if !context.coordinator.isUpdatingText, !vc.textView.isFirstResponder {
+            let currentText = vc.textView.text ?? ""
+            if currentText != text {
+                vc.loadText(text, preservingVisiblePosition: true)
+            }
         }
+        vc.restoreInitialContentOffsetIfNeeded(id: scrollRestorationID, offsetY: initialContentOffsetY)
     }
 }
 
@@ -2191,6 +2257,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     var onOpenDocumentLink: ((String) -> Void)?
     var isFindVisible = false
     var onCloseFind: (() -> Void)?
+    var onContentOffsetYChange: ((CGFloat) -> Void)?
     private(set) var textView: UITextView!
     private let minimumHorizontalTextInset: CGFloat = 16
     private let maximumTextWidth: CGFloat = 600
@@ -2198,6 +2265,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private let markdownDelegate = MarkdownTextDelegate()
     private var todoMarkerButtons: [Int: TodoMarkerButton] = [:]
     private var pendingText: String?
+    private var pendingTextPreservesVisiblePosition = false
     private var pageMentionSuggestionView: UIStackView?
     private var pageMentionSuggestionDocuments: [PageMentionDocument] = []
     private var selectedPageMentionSuggestionIndex = 0
@@ -2214,7 +2282,11 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var isImageLayoutInvalidationScheduled = false
     private var lastOverlayLayoutSize: CGSize = .zero
     private var keyboardObserverTokens: [NSObjectProtocol] = []
+    private var appLifecycleObserverTokens: [NSObjectProtocol] = []
     private var keyboardFrameInScreen: CGRect?
+    private var lifecycleContentOffset: CGPoint?
+    private var currentScrollRestorationID: String?
+    private var didRestoreInitialContentOffset = false
     private var loadingImageURLs: Set<URL> = []
     private var cachedRenderableBlocks: [MarkdownRenderableBlock] = []
     private var cachedRenderableBlocksText = ""
@@ -2281,23 +2353,28 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         ])
 
         if let pendingText {
-            applyText(pendingText)
+            applyText(pendingText, preservingVisiblePosition: pendingTextPreservesVisiblePosition)
             self.pendingText = nil
+            pendingTextPreservesVisiblePosition = false
         }
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         startKeyboardObservation()
+        startAppLifecycleObservation()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         stopKeyboardObservation()
+        rememberCurrentContentOffset()
+        stopAppLifecycleObservation()
     }
 
     deinit {
         stopKeyboardObservation()
+        stopAppLifecycleObservation()
     }
 
     override func viewDidLayoutSubviews() {
@@ -2394,15 +2471,17 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         onCloseFind?()
     }
 
-    func loadText(_ markdown: String) {
+    func loadText(_ markdown: String, preservingVisiblePosition: Bool = false) {
         guard isViewLoaded, textView != nil else {
             pendingText = markdown
+            pendingTextPreservesVisiblePosition = preservingVisiblePosition
             return
         }
-        applyText(markdown)
+        applyText(markdown, preservingVisiblePosition: preservingVisiblePosition)
     }
 
-    private func applyText(_ markdown: String) {
+    private func applyText(_ markdown: String, preservingVisiblePosition: Bool = false) {
+        let contentOffsetToRestore = preservingVisiblePosition ? textView.contentOffset : nil
         markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: markdown)
         coordinator?.beginApplyingEditorText(markdown)
         textView.text = markdown
@@ -2422,6 +2501,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         }
         scheduleEditorOverlayRefresh()
         updatePageMentionSuggestions()
+        if let contentOffsetToRestore {
+            restoreContentOffset(contentOffsetToRestore)
+        }
     }
 
     private func makeInputAccessoryView() -> UIView {
@@ -3504,6 +3586,39 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         keyboardFrameInScreen = nil
     }
 
+    private func startAppLifecycleObservation() {
+        guard appLifecycleObserverTokens.isEmpty else { return }
+
+        let center = NotificationCenter.default
+        appLifecycleObserverTokens.append(center.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.rememberCurrentContentOffset()
+        })
+        appLifecycleObserverTokens.append(center.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, let lifecycleContentOffset else { return }
+            restoreContentOffset(lifecycleContentOffset)
+        })
+    }
+
+    private func stopAppLifecycleObservation() {
+        let center = NotificationCenter.default
+        appLifecycleObserverTokens.forEach { center.removeObserver($0) }
+        appLifecycleObserverTokens.removeAll()
+    }
+
+    private func rememberCurrentContentOffset() {
+        guard isViewLoaded, textView != nil else { return }
+        lifecycleContentOffset = textView.contentOffset
+        onContentOffsetYChange?(textView.contentOffset.y)
+    }
+
     private func handleKeyboardFrameChange(_ notification: Notification) {
         keyboardFrameInScreen = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
         animateKeyboardAvoidance(using: notification)
@@ -3578,6 +3693,46 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         }
     }
 
+    func restoreInitialContentOffsetIfNeeded(id: String?, offsetY: CGFloat?) {
+        if id != currentScrollRestorationID {
+            currentScrollRestorationID = id
+            didRestoreInitialContentOffset = false
+        }
+
+        guard !didRestoreInitialContentOffset,
+              let offsetY,
+              offsetY.isFinite else {
+            return
+        }
+
+        didRestoreInitialContentOffset = true
+        restoreContentOffset(CGPoint(x: 0, y: offsetY))
+    }
+
+    private func restoreContentOffset(_ offset: CGPoint) {
+        guard isViewLoaded, textView != nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.textView != nil else { return }
+            self.textView.layoutIfNeeded()
+            let clampedOffset = self.clampedContentOffset(offset)
+            self.textView.setContentOffset(clampedOffset, animated: false)
+            self.lifecycleContentOffset = clampedOffset
+        }
+    }
+
+    private func clampedContentOffset(_ offset: CGPoint) -> CGPoint {
+        let inset = textView.adjustedContentInset
+        let minX = -inset.left
+        let minY = -inset.top
+        let maxX = max(minX, textView.contentSize.width - textView.bounds.width + inset.right)
+        let maxY = max(minY, textView.contentSize.height - textView.bounds.height + inset.bottom)
+
+        return CGPoint(
+            x: min(max(offset.x, minX), maxX),
+            y: min(max(offset.y, minY), maxY)
+        )
+    }
+
     /// Sets typing attributes to match the current paragraph's block kind,
     /// so newly typed characters inherit the correct font immediately
     /// (before the content-storage delegate re-styles the paragraph).
@@ -3592,6 +3747,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        if scrollView === textView {
+            onContentOffsetYChange?(scrollView.contentOffset.y)
+        }
         refreshTodoMarkerButtons()
         refreshImageOverlayViews()
         refreshFindHighlightOverlays()
@@ -4181,6 +4339,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var boldObserver: NSObjectProtocol?
     private var italicObserver: NSObjectProtocol?
     private var hyperlinkObserver: NSObjectProtocol?
+    private var scrollBoundsObserver: NSObjectProtocol?
     private var revealedHyperlinkRanges: [NSRange] = []
     private var revealedDividerRanges: [NSRange] = []
     private var isRestylingText = false
@@ -4278,6 +4437,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.documentView = textView
+        scrollView.contentView.postsBoundsChangedNotifications = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
 
@@ -4327,6 +4487,14 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         ) { [weak self] notification in
             guard self?.handlesWindowScopedCommand(notification) == true else { return }
             self?.handleHyperlinkCommand()
+        }
+
+        scrollBoundsObserver = NotificationCenter.default.addObserver(
+            forName: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refreshEditorOverlays()
         }
     }
 
@@ -5287,117 +5455,21 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             return
         }
         textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
+        textView.needsDisplay = true
         refreshImageOverlayViews()
     }
 
     private func refreshImageOverlayViews() {
         guard isViewLoaded, textView != nil else { return }
+        clearImageOverlayViews()
+        textView.needsDisplay = true
+    }
 
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.string,
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        )
-        let visibleRect = textView.visibleRect.insetBy(dx: -8, dy: -200)
-        var activeLocations: Set<Int> = []
-
-        for block in blocks {
-            guard case .imageLink(let imageLink) = block.kind,
-                  !block.isCollapsedXMLTagContent,
-                  let rect = imageOverlayRect(for: block),
-                  rect.intersects(visibleRect) else {
-                continue
-            }
-
-            activeLocations.insert(block.paragraphRange.location)
-
-            let view = imageOverlayViews[block.paragraphRange.location] ?? makeImageOverlayView()
-            view.frame = rect.integral
-            applyImage(to: view, imageLink: imageLink, displayRect: rect)
-            if view.superview !== textView {
-                textView.addSubview(view)
-            }
-            imageOverlayViews[block.paragraphRange.location] = view
-        }
-
-        for (location, view) in imageOverlayViews where !activeLocations.contains(location) {
+    private func clearImageOverlayViews() {
+        for (_, view) in imageOverlayViews {
             view.removeFromSuperview()
-            imageOverlayViews.removeValue(forKey: location)
         }
-    }
-
-    private func makeImageOverlayView() -> NSImageView {
-        let view = NSImageView(frame: .zero)
-        view.wantsLayer = true
-        view.layer?.cornerRadius = MarkdownVisualSpec.imagePreviewCornerRadius
-        view.layer?.masksToBounds = true
-        view.layer?.backgroundColor = AppTheme.nsCodeBackground.cgColor
-        view.imageScaling = .scaleProportionallyUpOrDown
-        view.imageAlignment = .alignCenter
-        view.isEditable = false
-        return view
-    }
-
-    private func applyImage(to view: NSImageView, imageLink: MarkdownImageLink, displayRect: CGRect) {
-        guard let url = imageLink.url else {
-            view.image = nil
-            return
-        }
-
-        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
-        let maxPixel = ceil(max(displayRect.width, displayRect.height) * scale)
-        if let displayImage = MarkdownImageLoader.cachedDisplayImage(for: url, maxPixelSize: maxPixel) {
-            if view.image !== displayImage {
-                view.image = displayImage
-            }
-        } else {
-            view.image = nil
-        }
-    }
-
-    private func imageOverlayRect(for block: MarkdownRenderableBlock) -> NSRect? {
-        let screenRect = textView.firstRect(
-            forCharacterRange: NSRange(location: block.visibleLineRange.location, length: 0),
-            actualRange: nil
-        )
-        guard let window = textView.window,
-              isFiniteRect(screenRect) else {
-            return nil
-        }
-
-        let windowRect = window.convertFromScreen(screenRect)
-        let caretRect = textView.convert(windowRect, from: nil)
-        guard isFiniteRect(caretRect) else { return nil }
-
-        let inset = textView.textContainerInset.width
-        let padding = textView.textContainer?.lineFragmentPadding ?? 0
-        let leading = inset + padding
-        let trailing = textView.bounds.width - inset - padding
-        let width = max(0, trailing - leading)
-        guard width > 0 else { return nil }
-
-        let verticalPadding = MarkdownVisualSpec.imagePreviewVerticalPadding
-        let totalHeight: CGFloat
-        if let url = imageLink(in: block)?.url,
-           let imageSize = MarkdownImageDimensionCache.cachedSize(for: url),
-           imageSize.width > 0 {
-            totalHeight = width * (imageSize.height / imageSize.width)
-        } else {
-            totalHeight = max(0, MarkdownVisualSpec.imagePreviewReservedHeight - verticalPadding * 2)
-        }
-
-        return NSRect(
-            x: leading,
-            y: caretRect.minY + verticalPadding,
-            width: width,
-            height: totalHeight
-        )
-    }
-
-    private func imageLink(in block: MarkdownRenderableBlock) -> MarkdownImageLink? {
-        if case .imageLink(let link) = block.kind {
-            return link
-        }
-        return nil
+        imageOverlayViews.removeAll()
     }
 
     private func refreshDividerLineViews() {
@@ -5598,6 +5670,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
         if let hyperlinkObserver {
             NotificationCenter.default.removeObserver(hyperlinkObserver)
+        }
+        if let scrollBoundsObserver {
+            NotificationCenter.default.removeObserver(scrollBoundsObserver)
         }
     }
 }

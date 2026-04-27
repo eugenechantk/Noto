@@ -13,6 +13,10 @@ struct EditorNavigationChrome: ViewModifier {
     var onCreateRootNote: (() -> Void)?
     var onDeleteRequested: () -> Void
     var onSearchRequested: () -> Void
+    var canNavigateBack = false
+    var canNavigateForward = false
+    var onNavigateBack: (() -> Void)?
+    var onNavigateForward: (() -> Void)?
     var onDismiss: () -> Void
 
     private static let countFormatter: NumberFormatter = {
@@ -61,31 +65,55 @@ struct EditorNavigationChrome: ViewModifier {
                         )
                     }
 
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Menu {
-                            Button(action: onSearchRequested) {
-                                Label("Search in Note", systemImage: "magnifyingglass")
+                    ToolbarItemGroup(placement: .navigationBarTrailing) {
+                        if canNavigateBack, let onNavigateBack {
+                            Button {
+                                onNavigateBack()
+                            } label: {
+                                Image(systemName: "chevron.left")
                             }
-                            .keyboardShortcut("f", modifiers: [.command])
-                            .accessibilityIdentifier("search_in_note_menu_item")
-
-                            Divider()
-
-                            Button(role: .destructive, action: onDeleteRequested) {
-                                Label("Delete Note", systemImage: "trash")
-                            }
-                            Divider()
-                            Text("\(formatted(statusCount.words)) words")
-                                .accessibilityIdentifier("editor_word_count_menu_item")
-                            Text("\(formatted(statusCount.characters)) characters")
-                                .accessibilityIdentifier("editor_character_count_menu_item")
-                        } label: {
-                            Image(systemName: "ellipsis")
+                            .accessibilityIdentifier("history_back_button")
+                            .accessibilityLabel("Back")
                         }
-                        .accessibilityIdentifier("more_menu_button")
+
+                        if canNavigateForward, let onNavigateForward {
+                            Button {
+                                onNavigateForward()
+                            } label: {
+                                Image(systemName: "chevron.right")
+                            }
+                            .accessibilityIdentifier("history_forward_button")
+                            .accessibilityLabel("Forward")
+                        }
+
+                        moreMenu
                     }
                 }
             }
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button(action: onSearchRequested) {
+                Label("Search in Note", systemImage: "magnifyingglass")
+            }
+            .keyboardShortcut("f", modifiers: [.command])
+            .accessibilityIdentifier("search_in_note_menu_item")
+
+            Divider()
+
+            Button(role: .destructive, action: onDeleteRequested) {
+                Label("Delete Note", systemImage: "trash")
+            }
+            Divider()
+            Text("\(formatted(statusCount.words)) words")
+                .accessibilityIdentifier("editor_word_count_menu_item")
+            Text("\(formatted(statusCount.characters)) characters")
+                .accessibilityIdentifier("editor_character_count_menu_item")
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .accessibilityIdentifier("more_menu_button")
     }
 
     private var hidesSystemBackButton: Bool {

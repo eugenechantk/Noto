@@ -81,6 +81,32 @@ struct TextKit2EditorLifecycleTests {
     }
 
     @MainActor
+    @Test("External text reload preserves the visible editor offset")
+    func externalTextReloadPreservesVisibleOffset() async throws {
+        let controller = TextKit2EditorViewController()
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 520))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.loadViewIfNeeded()
+
+        let longText = (0..<140).map { "Line \($0)" }.joined(separator: "\n")
+        controller.loadText(longText)
+        controller.view.layoutIfNeeded()
+        controller.textView.layoutIfNeeded()
+
+        let targetOffset = CGPoint(x: 0, y: 420)
+        controller.textView.setContentOffset(targetOffset, animated: false)
+        controller.loadText(longText + "\nRemote edit", preservingVisiblePosition: true)
+
+        await Task.yield()
+        controller.view.layoutIfNeeded()
+        controller.textView.layoutIfNeeded()
+        await Task.yield()
+
+        #expect(abs(controller.textView.contentOffset.y - targetOffset.y) < 1)
+    }
+
+    @MainActor
     @Test("Editor action transforms participate in native undo and redo")
     func editorActionTransformsRegisterUndoAndRedo() {
         let controller = TextKit2EditorViewController()

@@ -14,6 +14,9 @@ struct EditorContentView: View {
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
     var onFindNavigate: (EditorFindNavigationDirection) -> Void
+    var scrollRestorationID: String?
+    var initialContentOffsetY: CGFloat?
+    var onContentOffsetYChange: ((CGFloat) -> Void)?
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -101,7 +104,10 @@ struct EditorContentView: View {
             findQuery: findQuery,
             findNavigationRequest: findNavigationRequest,
             onFindStatusChange: handleFindStatusChange,
-            onCloseFind: closeFind
+            onCloseFind: closeFind,
+            scrollRestorationID: scrollRestorationID,
+            initialContentOffsetY: initialContentOffsetY,
+            onContentOffsetYChange: onContentOffsetYChange
         )
         #elseif os(macOS)
         TextKit2EditorView(

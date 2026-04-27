@@ -66,6 +66,53 @@ struct NoteEditorSessionTests {
         let savedContent = CoordinatedFileManager.readString(from: note.fileURL) ?? ""
         #expect(savedContent.contains("Delayed body"))
     }
+
+    @Test("Load note content reads existing file into session")
+    @MainActor
+    func loadNoteContentReadsExistingFileIntoSession() async {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        var note = store.createNote()
+        let content = MarkdownNote.makeFrontmatter(id: note.id) + "# Loaded Title\nBody"
+        note = store.saveContent(content, for: note).note
+        let session = NoteEditorSession(store: store, note: note)
+
+        await session.loadNoteContent()
+
+        #expect(session.hasLoaded)
+        #expect(!session.isDownloading)
+        #expect(!session.downloadFailed)
+        #expect(session.content == content)
+        #expect(session.latestEditorText == content)
+        #expect(session.lastPersistedText == content)
+        #expect(session.note.title == "Loaded Title")
+    }
+
+    @Test("Load note content marks unreadable current files as failed")
+    @MainActor
+    func loadNoteContentMarksUnreadableCurrentFileAsFailed() async {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        let missingURL = vault.appendingPathComponent("missing.md")
+        let note = MarkdownNote(
+            id: UUID(),
+            fileURL: missingURL,
+            title: "Missing",
+            modifiedDate: Date()
+        )
+        let session = NoteEditorSession(store: store, note: note)
+
+        await session.loadNoteContent()
+
+        #expect(!session.hasLoaded)
+        #expect(!session.isDownloading)
+        #expect(session.downloadFailed)
+        #expect(session.content.isEmpty)
+    }
 }
 
 private func makeTempVault() -> URL {
