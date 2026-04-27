@@ -4,6 +4,17 @@ import NotoSearch
 
 @Suite("MarkdownSearchIndexer")
 struct MarkdownSearchIndexerTests {
+    @Test("Default index directory lives outside the vault")
+    func defaultIndexDirectoryLivesOutsideVault() throws {
+        let vault = try makeTempDirectory("NotoSearchVault")
+        defer { removeDirectory(vault) }
+
+        let indexer = MarkdownSearchIndexer(vaultURL: vault)
+
+        #expect(!indexer.indexDirectory.path.hasPrefix(vault.standardizedFileURL.path))
+        #expect(indexer.indexDirectory.path.contains("SearchIndexes"))
+    }
+
     @Test("Indexer rebuilds fixture vault and ignores hidden .noto files")
     func indexerRebuildsFixtureVault() throws {
         let vault = try makeFixtureVault()
@@ -74,6 +85,49 @@ struct MarkdownSearchIndexerTests {
         #expect(result.deleted == 1)
         #expect(results.first?.fileURL.lastPathComponent == "Renamed Body.md")
         #expect(results.allSatisfy { !$0.fileURL.path.hasSuffix("Body Only.md") })
+    }
+
+    @Test("Single-file refresh indexes a new note immediately")
+    func refreshFileIndexesNewNoteImmediately() throws {
+        let vault = try makeFixtureVault()
+        let indexDirectory = try makeTempDirectory("NotoSearchIndex")
+        defer {
+            removeDirectory(vault)
+            removeDirectory(indexDirectory)
+        }
+
+        let indexer = MarkdownSearchIndexer(vaultURL: vault, indexDirectory: indexDirectory)
+        _ = try indexer.rebuild()
+        let newURL = try writeMarkdown(
+            "# Instant Search\n\nFreshly created comet marker.",
+            to: "Instant Search.md",
+            in: vault
+        )
+
+        _ = try indexer.refreshFile(at: newURL)
+        let engine = MarkdownSearchEngine(store: try indexer.openStore(), vaultURL: vault)
+
+        #expect(try engine.search("comet marker").first?.title == "Instant Search")
+    }
+
+    @Test("Single-file removal deletes a stale note from the index")
+    func removeFileDeletesStaleNote() throws {
+        let vault = try makeFixtureVault()
+        let indexDirectory = try makeTempDirectory("NotoSearchIndex")
+        defer {
+            removeDirectory(vault)
+            removeDirectory(indexDirectory)
+        }
+
+        let indexer = MarkdownSearchIndexer(vaultURL: vault, indexDirectory: indexDirectory)
+        _ = try indexer.rebuild()
+        let deletedURL = vault.appendingPathComponent("Captures/Reader Capture.md")
+        try FileManager.default.removeItem(at: deletedURL)
+
+        _ = try indexer.removeFile(at: deletedURL)
+        let engine = MarkdownSearchEngine(store: try indexer.openStore(), vaultURL: vault)
+
+        #expect(try engine.search("retention loops").isEmpty)
     }
 
     @Test("Rebuild after deleting search.sqlite restores equivalent counts")

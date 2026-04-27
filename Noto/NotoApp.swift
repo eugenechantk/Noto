@@ -121,6 +121,11 @@ struct NotoApp: App {
                 }
                 .keyboardShortcut("i", modifiers: [.command])
 
+                Button("Strikethrough") {
+                    NoteEditorCommands.requestToggleStrikethrough()
+                }
+                .keyboardShortcut("x", modifiers: [.command, .shift])
+
                 Button("Link") {
                     NoteEditorCommands.requestToggleHyperlink()
                 }
@@ -167,6 +172,85 @@ struct NotoApp: App {
     #endif
 }
 
+@MainActor
+final class DailyNotePrewarmer {
+    private let calendar: Calendar
+    private var prewarmTask: Task<Void, Never>?
+    private var midnightTask: Task<Void, Never>?
+    private var lastPrewarmedStartOfDay: Date?
+
+    init(calendar: Calendar = .current) {
+        self.calendar = calendar
+    }
+
+    deinit {
+        prewarmTask?.cancel()
+        midnightTask?.cancel()
+    }
+
+    func start(vaultURL: URL) {
+        prewarmToday(vaultURL: vaultURL)
+        scheduleNextMidnightPrewarm(vaultURL: vaultURL)
+    }
+
+    func stop() {
+        prewarmTask?.cancel()
+        midnightTask?.cancel()
+        prewarmTask = nil
+        midnightTask = nil
+    }
+
+    private func prewarmToday(vaultURL: URL) {
+        let now = Date()
+        let startOfDay = calendar.startOfDay(for: now)
+        guard lastPrewarmedStartOfDay != startOfDay else { return }
+        lastPrewarmedStartOfDay = startOfDay
+
+        prewarmTask?.cancel()
+        let calendar = calendar
+        prewarmTask = Task.detached(priority: .utility) {
+            let resolved = DailyNoteFile.ensure(vaultRootURL: vaultURL, date: now, calendar: calendar)
+            if resolved.didCreate {
+                do {
+                    _ = try await SearchIndexRefreshCoordinator.shared.refreshFile(
+                        vaultURL: vaultURL,
+                        fileURL: resolved.fileURL
+                    )
+                } catch {
+                    DebugTrace.record("daily note prewarm search refresh failed file=\(resolved.fileURL.lastPathComponent) error=\(String(describing: error))")
+                }
+            } else if resolved.didApplyTemplate {
+                await SearchIndexRefreshCoordinator.shared.scheduleRefreshFile(
+                    vaultURL: vaultURL,
+                    fileURL: resolved.fileURL
+                )
+            }
+        }
+    }
+
+    private func scheduleNextMidnightPrewarm(vaultURL: URL) {
+        midnightTask?.cancel()
+        let now = Date()
+        guard let nextStartOfDay = DailyNoteFile.nextStartOfDay(after: now, calendar: calendar) else { return }
+        let delay = max(0, nextStartOfDay.timeIntervalSince(now) + 1)
+        let nanoseconds = UInt64(delay * 1_000_000_000)
+
+        midnightTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: nanoseconds)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self else { return }
+                self.prewarmToday(vaultURL: vaultURL)
+                self.scheduleNextMidnightPrewarm(vaultURL: vaultURL)
+            }
+        }
+    }
+}
+
 /// Wrapper that owns the MarkdownNoteStore for a given vault URL.
 struct MainAppView: View {
     let vaultURL: URL
@@ -174,6 +258,7 @@ struct MainAppView: View {
     @ObservedObject var readwiseSyncController: ReadwiseSyncController
     @State private var store: MarkdownNoteStore
     @State private var fileWatcher = VaultFileWatcher()
+    @State private var dailyNotePrewarmer = DailyNotePrewarmer()
     @Environment(\.scenePhase) private var scenePhase
 
     init(vaultURL: URL, locationManager: VaultLocationManager, readwiseSyncController: ReadwiseSyncController) {
@@ -199,6 +284,7 @@ struct MainAppView: View {
             .tint(AppTheme.primaryText)
             .task {
                 store.loadItemsInBackground()
+                dailyNotePrewarmer.start(vaultURL: vaultURL)
                 readwiseSyncController.refreshSavedTokenState()
                 readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
                 await refreshSearchIndex()
@@ -209,10 +295,13 @@ struct MainAppView: View {
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
                     store.refreshForForegroundActivation()
+                    dailyNotePrewarmer.start(vaultURL: vaultURL)
                     readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
                     Task {
                         await refreshSearchIndex()
                     }
+                } else if newPhase == .background {
+                    dailyNotePrewarmer.stop()
                 }
             }
             .onChange(of: fileWatcher.changeCount) { _, _ in

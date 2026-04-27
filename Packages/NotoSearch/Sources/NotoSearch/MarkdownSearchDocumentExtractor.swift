@@ -9,7 +9,7 @@ public struct MarkdownSearchDocumentExtractor: Sendable {
 
     public func extract(fileURL: URL) throws -> SearchDocument {
         let normalizedFileURL = fileURL.standardizedFileURL
-        let markdown = try String(contentsOf: normalizedFileURL, encoding: .utf8)
+        let markdown = try Self.readMarkdown(from: normalizedFileURL)
         let relativePath = SearchUtilities.relativePath(for: normalizedFileURL, in: vaultURL)
         let parsed = parseFrontmatter(markdown)
         let body = parsed.body
@@ -201,5 +201,23 @@ public struct MarkdownSearchDocumentExtractor: Sendable {
             result = result.replacingOccurrences(of: marker, with: "")
         }
         return result
+    }
+
+    private static func readMarkdown(from url: URL) throws -> String {
+        var result: Result<String, Error>?
+        var coordinationError: NSError?
+        let coordinator = NSFileCoordinator()
+
+        coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
+            result = Result {
+                try String(contentsOf: coordinatedURL, encoding: .utf8)
+            }
+        }
+
+        if let coordinationError {
+            throw coordinationError
+        }
+
+        return try result?.get() ?? String(contentsOf: url, encoding: .utf8)
     }
 }

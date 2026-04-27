@@ -1,5 +1,6 @@
 import Foundation
 import ImageIO
+import NotoSearch
 import NotoVault
 import os.log
 import UniformTypeIdentifiers
@@ -242,6 +243,75 @@ private extension CGImage {
         @unknown default:
             return false
         }
+    }
+}
+
+struct DailyNoteFile {
+    struct Resolution {
+        let dailyFolderURL: URL
+        let fileURL: URL
+        let displayTitle: String
+        let id: UUID
+        let modifiedDate: Date
+        let didCreate: Bool
+        let didApplyTemplate: Bool
+    }
+
+    static func ensure(
+        vaultRootURL: URL,
+        date: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Resolution {
+        let dailyFolderURL = vaultRootURL.appendingPathComponent("Daily Notes")
+        if !FileManager.default.fileExists(atPath: dailyFolderURL.path) {
+            CoordinatedFileManager.createDirectory(at: dailyFolderURL)
+        }
+
+        let isoDate = dateFormatter(format: "yyyy-MM-dd", calendar: calendar).string(from: date)
+        let displayTitle = dateFormatter(format: "dd MMM, yy (EEE)", calendar: calendar).string(from: date)
+        let fileURL = dailyFolderURL.appendingPathComponent("\(isoDate).md")
+
+        var didCreate = false
+        if !FileManager.default.fileExists(atPath: fileURL.path) {
+            let id = UUID()
+            let template = NoteTemplate.dailyNote
+            let content = MarkdownNote.makeFrontmatter(id: id, createdAt: date) + "# \(displayTitle)\n\(template.body)"
+            didCreate = CoordinatedFileManager.writeString(content, to: fileURL)
+        }
+
+        let existingContent = CoordinatedFileManager.readString(from: fileURL) ?? ""
+        let template = NoteTemplate.dailyNote
+        var didApplyTemplate = false
+        if let updated = template.applyRetroactively(to: existingContent) {
+            didApplyTemplate = CoordinatedFileManager.writeString(updated, to: fileURL)
+        }
+
+        let id = MarkdownNote.idFromFrontmatter(existingContent) ?? VaultDirectoryLoader.stableID(for: fileURL)
+        let attrs = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey])
+
+        return Resolution(
+            dailyFolderURL: dailyFolderURL,
+            fileURL: fileURL,
+            displayTitle: displayTitle,
+            id: id,
+            modifiedDate: attrs?.contentModificationDate ?? date,
+            didCreate: didCreate,
+            didApplyTemplate: didApplyTemplate
+        )
+    }
+
+    static func nextStartOfDay(after date: Date = Date(), calendar: Calendar = .current) -> Date? {
+        let startOfDay = calendar.startOfDay(for: date)
+        return calendar.date(byAdding: .day, value: 1, to: startOfDay)
+    }
+
+    private static func dateFormatter(format: String, calendar: Calendar) -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = format
+        return formatter
     }
 }
 
@@ -541,31 +611,32 @@ final class MarkdownNoteStore {
         allowEmptyQuery: Bool = false
     ) -> [PageMentionDocument] {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-
-        let excludedPath = excludedURL?.standardizedFileURL.path
-        let documents = allPageMentionDocuments(excludingPath: excludedPath)
         guard !normalizedQuery.isEmpty else {
-            return allowEmptyQuery ? Array(documents.prefix(limit)) : []
+            guard allowEmptyQuery else { return [] }
+            return Array(allPageMentionDocuments(excludingPath: excludedURL?.standardizedFileURL.path).prefix(limit))
         }
 
+        let excludedPath = excludedURL?.standardizedFileURL.path
+        if let indexedDocuments = indexedPageMentionDocuments(
+            matching: query,
+            excludingPath: excludedPath,
+            limit: limit
+        ) {
+            return indexedDocuments
+        }
+
+        let documents = allPageMentionDocuments(excludingPath: excludedPath)
         return Array(documents
             .filter { document in
-                document.title.lowercased().contains(normalizedQuery) ||
-                    document.relativePath.lowercased().contains(normalizedQuery)
+                document.title.lowercased().contains(normalizedQuery)
             }
             .sorted { lhs, rhs in
                 let lhsTitle = lhs.title.lowercased()
                 let rhsTitle = rhs.title.lowercased()
-                let lhsPath = lhs.relativePath.lowercased()
-                let rhsPath = rhs.relativePath.lowercased()
 
                 let lhsTitlePrefix = lhsTitle.hasPrefix(normalizedQuery)
                 let rhsTitlePrefix = rhsTitle.hasPrefix(normalizedQuery)
                 if lhsTitlePrefix != rhsTitlePrefix { return lhsTitlePrefix }
-
-                let lhsPathPrefix = lhsPath.hasPrefix(normalizedQuery)
-                let rhsPathPrefix = rhsPath.hasPrefix(normalizedQuery)
-                if lhsPathPrefix != rhsPathPrefix { return lhsPathPrefix }
 
                 return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
             }
@@ -578,7 +649,9 @@ final class MarkdownNoteStore {
         let fileURL = directoryURL.appendingPathComponent(filename)
         let initialContent = MarkdownNote.makeFrontmatter(id: id) + "# "
 
-        if !CoordinatedFileManager.writeString(initialContent, to: fileURL) {
+        if CoordinatedFileManager.writeString(initialContent, to: fileURL) {
+            refreshSearchIndexFileImmediately(fileURL)
+        } else {
             logger.error("Failed to create note at \(fileURL.lastPathComponent)")
         }
 
@@ -643,6 +716,7 @@ final class MarkdownNoteStore {
             logger.error("Failed to save note \(note.fileURL.lastPathComponent)")
             return SaveResult(note: note, didWrite: false)
         }
+        scheduleSearchIndexRefresh(for: note.fileURL)
 
         let newTitle = MarkdownNote.titleFrom(content)
 
@@ -695,6 +769,7 @@ final class MarkdownNoteStore {
             items.insert(.note(updated), at: folderCount)
         }
 
+        replaceSearchIndexFile(oldFileURL: note.fileURL, newFileURL: updated.fileURL)
         return updated
     }
 
@@ -714,6 +789,7 @@ final class MarkdownNoteStore {
     func deleteNote(_ note: MarkdownNote) -> Bool {
         if CoordinatedFileManager.delete(at: note.fileURL) || deleteWithoutCoordination(note.fileURL) {
             items.removeAll { $0.id == note.id }
+            removeSearchIndexFile(note.fileURL)
             return true
         }
 
@@ -753,12 +829,14 @@ final class MarkdownNoteStore {
         items.removeAll { $0.id == note.id }
         logger.info("Moved note to \(destURL.path)")
 
-        return MarkdownNote(
+        let moved = MarkdownNote(
             id: note.id,
             fileURL: destURL,
             title: note.title,
             modifiedDate: note.modifiedDate
         )
+        replaceSearchIndexFile(oldFileURL: note.fileURL, newFileURL: moved.fileURL)
+        return moved
     }
 
     /// Moves a folder to a different directory. Creates the destination if needed.
@@ -837,55 +915,21 @@ final class MarkdownNoteStore {
     /// Returns today's note, creating the Daily Notes folder and note file if needed.
     /// Today's note lives at `Daily Notes/YYYY-MM-DD.md`.
     func todayNote() -> (store: MarkdownNoteStore, note: MarkdownNote) {
-        let dailyFolderURL = vaultRootURL.appendingPathComponent("Daily Notes")
-        if !FileManager.default.fileExists(atPath: dailyFolderURL.path) {
-            CoordinatedFileManager.createDirectory(at: dailyFolderURL)
+        let resolved = DailyNoteFile.ensure(vaultRootURL: vaultRootURL)
+        if resolved.didCreate {
+            refreshSearchIndexFileImmediately(resolved.fileURL)
+        } else if resolved.didApplyTemplate {
+            scheduleSearchIndexRefresh(for: resolved.fileURL)
         }
 
-        // Filename uses ISO date for chronological sorting
-        let isoFormatter = DateFormatter()
-        isoFormatter.dateFormat = "yyyy-MM-dd"
-        let isoDate = isoFormatter.string(from: Date())
-        let filename = "\(isoDate).md"
-        let fileURL = dailyFolderURL.appendingPathComponent(filename)
-
-        // Display title: "22 Mar, 26 (Sat)"
-        let displayFormatter = DateFormatter()
-        displayFormatter.dateFormat = "dd MMM, yy (EEE)"
-        let displayDate = displayFormatter.string(from: Date())
-
-        if !FileManager.default.fileExists(atPath: fileURL.path) {
-            let id = UUID()
-            let template = NoteTemplate.dailyNote
-            let content = MarkdownNote.makeFrontmatter(id: id) + "# \(displayDate)\n\(template.body)"
-            CoordinatedFileManager.writeString(content, to: fileURL)
-        }
-
-        // Read existing file content
-        let existingContent = CoordinatedFileManager.readString(from: fileURL) ?? ""
-
-        // Retroactively apply template to pre-existing daily notes that don't have it
-        let template = NoteTemplate.dailyNote
-        if let updated = template.applyRetroactively(to: existingContent) {
-            CoordinatedFileManager.writeString(updated, to: fileURL)
-        }
-
-        // Read ID from frontmatter
-        let id: UUID
-        if let fmId = MarkdownNote.idFromFrontmatter(existingContent) {
-            id = fmId
-        } else {
-            id = VaultDirectoryLoader.stableID(for: fileURL)
-        }
-        let attrs = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey])
         let note = MarkdownNote(
-            id: id,
-            fileURL: fileURL,
-            title: displayDate,
-            modifiedDate: attrs?.contentModificationDate ?? Date()
+            id: resolved.id,
+            fileURL: resolved.fileURL,
+            title: resolved.displayTitle,
+            modifiedDate: resolved.modifiedDate
         )
 
-        let dailyStore = MarkdownNoteStore(directoryURL: dailyFolderURL, vaultRootURL: vaultRootURL)
+        let dailyStore = MarkdownNoteStore(directoryURL: resolved.dailyFolderURL, vaultRootURL: vaultRootURL)
         return (dailyStore, note)
     }
 
@@ -927,6 +971,39 @@ final class MarkdownNoteStore {
 
         return documents.sorted {
             $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+        }
+    }
+
+    private func indexedPageMentionDocuments(
+        matching query: String,
+        excludingPath: String?,
+        limit: Int
+    ) -> [PageMentionDocument]? {
+        let indexer = MarkdownSearchIndexer(vaultURL: vaultRootURL)
+        let databaseURL = indexer.indexDirectory.appendingPathComponent("search.sqlite")
+        guard FileManager.default.fileExists(atPath: databaseURL.path) else {
+            return nil
+        }
+
+        do {
+            let engine = MarkdownSearchEngine(store: try indexer.openStore(), vaultURL: vaultRootURL)
+            let results = try engine.search(query, scope: .title, limit: limit)
+            return results.compactMap { result in
+                let fileURL = result.fileURL.standardizedFileURL
+                guard fileURL.path != excludingPath,
+                      let relativePath = vaultRelativePath(for: fileURL) else {
+                    return nil
+                }
+                return PageMentionDocument(
+                    id: result.noteID,
+                    title: result.title,
+                    relativePath: relativePath,
+                    fileURL: fileURL
+                )
+            }
+        } catch {
+            DebugTrace.record("page mention indexed search failed query=\(query) error=\(String(describing: error))")
+            return nil
         }
     }
 
@@ -980,6 +1057,50 @@ final class MarkdownNoteStore {
 }
 
 private extension MarkdownNoteStore {
+    func refreshSearchIndexFileImmediately(_ fileURL: URL) {
+        let vaultURL = vaultRootURL
+        Task.detached(priority: .utility) {
+            do {
+                _ = try await SearchIndexRefreshCoordinator.shared.refreshFile(vaultURL: vaultURL, fileURL: fileURL)
+            } catch {
+                DebugTrace.record("search index single-file refresh failed file=\(fileURL.lastPathComponent) error=\(String(describing: error))")
+            }
+        }
+    }
+
+    func scheduleSearchIndexRefresh(for fileURL: URL) {
+        let vaultURL = vaultRootURL
+        Task.detached(priority: .utility) {
+            await SearchIndexRefreshCoordinator.shared.scheduleRefreshFile(vaultURL: vaultURL, fileURL: fileURL)
+        }
+    }
+
+    func replaceSearchIndexFile(oldFileURL: URL, newFileURL: URL) {
+        let vaultURL = vaultRootURL
+        Task.detached(priority: .utility) {
+            do {
+                _ = try await SearchIndexRefreshCoordinator.shared.replaceFile(
+                    vaultURL: vaultURL,
+                    oldFileURL: oldFileURL,
+                    newFileURL: newFileURL
+                )
+            } catch {
+                DebugTrace.record("search index file replace failed file=\(newFileURL.lastPathComponent) error=\(String(describing: error))")
+            }
+        }
+    }
+
+    func removeSearchIndexFile(_ fileURL: URL) {
+        let vaultURL = vaultRootURL
+        Task.detached(priority: .utility) {
+            do {
+                _ = try await SearchIndexRefreshCoordinator.shared.removeFile(vaultURL: vaultURL, fileURL: fileURL)
+            } catch {
+                DebugTrace.record("search index file removal failed file=\(fileURL.lastPathComponent) error=\(String(describing: error))")
+            }
+        }
+    }
+
     func deleteWithoutCoordination(_ url: URL) -> Bool {
         guard FileManager.default.fileExists(atPath: url.path) else { return true }
 

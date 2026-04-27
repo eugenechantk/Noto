@@ -61,6 +61,7 @@
 import Testing
 import Foundation
 import ImageIO
+import NotoSearch
 import NotoVault
 import UniformTypeIdentifiers
 @testable import Noto
@@ -376,6 +377,38 @@ struct NoteCRUDTests {
         #expect(documents.first?.relativePath == "Projects/Project Brief.md")
     }
 
+    @Test("Page mention documents use indexed title search when available")
+    @MainActor
+    func pageMentionDocumentsUseIndexedTitleSearchWhenAvailable() throws {
+        let vault = makeTempVault()
+        let indexDirectory = MarkdownSearchIndexer.defaultIndexDirectory(for: vault)
+        defer {
+            cleanupVault(vault)
+            cleanupVault(indexDirectory)
+        }
+        let folder = vault.appendingPathComponent("VaultOnly")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "# Project Brief\nDetails".write(
+            to: folder.appendingPathComponent("Project Brief.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "# Roadmap\nDetails".write(
+            to: folder.appendingPathComponent("No Match.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try MarkdownSearchIndexer(vaultURL: vault).rebuild()
+
+        let store = MarkdownNoteStore(vaultURL: vault)
+        let briefDocuments = store.pageMentionDocuments(matching: "brief", limit: 10)
+        let pathOnlyDocuments = store.pageMentionDocuments(matching: "vaultonly", limit: 10)
+
+        #expect(briefDocuments.map(\.title) == ["Project Brief"])
+        #expect(briefDocuments.first?.relativePath == "VaultOnly/Project Brief.md")
+        #expect(pathOnlyDocuments.isEmpty)
+    }
+
     @Test("Page mention documents require a query before scanning")
     @MainActor
     func pageMentionDocumentsRequireQuery() throws {
@@ -610,6 +643,82 @@ struct DailyNoteTests {
         let (_, note2) = store.todayNote()
 
         #expect(note1.fileURL == note2.fileURL)
+    }
+
+    @Test("Daily note file helper creates the requested date")
+    func testDailyNoteFileCreatesRequestedDate() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let date = try #require(calendar.date(from: DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: 2026,
+            month: 4,
+            day: 27,
+            hour: 10
+        )))
+
+        let resolved = DailyNoteFile.ensure(vaultRootURL: vault, date: date, calendar: calendar)
+        let content = try String(contentsOf: resolved.fileURL, encoding: .utf8)
+
+        #expect(resolved.didCreate)
+        #expect(resolved.fileURL.lastPathComponent == "2026-04-27.md")
+        #expect(content.contains("# 27 Apr, 26 (Mon)"))
+        #expect(content.contains("## What did I do today?"))
+    }
+
+    @Test("Daily note file helper is idempotent for the requested date")
+    func testDailyNoteFileCreationIsIdempotentForRequestedDate() throws {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let date = try #require(calendar.date(from: DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: 2026,
+            month: 4,
+            day: 27,
+            hour: 10
+        )))
+
+        let first = DailyNoteFile.ensure(vaultRootURL: vault, date: date, calendar: calendar)
+        let firstContent = try String(contentsOf: first.fileURL, encoding: .utf8)
+        let second = DailyNoteFile.ensure(vaultRootURL: vault, date: date, calendar: calendar)
+        let secondContent = try String(contentsOf: second.fileURL, encoding: .utf8)
+
+        #expect(first.didCreate)
+        #expect(!second.didCreate)
+        #expect(!second.didApplyTemplate)
+        #expect(first.fileURL == second.fileURL)
+        #expect(firstContent == secondContent)
+    }
+
+    @Test("Daily note next start of day uses the calendar time zone")
+    func testDailyNoteNextStartOfDayUsesCalendarTimeZone() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let date = try #require(calendar.date(from: DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: 2026,
+            month: 4,
+            day: 27,
+            hour: 23,
+            minute: 59,
+            second: 30
+        )))
+        let expected = try #require(calendar.date(from: DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: 2026,
+            month: 4,
+            day: 28
+        )))
+
+        #expect(DailyNoteFile.nextStartOfDay(after: date, calendar: calendar) == expected)
     }
 
     @Test("Foreground refresh does not create today's note")

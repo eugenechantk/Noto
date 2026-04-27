@@ -35,21 +35,19 @@ struct NotoSplitView: View {
         #if os(iOS)
         iOSSplitView
         #else
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            sidebar
-        } detail: {
-            detailView
-                .notoBackgroundExtension()
-        }
-        .navigationSplitViewStyle(.prominentDetail)
-        .navigationTitle("Noto")
-        .sheet(isPresented: $isSearchPresented) {
-            NavigationStack {
-                NoteSearchSheet(rootStore: store) { result in
-                    selectSearchResult(result)
-                }
+        ZStack {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                sidebar
+            } detail: {
+                detailView
+                    .notoBackgroundExtension()
             }
-            .noteSearchSheetPresentationStyle()
+            .navigationSplitViewStyle(.prominentDetail)
+            .navigationTitle("Noto")
+
+            if isSearchPresented {
+                macOSSearchOverlay
+            }
         }
         .background {
             #if os(macOS)
@@ -77,6 +75,30 @@ struct NotoSplitView: View {
         }
         #endif
     }
+
+    #if os(macOS)
+    private var macOSSearchOverlay: some View {
+        ZStack {
+            MacSearchDismissBackdrop {
+                isSearchPresented = false
+            }
+                .ignoresSafeArea()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier("note_search_dismiss_overlay")
+
+            NoteSearchSheet(
+                rootStore: store,
+                onClose: {
+                    isSearchPresented = false
+                }
+            ) { result in
+                selectSearchResult(result)
+            }
+            .transition(.scale(scale: 0.98).combined(with: .opacity))
+        }
+        .zIndex(10)
+    }
+    #endif
 
     private var sidebar: some View {
         NotoSidebarView(
@@ -330,6 +352,7 @@ struct NotoSplitView: View {
     }
 
     private func showSearch() {
+        guard !isSearchPresented else { return }
         #if os(iOS)
         isSearchPresented = true
         #else
@@ -348,10 +371,7 @@ struct NotoSplitView: View {
 
     private var splitEditorLeadingChromeControls: EditorLeadingChromeControls {
         #if os(iOS)
-        EditorLeadingChromeControls(
-            showsBackButton: canNavigateNativeStackBack,
-            onBack: navigateNativeStackBack
-        )
+        .none
         #else
         .none
         #endif
@@ -375,15 +395,6 @@ struct NotoSplitView: View {
     }
 
     #if os(iOS)
-    private var canNavigateNativeStackBack: Bool {
-        !noteStackNavigation.path.isEmpty
-    }
-
-    private func navigateNativeStackBack() {
-        guard canNavigateNativeStackBack else { return }
-        noteStackNavigation.path.removeLast()
-    }
-
     private func createRootNote() {
         let note = store.createNote()
         selectHistoryEntry(NoteStackEntry(note: note, store: store, isNew: true), recordsVisit: true)
@@ -439,6 +450,40 @@ private extension View {
 }
 
 #if os(macOS)
+private struct MacSearchDismissBackdrop: NSViewRepresentable {
+    var onDismiss: () -> Void
+
+    func makeNSView(context: Context) -> DismissBackdropView {
+        let view = DismissBackdropView(frame: .zero)
+        view.onDismiss = onDismiss
+        view.setAccessibilityIdentifier("note_search_dismiss_overlay")
+        return view
+    }
+
+    func updateNSView(_ view: DismissBackdropView, context: Context) {
+        view.onDismiss = onDismiss
+    }
+
+    final class DismissBackdropView: NSView {
+        var onDismiss: (() -> Void)?
+
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            wantsLayer = true
+            layer?.backgroundColor = NSColor.black.withAlphaComponent(0.30).cgColor
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            onDismiss?()
+        }
+    }
+}
+
 private struct WindowReader: NSViewRepresentable {
     @Binding var window: NSWindow?
 

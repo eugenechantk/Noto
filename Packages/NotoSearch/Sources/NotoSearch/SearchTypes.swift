@@ -82,6 +82,18 @@ public struct SearchIndexStats: Sendable, Equatable {
     }
 }
 
+public struct SearchIndexedDocument: Sendable, Equatable {
+    public let document: SearchDocument
+    public let fileModifiedAt: Date
+    public let fileSize: Int
+
+    public init(document: SearchDocument, fileModifiedAt: Date, fileSize: Int) {
+        self.document = document
+        self.fileModifiedAt = fileModifiedAt
+        self.fileSize = fileSize
+    }
+}
+
 public struct SearchIndexRefreshResult: Sendable, Equatable {
     public let scanned: Int
     public let upserted: Int

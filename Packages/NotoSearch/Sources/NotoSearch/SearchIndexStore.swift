@@ -17,6 +17,7 @@ public final class SearchIndexStore {
             let message = pointer.map { String(cString: sqlite3_errmsg($0)) } ?? "Unknown SQLite error"
             throw SearchIndexStoreError.openFailed(message)
         }
+        sqlite3_busy_timeout(pointer, 5_000)
         self.db = pointer
         try createSchema()
     }
@@ -34,8 +35,15 @@ public final class SearchIndexStore {
 
     public func destroy() throws {
         close()
-        if FileManager.default.fileExists(atPath: databaseURL.path) {
-            try FileManager.default.removeItem(at: databaseURL)
+        for url in [
+            databaseURL,
+            URL(fileURLWithPath: databaseURL.path + "-wal"),
+            URL(fileURLWithPath: databaseURL.path + "-shm"),
+            URL(fileURLWithPath: databaseURL.path + "-journal"),
+        ] {
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
         }
     }
 
@@ -49,6 +57,7 @@ public final class SearchIndexStore {
             title TEXT NOT NULL,
             folder_path TEXT NOT NULL,
             file_modified_at TEXT NOT NULL,
+            file_size INTEGER NOT NULL DEFAULT 0,
             content_hash TEXT NOT NULL
         );
 
@@ -85,25 +94,32 @@ public final class SearchIndexStore {
             value TEXT NOT NULL
         );
         """)
+        try migrateSchema()
         try setMetadata("schema_version", value: "1")
     }
 
-    public func rebuild(documents: [(document: SearchDocument, fileModifiedAt: Date)]) throws -> SearchIndexStats {
+    public func rebuild(documents: [SearchIndexedDocument]) throws -> SearchIndexStats {
         try transaction {
             try execute("DELETE FROM note_fts;")
             try execute("DELETE FROM section_fts;")
             try execute("DELETE FROM sections;")
             try execute("DELETE FROM notes;")
             for entry in documents {
-                try upsert(entry.document, fileModifiedAt: entry.fileModifiedAt, withinTransaction: true)
+                try upsert(entry.document, fileModifiedAt: entry.fileModifiedAt, fileSize: entry.fileSize, withinTransaction: true)
             }
         }
         return try stats()
     }
 
-    public func upsert(_ document: SearchDocument, fileModifiedAt: Date) throws {
+    public func rebuild(documents: [(document: SearchDocument, fileModifiedAt: Date)]) throws -> SearchIndexStats {
+        try rebuild(documents: documents.map {
+            SearchIndexedDocument(document: $0.document, fileModifiedAt: $0.fileModifiedAt, fileSize: 0)
+        })
+    }
+
+    public func upsert(_ document: SearchDocument, fileModifiedAt: Date, fileSize: Int = 0) throws {
         try transaction {
-            try upsert(document, fileModifiedAt: fileModifiedAt, withinTransaction: true)
+            try upsert(document, fileModifiedAt: fileModifiedAt, fileSize: fileSize, withinTransaction: true)
         }
     }
 
@@ -119,15 +135,31 @@ public final class SearchIndexStore {
         return deleted
     }
 
-    public func noteCatalog() throws -> [(noteID: UUID, relativePath: String, contentHash: String)] {
-        var rows: [(UUID, String, String)] = []
-        try query("SELECT note_id, relative_path, content_hash FROM notes;") { stmt in
+    @discardableResult
+    public func delete(relativePath: String) throws -> Bool {
+        var noteID: UUID?
+        try query("SELECT note_id FROM notes WHERE relative_path = ? LIMIT 1;", [.text(relativePath)]) { stmt in
+            noteID = textColumn(stmt, 0).flatMap(UUID.init(uuidString:))
+        }
+        guard let noteID else { return false }
+
+        try transaction {
+            try deleteNote(noteID: noteID, withinTransaction: true)
+        }
+        return true
+    }
+
+    public func noteCatalog() throws -> [(noteID: UUID, relativePath: String, contentHash: String, fileModifiedAt: Date?, fileSize: Int)] {
+        var rows: [(UUID, String, String, Date?, Int)] = []
+        try query("SELECT note_id, relative_path, content_hash, file_modified_at, file_size FROM notes;") { stmt in
             guard let idText = textColumn(stmt, 0), let id = UUID(uuidString: idText),
                   let path = textColumn(stmt, 1),
                   let hash = textColumn(stmt, 2) else {
                 return
             }
-            rows.append((id, path, hash))
+            let modifiedAt = textColumn(stmt, 3).flatMap { SearchUtilities.iso8601.date(from: $0) }
+            let fileSize = Int(sqlite3_column_int64(stmt, 4))
+            rows.append((id, path, hash, modifiedAt, fileSize))
         }
         return rows
     }
@@ -165,13 +197,13 @@ public final class SearchIndexStore {
             .map(\.result)
     }
 
-    private func upsert(_ document: SearchDocument, fileModifiedAt: Date, withinTransaction: Bool) throws {
+    private func upsert(_ document: SearchDocument, fileModifiedAt: Date, fileSize: Int, withinTransaction: Bool) throws {
         try deleteNote(noteID: document.id, withinTransaction: withinTransaction)
 
         try run(
             """
-            INSERT INTO notes (note_id, relative_path, title, folder_path, file_modified_at, content_hash)
-            VALUES (?, ?, ?, ?, ?, ?);
+            INSERT INTO notes (note_id, relative_path, title, folder_path, file_modified_at, file_size, content_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?);
             """,
             [
                 .text(document.id.uuidString),
@@ -179,6 +211,7 @@ public final class SearchIndexStore {
                 .text(document.title),
                 .text(document.folderPath),
                 .text(SearchUtilities.iso8601.string(from: fileModifiedAt)),
+                .int(fileSize),
                 .text(document.contentHash),
             ]
         )
@@ -386,6 +419,19 @@ public final class SearchIndexStore {
         return -1.5 * exp(-ageInDays / 30)
     }
 
+    private func migrateSchema() throws {
+        var noteColumns = Set<String>()
+        try query("PRAGMA table_info(notes);") { stmt in
+            if let name = textColumn(stmt, 1) {
+                noteColumns.insert(name)
+            }
+        }
+
+        if !noteColumns.contains("file_size") {
+            try execute("ALTER TABLE notes ADD COLUMN file_size INTEGER NOT NULL DEFAULT 0;")
+        }
+    }
+
     private func setMetadata(_ key: String, value: String) throws {
         try run(
             "INSERT OR REPLACE INTO index_metadata (key, value) VALUES (?, ?);",
@@ -449,7 +495,7 @@ public final class SearchIndexStore {
             case .text(let text):
                 sqlite3_bind_text(stmt, bindIndex, text, -1, transient)
             case .int(let int):
-                sqlite3_bind_int(stmt, bindIndex, Int32(int))
+                sqlite3_bind_int64(stmt, bindIndex, sqlite3_int64(int))
             case .null:
                 sqlite3_bind_null(stmt, bindIndex)
             }
