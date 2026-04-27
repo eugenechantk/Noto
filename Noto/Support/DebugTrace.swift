@@ -21,12 +21,12 @@ enum DebugTrace {
         #endif
     }
 
-    static func record(_ message: String) {
+    static func record(_ message: @autoclosure () -> String) {
         #if DEBUG
         guard isEnabled else { return }
         var events = UserDefaults.standard.stringArray(forKey: eventsKey) ?? []
         let timestamp = formatter.string(from: Date())
-        events.append("[\(timestamp)] \(message)")
+        events.append("[\(timestamp)] \(message())")
         if events.count > maxEvents {
             events.removeFirst(events.count - maxEvents)
         }

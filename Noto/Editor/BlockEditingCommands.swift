@@ -243,9 +243,12 @@ struct PageMentionQuery: Equatable {
 
 enum PageMentionMarkdown {
     static func activeQuery(in text: String, selection: NSRange) -> PageMentionQuery? {
+        activeQuery(in: text as NSString, selection: selection)
+    }
+
+    static func activeQuery(in nsText: NSString, selection: NSRange) -> PageMentionQuery? {
         guard selection.location != NSNotFound, selection.length == 0 else { return nil }
 
-        let nsText = text as NSString
         let cursor = max(0, min(selection.location, nsText.length))
         let lineRange = nsText.lineRange(for: NSRange(location: cursor, length: 0))
         guard cursor >= lineRange.location else { return nil }

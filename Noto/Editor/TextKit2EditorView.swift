@@ -440,6 +440,13 @@ enum MarkdownSemanticAnalyzer {
         in text: String,
         collapsedXMLTagRanges: [NSRange] = []
     ) -> [MarkdownRenderableBlock] {
+        renderableBlocks(in: text as NSString, collapsedXMLTagRanges: collapsedXMLTagRanges, intersecting: nil)
+    }
+
+    static func renderableBlocks(
+        in text: NSString,
+        collapsedXMLTagRanges: [NSRange] = []
+    ) -> [MarkdownRenderableBlock] {
         renderableBlocks(in: text, collapsedXMLTagRanges: collapsedXMLTagRanges, intersecting: nil)
     }
 
@@ -448,9 +455,16 @@ enum MarkdownSemanticAnalyzer {
         collapsedXMLTagRanges: [NSRange] = [],
         intersecting targetRange: NSRange?
     ) -> [MarkdownRenderableBlock] {
-        let nsText = text as NSString
+        renderableBlocks(in: text as NSString, collapsedXMLTagRanges: collapsedXMLTagRanges, intersecting: targetRange)
+    }
+
+    static func renderableBlocks(
+        in nsText: NSString,
+        collapsedXMLTagRanges: [NSRange] = [],
+        intersecting targetRange: NSRange?
+    ) -> [MarkdownRenderableBlock] {
         guard nsText.length > 0 else { return [] }
-        let frontmatterRange = MarkdownFrontmatter.range(in: text)
+        let frontmatterRange = MarkdownFrontmatter.range(in: nsText)
 
         var blocks: [MarkdownRenderableBlock] = []
         let safeTargetRange = targetRange.flatMap { range -> NSRange? in
@@ -507,16 +521,27 @@ enum MarkdownSemanticAnalyzer {
 
 enum MarkdownFrontmatter {
     static func range(in fullText: String) -> NSRange? {
+        range(in: fullText as NSString)
+    }
+
+    static func range(in fullText: NSString) -> NSRange? {
         guard fullText.hasPrefix("---\n") || fullText.hasPrefix("---\r\n") else { return nil }
 
-        let searchStart = fullText.index(fullText.startIndex, offsetBy: min(4, fullText.count))
-        guard searchStart < fullText.endIndex,
-              let closeRange = fullText.range(of: "\n---", range: searchStart..<fullText.endIndex) else {
+        let searchStart = min(4, fullText.length)
+        guard searchStart < fullText.length else {
+            return nil
+        }
+        let closeRange = fullText.range(
+            of: "\n---",
+            options: [],
+            range: NSRange(location: searchStart, length: fullText.length - searchStart)
+        )
+        guard closeRange.location != NSNotFound else {
             return nil
         }
 
         let location = 0
-        let length = fullText.distance(from: fullText.startIndex, to: closeRange.upperBound)
+        let length = NSMaxRange(closeRange)
         return NSRange(location: location, length: length)
     }
 
@@ -1122,6 +1147,10 @@ enum MarkdownParagraphStyler {
 private enum MarkdownTypingAttributes {
     static func attributes(for documentText: String, selectionLocation: Int) -> [NSAttributedString.Key: Any] {
         let nsText = documentText as NSString
+        return attributes(in: nsText, selectionLocation: selectionLocation)
+    }
+
+    static func attributes(in nsText: NSString, selectionLocation: Int) -> [NSAttributedString.Key: Any] {
         guard selectionLocation <= nsText.length else {
             return baseAttributes(for: .paragraph, text: "")
         }
@@ -1807,6 +1836,7 @@ final class TextKit2EditorCoordinator {
     let autoFocus: Bool
     private(set) var isApplyingEditorText = false
     private(set) var lastPublishedText: String
+    private var lastPublishedTextBeforeApplying: String?
 
     init(text: Binding<String>, onTextChange: ((String) -> Void)?, autoFocus: Bool) {
         _text = text
@@ -1815,38 +1845,41 @@ final class TextKit2EditorCoordinator {
         self.lastPublishedText = text.wrappedValue
     }
 
-    func publishEditorText(_ newText: String) {
+    func publishEditorText(_ newText: String, updateBinding: Bool = false) {
         guard !isApplyingEditorText else { return }
         guard newText != lastPublishedText else { return }
         DebugTrace.record("editor publish \(DebugTrace.textSummary(newText))")
-        isUpdatingText = true
-        text = newText
         lastPublishedText = newText
-        isUpdatingText = false
+        if updateBinding {
+            isUpdatingText = true
+            text = newText
+            isUpdatingText = false
+        }
         onTextChange?(newText)
     }
 
     func beginApplyingEditorText(_ text: String) {
         isApplyingEditorText = true
+        lastPublishedTextBeforeApplying = lastPublishedText
         lastPublishedText = text
     }
 
     func finishApplyingEditorText() {
         isApplyingEditorText = false
+        lastPublishedTextBeforeApplying = nil
     }
 
     func commitAppliedEditorText(_ newText: String) {
         isApplyingEditorText = false
-        guard newText != text else {
+        let previousPublishedText = lastPublishedTextBeforeApplying ?? lastPublishedText
+        lastPublishedTextBeforeApplying = nil
+        guard newText != previousPublishedText else {
             lastPublishedText = newText
             return
         }
 
         DebugTrace.record("editor commit applied \(DebugTrace.textSummary(newText))")
-        isUpdatingText = true
-        text = newText
         lastPublishedText = newText
-        isUpdatingText = false
         onTextChange?(newText)
     }
 
@@ -1858,6 +1891,10 @@ final class TextKit2EditorCoordinator {
 enum HyperlinkSelectionRanges {
     static func fullRangesOnSelectedLines(in text: String, selection: NSRange) -> [NSRange] {
         let nsText = text as NSString
+        return fullRangesOnSelectedLines(in: nsText, selection: selection)
+    }
+
+    static func fullRangesOnSelectedLines(in nsText: NSString, selection: NSRange) -> [NSRange] {
         guard nsText.length > 0, selection.location != NSNotFound else { return [] }
 
         let safeLocation = max(0, min(selection.location, nsText.length))
@@ -1882,12 +1919,16 @@ enum DividerMarkdown {
 
     static func rangesOnSelectedLines(in text: String, selection: NSRange) -> [NSRange] {
         let nsText = text as NSString
+        return rangesOnSelectedLines(in: nsText, selection: selection)
+    }
+
+    static func rangesOnSelectedLines(in nsText: NSString, selection: NSRange) -> [NSRange] {
         guard nsText.length > 0, selection.location != NSNotFound else { return [] }
 
         let safeLocation = max(0, min(selection.location, nsText.length))
         let safeLength = max(0, min(selection.length, nsText.length - safeLocation))
         let selectedLineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: safeLength))
-        let frontmatterRange = MarkdownFrontmatter.range(in: text)
+        let frontmatterRange = MarkdownFrontmatter.range(in: nsText)
         var ranges: [NSRange] = []
         var location = selectedLineRange.location
         let selectedLineEnd = NSMaxRange(selectedLineRange)
@@ -2233,7 +2274,9 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
             navigationRequest: findNavigationRequest,
             onStatusChange: onFindStatusChange
         )
-        if !context.coordinator.isUpdatingText, !vc.textView.isFirstResponder {
+        if !context.coordinator.isUpdatingText,
+           !vc.textView.isFirstResponder,
+           text != context.coordinator.lastPublishedText {
             let currentText = vc.textView.text ?? ""
             if currentText != text {
                 vc.loadText(text, preservingVisiblePosition: true)
@@ -2280,6 +2323,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var isRestylingText = false
     private var isOverlayRefreshScheduled = false
     private var isImageLayoutInvalidationScheduled = false
+    private var pendingEditorPublishTask: Task<Void, Never>?
     private var lastOverlayLayoutSize: CGSize = .zero
     private var keyboardObserverTokens: [NSObjectProtocol] = []
     private var appLifecycleObserverTokens: [NSObjectProtocol] = []
@@ -2373,6 +2417,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     deinit {
+        pendingEditorPublishTask?.cancel()
         stopKeyboardObservation()
         stopAppLifecycleObservation()
     }
@@ -2481,14 +2526,16 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func applyText(_ markdown: String, preservingVisiblePosition: Bool = false) {
+        pendingEditorPublishTask?.cancel()
+        pendingEditorPublishTask = nil
         let contentOffsetToRestore = preservingVisiblePosition ? textView.contentOffset : nil
         markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: markdown)
         coordinator?.beginApplyingEditorText(markdown)
         textView.text = markdown
         coordinator?.finishApplyingEditorText()
         invalidateRenderableBlockCache()
-        updateTypingAttributes()
-        refreshFindMatches(preferredLocation: textView.selectedRange.location, scrollToSelection: false)
+        updateTypingAttributes(documentText: markdown as NSString)
+        refreshFindMatches(in: markdown, preferredLocation: textView.selectedRange.location, scrollToSelection: false)
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in
                 guard let tv = self?.textView else { return }
@@ -2500,7 +2547,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             }
         }
         scheduleEditorOverlayRefresh()
-        updatePageMentionSuggestions()
+        updatePageMentionSuggestions(in: markdown as NSString)
         if let contentOffsetToRestore {
             restoreContentOffset(contentOffsetToRestore)
         }
@@ -2791,16 +2838,36 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             textView.text = transform.text
         }
         textView.selectedRange = transform.selection
-        updateTypingAttributes()
+        updateTypingAttributes(documentText: transform.text as NSString)
         coordinator?.commitAppliedEditorText(transform.text)
         scheduleEditorOverlayRefresh()
     }
 
+    private func scheduleEditorTextPublish() {
+        pendingEditorPublishTask?.cancel()
+        pendingEditorPublishTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(180))
+            guard let self, !Task.isCancelled else { return }
+            self.coordinator?.publishEditorText(self.textView.text ?? "")
+            self.pendingEditorPublishTask = nil
+        }
+    }
+
+    private func flushEditorTextToSession(updateBinding: Bool = false) {
+        pendingEditorPublishTask?.cancel()
+        pendingEditorPublishTask = nil
+        coordinator?.publishEditorText(textView.text ?? "", updateBinding: updateBinding)
+    }
+
     private func updatePageMentionSuggestions() {
+        updatePageMentionSuggestions(in: textView.textStorage.mutableString)
+    }
+
+    private func updatePageMentionSuggestions(in documentText: NSString) {
         guard let pageMentionProvider,
               textView.isFirstResponder,
               let query = PageMentionMarkdown.activeQuery(
-                  in: textView.text ?? "",
+                  in: documentText,
                   selection: textView.selectedRange
               ) else {
             pendingPageMentionTriggerLocation = nil
@@ -3130,13 +3197,21 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func refreshFindMatches(preferredLocation: Int, scrollToSelection: Bool) {
+        refreshFindMatches(
+            in: textView.text ?? "",
+            preferredLocation: preferredLocation,
+            scrollToSelection: scrollToSelection
+        )
+    }
+
+    private func refreshFindMatches(in documentText: String, preferredLocation: Int, scrollToSelection: Bool) {
         guard isViewLoaded, textView != nil else {
             publishFindStatusIfNeeded()
             return
         }
 
         restoreFindHighlightBackgrounds()
-        findMatches = EditorFindMatcher.ranges(in: textView.text ?? "", query: findQuery)
+        findMatches = EditorFindMatcher.ranges(in: documentText, query: findQuery)
         selectedFindMatchIndex = EditorFindMatcher.preferredIndex(
             for: findMatches,
             selectionLocation: preferredLocation
@@ -3318,18 +3393,23 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     func textViewDidChange(_ textView: UITextView) {
-        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: textView.text ?? "")
+        let textStorageString = textView.textStorage.mutableString
+        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: textStorageString)
         invalidateRenderableBlockCache()
         if !isRestylingText {
             updateRevealedMarkdownRangesForSelection(restyle: false)
             applyDividerRenderAttributesToTextStorage(in: dividerRefreshRangesForCurrentSelection())
         }
-        coordinator?.publishEditorText(textView.text ?? "")
-        updateTypingAttributes()
-        scrollSelectionAboveKeyboard()
+        scheduleEditorTextPublish()
+        updateTypingAttributes(documentText: textStorageString)
+        if keyboardFrameInScreen != nil {
+            scrollSelectionAboveKeyboard()
+        }
         scheduleEditorOverlayRefresh()
-        updatePageMentionSuggestions()
-        refreshFindMatches(preferredLocation: textView.selectedRange.location, scrollToSelection: false)
+        updatePageMentionSuggestions(in: textStorageString)
+        if !findQuery.isEmpty || !findMatches.isEmpty {
+            refreshFindMatches(in: textStorageString as String, preferredLocation: textView.selectedRange.location, scrollToSelection: false)
+        }
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
@@ -3341,7 +3421,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {
-        coordinator?.publishEditorText(textView.text ?? "")
+        flushEditorTextToSession(updateBinding: true)
     }
 
     private func revealHyperlinkMarkdownForDeletionIfNeeded(changeRange: NSRange) -> Bool {
@@ -3376,9 +3456,10 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func updateRevealedMarkdownRangesForSelection(restyle: Bool) {
-        let text = textView.text ?? ""
+        let text = textView.textStorage.mutableString
         let hyperlinkRanges = hyperlinkRangesOnSelectedLines(in: text, selection: textView.selectedRange)
         let dividerRanges = dividerRangesOnSelectedLines(in: text, selection: textView.selectedRange)
+        let previousHyperlinkRanges = revealedHyperlinkRanges
         let previousDividerRanges = revealedDividerRanges
         let changed = !nsRangesEqual(hyperlinkRanges, revealedHyperlinkRanges)
             || !nsRangesEqual(dividerRanges, revealedDividerRanges)
@@ -3387,18 +3468,21 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         setRevealedHyperlinkRanges(hyperlinkRanges)
         setRevealedDividerRanges(dividerRanges)
         if restyle {
-            restyleTextPreservingSelection(affectedDividerRanges: previousDividerRanges + dividerRanges)
+            restyleTextPreservingSelection(
+                affectedHyperlinkRanges: previousHyperlinkRanges + hyperlinkRanges,
+                affectedDividerRanges: previousDividerRanges + dividerRanges
+            )
         } else {
             applyDividerRenderAttributesToTextStorage(in: previousDividerRanges + dividerRanges)
             scheduleEditorOverlayRefresh()
         }
     }
 
-    private func hyperlinkRangesOnSelectedLines(in text: String, selection: NSRange) -> [NSRange] {
+    private func hyperlinkRangesOnSelectedLines(in text: NSString, selection: NSRange) -> [NSRange] {
         HyperlinkSelectionRanges.fullRangesOnSelectedLines(in: text, selection: selection)
     }
 
-    private func dividerRangesOnSelectedLines(in text: String, selection: NSRange) -> [NSRange] {
+    private func dividerRangesOnSelectedLines(in text: NSString, selection: NSRange) -> [NSRange] {
         DividerMarkdown.rangesOnSelectedLines(in: text, selection: selection)
     }
 
@@ -3410,17 +3494,25 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         return true
     }
 
-    private func restyleTextPreservingSelection(affectedDividerRanges: [NSRange]? = nil) {
-        applyHyperlinkRenderAttributesToTextStorage()
+    private func restyleTextPreservingSelection(
+        affectedHyperlinkRanges: [NSRange]? = nil,
+        affectedDividerRanges: [NSRange]? = nil
+    ) {
+        applyHyperlinkRenderAttributesToTextStorage(in: affectedHyperlinkRanges)
         applyDividerRenderAttributesToTextStorage(in: affectedDividerRanges)
         applyFindHighlights()
         updateTypingAttributes()
         scheduleEditorOverlayRefresh()
     }
 
-    private func applyHyperlinkRenderAttributesToTextStorage() {
+    private func applyHyperlinkRenderAttributesToTextStorage(in affectedRanges: [NSRange]? = nil) {
         let textStorage = textView.textStorage
-        let matches = HyperlinkMarkdown.matches(in: textView.text ?? "")
+        let matches: [HyperlinkMarkdown.Match]
+        if let affectedRanges {
+            matches = hyperlinkMatches(in: affectedRanges)
+        } else {
+            matches = HyperlinkMarkdown.matches(in: textView.text ?? "")
+        }
 
         for match in matches {
             guard let url = match.url else { continue }
@@ -3456,6 +3548,33 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
                 }
             }
         }
+    }
+
+    private func hyperlinkMatches(in affectedRanges: [NSRange]) -> [HyperlinkMarkdown.Match] {
+        let nsText = textView.textStorage.mutableString
+        guard nsText.length > 0 else { return [] }
+
+        var matches: [HyperlinkMarkdown.Match] = []
+        var seenLocations: Set<Int> = []
+        for range in affectedRanges {
+            guard range.location != NSNotFound else { continue }
+            let safeLocation = max(0, min(range.location, nsText.length))
+            let safeLength = max(0, min(range.length, nsText.length - safeLocation))
+            let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: safeLength))
+            let lineText = nsText.substring(with: lineRange)
+            for match in HyperlinkMarkdown.matches(in: lineText) {
+                let documentMatch = HyperlinkMarkdown.Match(
+                    fullRange: NSRange(location: lineRange.location + match.fullRange.location, length: match.fullRange.length),
+                    titleRange: NSRange(location: lineRange.location + match.titleRange.location, length: match.titleRange.length),
+                    urlRange: NSRange(location: lineRange.location + match.urlRange.location, length: match.urlRange.length),
+                    title: match.title,
+                    urlText: match.urlText
+                )
+                guard seenLocations.insert(documentMatch.fullRange.location).inserted else { continue }
+                matches.append(documentMatch)
+            }
+        }
+        return matches
     }
 
     private func hyperlinkSyntaxRanges(for match: HyperlinkMarkdown.Match) -> [NSRange] {
@@ -3556,7 +3675,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        coordinator?.publishEditorText(textView.text ?? "")
+        flushEditorTextToSession(updateBinding: true)
     }
 
     private func startKeyboardObservation() {
@@ -3595,6 +3714,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            self?.flushEditorTextToSession()
             self?.rememberCurrentContentOffset()
         })
         appLifecycleObserverTokens.append(center.addObserver(
@@ -3736,12 +3856,10 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     /// Sets typing attributes to match the current paragraph's block kind,
     /// so newly typed characters inherit the correct font immediately
     /// (before the content-storage delegate re-styles the paragraph).
-    private func updateTypingAttributes() {
-        textView.typingAttributes = coordinator?.typingAttributes(
-            for: textView.text ?? "",
-            selectionLocation: textView.selectedRange.location
-        ) ?? MarkdownTypingAttributes.attributes(
-            for: textView.text ?? "",
+    private func updateTypingAttributes(documentText: NSString? = nil) {
+        let documentText = documentText ?? textView.textStorage.mutableString
+        textView.typingAttributes = MarkdownTypingAttributes.attributes(
+            in: documentText,
             selectionLocation: textView.selectedRange.location
         )
     }
@@ -3750,8 +3868,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         if scrollView === textView {
             onContentOffsetYChange?(scrollView.contentOffset.y)
         }
-        refreshTodoMarkerButtons()
-        refreshImageOverlayViews()
+        let blocks = visibleRenderableBlocks()
+        refreshTodoMarkerButtons(in: blocks)
+        refreshImageOverlayViews(in: blocks)
         refreshFindHighlightOverlays()
     }
 
@@ -3774,9 +3893,10 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
-        refreshTodoMarkerButtons()
-        refreshDividerLineViews()
-        refreshImageOverlayViews()
+        let blocks = visibleRenderableBlocks()
+        refreshTodoMarkerButtons(in: blocks)
+        refreshDividerLineViews(in: blocks)
+        refreshImageOverlayViews(in: blocks)
     }
 
     private func syncCollapsedXMLTagState() {
@@ -3790,10 +3910,10 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func currentRenderableBlocks() -> [MarkdownRenderableBlock] {
-        let text = textView.text ?? ""
+        let text = textView.textStorage.mutableString
         let collapsedXMLTagRanges = markdownDelegate.collapsedXMLTagRanges
 
-        if text == cachedRenderableBlocksText,
+        if text as String == cachedRenderableBlocksText,
            collapsedXMLTagRanges == cachedCollapsedXMLTagRanges {
             return cachedRenderableBlocks
         }
@@ -3803,13 +3923,13 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             collapsedXMLTagRanges: collapsedXMLTagRanges
         )
         cachedRenderableBlocks = blocks
-        cachedRenderableBlocksText = text
+        cachedRenderableBlocksText = text as String
         cachedCollapsedXMLTagRanges = collapsedXMLTagRanges
         return blocks
     }
 
     private func renderableBlocks(intersecting ranges: [NSRange]) -> [MarkdownRenderableBlock] {
-        let text = textView.text ?? ""
+        let text = textView.textStorage.mutableString
         let collapsedXMLTagRanges = markdownDelegate.collapsedXMLTagRanges
         var blocks: [MarkdownRenderableBlock] = []
         var seenLocations: Set<Int> = []
@@ -3835,7 +3955,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func selectedLineRange() -> NSRange? {
-        let nsText = (textView.text ?? "") as NSString
+        let nsText = textView.textStorage.mutableString
         guard nsText.length > 0, textView.selectedRange.location != NSNotFound else { return nil }
 
         let safeLocation = max(0, min(textView.selectedRange.location, nsText.length))
@@ -3853,7 +3973,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
         let start = textView.offset(from: textView.beginningOfDocument, to: startPosition)
         let end = textView.offset(from: textView.beginningOfDocument, to: endPosition)
-        let nsText = (textView.text ?? "") as NSString
+        let nsText = textView.textStorage.mutableString
         guard nsText.length > 0 else { return nil }
 
         let lowerBound = max(0, min(start, end, nsText.length))
@@ -3895,8 +4015,11 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func refreshImageOverlayViews() {
         guard isViewLoaded, textView != nil else { return }
+        refreshImageOverlayViews(in: visibleRenderableBlocks())
+    }
 
-        let blocks = visibleRenderableBlocks()
+    private func refreshImageOverlayViews(in blocks: [MarkdownRenderableBlock]) {
+        guard isViewLoaded, textView != nil else { return }
         let visibleRect = textView.bounds.insetBy(dx: -8, dy: -200)
         var activeLocations: Set<Int> = []
 
@@ -3997,8 +4120,11 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func refreshTodoMarkerButtons() {
         guard isViewLoaded, textView != nil else { return }
+        refreshTodoMarkerButtons(in: visibleRenderableBlocks())
+    }
 
-        let blocks = visibleRenderableBlocks()
+    private func refreshTodoMarkerButtons(in blocks: [MarkdownRenderableBlock]) {
+        guard isViewLoaded, textView != nil else { return }
         let visibleRect = textView.bounds.insetBy(dx: -8, dy: -80)
         var activeLocations: Set<Int> = []
 
@@ -4043,11 +4169,15 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func refreshDividerLineViews() {
         guard isViewLoaded, textView != nil else { return }
+        refreshDividerLineViews(in: visibleRenderableBlocks())
+    }
 
+    private func refreshDividerLineViews(in blocks: [MarkdownRenderableBlock]) {
+        guard isViewLoaded, textView != nil else { return }
         let visibleRect = textView.bounds.insetBy(dx: -8, dy: -80)
         var activeLocations: Set<Int> = []
 
-        for block in visibleRenderableBlocks() {
+        for block in blocks {
             guard block.kind == .divider,
                   !block.isCollapsedXMLTagContent,
                   !revealedDividerRanges.contains(where: { NSEqualRanges($0, block.visibleLineRange) }),
@@ -4309,6 +4439,7 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
         )
         guard !context.coordinator.isUpdatingText else { return }
         guard vc.textView.window?.firstResponder !== vc.textView else { return }
+        guard text != context.coordinator.lastPublishedText else { return }
         if vc.textView.string != text {
             vc.loadText(text)
         }
@@ -4730,7 +4861,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     func textDidEndEditing(_ notification: Notification) {
         DebugTrace.record("mac textDidEndEditing")
-        flushTextToBinding()
+        flushTextToBinding(updateBinding: true)
     }
 
     func textStorage(
@@ -4754,9 +4885,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         )
     }
 
-    private func flushTextToBinding() {
+    private func flushTextToBinding(updateBinding: Bool = false) {
         DebugTrace.record("mac flushTextToBinding \(DebugTrace.textSummary(textView.textStorage?.string ?? textView.string))")
-        coordinator?.publishEditorText(textView.textStorage?.string ?? textView.string)
+        coordinator?.publishEditorText(textView.textStorage?.string ?? textView.string, updateBinding: updateBinding)
     }
 
     private func handlesWindowScopedCommand(_ notification: Notification) -> Bool {

@@ -218,7 +218,6 @@ final class NoteEditorSession {
     private func applyEditorText(_ newText: String, scheduleRename shouldScheduleRename: Bool) {
         let previousTitle = note.title
         latestEditorText = newText
-        content = newText
         hasPendingLocalEdits = true
         DebugTrace.record("editor apply text note=\(note.fileURL.lastPathComponent) scheduleRename=\(shouldScheduleRename)")
         note = store.updateTitleFromContent(newText, for: note)
@@ -232,6 +231,7 @@ final class NoteEditorSession {
         DebugTrace.record("editor persist start note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(text))")
         note = store.updateTitleFromContent(text, for: note)
         let saveResult = store.saveContent(text, for: note)
+        content = text
         note = saveResult.note
         if saveResult.didWrite {
             lastPersistedText = text

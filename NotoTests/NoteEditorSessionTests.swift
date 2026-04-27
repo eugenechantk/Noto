@@ -67,6 +67,34 @@ struct NoteEditorSessionTests {
         #expect(savedContent.contains("Delayed body"))
     }
 
+    @Test("Editor changes track latest text without replacing bound content until save")
+    @MainActor
+    func editorChangesTrackLatestTextWithoutReplacingBoundContentUntilSave() async {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        var note = store.createNote()
+        let loadedContent = MarkdownNote.makeFrontmatter(id: note.id) + "# Loaded\nBody"
+        note = store.saveContent(loadedContent, for: note).note
+        let loadedFromDisk = CoordinatedFileManager.readString(from: note.fileURL) ?? loadedContent
+        let editedContent = loadedFromDisk.replacingOccurrences(of: "Body", with: "Body plus edit")
+        let session = NoteEditorSession(store: store, note: note)
+
+        await session.loadNoteContent()
+        session.handleEditorChange(editedContent)
+
+        #expect(session.content == loadedFromDisk)
+        #expect(session.latestEditorText == editedContent)
+        #expect(session.hasPendingLocalEdits)
+
+        try? await Task.sleep(for: .milliseconds(650))
+
+        #expect(session.content == editedContent)
+        #expect(session.lastPersistedText == editedContent)
+        #expect(!session.hasPendingLocalEdits)
+    }
+
     @Test("Move note flushes pending edits and updates session file URL")
     @MainActor
     func moveNoteFlushesPendingEditsAndUpdatesSessionFileURL() {
