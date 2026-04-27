@@ -32,6 +32,7 @@ flowchart TD
     RootStore --> CoordFS[CoordinatedFileManager<br/>NSFileCoordinator reads/writes]
     RootStore --> VaultPkg[NotoVault package<br/>directory/tree/title helpers]
     SearchRefresh --> SearchPkg[NotoSearch package<br/>SQLite FTS index]
+    Readwise --> ReadwisePkg[NotoReadwiseSync package<br/>Reader/Readwise API sync engine]
     TextKit --> Commands[BlockEditingCommands / TodoMarkdown / EditorFind]
 ```
 
