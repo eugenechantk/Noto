@@ -1,5 +1,6 @@
 import SwiftUI
 import NotoVault
+import UniformTypeIdentifiers
 
 #if os(macOS)
 import AppKit
@@ -27,6 +28,10 @@ struct NotoSidebarView: View {
     @State private var newFolderParentURL: URL?
     @State private var searchLoadTask: Task<Void, Never>?
     @State private var reloadTreeTask: Task<Void, Never>?
+    #if os(macOS)
+    @State private var targetedDropFolderURL: URL?
+    @State private var draggedNoteURL: URL?
+    #endif
 
     private var loader: SidebarTreeLoader {
         SidebarTreeLoader(directoryLoader: rootStore.directoryLoader)
@@ -85,6 +90,9 @@ struct NotoSidebarView: View {
         .listStyle(.sidebar)
         .notoSidebarRowSpacing()
         .environment(\.defaultMinListRowHeight, rowHeight)
+        #if os(macOS)
+        .background(rootDropTarget)
+        #endif
         .contextMenu {
             createMenuItems(in: rootStore.vaultRootURL)
         }
@@ -169,7 +177,7 @@ struct NotoSidebarView: View {
     @ViewBuilder
     private func sidebarRow(_ row: SidebarTreeNode) -> some View {
         let isSelected = isSelected(row)
-        HStack(spacing: 8) {
+        let baseRow = HStack(spacing: 8) {
             Image(systemName: symbolName(for: row))
                 .font(.body.weight(isSelected ? .semibold : .regular))
                 .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.secondaryText)
@@ -188,6 +196,27 @@ struct NotoSidebarView: View {
         .contextMenu {
             contextMenuItems(for: row)
         }
+
+        #if os(macOS)
+        switch row.kind {
+        case .note:
+            baseRow.onDrag {
+                noteDragProvider(for: row)
+            }
+        case .folder:
+            baseRow
+                .background(dropBackground(for: row))
+                .onDrop(
+                    of: [UTType.fileURL],
+                    isTargeted: dropTargetBinding(for: row),
+                    perform: { providers in
+                        handleNoteDrop(providers, on: row)
+                    }
+                )
+        }
+        #else
+        baseRow
+        #endif
     }
 
     @ViewBuilder
@@ -249,6 +278,141 @@ struct NotoSidebarView: View {
             "note_\(row.name)"
         }
     }
+
+    #if os(macOS)
+    private var rootDropTarget: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onDrop(
+                of: [UTType.fileURL],
+                isTargeted: rootDropTargetBinding,
+                perform: { providers in
+                    handleRootNoteDrop(providers)
+                }
+            )
+    }
+
+    private var rootDropTargetBinding: Binding<Bool> {
+        Binding(
+            get: {
+                targetedDropFolderURL == rootStore.vaultRootURL.standardizedFileURL
+            },
+            set: { isTargeted in
+                targetedDropFolderURL = isTargeted ? rootStore.vaultRootURL.standardizedFileURL : nil
+            }
+        )
+    }
+
+    private func noteDragProvider(for row: SidebarTreeNode) -> NSItemProvider {
+        let fileURL = row.url.standardizedFileURL
+        draggedNoteURL = fileURL
+        return NSItemProvider(contentsOf: fileURL) ?? NSItemProvider(object: fileURL as NSURL)
+    }
+
+    private func dropTargetBinding(for row: SidebarTreeNode) -> Binding<Bool> {
+        Binding(
+            get: {
+                targetedDropFolderURL == row.url.standardizedFileURL
+            },
+            set: { isTargeted in
+                targetedDropFolderURL = isTargeted ? row.url.standardizedFileURL : nil
+            }
+        )
+    }
+
+    private func dropBackground(for row: SidebarTreeNode) -> some View {
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .fill(targetedDropFolderURL == row.url.standardizedFileURL ? AppTheme.selectedRowBackground : Color.clear)
+    }
+
+    private func handleNoteDrop(_ providers: [NSItemProvider], on row: SidebarTreeNode) -> Bool {
+        guard case .folder = row.kind else {
+            return false
+        }
+
+        return handleNoteDrop(providers, to: row.url.standardizedFileURL)
+    }
+
+    private func handleRootNoteDrop(_ providers: [NSItemProvider]) -> Bool {
+        handleNoteDrop(providers, to: rootStore.vaultRootURL.standardizedFileURL)
+    }
+
+    private func handleNoteDrop(_ providers: [NSItemProvider], to destinationURL: URL) -> Bool {
+        if let draggedNoteURL {
+            moveDroppedNote(from: draggedNoteURL, to: destinationURL)
+            return true
+        }
+
+        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) else {
+            return false
+        }
+
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            guard let sourceURL = droppedFileURL(from: item) else { return }
+            DispatchQueue.main.async {
+                moveDroppedNote(from: sourceURL, to: destinationURL)
+            }
+        }
+        return true
+    }
+
+    private func droppedFileURL(from item: NSSecureCoding?) -> URL? {
+        if let url = item as? URL {
+            return url
+        }
+        if let url = item as? NSURL {
+            return url as URL
+        }
+        if let data = item as? Data,
+           let url = URL(dataRepresentation: data, relativeTo: nil) {
+            return url
+        }
+        if let string = item as? String {
+            return URL(string: string) ?? URL(fileURLWithPath: string)
+        }
+        return nil
+    }
+
+    private func moveDroppedNote(from sourceURL: URL, to destinationURL: URL) {
+        let normalizedSourceURL = sourceURL.standardizedFileURL
+        let normalizedDestinationURL = destinationURL.standardizedFileURL
+        guard normalizedSourceURL.pathExtension.localizedCaseInsensitiveCompare("md") == .orderedSame,
+              normalizedSourceURL.deletingLastPathComponent() != normalizedDestinationURL,
+              FileManager.default.fileExists(atPath: normalizedSourceURL.path),
+              normalizedSourceURL.path.hasPrefix(rootStore.vaultRootURL.standardizedFileURL.path + "/") else {
+            targetedDropFolderURL = nil
+            draggedNoteURL = nil
+            return
+        }
+
+        let modifiedAt = (try? normalizedSourceURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
+        let sourceStore = MarkdownNoteStore(
+            directoryURL: normalizedSourceURL.deletingLastPathComponent(),
+            vaultRootURL: rootStore.vaultRootURL,
+            directoryLoader: rootStore.directoryLoader
+        )
+        let note = markdownNote(for: normalizedSourceURL, modifiedAt: modifiedAt)
+        let movedNote = sourceStore.moveNote(note, to: normalizedDestinationURL)
+
+        if selectedNote?.id == movedNote.id ||
+            selectedNote?.fileURL.standardizedFileURL == normalizedSourceURL {
+            selectedNote = movedNote
+            selectedNoteStore = MarkdownNoteStore(
+                directoryURL: movedNote.fileURL.deletingLastPathComponent(),
+                vaultRootURL: rootStore.vaultRootURL,
+                autoload: false,
+                directoryLoader: rootStore.directoryLoader
+            )
+            selectedIsNew = false
+        }
+
+        expandedFolderURLs.insert(normalizedDestinationURL)
+        persistExpansionState()
+        targetedDropFolderURL = nil
+        draggedNoteURL = nil
+        scheduleReloadTree()
+    }
+    #endif
 
     private func activate(_ row: SidebarTreeNode) {
         switch row.kind {

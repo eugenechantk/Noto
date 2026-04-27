@@ -15,6 +15,7 @@ struct EditorNavigationChrome: ViewModifier {
     var onNavigateForward: (() -> Void)?
     var onOpenTodayNote: (() -> Void)?
     var onTapBreadcrumbLevel: ((URL) -> Void)?
+    var onMoveRequested: () -> Void
     var onDeleteRequested: () -> Void
     var onSearchRequested: () -> Void
 
@@ -82,6 +83,11 @@ struct EditorNavigationChrome: ViewModifier {
                             .accessibilityIdentifier("search_in_note_menu_item")
 
                             Divider()
+
+                            Button(action: onMoveRequested) {
+                                Label("Move Note", systemImage: "folder")
+                            }
+                            .accessibilityIdentifier("move_note_menu_item")
 
                             Button(role: .destructive, action: onDeleteRequested) {
                                 Label("Delete Note", systemImage: "trash")

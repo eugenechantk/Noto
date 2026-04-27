@@ -321,6 +321,7 @@ struct NoteListView: View {
                                     ))
                                 }
                             },
+                            onNoteUpdated: updateCompactHistory,
                             onOpenDocumentLink: { relativePath in
                                 openDocumentLink(relativePath, vaultRootURL: vaultRootURL)
                             },
@@ -364,6 +365,7 @@ struct NoteListView: View {
                                     ))
                                 }
                             },
+                            onNoteUpdated: updateCompactHistory,
                             onOpenDocumentLink: { relativePath in
                                 openDocumentLink(relativePath, vaultRootURL: store.vaultRootURL)
                             },
@@ -532,6 +534,13 @@ struct NoteListView: View {
             isNew: entry.isNew
         )
     }
+
+    private func updateCompactHistory(_ note: MarkdownNote) {
+        compactNoteHistory.replaceEntries(for: note)
+        if let currentEntry = compactNoteHistory.currentEntry, currentEntry.note.id == note.id {
+            compactNoteHistory.replaceCurrent(currentEntry.replacingNote(note))
+        }
+    }
     #endif
 
     private func createRootNoteAndSelect() {
@@ -582,6 +591,7 @@ private struct TodayNoteDestination: View {
     var onOpenTodayNote: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
     var onTapBreadcrumbLevel: ((URL) -> Void)?
+    var onNoteUpdated: ((MarkdownNote) -> Void)?
     var onOpenDocumentLink: ((String) -> Void)?
     var canNavigateBack: Bool = false
     var canNavigateForward: Bool = false
@@ -599,11 +609,13 @@ private struct TodayNoteDestination: View {
                     onOpenTodayNote: onOpenTodayNote,
                     onCreateRootNote: onCreateRootNote,
                     onTapBreadcrumbLevel: onTapBreadcrumbLevel,
+                    onNoteUpdated: onNoteUpdated,
                     onOpenDocumentLink: onOpenDocumentLink,
                     canNavigateBack: canNavigateBack,
                     canNavigateForward: canNavigateForward,
                     onNavigateBack: onNavigateBack,
-                    onNavigateForward: onNavigateForward
+                    onNavigateForward: onNavigateForward,
+                    chromeMode: .compactNavigation(showsInlineBackButton: true)
                 )
             } else {
                 ProgressView()

@@ -260,6 +260,14 @@ struct NotoSplitView: View {
 
         guard selectedNote?.id == note.id else { return }
         selectedNote = note
+        if selectedNoteStore?.directoryURL.standardizedFileURL != note.fileURL.deletingLastPathComponent().standardizedFileURL {
+            selectedNoteStore = MarkdownNoteStore(
+                directoryURL: note.fileURL.deletingLastPathComponent(),
+                vaultRootURL: store.vaultRootURL,
+                autoload: false,
+                directoryLoader: store.directoryLoader
+            )
+        }
         if let currentStackEntry {
             noteHistory.replaceCurrent(currentStackEntry)
         }

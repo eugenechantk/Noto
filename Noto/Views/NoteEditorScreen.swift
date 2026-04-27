@@ -6,6 +6,7 @@ import AppKit
 
 struct NoteEditorScreen: View {
     var store: MarkdownNoteStore
+    var note: MarkdownNote
     var isNew: Bool = false
     var fileWatcher: VaultFileWatcher?
     var onDelete: (() -> Void)? = nil
@@ -24,6 +25,7 @@ struct NoteEditorScreen: View {
 
     @State private var session: NoteEditorSession
     @State private var showDeleteConfirmation = false
+    @State private var showMoveSheet = false
     @State private var statusCount = WordCounter.Count(words: 0, characters: 0)
     @State private var isFindVisible = false
     @State private var findQuery = ""
@@ -60,6 +62,7 @@ struct NoteEditorScreen: View {
         chromeMode: EditorChromeMode = .platformDefault
     ) {
         self.store = store
+        self.note = note
         self.isNew = isNew
         self.fileWatcher = fileWatcher
         self.onDelete = onDelete
@@ -113,6 +116,7 @@ struct NoteEditorScreen: View {
             onTapBreadcrumbLevel: onTapBreadcrumbLevel,
             onOpenTodayNote: onOpenTodayNote,
             onCreateRootNote: onCreateRootNote,
+            onMoveRequested: { showMoveSheet = true },
             onDeleteRequested: { showDeleteConfirmation = true },
             onSearchRequested: showFind,
             canNavigateBack: canNavigateBack,
@@ -137,6 +141,7 @@ struct NoteEditorScreen: View {
             onNavigateForward: onNavigateForward,
             onOpenTodayNote: onOpenTodayNote,
             onTapBreadcrumbLevel: onTapBreadcrumbLevel,
+            onMoveRequested: { showMoveSheet = true },
             onDeleteRequested: { showDeleteConfirmation = true },
             onSearchRequested: showFind
         ))
@@ -163,6 +168,9 @@ struct NoteEditorScreen: View {
         .onChange(of: session.note) { _, updatedNote in
             onNoteUpdated?(updatedNote)
         }
+        .onChange(of: note) { _, updatedNote in
+            session.replaceNoteFromParent(updatedNote)
+        }
         .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { notification in
             guard let snapshot = notification.object as? NoteSyncSnapshot else { return }
             session.handleRemoteSnapshot(snapshot)
@@ -179,6 +187,19 @@ struct NoteEditorScreen: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+        .sheet(isPresented: $showMoveSheet) {
+            MoveNoteDestinationPicker(
+                vaultRootURL: store.vaultRootURL,
+                currentDirectoryURL: session.note.fileURL.deletingLastPathComponent(),
+                directoryLoader: store.directoryLoader,
+                onCancel: {
+                    showMoveSheet = false
+                },
+                onMove: { destinationURL in
+                    moveCurrentNote(to: destinationURL)
+                }
+            )
+        }
     }
 
     private func deleteCurrentNote() {
@@ -190,6 +211,12 @@ struct NoteEditorScreen: View {
         }
         onDelete?()
         dismiss()
+    }
+
+    private func moveCurrentNote(to destinationURL: URL) {
+        let movedNote = session.moveNote(to: destinationURL)
+        onNoteUpdated?(movedNote)
+        showMoveSheet = false
     }
 
     private func showFind() {
@@ -297,7 +324,104 @@ struct NoteEditorScreen: View {
             break
         }
     }
-    #endif
+#endif
+}
+
+private struct MoveNoteDestination: Identifiable, Equatable {
+    let url: URL
+    let name: String
+    let depth: Int
+
+    var id: String {
+        url.standardizedFileURL.path
+    }
+}
+
+private struct MoveNoteDestinationPicker: View {
+    let vaultRootURL: URL
+    let currentDirectoryURL: URL
+    let directoryLoader: VaultDirectoryLoader
+    var onCancel: () -> Void
+    var onMove: (URL) -> Void
+
+    @State private var destinations: [MoveNoteDestination] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        NavigationStack {
+            List(destinations) { destination in
+                Button {
+                    onMove(destination.url)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: destination.url.standardizedFileURL == vaultRootURL.standardizedFileURL ? "tray.full" : "folder")
+                            .foregroundStyle(AppTheme.secondaryText)
+                            .frame(width: 18)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(destination.name)
+                                .foregroundStyle(AppTheme.primaryText)
+                            if destination.url.standardizedFileURL == currentDirectoryURL.standardizedFileURL {
+                                Text("Current location")
+                                    .font(.caption)
+                                    .foregroundStyle(AppTheme.secondaryText)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.leading, CGFloat(destination.depth) * 16)
+                    .contentShape(Rectangle())
+                }
+                .disabled(destination.url.standardizedFileURL == currentDirectoryURL.standardizedFileURL)
+                .accessibilityIdentifier("move_destination_\(destination.name)")
+            }
+            .overlay {
+                if isLoading {
+                    ProgressView()
+                } else if destinations.isEmpty {
+                    ContentUnavailableView("No folders", systemImage: "folder")
+                }
+            }
+            .navigationTitle("Move Note")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                        .accessibilityIdentifier("move_note_cancel_button")
+                }
+            }
+        }
+        #if os(macOS)
+        .frame(minWidth: 360, minHeight: 420)
+        #endif
+        .task {
+            loadDestinations()
+        }
+    }
+
+    private func loadDestinations() {
+        isLoading = true
+        let rootDestination = MoveNoteDestination(
+            url: vaultRootURL.standardizedFileURL,
+            name: "Vault Root",
+            depth: 0
+        )
+
+        let folderRows = (try? SidebarTreeLoader(directoryLoader: directoryLoader)
+            .loadRows(rootURL: vaultRootURL)
+            .compactMap { row -> MoveNoteDestination? in
+                guard case .folder = row.kind else { return nil }
+                return MoveNoteDestination(
+                    url: row.url,
+                    name: row.name,
+                    depth: row.depth + 1
+                )
+            }) ?? []
+
+        destinations = [rootDestination] + folderRows
+        isLoading = false
+    }
 }
 
 #if os(iOS)

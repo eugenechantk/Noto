@@ -153,6 +153,31 @@ final class NoteEditorSession {
         isDeleting = false
     }
 
+    @discardableResult
+    func moveNote(to destinationDirectory: URL) -> MarkdownNote {
+        renameTask?.cancel()
+        autosaveTask?.cancel()
+        autosaveTask = nil
+
+        if hasPendingLocalEdits || latestEditorText != lastPersistedText {
+            persistEditorText(latestEditorText)
+        }
+
+        let moved = store.moveNote(note, to: destinationDirectory)
+        note = moved
+        return moved
+    }
+
+    func replaceNoteFromParent(_ updatedNote: MarkdownNote) {
+        guard updatedNote.id == note.id else { return }
+        guard updatedNote.fileURL.standardizedFileURL != note.fileURL.standardizedFileURL ||
+            updatedNote.title != note.title ||
+            updatedNote.modifiedDate != note.modifiedDate else {
+            return
+        }
+        note = updatedNote
+    }
+
     func cancelBackgroundWork() {
         renameTask?.cancel()
         autosaveTask?.cancel()

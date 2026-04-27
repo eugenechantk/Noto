@@ -67,6 +67,31 @@ struct NoteEditorSessionTests {
         #expect(savedContent.contains("Delayed body"))
     }
 
+    @Test("Move note flushes pending edits and updates session file URL")
+    @MainActor
+    func moveNoteFlushesPendingEditsAndUpdatesSessionFileURL() {
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+        let destinationURL = vault.appendingPathComponent("Archive")
+        try! FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+
+        let note = store.createNote()
+        let editedContent = MarkdownNote.makeFrontmatter(id: note.id) + "# Moved Title\nUnsaved body"
+        let session = NoteEditorSession(store: store, note: note, isNew: true)
+
+        session.handleEditorChange(editedContent)
+        let moved = session.moveNote(to: destinationURL)
+
+        #expect(moved.fileURL.deletingLastPathComponent().standardizedFileURL == destinationURL.standardizedFileURL)
+        #expect(session.note.fileURL == moved.fileURL)
+        #expect(!FileManager.default.fileExists(atPath: note.fileURL.path))
+        #expect(FileManager.default.fileExists(atPath: moved.fileURL.path))
+
+        let movedContent = CoordinatedFileManager.readString(from: moved.fileURL) ?? ""
+        #expect(movedContent.contains("Unsaved body"))
+    }
+
     @Test("Load note content reads existing file into session")
     @MainActor
     func loadNoteContentReadsExistingFileIntoSession() async {
