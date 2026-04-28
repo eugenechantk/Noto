@@ -8,6 +8,7 @@ import AppKit
 
 enum AppTheme {
     static let background = Color(hex: 0x0A0A0A)
+    static let sidebarBackground = Color(hex: 0x111113)
     static let primaryText = Color(hex: 0xE5E5E5)
     static let secondaryText = Color(hex: 0xD4D4D4)
     static let mutedText = Color(hex: 0x525252)

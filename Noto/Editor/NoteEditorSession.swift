@@ -7,6 +7,7 @@ private let sessionLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "c
 @Observable
 final class NoteEditorSession {
     let store: MarkdownNoteStore
+    let vaultController: VaultController
     let isNew: Bool
 
     var note: MarkdownNote
@@ -28,8 +29,17 @@ final class NoteEditorSession {
     private var renameTask: Task<Void, Never>?
     private var autosaveTask: Task<Void, Never>?
 
-    init(store: MarkdownNoteStore, note: MarkdownNote, isNew: Bool = false) {
+    init(
+        store: MarkdownNoteStore,
+        note: MarkdownNote,
+        isNew: Bool = false,
+        vaultController: VaultController? = nil
+    ) {
         self.store = store
+        self.vaultController = vaultController ?? VaultController(
+            vaultURL: store.vaultRootURL,
+            directoryLoader: store.directoryLoader
+        )
         self.note = note
         self.isNew = isNew
     }
@@ -72,11 +82,11 @@ final class NoteEditorSession {
     }
 
     func importImageAttachment(data: Data, suggestedFilename: String?) throws -> VaultImageAttachment {
-        try store.importImageAttachment(data: data, suggestedFilename: suggestedFilename)
+        try vaultController.importImageAttachment(data: data, suggestedFilename: suggestedFilename, in: store)
     }
 
     func importImageAttachment(fileURL: URL) throws -> VaultImageAttachment {
-        try store.importImageAttachment(fileURL: fileURL)
+        try vaultController.importImageAttachment(fileURL: fileURL, in: store)
     }
 
     func handleExternalChange(changedURL: URL?) {
@@ -91,7 +101,7 @@ final class NoteEditorSession {
             return
         }
 
-        let diskContent = store.readContent(of: note)
+        let diskContent = vaultController.openNote(note, in: store)
         guard !diskContent.isEmpty else { return }
 
         let diskBody = MarkdownNote.stripFrontmatter(diskContent)
@@ -163,9 +173,13 @@ final class NoteEditorSession {
             persistEditorText(latestEditorText)
         }
 
-        let moved = store.moveNote(note, to: destinationDirectory)
+        let moved = vaultController.move(note, to: destinationDirectory, in: store)
         note = moved
         return moved
+    }
+
+    func deleteCurrentNote() -> Bool {
+        vaultController.delete(note, in: store)
     }
 
     func replaceNoteFromParent(_ updatedNote: MarkdownNote) {
@@ -190,7 +204,7 @@ final class NoteEditorSession {
             try? await Task.sleep(for: Self.titleRenameDebounce)
             guard let self else { return }
             guard !Task.isCancelled, !self.isDeleting else { return }
-            self.note = self.store.renameFileIfNeeded(for: self.note)
+            self.note = self.vaultController.renameIfNeeded(self.note, in: self.store)
         }
     }
 
@@ -212,7 +226,7 @@ final class NoteEditorSession {
         latestEditorText = text
         lastPersistedText = text
         hasPendingLocalEdits = false
-        note = store.updateTitleFromContent(text, for: note)
+        note = vaultController.updateMetadataFromContent(text, for: note, in: store)
     }
 
     private func applyEditorText(_ newText: String, scheduleRename shouldScheduleRename: Bool) {
@@ -220,7 +234,7 @@ final class NoteEditorSession {
         latestEditorText = newText
         hasPendingLocalEdits = true
         DebugTrace.record("editor apply text note=\(note.fileURL.lastPathComponent) scheduleRename=\(shouldScheduleRename)")
-        note = store.updateTitleFromContent(newText, for: note)
+        note = vaultController.updateMetadataFromContent(newText, for: note, in: store)
         scheduleAutosave()
         if shouldScheduleRename, note.title != previousTitle {
             scheduleRename()
@@ -229,8 +243,8 @@ final class NoteEditorSession {
 
     private func persistEditorText(_ text: String) {
         DebugTrace.record("editor persist start note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(text))")
-        note = store.updateTitleFromContent(text, for: note)
-        let saveResult = store.saveContent(text, for: note)
+        note = vaultController.updateMetadataFromContent(text, for: note, in: store)
+        let saveResult = vaultController.save(text, for: note, in: store)
         content = text
         note = saveResult.note
         if saveResult.didWrite {

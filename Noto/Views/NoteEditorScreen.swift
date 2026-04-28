@@ -135,6 +135,7 @@ struct NoteEditorScreen: View {
             vaultRootURL: store.vaultRootURL,
             noteFileURL: session.note.fileURL,
             statusCount: statusCount,
+            leadingControls: leadingChromeControls,
             canNavigateBack: canNavigateBack,
             canNavigateForward: canNavigateForward,
             onNavigateBack: onNavigateBack,
@@ -204,8 +205,7 @@ struct NoteEditorScreen: View {
 
     private func deleteCurrentNote() {
         session.markDeleting()
-        let noteToDelete = session.note
-        guard session.store.deleteNote(noteToDelete) else {
+        guard session.deleteCurrentNote() else {
             session.finishDeleteAttempt()
             return
         }

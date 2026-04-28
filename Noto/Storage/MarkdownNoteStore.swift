@@ -1,9 +1,7 @@
 import Foundation
-import ImageIO
 import NotoSearch
 import NotoVault
 import os.log
-import UniformTypeIdentifiers
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "MarkdownNoteStore")
 
@@ -16,74 +14,27 @@ struct MarkdownNote: Identifiable, Hashable {
 
     /// Derives title from content, skipping YAML frontmatter and stripping heading prefix.
     static func titleFrom(_ content: String) -> String {
-        let body = stripFrontmatter(content)
-        let firstLine = body.prefix(while: { $0 != "\n" })
-        var title = String(firstLine).trimmingCharacters(in: .whitespaces)
-        if let match = title.range(of: #"^#{1,3}\s*"#, options: .regularExpression) {
-            title = String(title[match.upperBound...])
-        }
-        return title.isEmpty ? "Untitled" : title
+        VaultMarkdown.title(from: content)
     }
 
     /// Strips YAML frontmatter (--- ... ---) from the beginning of content.
     static func stripFrontmatter(_ content: String) -> String {
-        guard content.hasPrefix("---") else { return content }
-        // Find the closing ---
-        let searchRange = content.index(content.startIndex, offsetBy: 3)..<content.endIndex
-        guard let closeRange = content.range(of: "\n---", range: searchRange) else { return content }
-        let afterFrontmatter = content[closeRange.upperBound...]
-        // Skip leading newlines after frontmatter
-        return String(afterFrontmatter.drop(while: { $0 == "\n" }))
+        VaultMarkdown.stripFrontmatter(content)
     }
 
     /// Extracts the UUID from YAML frontmatter, if present.
     static func idFromFrontmatter(_ content: String) -> UUID? {
-        guard content.hasPrefix("---") else { return nil }
-        let searchRange = content.index(content.startIndex, offsetBy: 3)..<content.endIndex
-        guard let closeRange = content.range(of: "\n---", range: searchRange) else { return nil }
-        let frontmatter = String(content[content.startIndex..<closeRange.upperBound])
-        // Find id: line
-        for line in frontmatter.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("id:") {
-                let value = trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
-                return UUID(uuidString: value)
-            }
-        }
-        return nil
+        VaultMarkdown.idFromFrontmatter(content)
     }
 
     /// Generates YAML frontmatter block for a new note.
     static func makeFrontmatter(id: UUID, createdAt: Date = Date()) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        let now = formatter.string(from: createdAt)
-        return """
-        ---
-        id: \(id.uuidString)
-        created: \(now)
-        updated: \(now)
-        ---
-
-        """
+        VaultMarkdown.makeFrontmatter(id: id, createdAt: createdAt)
     }
 
     /// Updates the `updated` timestamp in existing frontmatter content.
     static func updateTimestamp(in content: String) -> String {
-        guard content.hasPrefix("---") else { return content }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        let now = formatter.string(from: Date())
-
-        let lines = content.components(separatedBy: "\n")
-        var updated = lines
-        for (i, line) in lines.enumerated() {
-            if line.trimmingCharacters(in: .whitespaces).hasPrefix("updated:") {
-                updated[i] = "updated: \(now)"
-                break
-            }
-        }
-        return updated.joined(separator: "\n")
+        VaultMarkdown.updateTimestamp(in: content)
     }
 }
 
@@ -94,157 +45,8 @@ struct PageMentionDocument: Identifiable, Equatable {
     let fileURL: URL
 }
 
-struct VaultImageAttachment: Equatable {
-    let fileURL: URL
-    let relativePath: String
-    let markdownPath: String
-    let altText: String
-
-    var markdown: String {
-        "![\(altText)](\(markdownPath))"
-    }
-}
-
-struct VaultImageAttachmentStore {
-    enum ImportError: Error, Equatable {
-        case unsupportedImage
-        case createAttachmentDirectoryFailed
-        case writeFailed
-    }
-
-    static let attachmentDirectoryName = ".attachments"
-
-    let vaultRootURL: URL
-    var maxPixelSize: CGFloat = 2400
-    var jpegCompressionQuality: CGFloat = 0.82
-
-    func importImageFile(at sourceURL: URL) throws -> VaultImageAttachment {
-        let data = try Data(contentsOf: sourceURL)
-        return try importImageData(data, suggestedFilename: sourceURL.lastPathComponent)
-    }
-
-    func importImageData(_ data: Data, suggestedFilename: String?) throws -> VaultImageAttachment {
-        let encoded = try encodeImage(data)
-        let attachmentsURL = vaultRootURL.appendingPathComponent(Self.attachmentDirectoryName, isDirectory: true)
-        guard FileManager.default.fileExists(atPath: attachmentsURL.path) || CoordinatedFileManager.createDirectory(at: attachmentsURL) else {
-            throw ImportError.createAttachmentDirectoryFailed
-        }
-
-        let stem = Self.sanitizedStem(from: suggestedFilename)
-        let filename = "\(stem).\(encoded.fileExtension)"
-        let destinationURL = Self.resolveConflict(for: filename, in: attachmentsURL)
-
-        guard CoordinatedFileManager.writeData(encoded.data, to: destinationURL) else {
-            throw ImportError.writeFailed
-        }
-
-        let relativePath = "\(Self.attachmentDirectoryName)/\(destinationURL.lastPathComponent)"
-        return VaultImageAttachment(
-            fileURL: destinationURL,
-            relativePath: relativePath,
-            markdownPath: Self.markdownPath(for: relativePath),
-            altText: destinationURL.deletingPathExtension().lastPathComponent
-        )
-    }
-
-    private func encodeImage(_ data: Data) throws -> (data: Data, fileExtension: String) {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-            throw ImportError.unsupportedImage
-        }
-
-        let thumbnailOptions: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
-        ]
-
-        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary)
-            ?? CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            throw ImportError.unsupportedImage
-        }
-
-        let preservesAlpha = image.hasMeaningfulAlpha
-        let outputType = preservesAlpha ? UTType.png : UTType.jpeg
-        let outputExtension = preservesAlpha ? "png" : "jpg"
-        let outputData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            outputData,
-            outputType.identifier as CFString,
-            1,
-            nil
-        ) else {
-            throw ImportError.unsupportedImage
-        }
-
-        let properties: [CFString: Any]
-        if preservesAlpha {
-            properties = [:]
-        } else {
-            properties = [kCGImageDestinationLossyCompressionQuality: jpegCompressionQuality]
-        }
-
-        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
-        guard CGImageDestinationFinalize(destination) else {
-            throw ImportError.unsupportedImage
-        }
-
-        return (outputData as Data, outputExtension)
-    }
-
-    private static func sanitizedStem(from suggestedFilename: String?) -> String {
-        let fallback = "Image"
-        guard let suggestedFilename, !suggestedFilename.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return fallback
-        }
-
-        let base = URL(fileURLWithPath: suggestedFilename).deletingPathExtension().lastPathComponent
-        let illegal = CharacterSet(charactersIn: "/\\:?\"<>|*")
-        let sanitized = base
-            .components(separatedBy: illegal)
-            .joined()
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !sanitized.isEmpty else { return fallback }
-        return String(sanitized.prefix(80))
-    }
-
-    private static func markdownPath(for relativePath: String) -> String {
-        relativePath
-            .split(separator: "/", omittingEmptySubsequences: false)
-            .map { component in
-                String(component).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String(component)
-            }
-            .joined(separator: "/")
-    }
-
-    private static func resolveConflict(for filename: String, in directory: URL) -> URL {
-        let fm = FileManager.default
-        var candidate = directory.appendingPathComponent(filename)
-        guard fm.fileExists(atPath: candidate.path) else { return candidate }
-
-        let stem = candidate.deletingPathExtension().lastPathComponent
-        let ext = candidate.pathExtension
-        var counter = 2
-        while fm.fileExists(atPath: candidate.path) {
-            candidate = directory.appendingPathComponent("\(stem)(\(counter)).\(ext)")
-            counter += 1
-        }
-        return candidate
-    }
-}
-
-private extension CGImage {
-    var hasMeaningfulAlpha: Bool {
-        switch alphaInfo {
-        case .alphaOnly, .first, .last, .premultipliedFirst, .premultipliedLast:
-            return true
-        case .none, .noneSkipFirst, .noneSkipLast:
-            return false
-        @unknown default:
-            return false
-        }
-    }
-}
+typealias VaultImageAttachment = NotoVault.VaultImageAttachment
+typealias VaultImageAttachmentStore = NotoVault.AttachmentStore
 
 struct DailyNoteFile {
     struct Resolution {
@@ -262,56 +64,21 @@ struct DailyNoteFile {
         date: Date = Date(),
         calendar: Calendar = .current
     ) -> Resolution {
-        let dailyFolderURL = vaultRootURL.appendingPathComponent("Daily Notes")
-        if !FileManager.default.fileExists(atPath: dailyFolderURL.path) {
-            CoordinatedFileManager.createDirectory(at: dailyFolderURL)
-        }
-
-        let isoDate = dateFormatter(format: "yyyy-MM-dd", calendar: calendar).string(from: date)
-        let displayTitle = dateFormatter(format: "dd MMM, yy (EEE)", calendar: calendar).string(from: date)
-        let fileURL = dailyFolderURL.appendingPathComponent("\(isoDate).md")
-
-        var didCreate = false
-        if !FileManager.default.fileExists(atPath: fileURL.path) {
-            let id = UUID()
-            let template = NoteTemplate.dailyNote
-            let content = MarkdownNote.makeFrontmatter(id: id, createdAt: date) + "# \(displayTitle)\n\(template.body)"
-            didCreate = CoordinatedFileManager.writeString(content, to: fileURL)
-        }
-
-        let existingContent = CoordinatedFileManager.readString(from: fileURL) ?? ""
-        let template = NoteTemplate.dailyNote
-        var didApplyTemplate = false
-        if let updated = template.applyRetroactively(to: existingContent) {
-            didApplyTemplate = CoordinatedFileManager.writeString(updated, to: fileURL)
-        }
-
-        let id = MarkdownNote.idFromFrontmatter(existingContent) ?? VaultDirectoryLoader.stableID(for: fileURL)
-        let attrs = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey])
-
+        let resolved = DailyNoteService(vaultRootURL: vaultRootURL)
+            .ensure(date: date, calendar: calendar)
         return Resolution(
-            dailyFolderURL: dailyFolderURL,
-            fileURL: fileURL,
-            displayTitle: displayTitle,
-            id: id,
-            modifiedDate: attrs?.contentModificationDate ?? date,
-            didCreate: didCreate,
-            didApplyTemplate: didApplyTemplate
+            dailyFolderURL: resolved.dailyFolderURL,
+            fileURL: resolved.fileURL,
+            displayTitle: resolved.displayTitle,
+            id: resolved.id,
+            modifiedDate: resolved.modifiedDate,
+            didCreate: resolved.didCreate,
+            didApplyTemplate: resolved.didApplyTemplate
         )
     }
 
     static func nextStartOfDay(after date: Date = Date(), calendar: Calendar = .current) -> Date? {
-        let startOfDay = calendar.startOfDay(for: date)
-        return calendar.date(byAdding: .day, value: 1, to: startOfDay)
-    }
-
-    private static func dateFormatter(format: String, calendar: Calendar) -> DateFormatter {
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = format
-        return formatter
+        DailyNoteService.nextStartOfDay(after: date, calendar: calendar)
     }
 }
 
@@ -354,6 +121,19 @@ extension MarkdownNote {
             modifiedDate: summary.modifiedDate
         )
     }
+
+    init(record: VaultNoteRecord) {
+        self.init(
+            id: record.id,
+            fileURL: record.fileURL,
+            title: record.title,
+            modifiedDate: record.modifiedDate
+        )
+    }
+
+    var vaultRecord: VaultNoteRecord {
+        VaultNoteRecord(id: id, fileURL: fileURL, title: title, modifiedDate: modifiedDate)
+    }
 }
 
 extension NotoFolder {
@@ -365,6 +145,17 @@ extension NotoFolder {
             modifiedDate: summary.modifiedDate,
             folderCount: summary.folderCount,
             itemCount: summary.itemCount
+        )
+    }
+
+    init(record: VaultFolderRecord) {
+        self.init(
+            id: record.id,
+            folderURL: record.folderURL,
+            name: record.name,
+            modifiedDate: record.modifiedDate,
+            folderCount: record.folderCount,
+            itemCount: record.itemCount
         )
     }
 }
@@ -398,6 +189,14 @@ final class MarkdownNoteStore {
     let directoryURL: URL
     let vaultRootURL: URL
     let directoryLoader: VaultDirectoryLoader
+
+    private var noteRepository: NoteRepository {
+        NoteRepository(directoryURL: directoryURL, vaultRootURL: vaultRootURL)
+    }
+
+    private var folderRepository: FolderRepository {
+        FolderRepository(directoryURL: directoryURL)
+    }
 
     /// Initialize for a specific directory within the vault.
     init(
@@ -435,7 +234,7 @@ final class MarkdownNoteStore {
 
     private func ensureDirectoryExists() {
         if !FileManager.default.fileExists(atPath: directoryURL.path) {
-            CoordinatedFileManager.createDirectory(at: directoryURL)
+            noteRepository.ensureDirectoryExists()
             logger.info("Created directory at \(self.directoryURL.path)")
         }
     }
@@ -493,7 +292,7 @@ final class MarkdownNoteStore {
     }
 
     func readContent(of note: MarkdownNote) -> String {
-        let content = CoordinatedFileManager.readString(from: note.fileURL) ?? ""
+        let content = noteRepository.readContent(of: note.vaultRecord)
         DebugTrace.record("store read note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(content))")
         return content
     }
@@ -509,47 +308,14 @@ final class MarkdownNoteStore {
     }
 
     func vaultRelativePath(for fileURL: URL) -> String? {
-        let rootPath = vaultRootURL.standardizedFileURL.path
-        let filePath = fileURL.standardizedFileURL.path
-        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-        guard filePath.hasPrefix(prefix) else { return nil }
-        return String(filePath.dropFirst(prefix.count))
+        noteRepository.relativePath(for: fileURL)
     }
 
     func note(atVaultRelativePath relativePath: String) -> (store: MarkdownNoteStore, note: MarkdownNote)? {
-        let decodedPath = relativePath.removingPercentEncoding ?? relativePath
-        let components = decodedPath.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-        guard !components.isEmpty,
-              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
-            return nil
-        }
-
-        var fileURL = vaultRootURL
-        for component in components {
-            fileURL.appendPathComponent(component)
-        }
-        fileURL = fileURL.standardizedFileURL
-
-        let rootPath = vaultRootURL.standardizedFileURL.path
-        let filePath = fileURL.path
-        guard filePath.hasPrefix(rootPath + "/"),
-              fileURL.pathExtension.localizedCaseInsensitiveCompare("md") == .orderedSame,
-              FileManager.default.fileExists(atPath: filePath) else {
-            return nil
-        }
-
-        let content = CoordinatedFileManager.readString(from: fileURL) ?? ""
-        let id = MarkdownNote.idFromFrontmatter(content) ?? VaultDirectoryLoader.stableID(for: fileURL)
-        let modifiedDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
-            ?? Date()
-        let note = MarkdownNote(
-            id: id,
-            fileURL: fileURL,
-            title: Self.displayTitle(for: fileURL, content: content),
-            modifiedDate: modifiedDate
-        )
+        guard let record = noteRepository.note(atVaultRelativePath: relativePath) else { return nil }
+        let note = MarkdownNote(record: record)
         let noteStore = MarkdownNoteStore(
-            directoryURL: fileURL.deletingLastPathComponent(),
+            directoryURL: record.fileURL.deletingLastPathComponent(),
             vaultRootURL: vaultRootURL,
             autoload: false,
             directoryLoader: directoryLoader
@@ -558,50 +324,14 @@ final class MarkdownNoteStore {
     }
 
     func note(withID noteID: UUID) -> (store: MarkdownNoteStore, note: MarkdownNote)? {
-        if FileManager.default.fileExists(atPath: vaultRootURL.path) {
-            guard let enumerator = FileManager.default.enumerator(
-                at: vaultRootURL.standardizedFileURL,
-                includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            ) else {
-                return nil
-            }
-
-            // Read only the frontmatter prefix to find the matching ID — reading
-            // every full file on the main thread can stall for seconds on large
-            // or iCloud-backed vaults and trip the iOS watchdog.
-            let frontmatterByteLimit = 64 * 1024
-            for case let fileURL as URL in enumerator {
-                let normalizedURL = fileURL.standardizedFileURL
-                guard normalizedURL.pathExtension.localizedCaseInsensitiveCompare("md") == .orderedSame,
-                      let prefixData = CoordinatedFileManager.readPrefix(from: normalizedURL, maxBytes: frontmatterByteLimit) else {
-                    continue
-                }
-                let prefix = String(decoding: prefixData, as: UTF8.self)
-                guard MarkdownNote.idFromFrontmatter(prefix) == noteID,
-                      let content = CoordinatedFileManager.readString(from: normalizedURL) else {
-                    continue
-                }
-
-                let modifiedDate = (try? normalizedURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
-                    ?? Date()
-                let note = MarkdownNote(
-                    id: noteID,
-                    fileURL: normalizedURL,
-                    title: Self.displayTitle(for: normalizedURL, content: content),
-                    modifiedDate: modifiedDate
-                )
-                let noteStore = MarkdownNoteStore(
-                    directoryURL: normalizedURL.deletingLastPathComponent(),
-                    vaultRootURL: vaultRootURL,
-                    autoload: false,
-                    directoryLoader: directoryLoader
-                )
-                return (noteStore, note)
-            }
-        }
-
-        return nil
+        guard let record = noteRepository.note(withID: noteID) else { return nil }
+        let noteStore = MarkdownNoteStore(
+            directoryURL: record.fileURL.deletingLastPathComponent(),
+            vaultRootURL: vaultRootURL,
+            autoload: false,
+            directoryLoader: directoryLoader
+        )
+        return (noteStore, MarkdownNote(record: record))
     }
 
     func pageMentionDocuments(
@@ -644,18 +374,12 @@ final class MarkdownNoteStore {
     }
 
     func createNote() -> MarkdownNote {
-        let id = UUID()
-        let filename = "\(id.uuidString).md"
-        let fileURL = directoryURL.appendingPathComponent(filename)
-        let initialContent = MarkdownNote.makeFrontmatter(id: id) + "# "
-
-        if CoordinatedFileManager.writeString(initialContent, to: fileURL) {
-            refreshSearchIndexFileImmediately(fileURL)
+        let note = MarkdownNote(record: noteRepository.createNote())
+        if FileManager.default.fileExists(atPath: note.fileURL.path) {
+            refreshSearchIndexFileImmediately(note.fileURL)
         } else {
-            logger.error("Failed to create note at \(fileURL.lastPathComponent)")
+            logger.error("Failed to create note at \(note.fileURL.lastPathComponent)")
         }
-
-        let note = MarkdownNote(id: id, fileURL: fileURL, title: "Untitled", modifiedDate: Date())
         items.insert(.note(note), at: folderCount)
         return note
     }
@@ -696,8 +420,7 @@ final class MarkdownNoteStore {
     /// Only writes to disk and updates the `updated` timestamp if the content body has actually changed.
     @discardableResult
     func saveContent(_ content: String, for note: MarkdownNote) -> SaveResult {
-        // Check if the body (non-frontmatter) content actually changed
-        let existingContent = CoordinatedFileManager.readString(from: note.fileURL) ?? ""
+        let existingContent = noteRepository.readContent(of: note.vaultRecord)
         let existingBody = MarkdownNote.stripFrontmatter(existingContent)
         let newBody = MarkdownNote.stripFrontmatter(content)
 
@@ -709,23 +432,15 @@ final class MarkdownNoteStore {
             return SaveResult(note: note, didWrite: false)
         }
 
-        let contentToSave = MarkdownNote.updateTimestamp(in: content)
-        let writeSucceeded = CoordinatedFileManager.writeString(contentToSave, to: note.fileURL)
-        DebugTrace.record("store write result note=\(note.fileURL.lastPathComponent) success=\(writeSucceeded)")
-        guard writeSucceeded else {
+        let result = noteRepository.saveContent(content, for: note.vaultRecord)
+        DebugTrace.record("store write result note=\(note.fileURL.lastPathComponent) success=\(result.didWrite)")
+        guard result.didWrite else {
             logger.error("Failed to save note \(note.fileURL.lastPathComponent)")
             return SaveResult(note: note, didWrite: false)
         }
         scheduleSearchIndexRefresh(for: note.fileURL)
 
-        let newTitle = MarkdownNote.titleFrom(content)
-
-        let updated = MarkdownNote(
-            id: note.id,
-            fileURL: note.fileURL,
-            title: newTitle,
-            modifiedDate: Date()
-        )
+        let updated = MarkdownNote(record: result.note)
 
         if let idx = items.firstIndex(where: { $0.id == note.id }) {
             items.remove(at: idx)
@@ -739,55 +454,30 @@ final class MarkdownNoteStore {
     /// Renames the file to match the note title. Returns updated note with new fileURL.
     @discardableResult
     func renameFileIfNeeded(for note: MarkdownNote) -> MarkdownNote {
-        let currentStem = note.fileURL.deletingPathExtension().lastPathComponent
-        let isDailyNote = currentStem.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil
-        let sanitized = Self.sanitizeFilename(note.title)
-
-        guard !isDailyNote && !sanitized.isEmpty && sanitized != "Untitled" && sanitized != currentStem else {
+        let renamed = MarkdownNote(record: noteRepository.renameFileIfNeeded(for: note.vaultRecord))
+        guard renamed.fileURL != note.fileURL else {
             return note
         }
 
-        let directoryURL = note.fileURL.deletingLastPathComponent()
-        let newURL = Self.resolveConflict(for: "\(sanitized).md", in: directoryURL)
-
-        guard CoordinatedFileManager.move(from: note.fileURL, to: newURL) else {
-            logger.error("Failed to rename note to \(newURL.lastPathComponent)")
-            return note
-        }
-
-        logger.info("Renamed note to \(newURL.lastPathComponent)")
-
-        let updated = MarkdownNote(
-            id: note.id,
-            fileURL: newURL,
-            title: note.title,
-            modifiedDate: note.modifiedDate
-        )
+        logger.info("Renamed note to \(renamed.fileURL.lastPathComponent)")
 
         if let idx = items.firstIndex(where: { $0.id == note.id }) {
             items.remove(at: idx)
-            items.insert(.note(updated), at: folderCount)
+            items.insert(.note(renamed), at: folderCount)
         }
 
-        replaceSearchIndexFile(oldFileURL: note.fileURL, newFileURL: updated.fileURL)
-        return updated
+        replaceSearchIndexFile(oldFileURL: note.fileURL, newFileURL: renamed.fileURL)
+        return renamed
     }
 
     /// Sanitize a string for use as a filename.
     private static func sanitizeFilename(_ name: String) -> String {
-        let illegal = CharacterSet(charactersIn: "/\\:?\"<>|*")
-        var sanitized = name.components(separatedBy: illegal).joined()
-        sanitized = sanitized.trimmingCharacters(in: .whitespaces)
-        // Limit length
-        if sanitized.count > 100 {
-            sanitized = String(sanitized.prefix(100))
-        }
-        return sanitized
+        VaultMarkdown.sanitizeFilename(name)
     }
 
     @discardableResult
     func deleteNote(_ note: MarkdownNote) -> Bool {
-        if CoordinatedFileManager.delete(at: note.fileURL) || deleteWithoutCoordination(note.fileURL) {
+        if noteRepository.deleteNote(note.vaultRecord) {
             items.removeAll { $0.id == note.id }
             removeSearchIndexFile(note.fileURL)
             return true
@@ -803,38 +493,14 @@ final class MarkdownNoteStore {
     /// On filename conflict, appends (2), (3), etc. Returns the moved note.
     @discardableResult
     func moveNote(_ note: MarkdownNote, to destinationDirectory: URL) -> MarkdownNote {
-        // No-op if already in the destination
-        if note.fileURL.deletingLastPathComponent().standardizedFileURL == destinationDirectory.standardizedFileURL {
-            return note
-        }
-
-        // Create destination if needed
-        if !FileManager.default.fileExists(atPath: destinationDirectory.path) {
-            guard CoordinatedFileManager.createDirectory(at: destinationDirectory) else {
-                logger.error("Failed to create destination directory")
-                return note
-            }
-        }
-
-        let destURL = Self.resolveConflict(
-            for: note.fileURL.lastPathComponent,
-            in: destinationDirectory
-        )
-
-        guard CoordinatedFileManager.move(from: note.fileURL, to: destURL) else {
-            logger.error("Failed to move note to \(destURL.lastPathComponent)")
+        let moved = MarkdownNote(record: noteRepository.moveNote(note.vaultRecord, to: destinationDirectory))
+        guard moved.fileURL != note.fileURL else {
             return note
         }
 
         items.removeAll { $0.id == note.id }
-        logger.info("Moved note to \(destURL.path)")
+        logger.info("Moved note to \(moved.fileURL.path)")
 
-        let moved = MarkdownNote(
-            id: note.id,
-            fileURL: destURL,
-            title: note.title,
-            modifiedDate: note.modifiedDate
-        )
         replaceSearchIndexFile(oldFileURL: note.fileURL, newFileURL: moved.fileURL)
         return moved
     }
@@ -843,71 +509,33 @@ final class MarkdownNoteStore {
     /// On name conflict, appends (2), (3), etc. Returns the moved folder.
     @discardableResult
     func moveFolder(_ folder: NotoFolder, to destinationDirectory: URL) -> NotoFolder {
-        // No-op if already in the destination
-        if folder.folderURL.deletingLastPathComponent().standardizedFileURL == destinationDirectory.standardizedFileURL {
-            return folder
-        }
-
-        // Create destination if needed
-        if !FileManager.default.fileExists(atPath: destinationDirectory.path) {
-            guard CoordinatedFileManager.createDirectory(at: destinationDirectory) else {
-                logger.error("Failed to create destination directory")
-                return folder
-            }
-        }
-
-        let destURL = Self.resolveConflictForFolder(
-            named: folder.name,
-            in: destinationDirectory
-        )
-
-        guard CoordinatedFileManager.move(from: folder.folderURL, to: destURL) else {
-            logger.error("Failed to move folder to \(destURL.lastPathComponent)")
+        let moved = NotoFolder(record: folderRepository.moveFolder(
+            id: folder.id,
+            folderURL: folder.folderURL,
+            name: folder.name,
+            modifiedDate: folder.modifiedDate,
+            folderCount: folder.folderCount,
+            itemCount: folder.itemCount,
+            to: destinationDirectory
+        ))
+        guard moved.folderURL != folder.folderURL else {
             return folder
         }
 
         items.removeAll { $0.id == folder.id }
-        logger.info("Moved folder to \(destURL.path)")
+        logger.info("Moved folder to \(moved.folderURL.path)")
 
-        return NotoFolder(
-            id: folder.id,
-            folderURL: destURL,
-            name: destURL.lastPathComponent,
-            modifiedDate: folder.modifiedDate,
-            folderCount: folder.folderCount,
-            itemCount: folder.itemCount
-        )
+        return moved
     }
 
     /// Resolves filename conflicts by appending (2), (3), etc.
     private static func resolveConflict(for filename: String, in directory: URL) -> URL {
-        let fm = FileManager.default
-        var candidate = directory.appendingPathComponent(filename)
-        guard fm.fileExists(atPath: candidate.path) else { return candidate }
-
-        let stem = candidate.deletingPathExtension().lastPathComponent
-        let ext = candidate.pathExtension
-        var counter = 2
-        while fm.fileExists(atPath: candidate.path) {
-            let newName = ext.isEmpty ? "\(stem)(\(counter))" : "\(stem)(\(counter)).\(ext)"
-            candidate = directory.appendingPathComponent(newName)
-            counter += 1
-        }
-        return candidate
+        VaultMarkdown.resolveFileConflict(for: filename, in: directory, fileSystem: CoordinatedVaultFileSystem())
     }
 
     /// Resolves folder name conflicts by appending (2), (3), etc.
     private static func resolveConflictForFolder(named name: String, in directory: URL) -> URL {
-        let fm = FileManager.default
-        var candidate = directory.appendingPathComponent(name)
-        guard fm.fileExists(atPath: candidate.path) else { return candidate }
-
-        var counter = 2
-        while fm.fileExists(atPath: candidate.path) {
-            candidate = directory.appendingPathComponent("\(name)(\(counter))")
-            counter += 1
-        }
-        return candidate
+        VaultMarkdown.resolveFolderConflict(named: name, in: directory, fileSystem: CoordinatedVaultFileSystem())
     }
 
     // MARK: - Today's Note
@@ -929,7 +557,12 @@ final class MarkdownNoteStore {
             modifiedDate: resolved.modifiedDate
         )
 
-        let dailyStore = MarkdownNoteStore(directoryURL: resolved.dailyFolderURL, vaultRootURL: vaultRootURL)
+        let dailyStore = MarkdownNoteStore(
+            directoryURL: resolved.dailyFolderURL,
+            vaultRootURL: vaultRootURL,
+            autoload: false,
+            directoryLoader: directoryLoader
+        )
         return (dailyStore, note)
     }
 
@@ -1022,17 +655,7 @@ final class MarkdownNoteStore {
     }
 
     func createFolder(name: String) -> NotoFolder {
-        let folderURL = directoryURL.appendingPathComponent(name)
-        CoordinatedFileManager.createDirectory(at: folderURL)
-
-        let folder = NotoFolder(
-            id: VaultDirectoryLoader.stableID(for: folderURL),
-            folderURL: folderURL,
-            name: name,
-            modifiedDate: Date(),
-            folderCount: 0,
-            itemCount: 0
-        )
+        let folder = NotoFolder(record: folderRepository.createFolder(named: name))
 
         // Insert in alphabetical order among existing folders
         let insertIdx = folders.firstIndex { $0.name.localizedCaseInsensitiveCompare(name) == .orderedDescending } ?? folderCount
@@ -1041,7 +664,7 @@ final class MarkdownNoteStore {
     }
 
     func deleteFolder(_ folder: NotoFolder) {
-        if CoordinatedFileManager.delete(at: folder.folderURL) {
+        if folderRepository.deleteFolder(at: folder.folderURL) {
             items.removeAll { $0.id == folder.id }
         } else {
             logger.error("Failed to delete folder \(folder.name)")
@@ -1061,7 +684,7 @@ private extension MarkdownNoteStore {
         let vaultURL = vaultRootURL
         Task.detached(priority: .utility) {
             do {
-                _ = try await SearchIndexRefreshCoordinator.shared.refreshFile(vaultURL: vaultURL, fileURL: fileURL)
+                _ = try await SearchIndexController.shared.refreshFile(vaultURL: vaultURL, fileURL: fileURL)
             } catch {
                 DebugTrace.record("search index single-file refresh failed file=\(fileURL.lastPathComponent) error=\(String(describing: error))")
             }
@@ -1071,7 +694,7 @@ private extension MarkdownNoteStore {
     func scheduleSearchIndexRefresh(for fileURL: URL) {
         let vaultURL = vaultRootURL
         Task.detached(priority: .utility) {
-            await SearchIndexRefreshCoordinator.shared.scheduleRefreshFile(vaultURL: vaultURL, fileURL: fileURL)
+            await SearchIndexController.shared.scheduleRefreshFile(vaultURL: vaultURL, fileURL: fileURL)
         }
     }
 
@@ -1079,7 +702,7 @@ private extension MarkdownNoteStore {
         let vaultURL = vaultRootURL
         Task.detached(priority: .utility) {
             do {
-                _ = try await SearchIndexRefreshCoordinator.shared.replaceFile(
+                _ = try await SearchIndexController.shared.replaceFile(
                     vaultURL: vaultURL,
                     oldFileURL: oldFileURL,
                     newFileURL: newFileURL
@@ -1094,7 +717,7 @@ private extension MarkdownNoteStore {
         let vaultURL = vaultRootURL
         Task.detached(priority: .utility) {
             do {
-                _ = try await SearchIndexRefreshCoordinator.shared.removeFile(vaultURL: vaultURL, fileURL: fileURL)
+                _ = try await SearchIndexController.shared.removeFile(vaultURL: vaultURL, fileURL: fileURL)
             } catch {
                 DebugTrace.record("search index file removal failed file=\(fileURL.lastPathComponent) error=\(String(describing: error))")
             }

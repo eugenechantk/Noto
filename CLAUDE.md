@@ -32,6 +32,10 @@ The app is a **clean-sheet rewrite** (v2) of an earlier outline-based version. V
 
 These are the standard workflows for all development work on this project. Follow them every time.
 
+### Read the Architecture First
+
+Before doing implementation, debugging, refactoring, or architecture work, read `README.md`. Treat it as the current architecture and lifecycle map for this repo, and use it to choose the right abstraction level, ownership boundary, and established pattern before editing code.
+
 ### New features → `/ios-development` skill
 
 When asked to build any new feature or enhancement, always load and follow the `/ios-development` skill. This ensures a consistent flow: feature doc → tests → implementation → simulator verification.

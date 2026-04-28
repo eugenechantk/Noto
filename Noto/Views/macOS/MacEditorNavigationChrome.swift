@@ -9,6 +9,7 @@ struct EditorNavigationChrome: ViewModifier {
     let vaultRootURL: URL
     let noteFileURL: URL
     let statusCount: WordCounter.Count
+    var leadingControls: EditorLeadingChromeControls = .none
     var canNavigateBack = false
     var canNavigateForward = false
     var onNavigateBack: (() -> Void)?
@@ -31,6 +32,19 @@ struct EditorNavigationChrome: ViewModifier {
             .toolbar {
                 if showsEditorToolbar {
                     ToolbarItemGroup(placement: .navigation) {
+                        if let onToggleSidebar = leadingControls.onToggleSidebar,
+                           let sidebarSystemImage = leadingControls.sidebarSystemImage {
+                            Button {
+                                onToggleSidebar()
+                            } label: {
+                                Label(leadingControls.sidebarAccessibilityLabel ?? "Toggle Sidebar", systemImage: sidebarSystemImage)
+                            }
+                            .labelStyle(.iconOnly)
+                            .accessibilityIdentifier("sidebar_toggle_button")
+                            .accessibilityLabel(leadingControls.sidebarAccessibilityLabel ?? "Toggle Sidebar")
+                            .help(leadingControls.sidebarAccessibilityLabel ?? "Toggle Sidebar")
+                        }
+
                         Button {
                             onNavigateBack?()
                         } label: {

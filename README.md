@@ -2,9 +2,70 @@
 
 This is a universal apple application for my markdown based note taking app
 
-## Current editor architecture
+## Current Architecture
 
-The live editor path is a markdown-native block editor on iOS. At the app level, `NotoApp` creates a vault-scoped `MarkdownNoteStore` plus a `VaultFileWatcher`, and `NoteEditorScreen` loads one note's full markdown content into a single `String` state called `content`. The screen passes that binding into `BlockEditorView`, and debounces save and rename operations back through `MarkdownNoteStore`. The store is the persistence boundary: it reads and writes `.md` files, manages YAML frontmatter timestamps, derives titles from markdown content, and renames files to match note titles when appropriate.
+Noto is now organized around explicit ownership boundaries. The app target owns Apple-platform lifecycle, presentation, and side effects. Swift packages own platform-neutral vault, search, and Readwise mechanics.
+
+```text
+NotoApp
+  MainAppView
+    owns launch/scene lifecycle, root store compatibility, file watcher,
+    daily-note prewarming, automatic Readwise sync, and search-index refresh
+
+    VaultWorkspaceView
+      owns workspace navigation and presentation
+      handles VaultWorkspaceIntent from lists, sidebar, search, and editor
+      owns compact iPhone NavigationStack routes
+      owns iPad/macOS split selection and note history
+      owns Today, search, settings, document-link routing, and restore-last-note
+
+      NotoSplitView
+        layout shell for NavigationSplitView, sidebar visibility, and search presentation
+
+      NotoSidebarView / FolderContentView
+        render vault rows and emit workspace intents
+
+      NoteEditorScreen
+        composes NoteEditorSession, editor chrome, sheets, find, move, and delete UI
+
+        NoteEditorSession
+          owns one open note's load/edit/autosave/rename/move/delete/conflict lifecycle
+
+        TextKit2EditorView
+          active native markdown editing surface
+
+VaultController
+  app-facing facade for vault operations
+  wraps current MarkdownNoteStore compatibility behavior
+
+SearchIndexController
+  app-facing search-index lifecycle side effects
+  wraps NotoSearch.SearchIndexCoordinator and posts app notifications
+
+Packages
+  NotoVault: UI-free filesystem, note, folder, daily-note, attachment, path,
+             title, sidebar tree, and word-count mechanics
+  NotoSearch: UI-free markdown indexing, search, and refresh coordination
+  NotoReadwiseSync: Readwise/Reader API client, sync engine, note rendering,
+                    sync state, tests, and CLI
+```
+
+### Ownership Rules
+
+- `MainAppView` owns app runtime lifecycle, not workspace routing.
+- `VaultWorkspaceView` owns navigation and presentation, not low-level filesystem logic.
+- UI surfaces emit `VaultWorkspaceIntent`; they do not mutate selection, `NavigationPath`, or vault files directly.
+- `NotoSplitView` is a layout shell. It does not construct editors, create notes, or resolve document links.
+- `VaultController` is the app-facing vault interface. It currently delegates through `MarkdownNoteStore` while package services continue to absorb non-UI behavior.
+- `SearchIndexController` owns app-side search-index notifications and lifecycle triggers. `NotoSearch.SearchIndexCoordinator` owns package-level refresh mechanics.
+- `NoteEditorSession` owns editor-local state and persistence timing for a single open note.
+- `TextKit2EditorView` owns text input, selection, native rendering, and keyboard/input behavior.
+
+### Remaining Compatibility Layers
+
+- `MarkdownNoteStore` remains the main app-facing compatibility adapter for existing list and editor call sites.
+- `CoordinatedFileManager` remains a small app compatibility wrapper over `NotoVault.CoordinatedVaultFileSystem`.
+- Some package services are already in `NotoVault`, but the app still uses compatibility store methods in places while the migration continues incrementally.
 
 ## macOS runtime notes
 
@@ -64,62 +125,90 @@ So the rule is:
 - trust actual read success on iOS
 - use iCloud metadata as a hint, not as the primary source of truth
 
-### Active runtime path
+## Runtime Lifecycles
 
-The current live editor is `BlockEditorView`, not the older `MarkdownEditorView` TextKit path. `BlockEditorView` is a `UIViewControllerRepresentable` wrapper around `BlockEditorViewController`. The controller owns a `BlockDocument`, which is an array of `Block` values, one block per markdown line. Each `Block` stores the full markdown text for that line, including prefixes such as `# `, `- `, or `- [ ] `. Structure is inferred from text; `BlockType.detect(from:)` derives whether a row is a paragraph, heading, todo, bullet, ordered list, or frontmatter block. That means markdown stays the source of truth, and semantics come from parsing prefixes rather than from a separate rich-text model.
+### App Lifecycle
 
-Each visible row in the editor is a `BlockCell` with its own `UITextView`. The controller renders the document through a `UITableView`, tracks the focused row and cursor offset, and handles structural editing operations at the document layer. Pressing Return calls `BlockDocument.split(blockIndex:atOffset:)`, which splits the current markdown line into two blocks and auto-continues list prefixes when needed. Pressing Backspace at the start of a row calls `mergeWithPrevious(blockIndex:)`, which joins the current block into the previous block. Tapping a todo checkbox or the keyboard toolbar todo button mutates the underlying markdown using `TodoMarkdown` helpers and then re-renders the affected row.
+The launch path is:
 
-### Load, edit, and save flow
+1. `NotoApp` resolves the active vault through `VaultLocationManager`.
+2. `MainAppView` creates the root `MarkdownNoteStore`, `VaultFileWatcher`, `DailyNotePrewarmer`, and `ReadwiseSyncController`.
+3. On first task, `MainAppView` loads root items, prewarms today's note, refreshes saved Readwise token state, starts automatic Readwise sync, and refreshes the search index.
+4. On foreground activation, `MainAppView` refreshes root state, restarts daily-note prewarming and Readwise sync, and refreshes search.
+5. On external file changes, `VaultFileWatcher` triggers root reload and search-index refresh.
 
-The load path is:
+### Workspace and Navigation Lifecycle
 
-1. Disk file -> `MarkdownNoteStore.readContent(of:)`
-2. Raw markdown string -> `NoteEditorScreen.content`
-3. `BlockEditorViewController.loadMarkdown(_:)`
-4. `BlockParser.parse(...)` -> `[Block]`
-5. `[Block]` stored in `BlockDocument`
+`VaultWorkspaceView` is the single owner of workspace routing.
 
-Frontmatter is preserved as a single hidden `frontmatter` block, while the remaining note body is split by newline into one block per line. The editor never stores a separate rich document format.
+- Compact iPhone uses a root `NavigationStack` with `NoteRoute`.
+- iPad and macOS use `NotoSplitView` as a shell around `NavigationSplitView`.
+- The split detail selection, note history, search sheet, settings sheet, Today routing, last-opened-note restore, and document-link routing all live in `VaultWorkspaceView`.
+- `FolderContentView`, `NotoSidebarView`, search results, and editor callbacks all report `VaultWorkspaceIntent`.
+- `VaultWorkspaceView` translates each intent into either route changes or vault operations.
 
-While editing, each block cell updates only its own markdown text. The controller then serializes the full `BlockDocument` back into a single markdown string using `BlockSerializer.serialize(...)` and pushes it through the SwiftUI binding. `NoteEditorScreen` debounces persistence: a short task writes updated content through `saveContent`, and a longer task renames the file through `renameFileIfNeeded`. On disappear, it performs a final save and rename pass.
+Opening a note is now:
 
-The save path is:
+1. A list row, sidebar row, search result, Today button, or document link emits an intent.
+2. `VaultWorkspaceView` resolves the target note/store and updates compact or split navigation state.
+3. `NoteEditorScreen` is created only by the workspace route/detail mapping.
+4. `NoteEditorScreen` creates `NoteEditorSession` for that note.
 
-1. Block row edit -> update one `Block.text`
-2. `BlockDocument` -> `BlockSerializer.serialize(...)`
-3. Serialized markdown -> SwiftUI binding
-4. `MarkdownNoteStore.saveContent(...)`
-5. Store updates frontmatter timestamp and writes the `.md` file
+### Editor Lifecycle
 
-### Rendering and formatting
+The live editor is `TextKit2EditorView`, composed by `NoteEditorScreen`.
 
-Rendering is separate from the document model. `BlockType.renderSpec(for:)` converts semantic block type into a declarative `BlockRenderSpec`, which describes typography, spacing, indentation, prefix visibility, checkbox state, and content styling. `BlockRenderer.render(...)` then converts the block's raw markdown into an attributed string for display.
+The open path is:
 
-This is how the editor can:
+1. `NoteEditorScreen` initializes `NoteEditorSession(store:note:isNew:)`.
+2. `NoteEditorSession.loadNoteContent()` tries a real coordinated read first.
+3. If the note is readable, the session applies the markdown immediately.
+4. If the note is genuinely unavailable, the session starts the iCloud download loop.
+5. `TextKit2EditorView` receives the session content and owns native editing, selection, rendering, and input behavior.
 
-- hide or dim heading prefixes while preserving the underlying `# `
-- replace todo markdown prefixes with a checkbox accessory
-- render focused bullet and ordered-list markers without exposing raw markdown prefixes
-- apply checked-state strikethrough and dimming for completed todos
-- apply inline markdown styling for bold, italic, and code spans
+The edit/save path is:
 
-The important separation is:
+1. `TextKit2EditorView` reports text changes to `NoteEditorSession.handleEditorChange(_:)`.
+2. The session tracks latest editor text, pending local edits, title metadata, autosave debounce, and rename debounce.
+3. Autosave calls `VaultController.save(_:for:in:)`, which currently delegates through `MarkdownNoteStore`.
+4. Successful writes publish `NoteSyncCenter` snapshots for same-process multi-window sync.
+5. On disappear, the session performs a final persist if local edits are still pending.
 
-- document structure comes from markdown prefixes in `Block.text`
-- block-level presentation comes from `BlockRenderSpec`
-- inline markdown formatting is applied after block styling in the renderer
+The remote-change path is:
 
-During typing, the editor avoids fully restyling the row on every keystroke. Instead, it updates the block text immediately and mainly re-applies focused or unfocused styling on configuration and focus transitions. This keeps keyboard behavior and row focus stable.
+- `VaultFileWatcher` handles external filesystem/iCloud changes.
+- `NoteSyncCenter` handles same-process window-to-window snapshots.
+- A clean editor applies same-process snapshots immediately.
+- A dirty editor keeps local edits and records a pending remote snapshot instead of overwriting in-progress work.
 
-### Older editor still in tree
+### Search Lifecycle
 
-There is also an older `MarkdownEditorView` architecture still in the repo. That version uses a single `UITextView` backed by `MarkdownTextStorage`, `MarkdownFormatter`, and `MarkdownLayoutManager`. Architecturally, that editor is a single-buffer text editor with markdown-aware attributed rendering layered on top. The current live block editor is different: it is row-structured first, markdown serialization second.
+Search is split between app lifecycle and package mechanics.
+
+- `SearchIndexController` is the app-facing actor.
+- It decides when app-visible refresh side effects happen and posts `.notoSearchIndexDidChange`.
+- `NotoSearch.SearchIndexCoordinator` owns package-level single-flight full refreshes, debounced file refreshes, remove/replace behavior, and follow-up work after overlapping refreshes.
+- `NoteSearchSheet` asks the search index for results and emits selected results back to `VaultWorkspaceView` as workspace navigation.
+
+### Mention Menu Lifecycle
+
+The mention menu stays editor-scoped:
+
+- `NoteEditorScreen` provides page mention candidates from the current store.
+- `NoteEditorSession` and `TextKit2EditorView` keep the active note's text/editing state local.
+- The provider excludes the currently open note and uses vault title/path resolution through the store/controller compatibility layer.
+- Selecting a mention updates editor text; opening a document link flows back through `VaultWorkspaceView` as `openDocumentLink`.
+
+### Readwise Lifecycle
+
+Readwise is split across the app target and package:
+
+- `ReadwiseSyncController` lives in the app target and owns token UI state, keychain access, automatic sync state, and Settings integration.
+- `Packages/NotoReadwiseSync/Sources/NotoReadwiseSyncCore` owns API models, the Readwise client, Reader/Readwise sync engines, source-note rendering, and sync state.
+- `Packages/NotoReadwiseSync/Sources/noto-readwise-sync` contains the CLI wrapper around the same core package.
 
 ## Feature set (running)
 
-- node-based note-taking that doesn't feel like you are typing out a bullet list
-  - node-based because it can accommodate very small, random thoughts
 - semantic + keyword search on any snippet of text
 - a way to dump ideas in, and process later (e.g. Today notes/Inbox)
   - between today notes and inbox, today notes is better for me, because i associate random thoughts with the day i thought of it + i can keep my journal there as well
@@ -135,7 +224,6 @@ There is also an older `MarkdownEditorView` architecture still in the repo. That
 - offline search
 - sync across devices
 - metadata & metadata templates
-  - e.g. for every node, it should have created time; for notes, it should have status (e.g. seeding, growing, blossomed, etc.)
   - the metadata fields should also be a template, based on a higher level of categorization (e.g. tags)
 - tags
   - i am not sure about tags; because my belief is that, if search is so great, there is no need for tagging or any form of categorization
@@ -146,21 +234,6 @@ There is also an older `MarkdownEditorView` architecture still in the repo. That
   - i don't need to think about how to format either, it just looks good for both
 
 ## Feature brainstorm
-
-### 1. Outline-based note-taking
-
-This note-taking app should be an outliner-based note taking. Here are the requirements for this outliner-based note taking system
-
-- Each entry is a block, represented as a bullet point
-- Blocks can be infinitely nested through identation.
-- Each block is individually addressable and can be linked/referenced elsewhere
-- Each block can attach metadata on it (e.g. created at, tags, etc.)
-
-As for the interface for this outline-based note-taking approach, here are the requirements
-
-- Each block itself can be selected as the main view, with all its descendent blocks shown in the view
-- the child of the main block view would not be shown as a bullet, so to maintain a regular note look and feel; all the other descendent blocks from the child (e.g. grandchildren, great-grandchildren, etc.) will be shown as bullets and sub-bullets, with appropropriate identation
-- Clicking on any block make that block the main view, and display its descendents accordingly
 
 ### Markdown editor + image + URL
 
@@ -182,27 +255,9 @@ This also serves as the backbone for AI chat, which requires some grounding from
 
 ### Today notes / Inbox / An easy way to dump ideas
 
-The today notes follow the same block primitive as the whole entire app. The block structure of the today notes feature would be like:
-|-Today notes
-|--[Year e.g. 2026]
-|---[Month e.g. Jan 2026]
-|----[Week e.g. Week 1 (1/1 - 7/1)]
-|-----[Day e.g. 1/1/2026]
-
-The block data model already supports scaffolding of the year -> month -> week -> day
-But this feature needs a way to automatically add blocks when a new day/week/month/year starts
-I may also add those new day/week/month/year manually. So the auto-adding function needs to check if the new day/week/month/year is already added
-
-This automatic adding of block should become a new primitive, not just suitable for this today notes feature, but also for other features like AI editing
-Therefore, this automatic adding block primitive should have a robust interface that other features can reuse
-
 ### Templates & auto-fill
 
 ### Bidirectional linking and editing
-
-When you mentioned a block, the original block displays the mentioned block as a link to the mentioned block. The mentioned block gains a "linked reference" to the block that mentioned it.
-
-I am also able to edit the mentioned text, and reflect the changes to the mentioned block
 
 ### Readwise integration
 

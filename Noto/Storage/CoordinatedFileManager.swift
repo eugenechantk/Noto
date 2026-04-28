@@ -1,228 +1,60 @@
 import Foundation
-import os.log
+import NotoVault
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "CoordinatedFileManager")
-
-/// Wraps file operations in NSFileCoordinator for safe iCloud Drive sync.
-/// All methods are synchronous and coordinate with file presenters (iCloud, other apps).
+/// Compatibility wrapper while vault filesystem callers migrate to `NotoVault`.
 enum CoordinatedFileManager {
+    private static let fileSystem = CoordinatedVaultFileSystem()
 
-    // MARK: - Read
-
-    /// Reads the full contents of a file using coordinated access.
     static func readString(from url: URL) -> String? {
-        var result: String?
-        var coordinationError: NSError?
-        let coordinator = NSFileCoordinator()
-
-        coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
-            result = try? String(contentsOf: coordinatedURL, encoding: .utf8)
-        }
-
-        if let error = coordinationError {
-            logger.error("Coordinated read failed for \(url.lastPathComponent): \(error)")
-        }
-        return result
+        fileSystem.readString(from: url)
     }
 
-    /// Reads up to `maxBytes` from the beginning of a file using coordinated access.
     static func readPrefix(from url: URL, maxBytes: Int) -> Data? {
-        var result: Data?
-        var coordinationError: NSError?
-        let coordinator = NSFileCoordinator()
-
-        coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
-            guard let handle = try? FileHandle(forReadingFrom: coordinatedURL) else { return }
-            result = handle.readData(ofLength: maxBytes)
-            handle.closeFile()
-        }
-
-        if let error = coordinationError {
-            logger.error("Coordinated prefix read failed for \(url.lastPathComponent): \(error)")
-        }
-        return result
+        fileSystem.readPrefix(from: url, maxBytes: maxBytes)
     }
 
-    /// Reads the full contents of a file using coordinated access.
     static func readData(from url: URL) -> Data? {
-        var result: Data?
-        var coordinationError: NSError?
-        let coordinator = NSFileCoordinator()
-
-        coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
-            result = try? Data(contentsOf: coordinatedURL)
-        }
-
-        if let error = coordinationError {
-            logger.error("Coordinated data read failed for \(url.lastPathComponent): \(error)")
-        }
-        return result
+        fileSystem.readData(from: url)
     }
 
-    // MARK: - Write
-
-    /// Writes a string to a file using coordinated access.
     @discardableResult
     static func writeString(_ content: String, to url: URL) -> Bool {
-        var success = false
-        var coordinationError: NSError?
-        var writeErrorDescription: String?
-        let coordinator = NSFileCoordinator()
-
-        coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { coordinatedURL in
-            do {
-                // Write non-atomically: atomic writes create a temp file in the same
-                // directory, which fails under macOS sandbox for security-scoped
-                // iCloud Drive folders (NSPOSIXErrorDomain Code=1 "Operation not permitted").
-                // NSFileCoordinator already provides safe write coordination.
-                try content.write(to: coordinatedURL, atomically: false, encoding: .utf8)
-                success = true
-            } catch {
-                logger.error("Write failed for \(url.lastPathComponent): \(error)")
-                writeErrorDescription = String(describing: error)
-            }
-        }
-
-        if let error = coordinationError {
-            logger.error("Coordinated write failed for \(url.lastPathComponent): \(error)")
-            DebugTrace.record("coord write coordinationError file=\(url.lastPathComponent) error=\(String(describing: error))")
-        }
-        if let writeErrorDescription {
-            DebugTrace.record("coord write writeError file=\(url.lastPathComponent) error=\(writeErrorDescription)")
+        let success = fileSystem.writeString(content, to: url)
+        if !success {
+            DebugTrace.record("coord write failed file=\(url.lastPathComponent)")
         }
         return success
     }
 
-    /// Writes data to a file using coordinated access.
     @discardableResult
     static func writeData(_ data: Data, to url: URL) -> Bool {
-        var success = false
-        var coordinationError: NSError?
-        var writeErrorDescription: String?
-        let coordinator = NSFileCoordinator()
-
-        coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { coordinatedURL in
-            do {
-                try data.write(to: coordinatedURL, options: [])
-                success = true
-            } catch {
-                logger.error("Data write failed for \(url.lastPathComponent): \(error)")
-                writeErrorDescription = String(describing: error)
-            }
-        }
-
-        if let error = coordinationError {
-            logger.error("Coordinated data write failed for \(url.lastPathComponent): \(error)")
-            DebugTrace.record("coord data write coordinationError file=\(url.lastPathComponent) error=\(String(describing: error))")
-        }
-        if let writeErrorDescription {
-            DebugTrace.record("coord data write writeError file=\(url.lastPathComponent) error=\(writeErrorDescription)")
+        let success = fileSystem.writeData(data, to: url)
+        if !success {
+            DebugTrace.record("coord data write failed file=\(url.lastPathComponent)")
         }
         return success
     }
 
-    // MARK: - Delete
-
-    /// Deletes a file or directory using coordinated access.
     @discardableResult
     static func delete(at url: URL) -> Bool {
-        var success = false
-        var coordinationError: NSError?
-        let coordinator = NSFileCoordinator()
-
-        coordinator.coordinate(writingItemAt: url, options: .forDeleting, error: &coordinationError) { coordinatedURL in
-            do {
-                try FileManager.default.removeItem(at: coordinatedURL)
-                success = true
-            } catch {
-                logger.error("Delete failed for \(url.lastPathComponent): \(error)")
-            }
-        }
-
-        if let error = coordinationError {
-            logger.error("Coordinated delete failed for \(url.lastPathComponent): \(error)")
-        }
-        return success
+        fileSystem.delete(at: url)
     }
 
-    // MARK: - Move
-
-    /// Moves a file or directory using coordinated access on both source and destination.
     @discardableResult
     static func move(from sourceURL: URL, to destinationURL: URL) -> Bool {
-        var success = false
-        var coordinationError: NSError?
-        let coordinator = NSFileCoordinator()
-
-        coordinator.coordinate(
-            writingItemAt: sourceURL, options: .forMoving,
-            writingItemAt: destinationURL, options: .forReplacing,
-            error: &coordinationError
-        ) { coordSource, coordDest in
-            do {
-                try FileManager.default.moveItem(at: coordSource, to: coordDest)
-                success = true
-            } catch {
-                logger.error("Move failed \(sourceURL.lastPathComponent) → \(destinationURL.lastPathComponent): \(error)")
-            }
-        }
-
-        if let error = coordinationError {
-            logger.error("Coordinated move failed: \(error)")
-        }
-        return success
+        fileSystem.move(from: sourceURL, to: destinationURL)
     }
 
-    // MARK: - Directory
-
-    /// Creates a directory using coordinated access.
     @discardableResult
     static func createDirectory(at url: URL) -> Bool {
-        var success = false
-        var coordinationError: NSError?
-        let coordinator = NSFileCoordinator()
-
-        coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { coordinatedURL in
-            do {
-                try FileManager.default.createDirectory(at: coordinatedURL, withIntermediateDirectories: true)
-                success = true
-            } catch {
-                logger.error("Create directory failed for \(url.lastPathComponent): \(error)")
-            }
-        }
-
-        if let error = coordinationError {
-            logger.error("Coordinated create directory failed: \(error)")
-        }
-        return success
+        fileSystem.createDirectory(at: url)
     }
 
-    // MARK: - iCloud Download Status
-
-    /// Checks whether a file is fully downloaded (not evicted by iCloud).
-    /// Returns `true` if the file is local or fully downloaded, `false` if it needs downloading.
     static func isDownloaded(at url: URL) -> Bool {
-        do {
-            let values = try url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
-            guard let status = values.ubiquitousItemDownloadingStatus else {
-                // Not an iCloud file — it's local
-                return true
-            }
-            return status == .current
-        } catch {
-            // If we can't read the attribute, assume it's available
-            return true
-        }
+        fileSystem.isDownloaded(at: url)
     }
 
-    /// Triggers download of an iCloud-evicted file. No-op if already downloaded.
     static func startDownloading(at url: URL) {
-        guard !isDownloaded(at: url) else { return }
-        do {
-            try FileManager.default.startDownloadingUbiquitousItem(at: url)
-            logger.info("Started downloading \(url.lastPathComponent)")
-        } catch {
-            logger.error("Failed to start download for \(url.lastPathComponent): \(error)")
-        }
+        fileSystem.startDownloading(at: url)
     }
 }

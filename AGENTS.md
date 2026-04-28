@@ -1,5 +1,6 @@
 # Workspace Agent Instructions
 
+- Before doing implementation, debugging, refactoring, or architecture work, read `README.md` first. Treat it as the current architecture and lifecycle map for this repo, and align changes with the ownership boundaries and patterns described there.
 - Send macOS banner notifications only in these cases:
   `1)` when work is finished, or
   `2)` when user input is required to proceed.

@@ -19,6 +19,35 @@ enum NoteRoute: Hashable {
     case todayNote
 }
 
+enum VaultWorkspaceSidebarItemKind {
+    case note
+    case folder
+}
+
+enum VaultWorkspaceIntent {
+    case openNote(MarkdownNote, store: MarkdownNoteStore, isNew: Bool)
+    case openSidebarNote(fileURL: URL, noteID: UUID?, title: String, modifiedAt: Date, isNew: Bool)
+    case openFolder(NotoFolder, parentStore: MarkdownNoteStore)
+    case openFolderURL(URL, name: String, vaultRootURL: URL)
+    case openToday
+    case openSearch
+    case closeSearch
+    case openSettings
+    case createNote(in: MarkdownNoteStore)
+    case createNoteInDirectory(URL)
+    case createFolder(named: String, in: MarkdownNoteStore)
+    case createFolderInDirectory(named: String, parentURL: URL)
+    case deleteItem(DirectoryItem, in: MarkdownNoteStore)
+    case deleteNote(MarkdownNote, in: MarkdownNoteStore)
+    case deleteFolder(NotoFolder, in: MarkdownNoteStore)
+    case deleteSidebarItem(fileURL: URL, kind: VaultWorkspaceSidebarItemKind, noteID: UUID?, title: String, modifiedAt: Date)
+    case moveNote(MarkdownNote, from: MarkdownNoteStore, to: URL)
+    case moveNoteURL(URL, to: URL)
+    case openDocumentLink(String)
+    case updateSelectedNote(MarkdownNote)
+    case clearSelection
+}
+
 // MARK: - Stack History
 
 struct NoteStackEntry: Equatable, Hashable {
@@ -220,10 +249,10 @@ struct NoteNavigationHistory: Equatable {
     }
 }
 
-// MARK: - Root View
+// MARK: - Workspace View
 
-/// Root entry point — NavigationStack on iOS, NavigationSplitView on macOS.
-struct NoteListView: View {
+/// Workspace entry point — NavigationStack on compact iOS, split view on iPadOS/macOS.
+struct VaultWorkspaceView: View {
     var store: MarkdownNoteStore
     var locationManager: VaultLocationManager?
     var fileWatcher: VaultFileWatcher?
@@ -232,16 +261,22 @@ struct NoteListView: View {
     #if os(iOS)
     @State private var path = NavigationPath()
     @State private var compactNoteHistory = NoteNavigationHistory()
-    @State private var isNoteSearchPresented = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
+    @State private var isSearchPresented = false
     @State private var selectedNote: MarkdownNote?
     @State private var selectedNoteStore: MarkdownNoteStore?
     @State private var selectedNoteIsNew = false
     @State private var externallyDeletingNoteID: UUID?
+    @State private var splitNoteHistory = NoteNavigationHistory()
+    @State private var isApplyingSplitHistoryNavigation = false
     @State private var showSettings = false
     @State private var hasRestoredSelection = false
+    #if os(iOS)
+    @State private var splitNoteStackNavigation = NoteStackNavigationState()
+    @State private var isSyncingSplitSelectionFromNativeStack = false
+    #endif
     #if os(macOS)
     @State private var hostingWindow: NSWindow?
     #endif
@@ -253,12 +288,38 @@ struct NoteListView: View {
         if horizontalSizeClass == .regular {
             NotoSplitView(
                 store: store,
-                fileWatcher: fileWatcher,
-                selectedNote: $selectedNote,
-                selectedNoteStore: $selectedNoteStore,
-                selectedIsNew: $selectedNoteIsNew,
-                externallyDeletingNoteID: $externallyDeletingNoteID,
-                onOpenTodayNote: openTodayNote
+                isSearchPresented: $isSearchPresented,
+                noteStackPath: $splitNoteStackNavigation.path,
+                onSearchResult: { result in
+                    handleWorkspaceIntent(.openNote(result.note, store: result.store, isNew: false))
+                },
+                onOpenTodayNote: {
+                    handleWorkspaceIntent(.openToday)
+                },
+                onCreateRootNote: {
+                    handleWorkspaceIntent(.createNote(in: store))
+                },
+                onNativeStackChanged: syncSplitSelectionFromNativeStack,
+                sidebar: { searchText, onToggleSidebar in
+                    NotoSidebarView(
+                        rootStore: store,
+                        fileWatcher: fileWatcher,
+                        selectedNote: selectedNote,
+                        searchText: searchText,
+                        onIntent: handleWorkspaceIntent,
+                        onToggleSidebar: onToggleSidebar
+                    )
+                    .toolbar(.hidden, for: .navigationBar)
+                },
+                detail: { onToggleSidebar in
+                    splitDetailView(onToggleSidebar: onToggleSidebar)
+                },
+                iosDetailRoot: { onToggleSidebar in
+                    splitIOSDetailRoot(onToggleSidebar: onToggleSidebar)
+                },
+                iosDestination: { entry, onToggleSidebar in
+                    splitEditor(for: entry, onToggleSidebar: onToggleSidebar)
+                }
             )
             .sheet(isPresented: $showSettings) {
                 if let locationManager {
@@ -290,11 +351,8 @@ struct NoteListView: View {
                     title: "Notes",
                     isRoot: true,
                     fileWatcher: fileWatcher,
-                    path: $path,
-                    onOpenNote: openCompactNote,
-                    onTodayTap: { path.append(NoteRoute.todayNote) },
-                    onCreateRootNote: createRootNoteAndPush,
-                    onSettingsTap: locationManager != nil ? { path.append(NoteRoute.settings) } : nil
+                    onIntent: handleWorkspaceIntent,
+                    canOpenSettings: locationManager != nil
                 )
                 .navigationDestination(for: NoteRoute.self) { route in
                     switch route {
@@ -340,10 +398,7 @@ struct NoteListView: View {
                             ),
                             title: name,
                             fileWatcher: fileWatcher,
-                            path: $path,
-                            onOpenNote: openCompactNote,
-                            onTodayTap: { path.append(NoteRoute.todayNote) },
-                            onCreateRootNote: createRootNoteAndPush
+                            onIntent: handleWorkspaceIntent
                         )
                     case .settings:
                         if let locationManager {
@@ -378,14 +433,14 @@ struct NoteListView: View {
                 }
             }
             .notoAppBottomToolbar(
-                onOpenTodayNote: { path.append(NoteRoute.todayNote) },
-                onSearch: { isNoteSearchPresented = true },
-                onCreateRootNote: createRootNoteAndPush
+                onOpenTodayNote: { handleWorkspaceIntent(.openToday) },
+                onSearch: { handleWorkspaceIntent(.openSearch) },
+                onCreateRootNote: { handleWorkspaceIntent(.createNote(in: store)) }
             )
-            .sheet(isPresented: $isNoteSearchPresented) {
+            .sheet(isPresented: $isSearchPresented) {
                 NavigationStack {
                     NoteSearchSheet(rootStore: store) { result in
-                        openCompactNote(result.note, in: result.store, isNew: false)
+                        handleWorkspaceIntent(.openNote(result.note, store: result.store, isNew: false))
                     }
                 }
                 .presentationDetents([.large])
@@ -393,27 +448,53 @@ struct NoteListView: View {
                 .noteSearchSheetPresentationStyle()
             }
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { _ in
-                path.append(NoteRoute.todayNote)
+                handleWorkspaceIntent(.openToday)
             }
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.showSearch)) { _ in
-                isNoteSearchPresented = true
+                handleWorkspaceIntent(.openSearch)
             }
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openSettings)) { _ in
                 if locationManager != nil {
-                    path.append(NoteRoute.settings)
+                    handleWorkspaceIntent(.openSettings)
                 }
             }
         }
         #elseif os(macOS)
-        NotoSplitView(
-            store: store,
-            fileWatcher: fileWatcher,
-            selectedNote: $selectedNote,
-            selectedNoteStore: $selectedNoteStore,
-            selectedIsNew: $selectedNoteIsNew,
-            externallyDeletingNoteID: $externallyDeletingNoteID,
-            onOpenTodayNote: openTodayNote
-        )
+            NotoSplitView(
+                store: store,
+                isSearchPresented: $isSearchPresented,
+                noteStackPath: .constant([]),
+                onSearchResult: { result in
+                    handleWorkspaceIntent(.openNote(result.note, store: result.store, isNew: false))
+                },
+                onOpenTodayNote: {
+                    handleWorkspaceIntent(.openToday)
+                },
+                onToggleSidebarCommand: {},
+                onShowSearchCommand: {
+                    handleWorkspaceIntent(.openSearch)
+                },
+                sidebar: { searchText, onToggleSidebar in
+                    NotoSidebarView(
+                        rootStore: store,
+                        fileWatcher: fileWatcher,
+                        selectedNote: selectedNote,
+                        searchText: searchText,
+                        onIntent: handleWorkspaceIntent,
+                        onToggleSidebar: onToggleSidebar
+                    )
+                    .toolbar(removing: .sidebarToggle)
+                },
+                detail: { onToggleSidebar in
+                    splitDetailView(onToggleSidebar: onToggleSidebar)
+                },
+                iosDetailRoot: { _ in
+                    EmptyView()
+                },
+                iosDestination: { _, _ in
+                    EmptyView()
+                }
+            )
         .background {
             WindowCommandReader(window: $hostingWindow)
                 .frame(width: 0, height: 0)
@@ -445,36 +526,156 @@ struct NoteListView: View {
         #endif
     }
 
+    private func handleWorkspaceIntent(_ intent: VaultWorkspaceIntent) {
+        switch intent {
+        case .openNote(let note, let noteStore, let isNew):
+            openNoteFromWorkspace(note, in: noteStore, isNew: isNew)
+        case .openSidebarNote(let fileURL, let noteID, let title, let modifiedAt, let isNew):
+            let noteStore = storeForDirectory(fileURL.deletingLastPathComponent())
+            let note = MarkdownNote(
+                id: noteID ?? VaultDirectoryLoader.stableID(for: fileURL),
+                fileURL: fileURL,
+                title: title,
+                modifiedDate: modifiedAt
+            )
+            openNoteFromWorkspace(note, in: noteStore, isNew: isNew)
+        case .openFolder(let folder, let parentStore):
+            handleWorkspaceIntent(.openFolderURL(
+                folder.folderURL,
+                name: folder.name,
+                vaultRootURL: parentStore.vaultRootURL
+            ))
+        case .openFolderURL(let folderURL, let name, let vaultRootURL):
+            #if os(iOS)
+            path.append(NoteRoute.folder(folderURL: folderURL, name: name, vaultRootURL: vaultRootURL))
+            #endif
+        case .openToday:
+            openTodayFromWorkspace()
+        case .openSearch:
+            isSearchPresented = true
+        case .closeSearch:
+            isSearchPresented = false
+        case .openSettings:
+            guard locationManager != nil else { return }
+            #if os(iOS)
+            if horizontalSizeClass == .regular {
+                showSettings = true
+            } else {
+                path.append(NoteRoute.settings)
+            }
+            #else
+            showSettings = true
+            #endif
+        case .createNote(let noteStore):
+            let note = noteStore.createNote()
+            openNoteFromWorkspace(note, in: noteStore, isNew: true)
+        case .createNoteInDirectory(let directoryURL):
+            let noteStore = storeForDirectory(directoryURL)
+            let note = noteStore.createNote()
+            openNoteFromWorkspace(note, in: noteStore, isNew: true)
+        case .createFolder(let name, let noteStore):
+            _ = noteStore.createFolder(name: name)
+        case .createFolderInDirectory(let name, let parentURL):
+            _ = storeForDirectory(parentURL).createFolder(name: name)
+        case .deleteItem(let item, let noteStore):
+            clearSelectionIfNeeded(for: item)
+            noteStore.deleteItem(item)
+        case .deleteNote(let note, let noteStore):
+            externallyDeletingNoteID = note.id
+            clearSelectionIfNeeded(noteFileURL: note.fileURL)
+            noteStore.deleteNote(note)
+        case .deleteFolder(let folder, let noteStore):
+            clearSelectionIfNeeded(folderURL: folder.folderURL)
+            noteStore.deleteFolder(folder)
+        case .deleteSidebarItem(let fileURL, let kind, let noteID, let title, let modifiedAt):
+            let parentStore = storeForDirectory(fileURL.deletingLastPathComponent())
+            switch kind {
+            case .note:
+                let note = MarkdownNote(
+                    id: noteID ?? VaultDirectoryLoader.stableID(for: fileURL),
+                    fileURL: fileURL,
+                    title: title,
+                    modifiedDate: modifiedAt
+                )
+                handleWorkspaceIntent(.deleteNote(note, in: parentStore))
+            case .folder:
+                let folder = NotoFolder(
+                    id: VaultDirectoryLoader.stableID(for: fileURL),
+                    folderURL: fileURL,
+                    name: title,
+                    modifiedDate: modifiedAt,
+                    folderCount: 0,
+                    itemCount: 0
+                )
+                handleWorkspaceIntent(.deleteFolder(folder, in: parentStore))
+            }
+        case .moveNote(let note, let sourceStore, let destinationURL):
+            let movedNote = sourceStore.moveNote(note, to: destinationURL)
+            updateSelectionAfterMove(from: note.fileURL, to: movedNote)
+        case .moveNoteURL(let sourceURL, let destinationURL):
+            let sourceStore = storeForDirectory(sourceURL.deletingLastPathComponent())
+            let note = markdownNote(for: sourceURL)
+            handleWorkspaceIntent(.moveNote(note, from: sourceStore, to: destinationURL))
+        case .openDocumentLink(let relativePath):
+            guard let resolved = store.note(atVaultRelativePath: relativePath) else { return }
+            openNoteFromWorkspace(resolved.note, in: resolved.store, isNew: false)
+        case .updateSelectedNote(let note):
+            updateSelectedNote(note)
+        case .clearSelection:
+            clearSplitSelection()
+        }
+    }
+
+    private func openTodayFromWorkspace() {
+        #if os(iOS)
+        if horizontalSizeClass != .regular {
+            path.append(NoteRoute.todayNote)
+            return
+        }
+        #endif
+        openTodayNote()
+    }
+
     private func openTodayNote() {
         let (todayStore, todayNote) = store.todayNote()
         selectNote(todayNote, in: todayStore, isNew: false)
     }
 
-    private func openDocumentLinkInSelection(_ relativePath: String) {
-        guard let resolved = store.note(atVaultRelativePath: relativePath) else { return }
-        selectNote(resolved.note, in: resolved.store, isNew: false)
+    private func openNoteFromWorkspace(_ note: MarkdownNote, in noteStore: MarkdownNoteStore, isNew: Bool) {
+        #if os(iOS)
+        if horizontalSizeClass != .regular {
+            openCompactNote(note, in: noteStore, isNew: isNew)
+            return
+        }
+        #endif
+        selectNote(note, in: noteStore, isNew: isNew)
+    }
+
+    private func storeForDirectory(_ directoryURL: URL, autoload: Bool = false) -> MarkdownNoteStore {
+        MarkdownNoteStore(
+            directoryURL: directoryURL,
+            vaultRootURL: store.vaultRootURL,
+            autoload: autoload,
+            directoryLoader: store.directoryLoader
+        )
+    }
+
+    private func markdownNote(for fileURL: URL) -> MarkdownNote {
+        let content = CoordinatedFileManager.readString(from: fileURL) ?? ""
+        let titleResolver = NoteTitleResolver()
+        let modifiedAt = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
+        return MarkdownNote(
+            id: MarkdownNote.idFromFrontmatter(content) ?? VaultDirectoryLoader.stableID(for: fileURL),
+            fileURL: fileURL,
+            title: titleResolver.title(from: content, fallbackTitle: titleResolver.fallbackTitle(for: fileURL)),
+            modifiedDate: modifiedAt
+        )
     }
 
     @ViewBuilder
-    private var splitDetailView: some View {
-        if let selectedNote, let selectedNoteStore {
-            NoteEditorScreen(
-                store: selectedNoteStore,
-                note: selectedNote,
-                isNew: selectedNoteIsNew,
-                fileWatcher: fileWatcher,
-                onDelete: {
-                    self.selectedNote = nil
-                    self.selectedNoteStore = nil
-                    self.selectedNoteIsNew = false
-                },
-                onOpenTodayNote: { openTodayNote() },
-                onCreateRootNote: { createRootNoteAndSelect() },
-                onOpenDocumentLink: openDocumentLinkInSelection,
-                externallyDeletingNoteID: $externallyDeletingNoteID,
-                chromeMode: .compactNavigation(showsInlineBackButton: false)
-            )
-            .id(selectedNote.id)
+    private func splitDetailView(onToggleSidebar: @escaping () -> Void) -> some View {
+        if let entry = currentSplitStackEntry {
+            splitEditor(for: entry, onToggleSidebar: onToggleSidebar)
         } else {
             Text("Select a note")
                 .font(.title2)
@@ -484,12 +685,191 @@ struct NoteListView: View {
         }
     }
 
+    #if os(iOS)
+    @ViewBuilder
+    private func splitIOSDetailRoot(onToggleSidebar: @escaping () -> Void) -> some View {
+        if let entry = splitNoteStackNavigation.root {
+            splitEditor(for: entry, onToggleSidebar: onToggleSidebar)
+        } else {
+            splitDetailView(onToggleSidebar: onToggleSidebar)
+        }
+    }
+    #endif
+
+    private var currentSplitStackEntry: NoteStackEntry? {
+        guard let selectedNote, let selectedNoteStore else { return nil }
+        return NoteStackEntry(note: selectedNote, store: selectedNoteStore, isNew: selectedNoteIsNew)
+    }
+
+    @ViewBuilder
+    private func splitEditor(for entry: NoteStackEntry, onToggleSidebar: @escaping () -> Void) -> some View {
+        NoteEditorScreen(
+            store: entry.store,
+            note: entry.note,
+            isNew: entry.isNew,
+            fileWatcher: fileWatcher,
+            onDelete: {
+                handleWorkspaceIntent(.clearSelection)
+            },
+            onOpenTodayNote: {
+                handleWorkspaceIntent(.openToday)
+            },
+            onCreateRootNote: {
+                handleWorkspaceIntent(.createNote(in: store))
+            },
+            onNoteUpdated: { updatedNote in
+                handleWorkspaceIntent(.updateSelectedNote(updatedNote))
+            },
+            onOpenDocumentLink: { relativePath in
+                handleWorkspaceIntent(.openDocumentLink(relativePath))
+            },
+            canNavigateBack: splitNoteHistory.canGoBack,
+            canNavigateForward: splitNoteHistory.canGoForward,
+            onNavigateBack: navigateSplitHistoryBack,
+            onNavigateForward: navigateSplitHistoryForward,
+            leadingChromeControls: splitEditorLeadingControls(onToggleSidebar: onToggleSidebar),
+            externallyDeletingNoteID: $externallyDeletingNoteID,
+            chromeMode: splitEditorChromeMode
+        )
+        .id(entry.note.id)
+    }
+
+    private var splitEditorChromeMode: EditorChromeMode {
+        #if os(macOS)
+        .macToolbar
+        #else
+        .compactNavigation(showsInlineBackButton: false)
+        #endif
+    }
+
+    private func splitEditorLeadingControls(onToggleSidebar: @escaping () -> Void) -> EditorLeadingChromeControls {
+        #if os(macOS)
+        EditorLeadingChromeControls(
+            sidebarSystemImage: "sidebar.left",
+            sidebarAccessibilityLabel: "Toggle Sidebar",
+            onToggleSidebar: onToggleSidebar
+        )
+        #else
+        .none
+        #endif
+    }
+
     private func selectNote(_ note: MarkdownNote, in noteStore: MarkdownNoteStore, isNew: Bool) {
         selectedNoteStore = noteStore
         selectedNote = note
         selectedNoteIsNew = isNew
+        let entry = NoteStackEntry(note: note, store: noteStore, isNew: isNew)
+        if !isApplyingSplitHistoryNavigation {
+            splitNoteHistory.visit(entry)
+        }
+        #if os(iOS)
+        isSyncingSplitSelectionFromNativeStack = true
+        splitNoteStackNavigation.select(entry)
+        DispatchQueue.main.async {
+            isSyncingSplitSelectionFromNativeStack = false
+        }
+        #endif
         collapseSidebar()
     }
+
+    private func updateSelectedNote(_ note: MarkdownNote) {
+        guard selectedNote?.id == note.id ||
+            selectedNote?.fileURL.standardizedFileURL == note.fileURL.standardizedFileURL else {
+            return
+        }
+
+        selectedNote = note
+        selectedNoteStore = storeForDirectory(note.fileURL.deletingLastPathComponent())
+        splitNoteHistory.replaceEntries(for: note)
+        if let currentEntry = currentSplitStackEntry {
+            splitNoteHistory.replaceCurrent(currentEntry)
+        }
+        #if os(iOS)
+        splitNoteStackNavigation.replaceEntries(for: note)
+        #endif
+    }
+
+    private func clearSplitSelection() {
+        selectedNote = nil
+        selectedNoteStore = nil
+        selectedNoteIsNew = false
+        splitNoteHistory.clear()
+        #if os(iOS)
+        splitNoteStackNavigation.clear()
+        #endif
+    }
+
+    private func clearSelectionIfNeeded(for item: DirectoryItem) {
+        switch item {
+        case .note(let note):
+            externallyDeletingNoteID = note.id
+            clearSelectionIfNeeded(noteFileURL: note.fileURL)
+        case .folder(let folder):
+            clearSelectionIfNeeded(folderURL: folder.folderURL)
+        }
+    }
+
+    private func clearSelectionIfNeeded(noteFileURL: URL) {
+        guard selectedNote?.fileURL.standardizedFileURL == noteFileURL.standardizedFileURL else { return }
+        clearSplitSelection()
+    }
+
+    private func clearSelectionIfNeeded(folderURL: URL) {
+        guard let selectedNoteURL = selectedNote?.fileURL.standardizedFileURL else { return }
+        let folderPath = folderURL.standardizedFileURL.path
+        guard selectedNoteURL.path == folderPath || selectedNoteURL.path.hasPrefix(folderPath + "/") else { return }
+        clearSplitSelection()
+    }
+
+    private func updateSelectionAfterMove(from sourceURL: URL, to movedNote: MarkdownNote) {
+        guard selectedNote?.id == movedNote.id ||
+            selectedNote?.fileURL.standardizedFileURL == sourceURL.standardizedFileURL else {
+            return
+        }
+        selectNote(movedNote, in: storeForDirectory(movedNote.fileURL.deletingLastPathComponent()), isNew: false)
+    }
+
+    private func navigateSplitHistoryBack() {
+        guard let entry = splitNoteHistory.goBack() else { return }
+        selectSplitHistoryEntry(entry)
+    }
+
+    private func navigateSplitHistoryForward() {
+        guard let entry = splitNoteHistory.goForward() else { return }
+        selectSplitHistoryEntry(entry)
+    }
+
+    private func selectSplitHistoryEntry(_ entry: NoteStackEntry) {
+        isApplyingSplitHistoryNavigation = true
+        selectedNote = entry.note
+        selectedNoteStore = entry.store
+        selectedNoteIsNew = entry.isNew
+        #if os(iOS)
+        isSyncingSplitSelectionFromNativeStack = true
+        splitNoteStackNavigation.replaceVisibleEntry(entry)
+        DispatchQueue.main.async {
+            isSyncingSplitSelectionFromNativeStack = false
+        }
+        #endif
+        isApplyingSplitHistoryNavigation = false
+    }
+
+    #if os(iOS)
+    private func syncSplitSelectionFromNativeStack() {
+        guard !isSyncingSplitSelectionFromNativeStack,
+              let visibleEntry = splitNoteStackNavigation.visibleEntry else {
+            return
+        }
+        isApplyingSplitHistoryNavigation = true
+        selectedNote = visibleEntry.note
+        selectedNoteStore = visibleEntry.store
+        selectedNoteIsNew = visibleEntry.isNew
+        if !splitNoteHistory.moveToAdjacentEntry(matching: visibleEntry) {
+            splitNoteHistory.visit(visibleEntry)
+        }
+        isApplyingSplitHistoryNavigation = false
+    }
+    #endif
 
     #if os(iOS)
     private func createRootNoteAndPush() {
@@ -543,11 +923,6 @@ struct NoteListView: View {
     }
     #endif
 
-    private func createRootNoteAndSelect() {
-        let note = store.createNote()
-        selectNote(note, in: store, isNew: true)
-    }
-
     private func persistLastOpenedNoteURL(_ url: URL?) {
         if let path = url?.path {
             UserDefaults.standard.set(path, forKey: Self.lastOpenedNoteKey)
@@ -563,17 +938,27 @@ struct NoteListView: View {
             let noteStore = MarkdownNoteStore(
                 directoryURL: directoryURL,
                 vaultRootURL: store.vaultRootURL,
+                autoload: false,
                 directoryLoader: store.directoryLoader
             )
 
-            if let note = noteStore.notes.first(where: { $0.fileURL.path == savedPath }) {
-                selectNote(note, in: noteStore, isNew: false)
-                return
-            }
+            selectNote(restoredNote(for: fileURL), in: noteStore, isNew: false)
+            return
         }
 
         // Fall back to today's note when there is no saved selection.
         openTodayNote()
+    }
+
+    private func restoredNote(for fileURL: URL) -> MarkdownNote {
+        let modifiedAt = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
+        let titleResolver = NoteTitleResolver()
+        return MarkdownNote(
+            id: VaultDirectoryLoader.stableID(for: fileURL),
+            fileURL: fileURL,
+            title: titleResolver.fallbackTitle(for: fileURL),
+            modifiedDate: modifiedAt
+        )
     }
 
     #if os(iOS)
@@ -627,321 +1012,234 @@ private struct TodayNoteDestination: View {
     }
 }
 
-// MARK: - Shared Sidebar
+// MARK: - Directory Content
 
-/// Sidebar with Finder-style folder navigation.
-/// - Clicking a folder drills into it (replaces sidebar content with that folder's items)
-/// - Back button goes up one level
-/// - Clicking a note opens it in the detail pane
-struct SidebarView: View {
-    var rootStore: MarkdownNoteStore
-    var fileWatcher: VaultFileWatcher?
-    @Binding var selectedNote: MarkdownNote?
-    @Binding var selectedNoteStore: MarkdownNoteStore?
-    @Binding var selectedIsNew: Bool
-    @Binding var externallyDeletingNoteID: UUID?
-    var onNoteActivated: (() -> Void)? = nil
-    var onTodayTap: (() -> Void)? = nil
-    var onCreateRootNote: (() -> Void)? = nil
-
-    /// Stack of (store, title) for folder navigation. Empty = showing root.
-    @State private var folderStack: [(store: MarkdownNoteStore, title: String)] = []
-    @State private var showNewFolderAlert = false
-    @State private var newFolderName = ""
-
-    private var currentStore: MarkdownNoteStore {
-        folderStack.last?.store ?? rootStore
-    }
-
-    private var currentTitle: String {
-        folderStack.last?.title ?? "Notes"
-    }
-
-    private var canGoBack: Bool {
-        !folderStack.isEmpty
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                if canGoBack {
-                    Button(action: goBack) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                                .font(.caption.weight(.semibold))
-                            Text(folderStack.count > 1 ? folderStack[folderStack.count - 2].title : "Notes")
-                                .font(.subheadline)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("back_button")
-                }
-
-                Spacer()
-
-                Button(action: createNote) {
-                    Label("New Note", systemImage: "plus")
-                        .labelStyle(.iconOnly)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("new_note_button")
-                .accessibilityLabel("New Note")
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-
-            List {
-                ForEach(currentStore.items) { (item: DirectoryItem) in
-                    sidebarRow(for: item)
-                }
-                .listRowBackground(AppTheme.background)
-            }
-            .scrollContentBackground(.hidden)
-            .background(AppTheme.background)
-            .contextMenu {
-                Button(action: createNote) {
-                    Label("New Note", systemImage: "doc.badge.plus")
-                }
-                Button(action: { showNewFolderAlert = true }) {
-                    Label("New Folder", systemImage: "folder.badge.plus")
-                }
-            }
-        }
-        .background(AppTheme.background)
-        .foregroundStyle(AppTheme.primaryText)
-        .tint(AppTheme.primaryText)
-        .listStyle(.sidebar)
-        .navigationTitle(currentTitle)
-        .alert("New Folder", isPresented: $showNewFolderAlert) {
-            TextField("Folder name", text: $newFolderName)
-            Button("Create") {
-                let name = newFolderName.trimmingCharacters(in: .whitespaces)
-                if !name.isEmpty {
-                    _ = currentStore.createFolder(name: name)
-                }
-                newFolderName = ""
-            }
-            Button("Cancel", role: .cancel) { newFolderName = "" }
-        }
-        .onAppear {
-            rootStore.loadItemsInBackground()
-        }
-    }
-
-    @ViewBuilder
-    private func sidebarRow(for item: DirectoryItem) -> some View {
-        switch item {
-        case .folder(let folder):
-            SidebarFolderRow(
-                folder: folder,
-                rootStore: rootStore,
-                fileWatcher: fileWatcher,
-                selectedNote: $selectedNote,
-                selectedNoteStore: $selectedNoteStore,
-                selectedIsNew: $selectedIsNew,
-                externallyDeletingNoteID: $externallyDeletingNoteID,
-                onNoteActivated: onNoteActivated,
-                onNavigate: { folder in
-                    let subStore = MarkdownNoteStore(
-                        directoryURL: folder.folderURL,
-                        vaultRootURL: rootStore.vaultRootURL,
-                        directoryLoader: rootStore.directoryLoader
-                    )
-                    folderStack.append((store: subStore, title: folder.name))
-                },
-                onDelete: {
-                    currentStore.deleteFolder(folder)
-                }
-            )
-        case .note(let note):
-            Button {
-                selectedNote = note
-                selectedNoteStore = currentStore
-                selectedIsNew = false
-                onNoteActivated?()
-            } label: {
-                Label(note.title, systemImage: "doc.text")
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("note_\(note.title)")
-            .foregroundStyle(AppTheme.primaryText)
-            .listRowBackground(selectedNote?.id == note.id ? AppTheme.selectedRowBackground : AppTheme.background)
-            .contextMenu {
-                Button(role: .destructive) {
-                    externallyDeletingNoteID = note.id
-                    if note.id == selectedNote?.id {
-                        selectedNote = nil
-                        selectedNoteStore = nil
-                        selectedIsNew = false
-                    }
-                    currentStore.deleteNote(note)
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
-        }
-    }
-
-    private func goBack() {
-        folderStack.removeLast()
-    }
-
-    private func createNote() {
-        let note = currentStore.createNote()
-        selectedNote = note
-        selectedNoteStore = currentStore
-        selectedIsNew = true
-        onNoteActivated?()
-    }
-
+enum DirectoryContentListPresentation {
+    case content
+    case sidebar
 }
 
-/// A folder row with a disclosure triangle (expand in-place) and a clickable label (navigate into).
-private struct SidebarFolderRow: View {
-    let folder: NotoFolder
-    let rootStore: MarkdownNoteStore
-    var fileWatcher: VaultFileWatcher?
-    @Binding var selectedNote: MarkdownNote?
-    @Binding var selectedNoteStore: MarkdownNoteStore?
-    @Binding var selectedIsNew: Bool
-    @Binding var externallyDeletingNoteID: UUID?
-    var onNoteActivated: (() -> Void)? = nil
-    var onNavigate: (NotoFolder) -> Void
-    var onDelete: () -> Void
-
-    @State private var isExpanded = false
-    @State private var childStore: MarkdownNoteStore?
-
-    var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            if let childStore {
-                ForEach(childStore.items) { (childItem: DirectoryItem) in
-                    switch childItem {
-                    case .folder(let subfolder):
-                        SidebarFolderRow(
-                            folder: subfolder,
-                            rootStore: rootStore,
-                            fileWatcher: fileWatcher,
-                            selectedNote: $selectedNote,
-                            selectedNoteStore: $selectedNoteStore,
-                            selectedIsNew: $selectedIsNew,
-                            externallyDeletingNoteID: $externallyDeletingNoteID,
-                            onNoteActivated: onNoteActivated,
-                            onNavigate: onNavigate,
-                            onDelete: {
-                                childStore.deleteFolder(subfolder)
-                            }
-                        )
-                    case .note(let note):
-                        Button {
-                            selectedNote = note
-                            selectedNoteStore = childStore
-                            selectedIsNew = false
-                            onNoteActivated?()
-                        } label: {
-                            Label(note.title, systemImage: "doc.text")
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("note_\(note.title)")
-                        .foregroundStyle(AppTheme.primaryText)
-                        .listRowBackground(selectedNote?.id == note.id ? AppTheme.selectedRowBackground : AppTheme.background)
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                externallyDeletingNoteID = note.id
-                                if note.id == selectedNote?.id {
-                                    selectedNote = nil
-                                    selectedNoteStore = nil
-                                    selectedIsNew = false
-                                }
-                                childStore.deleteNote(note)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
-            Button(action: { onNavigate(folder) }) {
-                Label(folder.name, systemImage: "folder.fill")
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("folder_\(folder.name)")
-        }
-        .contextMenu {
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-        .onChange(of: isExpanded) { _, expanded in
-            if expanded, childStore == nil {
-                childStore = MarkdownNoteStore(
-                    directoryURL: folder.folderURL,
-                    vaultRootURL: rootStore.vaultRootURL,
-                    directoryLoader: rootStore.directoryLoader
-                )
-            }
-        }
-    }
-}
-
-// MARK: - iOS Folder Content View
-
-#if os(iOS)
-/// Reusable view that shows the contents of a directory (folders + notes).
-struct FolderContentView: View {
+/// Shared directory page body that shows one directory's direct folders and notes.
+struct DirectoryContentListView: View {
     var store: MarkdownNoteStore
-    let title: String
-    var isRoot: Bool = false
     var fileWatcher: VaultFileWatcher?
-    @Binding var path: NavigationPath
-    var onOpenNote: ((MarkdownNote, MarkdownNoteStore, Bool) -> Void)?
-    var onTodayTap: (() -> Void)?
-    var onCreateRootNote: (() -> Void)?
-    var onSettingsTap: (() -> Void)?
-
-    @State private var showNewFolderAlert = false
-    @State private var newFolderName = ""
+    var selectedNote: MarkdownNote?
+    var presentation: DirectoryContentListPresentation = .content
+    var onOpenFolder: (NotoFolder, MarkdownNoteStore) -> Void
+    var onOpenNote: (MarkdownNote, MarkdownNoteStore, Bool) -> Void
+    var onDeleteItem: (DirectoryItem, MarkdownNoteStore) -> Void
+    #if os(macOS)
+    var onNoteDrag: ((MarkdownNote) -> NSItemProvider)? = nil
+    #endif
 
     var body: some View {
         List {
             ForEach(store.items) { item in
                 switch item {
                 case .folder(let folder):
-                    Button {
-                        path.append(NoteRoute.folder(
-                            folderURL: folder.folderURL,
-                            name: folder.name,
-                            vaultRootURL: store.vaultRootURL
-                        ))
-                    } label: {
-                        FolderRow(folder: folder)
-                    }
-                    .accessibilityIdentifier("folder_\(folder.name)")
+                    folderButton(folder)
                 case .note(let note):
-                    Button {
-                        openNote(note, isNew: false)
-                    } label: {
-                        MarkdownNoteRow(note: note)
-                    }
-                    .accessibilityIdentifier("note_\(note.title)")
+                    noteButton(note)
                 }
             }
             .onDelete(perform: deleteItems)
-            .listRowBackground(AppTheme.background)
+            .listRowBackground(rowBackground)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(AppTheme.background)
+        .background(listBackground)
         .foregroundStyle(AppTheme.primaryText)
         .tint(AppTheme.primaryText)
         .accessibilityIdentifier("note_list")
+        .task(id: store.directoryURL.standardizedFileURL.path) {
+            store.loadItemsInBackground()
+        }
+        .onChange(of: fileWatcher?.changeCount) { _, _ in
+            store.loadItemsInBackground()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { notification in
+            guard let snapshot = notification.object as? NoteSyncSnapshot else { return }
+            guard snapshot.fileURL.deletingLastPathComponent().standardizedFileURL == store.directoryURL.standardizedFileURL else {
+                return
+            }
+            store.loadItemsInBackground()
+        }
+        .overlay {
+            if store.isLoadingItems {
+                ProgressView()
+                    .allowsHitTesting(false)
+            } else if store.items.isEmpty {
+                ContentUnavailableView(
+                    "Empty",
+                    systemImage: "folder",
+                    description: Text(emptyDirectoryDescription)
+                )
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func folderButton(_ folder: NotoFolder) -> some View {
+        Button {
+            onOpenFolder(folder, store)
+        } label: {
+            switch presentation {
+            case .content:
+                FolderRow(folder: folder)
+            case .sidebar:
+                SidebarDirectoryRow(
+                    systemImage: "folder.fill",
+                    title: folder.name,
+                    subtitle: folder.contentsSummary,
+                    isSelected: false
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("folder_\(folder.name)")
+    }
+
+    @ViewBuilder
+    private func noteButton(_ note: MarkdownNote) -> some View {
+        let isSelected = selectedNote?.fileURL.standardizedFileURL == note.fileURL.standardizedFileURL
+        let button = Button {
+            onOpenNote(note, store, false)
+        } label: {
+            switch presentation {
+            case .content:
+                MarkdownNoteRow(note: note)
+            case .sidebar:
+                SidebarDirectoryRow(
+                    systemImage: "doc",
+                    title: note.title,
+                    subtitle: note.modifiedDate.formatted(.relative(presentation: .numeric)),
+                    isSelected: isSelected
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("note_\(note.title)")
+
+        #if os(macOS)
+        if let onNoteDrag {
+            button.onDrag {
+                onNoteDrag(note)
+            }
+        } else {
+            button
+        }
+        #else
+        button
+        #endif
+    }
+
+    private var rowBackground: some View {
+        switch presentation {
+        case .content:
+            AppTheme.background
+        case .sidebar:
+            Color.clear
+        }
+    }
+
+    private var listBackground: some View {
+        switch presentation {
+        case .content:
+            AppTheme.background
+        case .sidebar:
+            AppTheme.sidebarBackground
+        }
+    }
+
+    private var emptyDirectoryDescription: String {
+        switch presentation {
+        case .content:
+            "Tap + to create a note or folder"
+        case .sidebar:
+            "Secondary-click to create a note or folder"
+        }
+    }
+
+    private func deleteItems(at offsets: IndexSet) {
+        for index in offsets {
+            onDeleteItem(store.items[index], store)
+        }
+    }
+}
+
+private struct SidebarDirectoryRow: View {
+    let systemImage: String
+    let title: String
+    let subtitle: String
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.body.weight(isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.secondaryText)
+                .frame(width: 18, alignment: .center)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body.weight(isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.secondaryText)
+                    .lineLimit(1)
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryText)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .background {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(isSelected ? AppTheme.selectedRowBackground : Color.clear)
+        }
+    }
+}
+
+#if os(iOS)
+struct FolderContentView: View {
+    var store: MarkdownNoteStore
+    let title: String
+    var isRoot: Bool = false
+    var fileWatcher: VaultFileWatcher?
+    var onIntent: (VaultWorkspaceIntent) -> Void
+    var canOpenSettings = false
+
+    @State private var showNewFolderAlert = false
+    @State private var newFolderName = ""
+
+    var body: some View {
+        DirectoryContentListView(
+            store: store,
+            fileWatcher: fileWatcher,
+            presentation: .content,
+            onOpenFolder: { folder, parentStore in
+                onIntent(.openFolder(folder, parentStore: parentStore))
+            },
+            onOpenNote: { note, noteStore, isNew in
+                onIntent(.openNote(note, store: noteStore, isNew: isNew))
+            },
+            onDeleteItem: { item, noteStore in
+                onIntent(.deleteItem(item, in: noteStore))
+            }
+        )
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                if isRoot, let onSettingsTap {
-                    Button(action: onSettingsTap) {
+                if isRoot, canOpenSettings {
+                    Button {
+                        onIntent(.openSettings)
+                    } label: {
                         Label("Settings", systemImage: "gearshape")
                     }
                     .labelStyle(.iconOnly)
@@ -969,63 +1267,18 @@ struct FolderContentView: View {
             Button("Create") {
                 let name = newFolderName.trimmingCharacters(in: .whitespaces)
                 if !name.isEmpty {
-                    _ = store.createFolder(name: name)
+                    onIntent(.createFolder(named: name, in: store))
                 }
                 newFolderName = ""
             }
             Button("Cancel", role: .cancel) { newFolderName = "" }
         }
-        .onAppear {
-            store.loadItemsInBackground()
-        }
-        .onChange(of: fileWatcher?.changeCount) { _, _ in
-            store.loadItemsInBackground()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { notification in
-            guard let snapshot = notification.object as? NoteSyncSnapshot else { return }
-            guard snapshot.fileURL.deletingLastPathComponent().standardizedFileURL == store.directoryURL.standardizedFileURL else {
-                return
-            }
-            store.loadItemsInBackground()
-        }
-        .overlay {
-            if store.isLoadingItems {
-                ProgressView()
-                    .allowsHitTesting(false)
-            } else if store.items.isEmpty {
-                ContentUnavailableView(
-                    "Empty",
-                    systemImage: "folder",
-                    description: Text("Tap + to create a note or folder")
-                )
-                .allowsHitTesting(false)
-            }
-        }
     }
 
     private func createNote() {
-        let note = store.createNote()
-        openNote(note, isNew: true)
+        onIntent(.createNote(in: store))
     }
 
-    private func openNote(_ note: MarkdownNote, isNew: Bool) {
-        if let onOpenNote {
-            onOpenNote(note, store, isNew)
-        } else {
-            path.append(NoteRoute.note(
-                note,
-                directoryURL: store.directoryURL,
-                vaultRootURL: store.vaultRootURL,
-                isNew: isNew
-            ))
-        }
-    }
-
-    private func deleteItems(at offsets: IndexSet) {
-        for index in offsets {
-            store.deleteItem(store.items[index])
-        }
-    }
 }
 #endif
 
@@ -1577,7 +1830,7 @@ struct NoteSearchSheet: View {
         #endif
 
         do {
-            let result = try await SearchIndexRefreshCoordinator.shared.refresh(vaultURL: rootURL)
+            let result = try await SearchIndexController.shared.refresh(vaultURL: rootURL)
             #if DEBUG
             updateDebug(
                 path: "Refreshed",

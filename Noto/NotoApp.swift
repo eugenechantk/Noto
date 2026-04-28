@@ -212,7 +212,7 @@ final class DailyNotePrewarmer {
             let resolved = DailyNoteFile.ensure(vaultRootURL: vaultURL, date: now, calendar: calendar)
             if resolved.didCreate {
                 do {
-                    _ = try await SearchIndexRefreshCoordinator.shared.refreshFile(
+                    _ = try await SearchIndexController.shared.refreshFile(
                         vaultURL: vaultURL,
                         fileURL: resolved.fileURL
                     )
@@ -220,7 +220,7 @@ final class DailyNotePrewarmer {
                     DebugTrace.record("daily note prewarm search refresh failed file=\(resolved.fileURL.lastPathComponent) error=\(String(describing: error))")
                 }
             } else if resolved.didApplyTemplate {
-                await SearchIndexRefreshCoordinator.shared.scheduleRefreshFile(
+                await SearchIndexController.shared.scheduleRefreshFile(
                     vaultURL: vaultURL,
                     fileURL: resolved.fileURL
                 )
@@ -273,7 +273,7 @@ struct MainAppView: View {
     }
 
     var body: some View {
-        NoteListView(
+        VaultWorkspaceView(
             store: store,
             locationManager: locationManager,
             fileWatcher: fileWatcher,
@@ -314,7 +314,7 @@ struct MainAppView: View {
 
     private func refreshSearchIndex() async {
         do {
-            _ = try await SearchIndexRefreshCoordinator.shared.refresh(vaultURL: vaultURL)
+            _ = try await SearchIndexController.shared.refresh(vaultURL: vaultURL)
         } catch {
             logger.error("Search index refresh failed: \(error.localizedDescription)")
         }
