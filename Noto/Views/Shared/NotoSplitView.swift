@@ -42,6 +42,7 @@ struct NotoSplitView<SidebarContent: View, DetailContent: View, IOSDetailRoot: V
         ZStack {
             NavigationSplitView(columnVisibility: $columnVisibility) {
                 sidebar($sidebarSearchText, toggleSidebar)
+                    .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 460)
             } detail: {
                 detail(toggleSidebar)
                     .notoBackgroundExtension()
@@ -86,6 +87,7 @@ struct NotoSplitView<SidebarContent: View, DetailContent: View, IOSDetailRoot: V
             ) { result in
                 onSearchResult(result)
             }
+            .padding(.horizontal, 16)
             .transition(.scale(scale: 0.98).combined(with: .opacity))
         }
         .zIndex(10)

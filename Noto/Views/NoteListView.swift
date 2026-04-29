@@ -1050,6 +1050,7 @@ struct DirectoryContentListView: View {
         .background(listBackground)
         .foregroundStyle(AppTheme.primaryText)
         .tint(AppTheme.primaryText)
+        .fileExplorerBottomToolbarInset()
         .accessibilityIdentifier("note_list")
         .task(id: store.directoryURL.standardizedFileURL.path) {
             store.loadItemsInBackground()
@@ -1097,6 +1098,7 @@ struct DirectoryContentListView: View {
             }
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
         .accessibilityIdentifier("folder_\(folder.name)")
     }
 
@@ -1119,6 +1121,7 @@ struct DirectoryContentListView: View {
             }
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
         .accessibilityIdentifier("note_\(note.title)")
 
         #if os(macOS)
@@ -1168,6 +1171,21 @@ struct DirectoryContentListView: View {
     }
 }
 
+private extension View {
+    @ViewBuilder
+    func fileExplorerBottomToolbarInset() -> some View {
+        #if os(iOS)
+        self.safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear
+                .frame(height: 80)
+                .allowsHitTesting(false)
+        }
+        #else
+        self
+        #endif
+    }
+}
+
 private struct SidebarDirectoryRow: View {
     let systemImage: String
     let title: String
@@ -1207,7 +1225,7 @@ private struct SidebarDirectoryRow: View {
 
 #if os(iOS)
 struct FolderContentView: View {
-    var store: MarkdownNoteStore
+    @State private var store: MarkdownNoteStore
     let title: String
     var isRoot: Bool = false
     var fileWatcher: VaultFileWatcher?
@@ -1216,6 +1234,22 @@ struct FolderContentView: View {
 
     @State private var showNewFolderAlert = false
     @State private var newFolderName = ""
+
+    init(
+        store: MarkdownNoteStore,
+        title: String,
+        isRoot: Bool = false,
+        fileWatcher: VaultFileWatcher? = nil,
+        onIntent: @escaping (VaultWorkspaceIntent) -> Void,
+        canOpenSettings: Bool = false
+    ) {
+        _store = State(wrappedValue: store)
+        self.title = title
+        self.isRoot = isRoot
+        self.fileWatcher = fileWatcher
+        self.onIntent = onIntent
+        self.canOpenSettings = canOpenSettings
+    }
 
     var body: some View {
         DirectoryContentListView(
@@ -1451,6 +1485,11 @@ struct NoteSearchSheet: View {
     var onClose: (() -> Void)? = nil
     var onSelect: (NoteSearchResult) -> Void
 
+    #if os(macOS)
+    private static let macOSPanelPreferredWidth: CGFloat = 620
+    private static let macOSPanelHeight: CGFloat = 560
+    #endif
+
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isSearchFocused: Bool
     @State private var query = ""
@@ -1552,7 +1591,8 @@ struct NoteSearchSheet: View {
             macOSSearchControls
             resultsList
         }
-        .frame(width: 620, height: 560)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: Self.macOSPanelPreferredWidth, maxHeight: Self.macOSPanelHeight)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -1679,6 +1719,44 @@ struct NoteSearchSheet: View {
             #endif
 
             ScrollViewReader { proxy in
+                Group {
+                #if os(macOS)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
+                            Button {
+                                onSelect(result)
+                                closeSearch()
+                            } label: {
+                                NoteSearchResultRow(result: result)
+                                    .padding(.horizontal, 12)
+                                    .background(index == selectedResultIndex ? AppTheme.selectedRowBackground : AppTheme.background)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("note_search_result_\(index)")
+                            .accessibilityLabel(result.title)
+                            .id(result.id)
+                            .onHover { isHovering in
+                                if isHovering {
+                                    NSCursor.pointingHand.push()
+                                } else {
+                                    NSCursor.pop()
+                                }
+                            }
+                        }
+                    }
+                }
+                .background(AppTheme.background)
+                .foregroundStyle(AppTheme.primaryText)
+                .tint(AppTheme.primaryText)
+                .accessibilityIdentifier("note_search_results_list")
+                .onChange(of: selectedResultIndex) { _, selectedResultIndex in
+                    guard let selectedResultIndex, results.indices.contains(selectedResultIndex) else { return }
+                    withAnimation(.easeOut(duration: 0.12)) {
+                        proxy.scrollTo(results[selectedResultIndex].id, anchor: .center)
+                    }
+                }
+                #else
                 List {
                     ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
                         Button {
@@ -1690,20 +1768,7 @@ struct NoteSearchSheet: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("note_search_result_\(index)")
                         .accessibilityLabel(result.title)
-                        #if os(macOS)
-                        .contentShape(Rectangle())
-                        .onHover { isHovering in
-                            if isHovering {
-                                selectedResultIndex = index
-                                NSCursor.pointingHand.push()
-                            } else {
-                                NSCursor.pop()
-                            }
-                        }
-                        .listRowBackground(index == selectedResultIndex ? AppTheme.selectedRowBackground : AppTheme.background)
-                        #else
                         .listRowBackground(AppTheme.background)
-                        #endif
                     }
                 }
                 .listStyle(.plain)
@@ -1712,14 +1777,8 @@ struct NoteSearchSheet: View {
                 .foregroundStyle(AppTheme.primaryText)
                 .tint(AppTheme.primaryText)
                 .accessibilityIdentifier("note_search_results_list")
-                #if os(macOS)
-                .onChange(of: selectedResultIndex) { _, selectedResultIndex in
-                    guard let selectedResultIndex, results.indices.contains(selectedResultIndex) else { return }
-                    withAnimation(.easeOut(duration: 0.12)) {
-                        proxy.scrollTo(results[selectedResultIndex].id, anchor: .center)
-                    }
-                }
                 #endif
+                }
                 .overlay {
                     if isPreparingIndex && results.isEmpty {
                         searchProgressIndicator(
@@ -2181,7 +2240,7 @@ extension View {
             self
         }
         #else
-        self.frame(minWidth: 620, minHeight: 560)
+        self.frame(minHeight: 560)
         #endif
     }
 }
@@ -2327,6 +2386,8 @@ struct FolderRow: View {
             }
         }
         .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 
@@ -2355,5 +2416,7 @@ struct MarkdownNoteRow: View {
             }
         }
         .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
