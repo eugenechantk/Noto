@@ -467,6 +467,12 @@ struct TextKit2EditorLifecycleTests {
         #expect(phoneInset == 16)
     }
 
+    @Test("Keyboard avoidance does not double count the editor accessory toolbar")
+    func keyboardAvoidanceDoesNotDoubleCountAccessoryToolbar() {
+        #expect(TextKit2EditorViewController.editorBottomInset(forKeyboardOverlap: 320) == 344)
+        #expect(TextKit2EditorViewController.editorBottomInset(forKeyboardOverlap: 0) == TextKit2EditorViewController.parentBottomToolbarClearance)
+    }
+
     @Test("Frontmatter range covers the YAML metadata block only")
     func detectsFrontmatterRange() throws {
         let markdown = """
@@ -648,6 +654,18 @@ struct TextKit2EditorLifecycleMacTests {
         let rowFrameInStack = stackView.convert(rowBackground.bounds, from: rowBackground)
         #expect(abs(rowFrameInStack.minX - stackView.edgeInsets.left) < 1.0)
         #expect(abs(rowFrameInStack.maxX - (stackView.bounds.width - stackView.edgeInsets.right)) < 1.0)
+    }
+
+    @MainActor
+    @Test("macOS editor keeps bottom scroll padding below the last line")
+    func macOSEditorKeepsBottomScrollPaddingBelowLastLine() throws {
+        let controller = TextKit2EditorViewController()
+        controller.loadViewIfNeeded()
+
+        let scrollView = try #require(controller.textView.enclosingScrollView)
+
+        #expect(scrollView.contentInsets.bottom == TextKit2EditorViewController.bottomScrollPadding)
+        #expect(scrollView.contentInsets.bottom == 48)
     }
 }
 

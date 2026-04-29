@@ -2287,7 +2287,8 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
 }
 
 final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, UIGestureRecognizerDelegate, PHPickerViewControllerDelegate {
-    private static let parentBottomToolbarClearance: CGFloat = 72
+    static let parentBottomToolbarClearance: CGFloat = 72
+    static let keyboardToolbarReadingGap: CGFloat = 24
 
     var coordinator: TextKit2EditorCoordinator?
     var vaultRootURL: URL? {
@@ -3771,11 +3772,15 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             guard keyboardFrameInView.intersects(view.bounds) else { return 0 }
             return max(0, view.bounds.maxY - keyboardFrameInView.minY)
         } ?? 0
-        let accessoryHeight = overlap > 0 ? (textView.inputAccessoryView?.bounds.height ?? 0) : 0
-        let bottomInset = max(Self.parentBottomToolbarClearance, overlap + accessoryHeight)
+        let bottomInset = Self.editorBottomInset(forKeyboardOverlap: overlap)
 
         textView.contentInset.bottom = bottomInset
         textView.verticalScrollIndicatorInsets.bottom = bottomInset
+    }
+
+    static func editorBottomInset(forKeyboardOverlap overlap: CGFloat) -> CGFloat {
+        guard overlap > 0 else { return parentBottomToolbarClearance }
+        return overlap + keyboardToolbarReadingGap
     }
 
     private func syncReadableWidthInsets() -> Bool {
@@ -3809,8 +3814,42 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         guard textView.isFirstResponder else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self, self.textView != nil else { return }
-            self.textView.scrollRangeToVisible(self.textView.selectedRange)
+            self.scrollSelectionToKeyboardReadingBoundary()
         }
+    }
+
+    private func scrollSelectionToKeyboardReadingBoundary() {
+        guard keyboardFrameInScreen != nil else {
+            textView.scrollRangeToVisible(textView.selectedRange)
+            return
+        }
+
+        textView.layoutIfNeeded()
+        let selectedRange = textView.selectedRange
+        let documentLength = (textView.text as NSString).length
+        let caretLocation = max(0, min(selectedRange.location, documentLength))
+        guard let caretPosition = textView.position(from: textView.beginningOfDocument, offset: caretLocation) else {
+            textView.scrollRangeToVisible(selectedRange)
+            return
+        }
+
+        let caretRect = textView.caretRect(for: caretPosition)
+        guard isFiniteRect(caretRect) else {
+            textView.scrollRangeToVisible(selectedRange)
+            return
+        }
+
+        let keyboardReadingBoundary = textView.bounds.maxY - textView.adjustedContentInset.bottom
+        let isAtDocumentEnd = NSMaxRange(selectedRange) >= documentLength
+        let distanceFromBoundary = caretRect.maxY - keyboardReadingBoundary
+
+        guard distanceFromBoundary > 0 || (isAtDocumentEnd && distanceFromBoundary < -1) else { return }
+
+        let targetOffset = CGPoint(
+            x: textView.contentOffset.x,
+            y: textView.contentOffset.y + distanceFromBoundary
+        )
+        textView.setContentOffset(clampedContentOffset(targetOffset), animated: false)
     }
 
     func restoreInitialContentOffsetIfNeeded(id: String?, offsetY: CGFloat?) {
@@ -4480,6 +4519,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private let minimumHorizontalTextInset: CGFloat = 48
     private let maximumTextWidth: CGFloat = 600
     private let verticalTextInset: CGFloat = 16
+    static let bottomScrollPadding: CGFloat = 48
     private var loadingImageURLs: Set<URL> = []
     private var findQuery = ""
     private var findMatches: [NSRange] = []
@@ -4567,6 +4607,12 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
+        scrollView.contentInsets = NSEdgeInsets(
+            top: 0,
+            left: 0,
+            bottom: Self.bottomScrollPadding,
+            right: 0
+        )
         scrollView.documentView = textView
         scrollView.contentView.postsBoundsChangedNotifications = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
