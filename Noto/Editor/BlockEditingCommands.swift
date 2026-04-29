@@ -16,6 +16,11 @@ struct TextReplacement: Equatable {
     let replacement: String
 }
 
+private struct StrikethroughLineTarget {
+    let range: NSRange
+    let wrappedRange: NSRange?
+}
+
 enum MarkdownImageInsertion {
     static func transform(in text: String, selection: NSRange, markdown: String) -> TextSelectionTransform {
         let nsText = text as NSString
@@ -390,6 +395,11 @@ struct BlockEditingCommands {
         let safeLength = max(0, min(selection.length, nsText.length - safeLocation))
         let safeSelection = NSRange(location: safeLocation, length: safeLength)
 
+        if safeSelection.length > 0,
+           nsText.substring(with: safeSelection).contains(where: { $0.isNewline }) {
+            return toggledMultilineStrikethrough(in: text, selection: safeSelection)
+        }
+
         let targetRange: NSRange
         if safeSelection.length > 0 {
             targetRange = safeSelection
@@ -418,6 +428,54 @@ struct BlockEditingCommands {
         return TextSelectionTransform(
             text: updatedText as String,
             selection: NSRange(location: targetRange.location + 2, length: targetRange.length)
+        )
+    }
+
+    private static func toggledMultilineStrikethrough(
+        in text: String,
+        selection safeSelection: NSRange
+    ) -> TextSelectionTransform? {
+        let nsText = text as NSString
+        let targets = strikethroughLineTargets(in: nsText, selection: safeSelection)
+        guard !targets.isEmpty else { return nil }
+
+        let allTargetsWrapped = targets.allSatisfy { $0.wrappedRange != nil }
+        if allTargetsWrapped {
+            return applyStrikethroughLineEdits(
+                in: text,
+                affectedRange: nsText.lineRange(for: safeSelection),
+                edits: targets.compactMap { target in
+                    guard let wrappedRange = target.wrappedRange else { return nil }
+                    let wrappedText = nsText.substring(with: wrappedRange)
+                    return TextReplacement(
+                        range: wrappedRange,
+                        replacement: String(wrappedText.dropFirst(2).dropLast(2))
+                    )
+                }
+            )
+        }
+
+        if let wrappedRange = multilineWrapperRange(containing: safeSelection, in: nsText) {
+            let wrappedText = nsText.substring(with: wrappedRange)
+            let unwrappedText = String(wrappedText.dropFirst(2).dropLast(2))
+            let updatedText = nsText.replacingCharacters(in: wrappedRange, with: unwrappedText)
+            return TextSelectionTransform(
+                text: updatedText,
+                selection: NSRange(location: wrappedRange.location, length: unwrappedText.utf16.count)
+            )
+        }
+
+        return applyStrikethroughLineEdits(
+            in: text,
+            affectedRange: nsText.lineRange(for: safeSelection),
+            edits: targets.compactMap { target in
+                guard target.wrappedRange == nil else { return nil }
+                let selectedLineText = nsText.substring(with: target.range)
+                return TextReplacement(
+                    range: target.range,
+                    replacement: "~~\(selectedLineText)~~"
+                )
+            }
         )
     }
 
@@ -741,6 +799,64 @@ struct BlockEditingCommands {
         guard ["-", "*", "•"].contains(marker), next == " " else { return nil }
 
         return index / 2
+    }
+
+    private static func strikethroughLineTargets(
+        in text: NSString,
+        selection: NSRange
+    ) -> [StrikethroughLineTarget] {
+        let affectedRange = text.lineRange(for: selection)
+        let affectedEnd = NSMaxRange(affectedRange)
+        var targets: [StrikethroughLineTarget] = []
+        var location = affectedRange.location
+
+        while location < affectedEnd {
+            let lineRange = text.lineRange(for: NSRange(location: location, length: 0))
+            let lineTextRange = lineTextRange(from: lineRange, in: text)
+            let targetRange = NSIntersectionRange(lineTextRange, selection)
+
+            if targetRange.length > 0 {
+                let targetText = text.substring(with: targetRange)
+                if targetText.contains(where: { !$0.isWhitespace && !$0.isNewline }) {
+                    let wrappedRange = wrappedStrikethroughRange(containing: targetRange, in: text)
+                    targets.append(StrikethroughLineTarget(range: targetRange, wrappedRange: wrappedRange))
+                }
+            }
+
+            let nextLocation = NSMaxRange(lineRange)
+            guard nextLocation > location else { break }
+            location = nextLocation
+        }
+
+        return targets
+    }
+
+    private static func multilineWrapperRange(containing range: NSRange, in text: NSString) -> NSRange? {
+        guard let wrappedRange = wrappedStrikethroughRange(containing: range, in: text) else { return nil }
+        let wrappedText = text.substring(with: wrappedRange)
+        guard wrappedText.contains(where: { $0.isNewline }) else { return nil }
+        return wrappedRange
+    }
+
+    private static func applyStrikethroughLineEdits(
+        in text: String,
+        affectedRange: NSRange,
+        edits: [TextReplacement]
+    ) -> TextSelectionTransform? {
+        guard !edits.isEmpty else { return nil }
+
+        let updatedText = NSMutableString(string: text)
+        var lengthDelta = 0
+
+        for edit in edits.sorted(by: { $0.range.location > $1.range.location }) {
+            updatedText.replaceCharacters(in: edit.range, with: edit.replacement)
+            lengthDelta += edit.replacement.utf16.count - edit.range.length
+        }
+
+        return TextSelectionTransform(
+            text: updatedText as String,
+            selection: NSRange(location: affectedRange.location, length: max(0, affectedRange.length + lengthDelta))
+        )
     }
 
     private static func wrappedStrikethroughRange(containing range: NSRange, in text: NSString) -> NSRange? {

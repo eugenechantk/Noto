@@ -212,6 +212,16 @@ struct TextKit2MarkdownLayoutTests {
         #expect(url.query?.contains("Folder/Project%20Brief.md") == true)
     }
 
+    @Test("Markdown strikethrough styles per-line command output")
+    func markdownStrikethroughStylesPerLineCommandOutput() throws {
+        let attributed = MarkdownParagraphStyler.style(text: "~~Alpha~~", kind: .paragraph)
+        let style = try #require(attributed.attribute(.strikethroughStyle, at: 2, effectiveRange: nil) as? Int)
+        let syntaxStyle = attributed.attribute(.strikethroughStyle, at: 0, effectiveRange: nil) as? Int
+
+        #expect(style == NSUnderlineStyle.single.rawValue)
+        #expect(syntaxStyle == nil)
+    }
+
     @Test("Renderable block discovery can be limited to an affected range")
     func renderableBlockDiscoveryCanBeLimitedToAffectedRange() {
         let text = """
@@ -705,6 +715,16 @@ struct TextKit2MarkdownLayoutMacTests {
 
         #expect(url.scheme == "noto-document")
         #expect(url.query?.contains("Folder/Project%20Brief.md") == true)
+    }
+
+    @Test("Markdown strikethrough styles per-line command output")
+    func markdownStrikethroughStylesPerLineCommandOutput() throws {
+        let attributed = MarkdownParagraphStyler.style(text: "~~Alpha~~", kind: .paragraph)
+        let style = try #require(attributed.attribute(.strikethroughStyle, at: 2, effectiveRange: nil) as? Int)
+        let syntaxStyle = attributed.attribute(.strikethroughStyle, at: 0, effectiveRange: nil) as? Int
+
+        #expect(style == NSUnderlineStyle.single.rawValue)
+        #expect(syntaxStyle == nil)
     }
 
     @Test("Deleting a rendered hyperlink can reveal the full markdown syntax")

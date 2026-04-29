@@ -230,6 +230,58 @@ struct BlockEditingCommandsTests {
         ))
     }
 
+    @Test("Strikethrough wraps selected multiline text line by line")
+    func strikethroughWrapsMultilineSelectionLineByLine() {
+        let result = BlockEditingCommands.toggledStrikethrough(
+            in: "Alpha\nBeta",
+            selection: NSRange(location: 0, length: 10)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "~~Alpha~~\n~~Beta~~",
+            selection: NSRange(location: 0, length: 18)
+        ))
+    }
+
+    @Test("Strikethrough removes per-line markers from selected multiline text")
+    func strikethroughUnwrapsMultilineSelectionLineByLine() {
+        let result = BlockEditingCommands.toggledStrikethrough(
+            in: "~~Alpha~~\n~~Beta~~",
+            selection: NSRange(location: 0, length: 18)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "Alpha\nBeta",
+            selection: NSRange(location: 0, length: 10)
+        ))
+    }
+
+    @Test("Strikethrough skips blank lines in multiline selections")
+    func strikethroughSkipsBlankLinesInMultilineSelections() {
+        let result = BlockEditingCommands.toggledStrikethrough(
+            in: "Alpha\n\nBeta",
+            selection: NSRange(location: 0, length: 11)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "~~Alpha~~\n\n~~Beta~~",
+            selection: NSRange(location: 0, length: 19)
+        ))
+    }
+
+    @Test("Strikethrough converts old multiline wrapper by unwrapping it first")
+    func strikethroughUnwrapsOldMultilineWrapper() {
+        let result = BlockEditingCommands.toggledStrikethrough(
+            in: "~~Alpha\nBeta~~",
+            selection: NSRange(location: 0, length: 14)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "Alpha\nBeta",
+            selection: NSRange(location: 0, length: 10)
+        ))
+    }
+
     @Test("Strikethrough wraps the word at the cursor when no text is selected")
     func strikethroughWrapsWordAtCursor() {
         let result = BlockEditingCommands.toggledStrikethrough(
