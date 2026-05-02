@@ -257,6 +257,7 @@ struct VaultWorkspaceView: View {
     var locationManager: VaultLocationManager?
     var fileWatcher: VaultFileWatcher?
     @ObservedObject var readwiseSyncController: ReadwiseSyncController
+    var initialDocumentLink: String?
 
     #if os(iOS)
     @State private var path = NavigationPath()
@@ -342,7 +343,7 @@ struct VaultWorkspaceView: View {
             .onAppear {
                 guard !hasRestoredSelection else { return }
                 hasRestoredSelection = true
-                restoreOrOpenToday()
+                openInitialDocumentLinkOrRestore()
             }
         } else {
             NavigationStack(path: $path) {
@@ -509,6 +510,10 @@ struct VaultWorkspaceView: View {
             guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
             openTodayNote()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.createNote)) { notification in
+            guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
+            handleWorkspaceIntent(.createNote(in: store))
+        }
         .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openSettings)) { notification in
             guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
             if locationManager != nil {
@@ -521,7 +526,7 @@ struct VaultWorkspaceView: View {
         .onAppear {
             guard !hasRestoredSelection else { return }
             hasRestoredSelection = true
-            restoreOrOpenToday()
+            openInitialDocumentLinkOrRestore()
         }
         #endif
     }
@@ -948,6 +953,16 @@ struct VaultWorkspaceView: View {
 
         // Fall back to today's note when there is no saved selection.
         openTodayNote()
+    }
+
+    private func openInitialDocumentLinkOrRestore() {
+        if let initialDocumentLink,
+           let resolved = store.note(atVaultRelativePath: initialDocumentLink) {
+            openNoteFromWorkspace(resolved.note, in: resolved.store, isNew: false)
+            return
+        }
+
+        restoreOrOpenToday()
     }
 
     private func restoredNote(for fileURL: URL) -> MarkdownNote {
@@ -1480,6 +1495,53 @@ private struct NoteSearchExecutionResult {
     let debugMessages: [String]
 }
 
+private extension SearchScope {
+    var segmentTitle: String {
+        switch self {
+        case .titleAndContent:
+            "Title + Content"
+        case .title:
+            "Title"
+        }
+    }
+
+    var shortcutCaption: String {
+        switch self {
+        case .titleAndContent:
+            "⌘1"
+        case .title:
+            "⌘2"
+        }
+    }
+
+    var shortcutKey: KeyEquivalent {
+        switch self {
+        case .titleAndContent:
+            "1"
+        case .title:
+            "2"
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .titleAndContent:
+            "Search title and content"
+        case .title:
+            "Search title only"
+        }
+    }
+
+    var accessibilityIdentifier: String {
+        switch self {
+        case .titleAndContent:
+            "note_search_scope_title_and_content"
+        case .title:
+            "note_search_scope_title_only"
+        }
+    }
+}
+
 struct NoteSearchSheet: View {
     var rootStore: MarkdownNoteStore
     var onClose: (() -> Void)? = nil
@@ -1701,13 +1763,50 @@ struct NoteSearchSheet: View {
     #endif
 
     private var searchScopePicker: some View {
-        Picker("Search Scope", selection: $scope) {
-            Text("Title + Content").tag(SearchScope.titleAndContent)
-            Text("Title").tag(SearchScope.title)
+        HStack(spacing: 0) {
+            searchScopeSegment(for: .titleAndContent)
+            searchScopeSegment(for: .title)
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
+        .padding(2)
+        .background(AppTheme.primaryText.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(AppTheme.primaryText.opacity(0.10), lineWidth: 0.5)
+        }
         .accessibilityIdentifier("note_search_scope_picker")
+    }
+
+    private func searchScopeSegment(for candidate: SearchScope) -> some View {
+        let isSelected = scope == candidate
+
+        return Button {
+            scope = candidate
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(candidate.segmentTitle)
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                Text(candidate.shortcutCaption)
+                    .font(.caption2)
+                    .foregroundStyle(isSelected ? AppTheme.primaryText.opacity(0.72) : AppTheme.secondaryText)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.86)
+            .frame(maxWidth: .infinity, minHeight: 34)
+            .padding(.horizontal, 8)
+            .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.secondaryText)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(AppTheme.primaryText.opacity(0.14))
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut(candidate.shortcutKey, modifiers: [.command])
+        .accessibilityLabel(candidate.accessibilityLabel)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityIdentifier(candidate.accessibilityIdentifier)
     }
 
     private var resultsList: some View {

@@ -16,6 +16,11 @@ struct TextReplacement: Equatable {
     let replacement: String
 }
 
+struct HyperlinkInsertionDraft: Equatable {
+    let range: NSRange
+    let label: String
+}
+
 private struct StrikethroughLineTarget {
     let range: NSRange
     let wrappedRange: NSRange?
@@ -523,6 +528,54 @@ struct BlockEditingCommands {
         return TextSelectionTransform(
             text: updatedText,
             selection: NSRange(location: targetRange.location + 1, length: selectedText.utf16.count)
+        )
+    }
+
+    static func hyperlinkInsertionDraft(in text: String, selection: NSRange) -> HyperlinkInsertionDraft? {
+        let nsText = text as NSString
+        guard selection.location != NSNotFound, selection.length > 0 else { return nil }
+
+        let safeLocation = max(0, min(selection.location, nsText.length))
+        let safeLength = max(0, min(selection.length, nsText.length - safeLocation))
+        let safeSelection = NSRange(location: safeLocation, length: safeLength)
+        guard safeSelection.length > 0,
+              HyperlinkMarkdown.matchForToggle(selection: safeSelection, in: nsText) == nil else {
+            return nil
+        }
+
+        let selectedText = nsText.substring(with: safeSelection)
+        let label = selectedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !label.isEmpty,
+              label.rangeOfCharacter(from: .newlines) == nil,
+              label.rangeOfCharacter(from: CharacterSet(charactersIn: "[]")) == nil,
+              HyperlinkMarkdown.normalizedURL(from: label) == nil else {
+            return nil
+        }
+
+        return HyperlinkInsertionDraft(range: safeSelection, label: selectedText)
+    }
+
+    static func insertedHyperlink(in text: String, draft: HyperlinkInsertionDraft, rawDestination: String) -> TextSelectionTransform? {
+        let nsText = text as NSString
+        guard draft.range.location >= 0,
+              draft.range.length > 0,
+              NSMaxRange(draft.range) <= nsText.length,
+              nsText.substring(with: draft.range) == draft.label else {
+            return nil
+        }
+
+        let destination = rawDestination.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard HyperlinkMarkdown.target(from: destination) != nil,
+              destination.rangeOfCharacter(from: .newlines) == nil,
+              destination.rangeOfCharacter(from: CharacterSet(charactersIn: "()")) == nil else {
+            return nil
+        }
+
+        let linkMarkdown = "[\(draft.label)](\(destination))"
+        let updatedText = nsText.replacingCharacters(in: draft.range, with: linkMarkdown)
+        return TextSelectionTransform(
+            text: updatedText,
+            selection: NSRange(location: draft.range.location + 1, length: draft.label.utf16.count)
         )
     }
 

@@ -414,6 +414,47 @@ struct BlockEditingCommandsTests {
         #expect(result == nil)
     }
 
+    @Test("Hyperlink insertion draft captures selected plain text as label")
+    func hyperlinkInsertionDraftCapturesPlainTextLabel() throws {
+        let draft = try #require(BlockEditingCommands.hyperlinkInsertionDraft(
+            in: "visit Example",
+            selection: NSRange(location: 6, length: 7)
+        ))
+
+        #expect(draft == HyperlinkInsertionDraft(
+            range: NSRange(location: 6, length: 7),
+            label: "Example"
+        ))
+    }
+
+    @Test("Hyperlink insertion replaces selected label with markdown link")
+    func hyperlinkInsertionReplacesSelectedLabel() {
+        let draft = HyperlinkInsertionDraft(
+            range: NSRange(location: 6, length: 7),
+            label: "Example"
+        )
+        let result = BlockEditingCommands.insertedHyperlink(
+            in: "visit Example",
+            draft: draft,
+            rawDestination: "example.com"
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "visit [Example](example.com)",
+            selection: NSRange(location: 7, length: 7)
+        ))
+    }
+
+    @Test("Hyperlink insertion draft ignores existing markdown links")
+    func hyperlinkInsertionDraftIgnoresExistingMarkdownLinks() {
+        let result = BlockEditingCommands.hyperlinkInsertionDraft(
+            in: "visit [Example](https://example.com)",
+            selection: NSRange(location: 7, length: 7)
+        )
+
+        #expect(result == nil)
+    }
+
     @Test("Markdown hyperlinks accept vault-relative note paths")
     func markdownHyperlinksAcceptVaultRelativeNotePaths() {
         let target = HyperlinkMarkdown.target(at: 1, in: "[Project Brief](Folder/Project Brief.md)")

@@ -11,6 +11,13 @@ import AppKit
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "TextKit2Editor")
 
+private enum HyperlinkInsertionStrings {
+    static let title = "Insert Link"
+    static let destinationPlaceholder = "URL or note path"
+    static let cancel = "Cancel"
+    static let insert = "Insert"
+}
+
 enum ReadableTextColumnLayout {
     static func textHorizontalInset(
         for availableWidth: CGFloat,
@@ -2220,6 +2227,126 @@ private final class PageMentionSheetViewController: UIViewController, UITableVie
     }
 }
 
+private final class HyperlinkInsertionSheetViewController: UIViewController, UITextFieldDelegate {
+    var onCancel: (() -> Void)?
+    var onInsert: ((String) -> Void)?
+
+    private let draft: HyperlinkInsertionDraft
+    private let destinationField = UITextField()
+    private var didComplete = false
+
+    init(draft: HyperlinkInsertionDraft) {
+        self.draft = draft
+        super.init(nibName: nil, bundle: nil)
+        modalPresentationStyle = .pageSheet
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = AppTheme.uiBackground
+        navigationItem.title = HyperlinkInsertionStrings.title
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            title: HyperlinkInsertionStrings.cancel,
+            style: .plain,
+            target: self,
+            action: #selector(cancel)
+        )
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            title: HyperlinkInsertionStrings.insert,
+            style: .done,
+            target: self,
+            action: #selector(insert)
+        )
+
+        let labelTitle = UILabel()
+        labelTitle.text = "Label"
+        labelTitle.font = UIFont.preferredFont(forTextStyle: .caption1)
+        labelTitle.textColor = AppTheme.uiMutedText
+
+        let labelValue = UILabel()
+        labelValue.text = draft.label
+        labelValue.font = UIFont.preferredFont(forTextStyle: .body)
+        labelValue.textColor = AppTheme.uiPrimaryText
+        labelValue.numberOfLines = 2
+
+        destinationField.placeholder = HyperlinkInsertionStrings.destinationPlaceholder
+        destinationField.borderStyle = .roundedRect
+        destinationField.textContentType = .URL
+        destinationField.keyboardType = .URL
+        destinationField.autocapitalizationType = .none
+        destinationField.autocorrectionType = .no
+        destinationField.returnKeyType = .done
+        destinationField.clearButtonMode = .whileEditing
+        destinationField.delegate = self
+        destinationField.accessibilityIdentifier = "hyperlink_destination_field"
+
+        let stackView = UIStackView(arrangedSubviews: [labelTitle, labelValue, destinationField])
+        stackView.axis = .vertical
+        stackView.spacing = 10
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stackView)
+
+        NSLayoutConstraint.activate([
+            stackView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
+            stackView.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
+        ])
+
+        preferredContentSize = CGSize(width: 420, height: 220)
+        destinationField.addTarget(self, action: #selector(destinationChanged), for: .editingChanged)
+        updateInsertButton()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        destinationField.becomeFirstResponder()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        guard !didComplete,
+              isBeingDismissed || navigationController?.isBeingDismissed == true else {
+            return
+        }
+        onCancel?()
+    }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        insert()
+        return true
+    }
+
+    @objc
+    private func destinationChanged() {
+        updateInsertButton()
+    }
+
+    private func updateInsertButton() {
+        navigationItem.rightBarButtonItem?.isEnabled = HyperlinkMarkdown.target(from: destinationField.text ?? "") != nil
+    }
+
+    @objc
+    private func cancel() {
+        didComplete = true
+        onCancel?()
+        dismiss(animated: true)
+    }
+
+    @objc
+    private func insert() {
+        let destination = destinationField.text ?? ""
+        guard HyperlinkMarkdown.target(from: destination) != nil else { return }
+        didComplete = true
+        onInsert?(destination)
+        dismiss(animated: true)
+    }
+}
+
 struct TextKit2EditorView: UIViewControllerRepresentable {
     @Binding var text: String
     var autoFocus: Bool = false
@@ -2315,6 +2442,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var selectedPageMentionSuggestionIndex = 0
     private var activePageMentionQuery: PageMentionQuery?
     private var pageMentionSheetViewController: PageMentionSheetViewController?
+    private var hyperlinkInsertionSheetViewController: HyperlinkInsertionSheetViewController?
     private var pendingPageMentionTriggerLocation: Int?
     private var suppressedPageMentionLocation: Int?
     private var revealedHyperlinkRanges: [NSRange] = []
@@ -2460,7 +2588,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             ),
             UIKeyCommand(
                 input: "k",
-                modifierFlags: [.command],
+                modifierFlags: [.command, .shift],
                 action: #selector(toggleSelectedHyperlink),
                 discoverabilityTitle: "Link"
             ),
@@ -2813,14 +2941,56 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     @objc
     private func toggleSelectedHyperlink() {
-        guard let transform = BlockEditingCommands.toggledHyperlink(
+        if let transform = BlockEditingCommands.toggledHyperlink(
+            in: textView.text ?? "",
+            selection: textView.selectedRange
+        ) {
+            applySelectionTransform(transform)
+            return
+        }
+
+        guard let draft = BlockEditingCommands.hyperlinkInsertionDraft(
             in: textView.text ?? "",
             selection: textView.selectedRange
         ) else {
             return
         }
 
-        applySelectionTransform(transform)
+        presentHyperlinkInsertionSheet(for: draft)
+    }
+
+    private func presentHyperlinkInsertionSheet(for draft: HyperlinkInsertionDraft) {
+        guard presentedViewController == nil,
+              hyperlinkInsertionSheetViewController == nil else {
+            return
+        }
+
+        let sheetViewController = HyperlinkInsertionSheetViewController(draft: draft)
+        hyperlinkInsertionSheetViewController = sheetViewController
+        sheetViewController.onCancel = { [weak self] in
+            self?.hyperlinkInsertionSheetViewController = nil
+            self?.textView.becomeFirstResponder()
+        }
+        sheetViewController.onInsert = { [weak self, draft] destination in
+            guard let self else { return }
+            self.hyperlinkInsertionSheetViewController = nil
+            if let transform = BlockEditingCommands.insertedHyperlink(
+                in: self.textView.text ?? "",
+                draft: draft,
+                rawDestination: destination
+            ) {
+                self.applySelectionTransform(transform)
+            }
+            self.textView.becomeFirstResponder()
+        }
+
+        let navigationController = UINavigationController(rootViewController: sheetViewController)
+        if let sheetPresentationController = navigationController.sheetPresentationController {
+            sheetPresentationController.detents = [.medium()]
+            sheetPresentationController.prefersGrabberVisible = true
+            sheetPresentationController.prefersScrollingExpandsWhenScrolledToEdge = false
+        }
+        present(navigationController, animated: true)
     }
 
     private func applySelectionTransform(_ transform: TextSelectionTransform) {
@@ -4368,15 +4538,127 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
 #if os(macOS)
 
+private final class HyperlinkInsertionPopoverViewController: NSViewController, NSTextFieldDelegate {
+    var onCancel: (() -> Void)?
+    var onInsert: ((String) -> Void)?
+
+    private let draft: HyperlinkInsertionDraft
+    private let destinationField = NSTextField()
+    private let insertButton = NSButton(title: HyperlinkInsertionStrings.insert, target: nil, action: nil)
+
+    init(draft: HyperlinkInsertionDraft) {
+        self.draft = draft
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func loadView() {
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 158))
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+
+        let stackView = NSStackView()
+        stackView.orientation = .vertical
+        stackView.spacing = 10
+        stackView.edgeInsets = NSEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stackView)
+
+        let titleLabel = NSTextField(labelWithString: HyperlinkInsertionStrings.title)
+        titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        titleLabel.textColor = AppTheme.nsPrimaryText
+
+        let labelField = NSTextField(labelWithString: draft.label)
+        labelField.font = .systemFont(ofSize: 13)
+        labelField.textColor = AppTheme.nsMutedText
+        labelField.lineBreakMode = .byTruncatingMiddle
+
+        destinationField.placeholderString = HyperlinkInsertionStrings.destinationPlaceholder
+        destinationField.font = .systemFont(ofSize: 13)
+        destinationField.delegate = self
+        destinationField.target = self
+        destinationField.action = #selector(insert)
+        destinationField.setAccessibilityIdentifier("hyperlink_destination_field")
+
+        let buttonStack = NSStackView()
+        buttonStack.orientation = .horizontal
+        buttonStack.spacing = 8
+        buttonStack.alignment = .centerY
+
+        let cancelButton = NSButton(title: HyperlinkInsertionStrings.cancel, target: self, action: #selector(cancel))
+        insertButton.target = self
+        insertButton.action = #selector(insert)
+        insertButton.keyEquivalent = "\r"
+
+        buttonStack.addArrangedSubview(NSView())
+        buttonStack.addArrangedSubview(cancelButton)
+        buttonStack.addArrangedSubview(insertButton)
+
+        stackView.addArrangedSubview(titleLabel)
+        stackView.addArrangedSubview(labelField)
+        stackView.addArrangedSubview(destinationField)
+        stackView.addArrangedSubview(buttonStack)
+
+        NSLayoutConstraint.activate([
+            stackView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            stackView.topAnchor.constraint(equalTo: view.topAnchor),
+            stackView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            destinationField.heightAnchor.constraint(equalToConstant: 28),
+        ])
+
+        updateInsertButton()
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        view.window?.makeFirstResponder(destinationField)
+    }
+
+    func controlTextDidChange(_ obj: Notification) {
+        updateInsertButton()
+    }
+
+    private func updateInsertButton() {
+        insertButton.isEnabled = HyperlinkMarkdown.target(from: destinationField.stringValue) != nil
+    }
+
+    @objc
+    private func cancel() {
+        onCancel?()
+    }
+
+    @objc
+    private func insert() {
+        let destination = destinationField.stringValue
+        guard HyperlinkMarkdown.target(from: destination) != nil else { return }
+        onInsert?(destination)
+    }
+}
+
 private final class HyperlinkOpeningTextView: NSTextView {
     var openHyperlinkTarget: ((HyperlinkMarkdown.Target) -> Void)?
+    var openHyperlinkTargetInNewWindow: ((HyperlinkMarkdown.Target) -> Void)?
     var shouldOpenHyperlinkAtIndex: ((Int) -> Bool)?
     var toggleTodoMarkerAtPoint: ((NSPoint) -> Bool)?
     var importImageFiles: (([URL], Int) -> Bool)?
+    private var hyperlinkTrackingArea: NSTrackingArea?
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         if toggleTodoMarkerAtPoint?(point) == true {
+            return
+        }
+
+        if event.modifierFlags.contains(.command),
+           let target = vaultDocumentHyperlinkTarget(at: point) {
+            openHyperlinkTargetInNewWindow?(target)
             return
         }
 
@@ -4389,6 +4671,34 @@ private final class HyperlinkOpeningTextView: NSTextView {
         }
 
         super.mouseDown(with: event)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hyperlinkTrackingArea {
+            removeTrackingArea(hyperlinkTrackingArea)
+        }
+
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+        hyperlinkTrackingArea = trackingArea
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        updateHyperlinkCursor(at: point)
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        super.flagsChanged(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        updateHyperlinkCursor(at: point)
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
@@ -4420,6 +4730,26 @@ private final class HyperlinkOpeningTextView: NSTextView {
             return type.conforms(to: .image)
         }
     }
+
+    private func updateHyperlinkCursor(at point: NSPoint) {
+        let characterIndex = characterIndexForInsertion(at: point)
+        if shouldOpenHyperlinkAtIndex?(characterIndex) != false,
+           HyperlinkMarkdown.target(at: characterIndex, in: string) != nil {
+            NSCursor.pointingHand.set()
+        } else {
+            NSCursor.iBeam.set()
+        }
+    }
+
+    private func vaultDocumentHyperlinkTarget(at point: NSPoint) -> HyperlinkMarkdown.Target? {
+        let characterIndex = characterIndexForInsertion(at: point)
+        guard shouldOpenHyperlinkAtIndex?(characterIndex) != false,
+              let target = HyperlinkMarkdown.target(at: characterIndex, in: string),
+              case .vaultDocument = target else {
+            return nil
+        }
+        return target
+    }
 }
 
 private final class FindHighlightOverlayView: NSView {
@@ -4436,6 +4766,7 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     var onImportImageFile: ((URL) throws -> VaultImageAttachment)?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
+    var onOpenDocumentLinkInNewWindow: ((String) -> Void)?
     var isFindVisible: Bool = false
     var findQuery: String = ""
     var findNavigationRequest: EditorFindNavigationRequest?
@@ -4453,6 +4784,7 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
         vc.onImportImageFile = onImportImageFile
         vc.pageMentionProvider = pageMentionProvider
         vc.onOpenDocumentLink = onOpenDocumentLink
+        vc.onOpenDocumentLinkInNewWindow = onOpenDocumentLinkInNewWindow
         vc.isFindVisible = isFindVisible
         vc.onCloseFind = onCloseFind
         vc.updateFind(
@@ -4469,6 +4801,7 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
         vc.vaultRootURL = vaultRootURL
         vc.onImportImageFile = onImportImageFile
         vc.onOpenDocumentLink = onOpenDocumentLink
+        vc.onOpenDocumentLinkInNewWindow = onOpenDocumentLinkInNewWindow
         vc.isFindVisible = isFindVisible
         vc.onCloseFind = onCloseFind
         vc.updateFind(
@@ -4485,7 +4818,7 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     }
 }
 
-final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, NSTextStorageDelegate {
+final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, NSTextStorageDelegate, NSPopoverDelegate {
     var coordinator: TextKit2EditorCoordinator?
     var vaultRootURL: URL? {
         didSet {
@@ -4495,6 +4828,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     var onImportImageFile: ((URL) throws -> VaultImageAttachment)?
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
+    var onOpenDocumentLinkInNewWindow: ((String) -> Void)?
     var isFindVisible = false
     var onCloseFind: (() -> Void)?
     private(set) var textView: NSTextView!
@@ -4509,6 +4843,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var boldObserver: NSObjectProtocol?
     private var italicObserver: NSObjectProtocol?
     private var hyperlinkObserver: NSObjectProtocol?
+    private var hyperlinkInsertionPopover: NSPopover?
     private var scrollBoundsObserver: NSObjectProtocol?
     private var revealedHyperlinkRanges: [NSRange] = []
     private var revealedDividerRanges: [NSRange] = []
@@ -4591,6 +4926,10 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             case .vaultDocument(let relativePath):
                 self?.onOpenDocumentLink?(relativePath)
             }
+        }
+        (textView as? HyperlinkOpeningTextView)?.openHyperlinkTargetInNewWindow = { [weak self] target in
+            guard case .vaultDocument(let relativePath) = target else { return }
+            self?.onOpenDocumentLinkInNewWindow?(relativePath)
         }
         (textView as? HyperlinkOpeningTextView)?.shouldOpenHyperlinkAtIndex = { [weak self] characterIndex in
             guard let self else { return true }
@@ -4978,14 +5317,77 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     private func handleHyperlinkCommand() {
         guard textView.window?.firstResponder === textView else { return }
-        guard let transform = BlockEditingCommands.toggledHyperlink(
+        if let transform = BlockEditingCommands.toggledHyperlink(
+            in: textView.string,
+            selection: textView.selectedRange()
+        ) {
+            applySelectionTransform(transform)
+            return
+        }
+
+        guard let draft = BlockEditingCommands.hyperlinkInsertionDraft(
             in: textView.string,
             selection: textView.selectedRange()
         ) else {
             return
         }
 
-        applySelectionTransform(transform)
+        showHyperlinkInsertionPopover(for: draft)
+    }
+
+    private func showHyperlinkInsertionPopover(for draft: HyperlinkInsertionDraft) {
+        hyperlinkInsertionPopover?.close()
+
+        let contentViewController = HyperlinkInsertionPopoverViewController(draft: draft)
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = contentViewController
+        popover.delegate = self
+        hyperlinkInsertionPopover = popover
+
+        contentViewController.onCancel = { [weak self, weak popover] in
+            popover?.close()
+            self?.hyperlinkInsertionPopover = nil
+            self?.textView.window?.makeFirstResponder(self?.textView)
+        }
+        contentViewController.onInsert = { [weak self, weak popover, draft] destination in
+            guard let self else { return }
+            if let transform = BlockEditingCommands.insertedHyperlink(
+                in: self.textView.string,
+                draft: draft,
+                rawDestination: destination
+            ) {
+                self.applySelectionTransform(transform)
+            }
+            popover?.close()
+            self.hyperlinkInsertionPopover = nil
+            self.textView.window?.makeFirstResponder(self.textView)
+        }
+
+        let anchorRect = hyperlinkPopoverAnchorRect(for: draft.range)
+        popover.show(relativeTo: anchorRect, of: textView, preferredEdge: .maxY)
+    }
+
+    private func hyperlinkPopoverAnchorRect(for range: NSRange) -> NSRect {
+        guard let window = textView.window else {
+            return textView.visibleRect
+        }
+
+        let screenRect = textView.firstRect(forCharacterRange: range, actualRange: nil)
+        guard !screenRect.isNull, isFiniteRect(screenRect) else {
+            return textView.visibleRect
+        }
+
+        let windowRect = window.convertFromScreen(screenRect)
+        let localRect = textView.convert(windowRect, from: nil)
+        guard isFiniteRect(localRect), localRect.width > 0, localRect.height > 0 else {
+            return textView.visibleRect
+        }
+        return localRect
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        hyperlinkInsertionPopover = nil
     }
 
     private func handleIndentCommand() {

@@ -82,6 +82,9 @@ struct NoteEditorScreen: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
 
     var body: some View {
         EditorContentView(
@@ -92,6 +95,7 @@ struct NoteEditorScreen: View {
             findStatus: $findStatus,
             pageMentionProvider: pageMentionDocuments(matching:),
             onOpenDocumentLink: onOpenDocumentLink,
+            onOpenDocumentLinkInNewWindow: openDocumentLinkInNewWindow,
             onFindNavigate: navigateFind,
             scrollRestorationID: session.note.fileURL.path,
             initialContentOffsetY: initialEditorContentOffsetY,
@@ -258,6 +262,12 @@ struct NoteEditorScreen: View {
         )
         #else
         store.pageMentionDocuments(matching: query, excluding: session.note.fileURL)
+        #endif
+    }
+
+    private func openDocumentLinkInNewWindow(_ relativePath: String) {
+        #if os(macOS)
+        openWindow(id: "main", value: relativePath)
         #endif
     }
 

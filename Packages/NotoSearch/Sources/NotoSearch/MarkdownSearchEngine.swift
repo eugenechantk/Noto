@@ -69,23 +69,22 @@ public struct MarkdownSearchEngine {
 
     private static func tokenQuery(_ query: String) -> String {
         let tokens = query
-            .components(separatedBy: .whitespacesAndNewlines)
-            .map(cleanToken)
+            .components(separatedBy: CharacterSet.alphanumericsAndUnderscore.inverted)
+            .map { $0.lowercased() }
             .filter { !$0.isEmpty }
         guard !tokens.isEmpty else { return "" }
-        guard tokens.count > 1 else {
-            let token = tokens[0]
-            return token.count >= 2 ? "\(token)*" : token
-        }
-        return #""\#(tokens.joined(separator: " "))""#
+        return tokens
+            .map { token in
+                token.count >= 2 ? "\(token)*" : token
+            }
+            .joined(separator: " ")
     }
+}
 
-    private static func cleanToken(_ token: String) -> String {
-        token
-            .unicodeScalars
-            .filter { CharacterSet.alphanumerics.contains($0) || $0 == "_" }
-            .map(String.init)
-            .joined()
-            .lowercased()
-    }
+private extension CharacterSet {
+    static let alphanumericsAndUnderscore: CharacterSet = {
+        var set = CharacterSet.alphanumerics
+        set.insert(charactersIn: "_")
+        return set
+    }()
 }

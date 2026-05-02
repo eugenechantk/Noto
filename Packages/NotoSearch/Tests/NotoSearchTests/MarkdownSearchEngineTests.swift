@@ -62,14 +62,14 @@ struct MarkdownSearchEngineTests {
         }
 
         let results = try engine.search("retention loops pricing")
-        #expect(results.isEmpty)
+        #expect(results.contains { $0.fileURL.lastPathComponent == "Reader Capture.md" })
 
         let phraseResults = try engine.search("retention loops")
         #expect(phraseResults.contains { $0.fileURL.lastPathComponent == "Reader Capture.md" })
     }
 
-    @Test("Multi-word search requires an exact phrase match")
-    func multiWordSearchRequiresExactPhraseMatch() throws {
+    @Test("Unquoted multi-word search prefix matches all terms")
+    func unquotedMultiWordSearchPrefixMatchesAllTerms() throws {
         let (vault, indexDirectory, engine) = try fixtureEngine()
         defer {
             removeDirectory(vault)
@@ -77,10 +77,10 @@ struct MarkdownSearchEngineTests {
         }
 
         let separatedWords = try engine.search("pricing churn")
-        let adjacentWords = try engine.search("annual conversion")
+        let partialTitle = try engine.search("launch not")
 
-        #expect(separatedWords.isEmpty)
-        #expect(adjacentWords.contains { $0.kind == .section && $0.title == "Launch Notes" })
+        #expect(separatedWords.contains { $0.kind == .section && $0.title == "Launch Notes" })
+        #expect(partialTitle.contains { $0.kind == .note && $0.title == "Launch Notes" })
     }
 
     @Test("Heading matches rank sections highly")
@@ -143,10 +143,10 @@ struct MarkdownSearchEngineTests {
     @Test("Query sanitizer supports prefix, phrase, punctuation, and unbalanced quotes")
     func querySanitizerSupportsExpectedInput() throws {
         #expect(MarkdownSearchEngine.ftsQuery(for: "orch") == "orch*")
-        #expect(MarkdownSearchEngine.ftsQuery(for: "orchard velocity") == "\"orchard velocity\"")
+        #expect(MarkdownSearchEngine.ftsQuery(for: "orchard velocity") == "orchard* velocity*")
         #expect(MarkdownSearchEngine.ftsQuery(for: "\"orchard velocity\"") == "\"orchard velocity\"")
-        #expect(MarkdownSearchEngine.ftsQuery(for: "pricing/churn?") == "pricingchurn*")
-        #expect(MarkdownSearchEngine.ftsQuery(for: "\"pricing churn") == "\"pricing churn\"")
+        #expect(MarkdownSearchEngine.ftsQuery(for: "pricing/churn?") == "pricing* churn*")
+        #expect(MarkdownSearchEngine.ftsQuery(for: "\"pricing churn") == "pricing* churn*")
     }
 
     @Test("Phrase search works")

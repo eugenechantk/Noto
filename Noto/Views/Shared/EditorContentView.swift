@@ -13,6 +13,7 @@ struct EditorContentView: View {
     @Binding var findStatus: EditorFindStatus
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
+    var onOpenDocumentLinkInNewWindow: ((String) -> Void)?
     var onFindNavigate: (EditorFindNavigationDirection) -> Void
     var scrollRestorationID: String?
     var initialContentOffsetY: CGFloat?
@@ -30,6 +31,8 @@ struct EditorContentView: View {
                 )
             } else if session.isDownloading {
                 downloadingView
+            } else if !session.hasLoaded {
+                loadingView
             } else {
                 editorBody
             }
@@ -45,6 +48,17 @@ struct EditorContentView: View {
         VStack(spacing: 12) {
             ProgressView()
             Text("Downloading from iCloud...")
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.secondaryText)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.background)
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+            Text("Loading note...")
                 .font(.subheadline)
                 .foregroundStyle(AppTheme.secondaryText)
         }
@@ -118,6 +132,7 @@ struct EditorContentView: View {
             onImportImageFile: session.importImageAttachment(fileURL:),
             pageMentionProvider: pageMentionProvider,
             onOpenDocumentLink: onOpenDocumentLink,
+            onOpenDocumentLinkInNewWindow: onOpenDocumentLinkInNewWindow,
             isFindVisible: isFindVisible,
             findQuery: findQuery,
             findNavigationRequest: findNavigationRequest,

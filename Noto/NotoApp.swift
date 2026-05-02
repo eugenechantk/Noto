@@ -16,6 +16,7 @@ enum NotoAppCommands {
     static let openSettings = Notification.Name("NotoAppCommands.openSettings")
     static let toggleSidebar = Notification.Name("NotoAppCommands.toggleSidebar")
     static let showSearch = Notification.Name("NotoAppCommands.showSearch")
+    static let createNote = Notification.Name("NotoAppCommands.createNote")
 }
 
 #if os(macOS)
@@ -41,7 +42,131 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 }
+
+private struct DefaultWindowHeightReader: NSViewRepresentable {
+    func makeNSView(context: Context) -> WindowHeightReaderView {
+        let view = WindowHeightReaderView()
+        view.onWindowChange = { window in
+            context.coordinator.configure(window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: WindowHeightReaderView, context: Context) {
+        nsView.onWindowChange = { window in
+            context.coordinator.configure(window)
+        }
+        context.coordinator.configure(nsView.window)
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator {
+        private weak var configuredWindow: NSWindow?
+
+        func configure(_ window: NSWindow?) {
+            guard let window, configuredWindow !== window else { return }
+            configuredWindow = window
+
+            DispatchQueue.main.async {
+                Self.expandToVisibleScreenHeight(window)
+            }
+        }
+
+        private static func expandToVisibleScreenHeight(_ window: NSWindow) {
+            let visibleFrame = (window.screen ?? NSScreen.main)?.visibleFrame
+            guard let visibleFrame, visibleFrame.height > 0 else { return }
+
+            let currentFrame = window.frame
+            let fullHeightFrame = NSRect(
+                x: currentFrame.origin.x,
+                y: visibleFrame.minY,
+                width: currentFrame.width,
+                height: visibleFrame.height
+            )
+
+            window.setFrame(fullHeightFrame, display: true)
+        }
+    }
+}
+
+private final class WindowHeightReaderView: NSView {
+    var onWindowChange: ((NSWindow?) -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        onWindowChange?(window)
+    }
+}
 #endif
+
+private struct NotoCommands: Commands {
+    var body: some Commands {
+        CommandMenu("Noto") {
+            #if os(macOS)
+            Button("New Note") {
+                NotificationCenter.default.post(name: NotoAppCommands.createNote, object: NotoCommandTarget.activeWindow)
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+            #endif
+
+            Button("Today") {
+                #if os(macOS)
+                NotificationCenter.default.post(name: NotoAppCommands.openToday, object: NotoCommandTarget.activeWindow)
+                #else
+                NotificationCenter.default.post(name: NotoAppCommands.openToday, object: nil)
+                #endif
+            }
+            .keyboardShortcut("t", modifiers: [.command])
+
+            Button("Search in Note") {
+                NoteEditorCommands.requestShowFind()
+            }
+            .keyboardShortcut("f", modifiers: [.command])
+
+            #if os(macOS)
+            Button("Toggle Sidebar") {
+                NotificationCenter.default.post(name: NotoAppCommands.toggleSidebar, object: NotoCommandTarget.activeWindow)
+            }
+            .keyboardShortcut("b", modifiers: [.command, .shift])
+
+            Button("Search") {
+                NotificationCenter.default.post(name: NotoAppCommands.showSearch, object: NotoCommandTarget.activeWindow)
+            }
+            .keyboardShortcut("k", modifiers: [.command])
+
+            Button("Bold") {
+                NoteEditorCommands.requestToggleBold()
+            }
+            .keyboardShortcut("b", modifiers: [.command])
+
+            Button("Italic") {
+                NoteEditorCommands.requestToggleItalic()
+            }
+            .keyboardShortcut("i", modifiers: [.command])
+
+            Button("Strikethrough") {
+                NoteEditorCommands.requestToggleStrikethrough()
+            }
+            .keyboardShortcut("x", modifiers: [.command, .shift])
+
+            Button("Link") {
+                NoteEditorCommands.requestToggleHyperlink()
+            }
+            .keyboardShortcut("k", modifiers: [.command, .shift])
+            #endif
+
+            #if os(iOS)
+            Button("Settings") {
+                NotificationCenter.default.post(name: NotoAppCommands.openSettings, object: nil)
+            }
+            .keyboardShortcut(",", modifiers: [.command])
+            #endif
+        }
+    }
+}
 
 @main
 struct NotoApp: App {
@@ -70,83 +195,17 @@ struct NotoApp: App {
     }
 
     var body: some Scene {
-        WindowGroup(id: "main") {
-            if Self.isRunningTests {
-                Color.clear
-            } else if locationManager.isVaultConfigured, let vaultURL = locationManager.vaultURL {
-                MainAppView(
-                    vaultURL: vaultURL,
-                    locationManager: locationManager,
-                    readwiseSyncController: readwiseSyncController
-                )
-            } else {
-                VaultSetupView(locationManager: locationManager)
-            }
-        }
-        .environment(\.colorScheme, .dark)
-        .commands {
-            CommandMenu("Noto") {
-                Button("Today") {
-                    #if os(macOS)
-                    NotificationCenter.default.post(name: NotoAppCommands.openToday, object: NotoCommandTarget.activeWindow)
-                    #else
-                    NotificationCenter.default.post(name: NotoAppCommands.openToday, object: nil)
-                    #endif
-                }
-                .keyboardShortcut("t", modifiers: [.command])
-
-                Button("Search in Note") {
-                    NoteEditorCommands.requestShowFind()
-                }
-                .keyboardShortcut("f", modifiers: [.command])
-
-                #if os(macOS)
-                Button("Toggle Sidebar") {
-                    NotificationCenter.default.post(name: NotoAppCommands.toggleSidebar, object: NotoCommandTarget.activeWindow)
-                }
-                .keyboardShortcut("b", modifiers: [.command, .shift])
-
-                Button("Search") {
-                    NotificationCenter.default.post(name: NotoAppCommands.showSearch, object: NotoCommandTarget.activeWindow)
-                }
-                .keyboardShortcut("k", modifiers: [.command])
-
-                Button("Bold") {
-                    NoteEditorCommands.requestToggleBold()
-                }
-                .keyboardShortcut("b", modifiers: [.command])
-
-                Button("Italic") {
-                    NoteEditorCommands.requestToggleItalic()
-                }
-                .keyboardShortcut("i", modifiers: [.command])
-
-                Button("Strikethrough") {
-                    NoteEditorCommands.requestToggleStrikethrough()
-                }
-                .keyboardShortcut("x", modifiers: [.command, .shift])
-
-                Button("Link") {
-                    NoteEditorCommands.requestToggleHyperlink()
-                }
-                .keyboardShortcut("k", modifiers: [.command, .shift])
-                #endif
-
-                #if os(iOS)
-                Button("Settings") {
-                    NotificationCenter.default.post(name: NotoAppCommands.openSettings, object: nil)
-                }
-                .keyboardShortcut(",", modifiers: [.command])
-                #endif
-            }
-        }
         #if os(macOS)
+        WindowGroup(id: "main", for: String.self) { initialDocumentLink in
+            appContent(initialDocumentLink: initialDocumentLink.wrappedValue)
+        }
+        .commands {
+            NotoCommands()
+        }
         .defaultSize(width: 800, height: 600)
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified)
-        #endif
 
-        #if os(macOS)
         Settings {
             SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
                 .frame(minWidth: 400, minHeight: 200)
@@ -155,7 +214,39 @@ struct NotoApp: App {
                 .foregroundStyle(AppTheme.primaryText)
                 .tint(AppTheme.primaryText)
         }
+        #else
+        WindowGroup(id: "main") {
+            appContent(initialDocumentLink: nil)
+        }
+        .commands {
+            NotoCommands()
+        }
         #endif
+    }
+
+    @ViewBuilder
+    private func appContent(initialDocumentLink: String?) -> some View {
+        Group {
+            if Self.isRunningTests {
+                Color.clear
+            } else if locationManager.isVaultConfigured, let vaultURL = locationManager.vaultURL {
+                MainAppView(
+                    vaultURL: vaultURL,
+                    locationManager: locationManager,
+                    readwiseSyncController: readwiseSyncController,
+                    initialDocumentLink: initialDocumentLink
+                )
+                #if os(macOS)
+                .background(DefaultWindowHeightReader().frame(width: 0, height: 0))
+                #endif
+            } else {
+                VaultSetupView(locationManager: locationManager)
+                    #if os(macOS)
+                .background(DefaultWindowHeightReader().frame(width: 0, height: 0))
+                #endif
+            }
+        }
+        .environment(\.colorScheme, .dark)
     }
 
     #if os(iOS)
@@ -256,15 +347,22 @@ struct MainAppView: View {
     let vaultURL: URL
     var locationManager: VaultLocationManager
     @ObservedObject var readwiseSyncController: ReadwiseSyncController
+    var initialDocumentLink: String?
     @State private var store: MarkdownNoteStore
     @State private var fileWatcher = VaultFileWatcher()
     @State private var dailyNotePrewarmer = DailyNotePrewarmer()
     @Environment(\.scenePhase) private var scenePhase
 
-    init(vaultURL: URL, locationManager: VaultLocationManager, readwiseSyncController: ReadwiseSyncController) {
+    init(
+        vaultURL: URL,
+        locationManager: VaultLocationManager,
+        readwiseSyncController: ReadwiseSyncController,
+        initialDocumentLink: String? = nil
+    ) {
         self.vaultURL = vaultURL
         self.locationManager = locationManager
         self.readwiseSyncController = readwiseSyncController
+        self.initialDocumentLink = initialDocumentLink
         _store = State(wrappedValue: MarkdownNoteStore(
             vaultURL: vaultURL,
             autoload: false,
@@ -277,7 +375,8 @@ struct MainAppView: View {
             store: store,
             locationManager: locationManager,
             fileWatcher: fileWatcher,
-            readwiseSyncController: readwiseSyncController
+            readwiseSyncController: readwiseSyncController,
+            initialDocumentLink: initialDocumentLink
         )
             .background(AppTheme.background)
             .foregroundStyle(AppTheme.primaryText)
