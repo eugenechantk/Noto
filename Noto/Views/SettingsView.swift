@@ -8,6 +8,8 @@ struct SettingsView: View {
     @ObservedObject var readwiseSyncController: ReadwiseSyncController
     @State private var showResetConfirmation = false
     @State private var isTokenSheetPresented = false
+    @State private var isRebuildingIndex = false
+    @State private var indexRebuildMessage: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -33,6 +35,34 @@ struct SettingsView: View {
                 Text("Storage")
             } footer: {
                 Text("Changing your vault returns you to the welcome screen where you can create or open a different vault.")
+            }
+
+            Section {
+                Button {
+                    rebuildSearchIndex()
+                } label: {
+                    HStack {
+                        Label("Refresh search index", systemImage: "magnifyingglass.circle")
+                        if isRebuildingIndex {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isRebuildingIndex || locationManager.vaultURL == nil)
+                .accessibilityIdentifier("refresh_search_index_button")
+            } header: {
+                Text("Search")
+            } footer: {
+                if let indexRebuildMessage {
+                    Text(indexRebuildMessage)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryText)
+                } else {
+                    Text("Deletes the local search database and re-indexes every note in the vault. Use this if mention or search results look stale.")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryText)
+                }
             }
 
             Section {
@@ -113,6 +143,27 @@ struct SettingsView: View {
                     isTokenSheetPresented = false
                 }
             )
+        }
+    }
+
+    private func rebuildSearchIndex() {
+        guard let vaultURL = locationManager.vaultURL, !isRebuildingIndex else { return }
+        isRebuildingIndex = true
+        indexRebuildMessage = "Rebuilding search index…"
+        Task {
+            do {
+                let result = try await SearchIndexController.shared.rebuildIndex(vaultURL: vaultURL)
+                await MainActor.run {
+                    isRebuildingIndex = false
+                    indexRebuildMessage = "Indexed \(result.upserted) notes."
+                }
+            } catch {
+                logger.error("Search index rebuild failed: \(error.localizedDescription)")
+                await MainActor.run {
+                    isRebuildingIndex = false
+                    indexRebuildMessage = "Rebuild failed — check Console for details."
+                }
+            }
         }
     }
 
