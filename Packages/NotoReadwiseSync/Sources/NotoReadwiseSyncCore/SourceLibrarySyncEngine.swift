@@ -26,6 +26,14 @@ public struct SourceLibrarySyncResult: Sendable {
         self.readerUpdatedAfter = readerUpdatedAfter
         self.readwiseUpdatedAfter = readwiseUpdatedAfter
     }
+
+    /// Union of every URL written across the reader and readwise legs of the
+    /// sync. Empty in dry-run mode. The app fans these out to per-file index
+    /// refreshes so freshly written iCloud files don't depend on the vault
+    /// enumerator (which can miss them inside the macOS sandbox).
+    public var writtenURLs: Set<URL> {
+        reader.writtenURLs.union(readwise.writtenURLs)
+    }
 }
 
 public struct SourceLibrarySyncEngine: Sendable {

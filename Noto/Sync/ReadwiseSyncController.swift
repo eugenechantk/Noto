@@ -25,6 +25,11 @@ struct PackageReadwiseSyncRunner: ReadwiseSyncRunning {
     }
 }
 
+/// Routes per-file index refreshes for URLs the Readwise sync just wrote.
+/// Pulled out so tests can inject a probe instead of touching the real
+/// `SearchIndexController`.
+typealias ReadwiseSyncIndexRefresher = @Sendable (URL, URL) async -> Void
+
 @MainActor
 final class ReadwiseSyncController: ObservableObject {
     @Published var tokenInput = ""
@@ -37,16 +42,19 @@ final class ReadwiseSyncController: ObservableObject {
     private let tokenStore: any ReadwiseTokenStore
     private let bundledTokenProvider: any ReadwiseBundledTokenProviding
     private let runner: any ReadwiseSyncRunning
+    private let refreshIndex: ReadwiseSyncIndexRefresher
     private var currentSyncTask: Task<Void, Never>?
 
     init(
         tokenStore: any ReadwiseTokenStore = KeychainReadwiseTokenStore(),
         bundledTokenProvider: any ReadwiseBundledTokenProviding = BundleReadwiseBundledTokenProvider(),
-        runner: any ReadwiseSyncRunning = PackageReadwiseSyncRunner()
+        runner: any ReadwiseSyncRunning = PackageReadwiseSyncRunner(),
+        refreshIndex: @escaping ReadwiseSyncIndexRefresher = ReadwiseSyncController.defaultIndexRefresher
     ) {
         self.tokenStore = tokenStore
         self.bundledTokenProvider = bundledTokenProvider
         self.runner = runner
+        self.refreshIndex = refreshIndex
         refreshSavedTokenState()
     }
 
@@ -164,13 +172,20 @@ final class ReadwiseSyncController: ObservableObject {
         isSyncing = true
         syncStatusMessage = automatic ? "Syncing in background..." : "Syncing..."
         let syncedAt = Date()
-        currentSyncTask = Task(priority: .utility) { [runner] in
+        currentSyncTask = Task(priority: .utility) { [runner, refreshIndex] in
             do {
                 let result = try await runner.syncIncrementally(
                     token: token,
                     vaultURL: vaultURL,
                     syncedAt: syncedAt
                 )
+                // Hand each freshly written URL to the index immediately. The
+                // package can't reach `SearchIndexController`; this loop is
+                // the bridge. Each call goes through the crash-safe queue so
+                // an interrupted sync replays on next launch.
+                for url in result.writtenURLs {
+                    await refreshIndex(vaultURL, url)
+                }
                 await MainActor.run {
                     self.isSyncing = false
                     self.lastSyncedAt = syncedAt
@@ -184,6 +199,18 @@ final class ReadwiseSyncController: ObservableObject {
                     self.currentSyncTask = nil
                 }
             }
+        }
+    }
+
+    static let defaultIndexRefresher: ReadwiseSyncIndexRefresher = { vaultURL, fileURL in
+        do {
+            _ = try await SearchIndexController.shared.refresh(
+                vaultURL: vaultURL,
+                fileURL: fileURL
+            )
+        } catch {
+            // Per-URL failure is non-fatal — the URL stays in the pending
+            // queue and the next launch's drain will retry it.
         }
     }
 

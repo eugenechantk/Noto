@@ -410,6 +410,46 @@ struct ReadwiseSyncTests {
         #expect(FileManager.default.fileExists(atPath: tempVault.appendingPathComponent(".noto/sync/readwise.json").path))
     }
 
+    @Test func syncReportsWrittenURLsForEveryNonDeletedBook() throws {
+        let books = try loadFixtureBooks()
+        let tempVault = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NotoReadwiseSyncTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempVault) }
+
+        let result = try SourceNoteSyncEngine().sync(
+            books: books,
+            vaultURL: tempVault,
+            sourceDirectory: "Sources",
+            dryRun: false,
+            syncedAt: ISO8601DateFormatter.noto.date(from: "2026-04-21T00:00:00Z")!
+        )
+
+        let nonDeletedCount = books.filter { !$0.isDeleted }.count
+        #expect(result.writtenURLs.count == nonDeletedCount)
+        for url in result.writtenURLs {
+            #expect(FileManager.default.fileExists(atPath: url.path))
+            #expect(url.standardizedFileURL == url)
+            #expect(url.path.hasPrefix(tempVault.standardizedFileURL.path))
+        }
+    }
+
+    @Test func dryRunSyncReportsNoWrittenURLs() throws {
+        let books = try loadFixtureBooks()
+        let tempVault = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NotoReadwiseSyncTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempVault) }
+
+        let result = try SourceNoteSyncEngine().sync(
+            books: books,
+            vaultURL: tempVault,
+            sourceDirectory: "Sources",
+            dryRun: true,
+            syncedAt: ISO8601DateFormatter.noto.date(from: "2026-04-21T00:00:00Z")!
+        )
+
+        #expect(result.writtenURLs.isEmpty)
+    }
+
     @Test func syncCanRunAgainstLimitedBookSet() throws {
         let books = Array(try loadFixtureBooks().prefix(1))
         let tempVault = FileManager.default.temporaryDirectory

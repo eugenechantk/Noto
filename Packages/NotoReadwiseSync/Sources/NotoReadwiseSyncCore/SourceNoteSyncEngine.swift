@@ -7,6 +7,11 @@ public struct SourceNoteSyncResult: Sendable {
     public var skippedChildDocuments: Int
     public var dryRun: Bool
     public var sourceDirectoryURL: URL
+    /// URLs the engine wrote (created or updated) during this sync. Empty in
+    /// dry-run mode. Consumers (e.g. the search-index controller) re-index
+    /// these directly without relying on a vault-wide enumeration that may
+    /// not see freshly written iCloud files inside the macOS sandbox.
+    public var writtenURLs: Set<URL>
 
     public init(
         created: Int,
@@ -14,7 +19,8 @@ public struct SourceNoteSyncResult: Sendable {
         skippedDeleted: Int,
         skippedChildDocuments: Int,
         dryRun: Bool,
-        sourceDirectoryURL: URL
+        sourceDirectoryURL: URL,
+        writtenURLs: Set<URL> = []
     ) {
         self.created = created
         self.updated = updated
@@ -22,6 +28,7 @@ public struct SourceNoteSyncResult: Sendable {
         self.skippedChildDocuments = skippedChildDocuments
         self.dryRun = dryRun
         self.sourceDirectoryURL = sourceDirectoryURL
+        self.writtenURLs = writtenURLs
     }
 }
 
@@ -43,6 +50,7 @@ public struct SourceNoteSyncEngine: Sendable {
         var created = 0
         var updated = 0
         var skippedDeleted = 0
+        var writtenURLs: Set<URL> = []
 
         if !dryRun {
             try FileManager.default.createDirectory(at: sourceDirectoryURL, withIntermediateDirectories: true)
@@ -101,6 +109,7 @@ public struct SourceNoteSyncEngine: Sendable {
 
             if !dryRun {
                 try markdown.write(to: noteURL, atomically: true, encoding: .utf8)
+                writtenURLs.insert(noteURL.standardizedFileURL)
             }
         }
 
@@ -115,7 +124,8 @@ public struct SourceNoteSyncEngine: Sendable {
             skippedDeleted: skippedDeleted,
             skippedChildDocuments: 0,
             dryRun: dryRun,
-            sourceDirectoryURL: sourceDirectoryURL
+            sourceDirectoryURL: sourceDirectoryURL,
+            writtenURLs: writtenURLs
         )
     }
 
@@ -133,6 +143,7 @@ public struct SourceNoteSyncEngine: Sendable {
         var created = 0
         var updated = 0
         var skippedChildDocuments = 0
+        var writtenURLs: Set<URL> = []
 
         if !dryRun {
             try FileManager.default.createDirectory(at: sourceDirectoryURL, withIntermediateDirectories: true)
@@ -211,6 +222,7 @@ public struct SourceNoteSyncEngine: Sendable {
 
             if !dryRun {
                 try markdown.write(to: noteURL, atomically: true, encoding: .utf8)
+                writtenURLs.insert(noteURL.standardizedFileURL)
             }
         }
 
@@ -225,7 +237,8 @@ public struct SourceNoteSyncEngine: Sendable {
             skippedDeleted: 0,
             skippedChildDocuments: skippedChildDocuments,
             dryRun: dryRun,
-            sourceDirectoryURL: sourceDirectoryURL
+            sourceDirectoryURL: sourceDirectoryURL,
+            writtenURLs: writtenURLs
         )
     }
 

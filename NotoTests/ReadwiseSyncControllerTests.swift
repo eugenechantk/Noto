@@ -163,6 +163,53 @@ struct ReadwiseSyncControllerTests {
             try? await Task.sleep(nanoseconds: 25_000_000)
         }
     }
+
+    @Test("Sync hands every written URL to the search index per file")
+    @MainActor
+    func syncFansEveryWrittenURLToTheSearchIndex() async throws {
+        let tokenStore = MockReadwiseTokenStore(token: "readwise-token")
+        let vaultURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ReadwiseSyncControllerTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: vaultURL) }
+        let alpha = vaultURL.appendingPathComponent("Captures/Alpha.md").standardizedFileURL
+        let beta = vaultURL.appendingPathComponent("Captures/Beta.md").standardizedFileURL
+        let gamma = vaultURL.appendingPathComponent("Captures/Gamma.md").standardizedFileURL
+        let runner = MockReadwiseSyncRunner(
+            readerURLs: [alpha, beta],
+            readwiseURLs: [gamma]
+        )
+        let probe = IndexRefreshProbe()
+        let refresher: ReadwiseSyncIndexRefresher = { vault, file in
+            await probe.record(vault: vault, file: file)
+        }
+        let controller = ReadwiseSyncController(
+            tokenStore: tokenStore,
+            bundledTokenProvider: MockBundledTokenProvider(),
+            runner: runner,
+            refreshIndex: refresher
+        )
+
+        controller.syncNow(vaultURL: vaultURL)
+        await runner.waitForSync()
+        await waitForSyncCompletion(controller)
+
+        let recorded = await probe.calls
+        let recordedFiles = Set(recorded.map(\.file))
+        #expect(recordedFiles == [alpha, beta, gamma])
+        #expect(recorded.allSatisfy { $0.vault == vaultURL })
+    }
+}
+
+private actor IndexRefreshProbe {
+    struct Call: Sendable, Equatable {
+        let vault: URL
+        let file: URL
+    }
+    private(set) var calls: [Call] = []
+
+    func record(vault: URL, file: URL) {
+        calls.append(Call(vault: vault, file: file))
+    }
 }
 
 private final class MockReadwiseTokenStore: @unchecked Sendable, ReadwiseTokenStore {
@@ -207,6 +254,13 @@ private actor MockReadwiseSyncRunner: ReadwiseSyncRunning {
     }
 
     private(set) var syncCalls: [SyncCall] = []
+    private let readerURLs: Set<URL>
+    private let readwiseURLs: Set<URL>
+
+    init(readerURLs: Set<URL> = [], readwiseURLs: Set<URL> = []) {
+        self.readerURLs = readerURLs
+        self.readwiseURLs = readwiseURLs
+    }
 
     func validate(token: String) async throws {}
 
@@ -223,7 +277,8 @@ private actor MockReadwiseSyncRunner: ReadwiseSyncRunning {
                 skippedDeleted: 0,
                 skippedChildDocuments: 0,
                 dryRun: false,
-                sourceDirectoryURL: vaultURL.appendingPathComponent("Captures", isDirectory: true)
+                sourceDirectoryURL: vaultURL.appendingPathComponent("Captures", isDirectory: true),
+                writtenURLs: readerURLs
             ),
             readwise: SourceNoteSyncResult(
                 created: 1,
@@ -231,7 +286,8 @@ private actor MockReadwiseSyncRunner: ReadwiseSyncRunning {
                 skippedDeleted: 0,
                 skippedChildDocuments: 0,
                 dryRun: false,
-                sourceDirectoryURL: vaultURL.appendingPathComponent("Captures", isDirectory: true)
+                sourceDirectoryURL: vaultURL.appendingPathComponent("Captures", isDirectory: true),
+                writtenURLs: readwiseURLs
             ),
             fetchedReaderDocuments: 1,
             fetchedReadwiseBooks: 2,
