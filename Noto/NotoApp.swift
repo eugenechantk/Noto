@@ -382,6 +382,11 @@ struct MainAppView: View {
             .foregroundStyle(AppTheme.primaryText)
             .tint(AppTheme.primaryText)
             .task {
+                // Replay anything queued before a previous quit/crash, then
+                // run the broader sweep. Drain first so files the sandbox
+                // enumerator can't see (recently-written iCloud files) still
+                // index via their direct path.
+                await SearchIndexController.shared.drainPendingQueue(vaultURL: vaultURL)
                 store.loadItemsInBackground()
                 dailyNotePrewarmer.start(vaultURL: vaultURL)
                 readwiseSyncController.refreshSavedTokenState()
@@ -397,6 +402,7 @@ struct MainAppView: View {
                     dailyNotePrewarmer.start(vaultURL: vaultURL)
                     readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
                     Task {
+                        await SearchIndexController.shared.drainPendingQueue(vaultURL: vaultURL)
                         await refreshSearchIndex()
                     }
                 } else if newPhase == .background {
@@ -405,8 +411,16 @@ struct MainAppView: View {
             }
             .onChange(of: fileWatcher.changeCount) { _, _ in
                 store.loadItemsInBackground()
+                let changedURL = fileWatcher.lastChangedFileURL
                 Task {
-                    await refreshSearchIndex()
+                    if let changedURL {
+                        try? await SearchIndexController.shared.refresh(
+                            vaultURL: vaultURL,
+                            fileURL: changedURL
+                        )
+                    } else {
+                        await refreshSearchIndex()
+                    }
                 }
             }
     }
