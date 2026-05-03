@@ -496,6 +496,157 @@ struct TextKit2EditorLifecycleTests {
         #expect(MarkdownFrontmatter.contains(position: 0, in: markdown))
         #expect(!MarkdownFrontmatter.contains(position: range.location + range.length + 1, in: markdown))
     }
+
+    @Test("Empty frontmatter range is detected")
+    func detectsEmptyFrontmatterRange() throws {
+        let markdown = """
+        ---
+        ---
+        # Title
+        """
+
+        let range = try #require(MarkdownFrontmatter.range(in: markdown))
+        let nsMarkdown = markdown as NSString
+
+        #expect(nsMarkdown.substring(with: range) == """
+        ---
+        ---
+        """)
+    }
+
+    @Test("Frontmatter collapsed reserve is independent of field count")
+    func frontmatterCollapsedReserveIsIndependentOfFieldCount() {
+        let emptyDocument = EditableFrontmatterDocument(markdown: """
+        ---
+        ---
+        # Title
+        """)
+        let populatedDocument = EditableFrontmatterDocument(markdown: """
+        ---
+        id: abc
+        updated: now
+        ---
+        # Title
+        """)
+
+        #expect(emptyDocument != nil)
+        #expect(populatedDocument != nil)
+        #expect(FrontmatterBlockLayout.reservedTopInset == FrontmatterBlockLayout.collapsedHeight + FrontmatterBlockLayout.gapBelowCollapsedBlock)
+    }
+
+    @Test("Frontmatter block expanded geometry includes all fields plus draft row")
+    func frontmatterBlockExpandedGeometryIncludesAllFieldsPlusDraftRow() throws {
+        let document = try #require(EditableFrontmatterDocument(markdown: """
+        ---
+        id: abc
+        updated: now
+        ---
+        # Title
+        """))
+        let rect = FrontmatterBlockLayout.blockRect(
+            point: CGPoint(x: 20, y: 80),
+            contentWidth: 360,
+            document: document
+        )
+
+        let expectedBlockHeight = FrontmatterBlockLayout.collapsedHeight + 3 * FrontmatterBlockLayout.rowHeight
+        #expect(rect == CGRect(x: 20, y: 80, width: 360, height: expectedBlockHeight))
+        #expect(FrontmatterBlockLayout.rowCount(for: document) == 3)
+        #expect(FrontmatterBlockLayout.reservedHeight(for: document) == FrontmatterBlockLayout.reservedTopInset)
+    }
+
+    @Test("Frontmatter block collapsed geometry reserves header height only")
+    func frontmatterBlockCollapsedGeometryReservesHeaderHeightOnly() throws {
+        let document = try #require(EditableFrontmatterDocument(markdown: """
+        ---
+        id: abc
+        updated: now
+        ---
+        # Title
+        """))
+
+        #expect(FrontmatterBlockLayout.blockHeight(for: document, isExpanded: false) == FrontmatterBlockLayout.collapsedHeight)
+        #expect(
+            FrontmatterBlockLayout.reservedHeight(for: document, isExpanded: false)
+                == FrontmatterBlockLayout.reservedTopInset
+        )
+    }
+
+    @Test("Frontmatter block height is not capped at six fields")
+    func frontmatterBlockHeightIsNotCappedAtSixFields() throws {
+        let document = try #require(EditableFrontmatterDocument(markdown: """
+        ---
+        one: 1
+        two: 2
+        three: 3
+        four: 4
+        five: 5
+        six: 6
+        seven: 7
+        eight: 8
+        ---
+        # Title
+        """))
+
+        #expect(FrontmatterBlockLayout.rowCount(for: document) == 9)
+        #expect(
+            FrontmatterBlockLayout.blockHeight(for: document)
+                == FrontmatterBlockLayout.collapsedHeight + 9 * FrontmatterBlockLayout.rowHeight
+        )
+        #expect(FrontmatterBlockLayout.reservedHeight(for: document) == FrontmatterBlockLayout.reservedTopInset)
+    }
+
+    @Test("Frontmatter block hit testing returns visible field index")
+    func frontmatterBlockHitTestingReturnsVisibleFieldIndex() throws {
+        let document = try #require(EditableFrontmatterDocument(markdown: """
+        ---
+        id: abc
+        updated: now
+        ---
+        # Title
+        """))
+        let blockRect = FrontmatterBlockLayout.blockRect(
+            point: CGPoint(x: 20, y: 80),
+            contentWidth: 360,
+            document: document,
+            isExpanded: true
+        )
+        let secondRow = FrontmatterBlockLayout.rowRect(at: 1, in: blockRect)
+        let draftRow = FrontmatterBlockLayout.rowRect(at: 2, in: blockRect)
+
+        #expect(
+            FrontmatterBlockLayout.fieldIndex(
+                at: CGPoint(x: secondRow.midX, y: secondRow.midY),
+                in: blockRect,
+                document: document,
+                isExpanded: true
+            ) == 1
+        )
+        #expect(
+            FrontmatterBlockLayout.fieldIndex(
+                at: CGPoint(x: secondRow.midX, y: secondRow.midY),
+                in: blockRect,
+                document: document,
+                isExpanded: false
+            ) == nil
+        )
+        #expect(
+            FrontmatterBlockLayout.rowIndex(
+                at: CGPoint(x: draftRow.midX, y: draftRow.midY),
+                in: blockRect,
+                document: document,
+                isExpanded: true
+            ) == 2
+        )
+        #expect(
+            FrontmatterBlockLayout.fieldIndex(
+                at: CGPoint(x: draftRow.midX, y: draftRow.midY),
+                in: blockRect,
+                document: document,
+                isExpanded: true
+            ) == nil
+        )
+    }
 }
 
 private extension UIView {

@@ -88,11 +88,12 @@ struct EditorContentView: View {
                     )
                     .padding(.top, findBarTopPadding(safeAreaTop: geometry.safeAreaInsets.top))
                     .padding(.trailing, findBarTrailingPadding)
+                    .frame(maxWidth: .infinity, alignment: .topTrailing)
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.18, anchor: .topTrailing)),
                         removal: .opacity.combined(with: .scale(scale: 0.92, anchor: .topTrailing))
                     ))
-                    .zIndex(1)
+                    .zIndex(3)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)

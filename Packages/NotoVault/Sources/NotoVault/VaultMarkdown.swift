@@ -76,8 +76,20 @@ public enum VaultMarkdown {
     }
 
     public static func sanitizeFilename(_ name: String, maxLength: Int = 100) -> String {
-        let illegal = CharacterSet(charactersIn: "/\\:?\"<>|*")
-        var sanitized = name.components(separatedBy: illegal).joined()
+        // Reserved on at least one platform → swap with visually similar Unicode
+        // so the heading-derived title still survives a round-trip on disk.
+        let replacements: [Character: Character] = [
+            "/": "\u{2215}",   // ∕ DIVISION SLASH
+            "\\": "\u{FF3C}",  // ＼ FULLWIDTH REVERSE SOLIDUS
+            ":": "\u{FF1A}",   // : FULLWIDTH COLON
+            "?": "\u{FF1F}",   // ？ FULLWIDTH QUESTION MARK
+            "\"": "\u{201D}",  // ” RIGHT DOUBLE QUOTATION MARK
+            "<": "\u{FF1C}",   // ＜ FULLWIDTH LESS-THAN SIGN
+            ">": "\u{FF1E}",   // ＞ FULLWIDTH GREATER-THAN SIGN
+            "|": "\u{FF5C}",   // ｜ FULLWIDTH VERTICAL LINE
+            "*": "\u{FF0A}",   // ＊ FULLWIDTH ASTERISK
+        ]
+        var sanitized = String(name.map { replacements[$0] ?? $0 })
         sanitized = sanitized.trimmingCharacters(in: .whitespaces)
         if sanitized.count > maxLength {
             sanitized = String(sanitized.prefix(maxLength))

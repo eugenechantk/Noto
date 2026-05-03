@@ -580,6 +580,17 @@ struct TextKit2MarkdownLayoutTests {
         #expect(fragment is ImageLayoutFragment)
     }
 
+    @Test("Frontmatter paragraphs use hidden fragments")
+    func frontmatterParagraphsUseHiddenFragments() {
+        let paragraph = MarkdownParagraph(
+            attributedString: NSAttributedString(string: "---"),
+            blockKind: .frontmatter
+        )
+        let fragment = MarkdownTextDelegate().layoutFragment(for: paragraph)
+
+        #expect(fragment is HiddenFrontmatterLayoutFragment)
+    }
+
     @Test("Collapsed XML paragraphs use hidden fragments instead of todo fragments")
     func collapsedXMLParagraphsUseHiddenFragmentsInsteadOfTodoFragments() {
         let paragraph = MarkdownParagraph(

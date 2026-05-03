@@ -532,24 +532,26 @@ enum MarkdownFrontmatter {
     }
 
     static func range(in fullText: NSString) -> NSRange? {
-        guard fullText.hasPrefix("---\n") || fullText.hasPrefix("---\r\n") else { return nil }
+        guard fullText.length > 0 else { return nil }
 
-        let searchStart = min(4, fullText.length)
-        guard searchStart < fullText.length else {
-            return nil
-        }
-        let closeRange = fullText.range(
-            of: "\n---",
-            options: [],
-            range: NSRange(location: searchStart, length: fullText.length - searchStart)
-        )
-        guard closeRange.location != NSNotFound else {
-            return nil
+        let openingLineRange = fullText.lineRange(for: NSRange(location: 0, length: 0))
+        let openingVisibleRange = MarkdownLineRanges.visibleLineRange(from: openingLineRange, in: fullText)
+        guard fullText.substring(with: openingVisibleRange) == "---" else { return nil }
+
+        var location = NSMaxRange(openingLineRange)
+        while location < fullText.length {
+            let lineRange = fullText.lineRange(for: NSRange(location: location, length: 0))
+            let visibleLineRange = MarkdownLineRanges.visibleLineRange(from: lineRange, in: fullText)
+            if fullText.substring(with: visibleLineRange) == "---" {
+                return NSRange(location: 0, length: NSMaxRange(visibleLineRange))
+            }
+
+            let nextLocation = NSMaxRange(lineRange)
+            guard nextLocation > location else { break }
+            location = nextLocation
         }
 
-        let location = 0
-        let length = NSMaxRange(closeRange)
-        return NSRange(location: location, length: length)
+        return nil
     }
 
     static func contains(position: Int, in fullText: String) -> Bool {
@@ -745,7 +747,11 @@ enum MarkdownParagraphStyler {
             paraStyle.paragraphSpacingBefore = 4
 
         case .frontmatter:
-            break
+            paraStyle.lineSpacing = 0
+            paraStyle.minimumLineHeight = MarkdownVisualSpec.collapsedXMLTagContentFontSize
+            paraStyle.maximumLineHeight = MarkdownVisualSpec.collapsedXMLTagContentFontSize
+            paraStyle.paragraphSpacingBefore = 0
+            paraStyle.paragraphSpacing = 0
 
         case .imageLink:
             paraStyle.lineSpacing = 0
@@ -884,8 +890,11 @@ enum MarkdownParagraphStyler {
 
         case .frontmatter:
             attributed.addAttributes([
-                .font: MarkdownTheme.codeFont,
-                .foregroundColor: MarkdownTheme.prefixColor,
+                .font: PlatformFont.systemFont(
+                    ofSize: MarkdownVisualSpec.collapsedXMLTagContentFontSize,
+                    weight: .regular
+                ),
+                .foregroundColor: PlatformColor.clear,
                 .paragraphStyle: paraStyle,
             ], range: fullRange)
             return attributed // No inline formatting for frontmatter
@@ -1195,8 +1204,6 @@ final class MarkdownParagraph: NSTextParagraph {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 }
-
-// MARK: - HiddenFrontmatterLayoutFragment
 
 final class HiddenFrontmatterLayoutFragment: NSTextLayoutFragment {
     override var layoutFragmentFrame: CGRect {
@@ -1722,6 +1729,7 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
     var revealedDividerRanges: [NSRange] = []
     var collapsedXMLTagRanges: [NSRange] = []
     var frontmatterRange: NSRange?
+    var frontmatterDocument: EditableFrontmatterDocument?
     var vaultRootURL: URL?
     var requestImageLoad: ((URL) -> Void)?
 
@@ -1971,6 +1979,11 @@ enum MarkdownLineRanges {
         }
         return NSRange(location: paragraphRange.location, length: length)
     }
+}
+
+private enum FrontmatterEditingTarget: Equatable {
+    case existingValue(key: String)
+    case newField
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -2347,6 +2360,244 @@ private final class HyperlinkInsertionSheetViewController: UIViewController, UIT
     }
 }
 
+private final class PaddedTextField: UITextField {
+    var insets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
+
+    override func textRect(forBounds bounds: CGRect) -> CGRect {
+        super.textRect(forBounds: bounds.inset(by: insets))
+    }
+
+    override func editingRect(forBounds bounds: CGRect) -> CGRect {
+        super.editingRect(forBounds: bounds.inset(by: insets))
+    }
+
+    override func placeholderRect(forBounds bounds: CGRect) -> CGRect {
+        super.placeholderRect(forBounds: bounds.inset(by: insets))
+    }
+}
+
+private final class FrontmatterBlockView: UIView {
+    var document: EditableFrontmatterDocument?
+    var isExpanded = true
+    var editingTarget: FrontmatterEditingTarget?
+
+    func configure(
+        document: EditableFrontmatterDocument,
+        isExpanded: Bool,
+        editingTarget: FrontmatterEditingTarget?
+    ) {
+        self.document = document
+        self.isExpanded = isExpanded
+        self.editingTarget = editingTarget
+        setNeedsDisplay()
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isUserInteractionEnabled = true
+        isOpaque = false
+        layer.backgroundColor = FrontmatterBlockLayout.uiSurfaceColor.cgColor
+        layer.cornerRadius = FrontmatterBlockLayout.cornerRadius
+        layer.masksToBounds = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draw(_ rect: CGRect) {
+        guard let context = UIGraphicsGetCurrentContext(),
+              let document else {
+            return
+        }
+
+        let blockRect = bounds.integral
+        let path = UIBezierPath(
+            roundedRect: blockRect,
+            cornerRadius: FrontmatterBlockLayout.cornerRadius
+        )
+        FrontmatterBlockLayout.uiSurfaceColor.setFill()
+        path.fill()
+        AppTheme.uiSeparator.withAlphaComponent(0.9).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+
+        drawChevron(in: blockRect, context: context)
+        drawText("Metadata", in: titleRect(in: blockRect), font: .systemFont(ofSize: 15, weight: .semibold), color: AppTheme.uiPrimaryText)
+        drawText(
+            "\(document.fields.count)",
+            in: countRect(in: blockRect),
+            font: .monospacedDigitSystemFont(ofSize: 12, weight: .regular),
+            color: AppTheme.uiMutedText,
+            alignment: .right
+        )
+
+        guard isExpanded else { return }
+        for index in 0..<FrontmatterBlockLayout.rowCount(for: document) {
+            let rowRect = FrontmatterBlockLayout.rowRect(at: index, in: blockRect)
+            let keyRect = FrontmatterBlockLayout.keyRect(for: rowRect, blockWidth: blockRect.width)
+            let isExistingField = index < document.fields.count
+            let isURLField = isExistingField && document.fields[index].url != nil
+            let valueRect = FrontmatterBlockLayout.valueRect(
+                for: rowRect,
+                blockWidth: blockRect.width,
+                hasEditControl: isURLField
+            )
+
+            context.move(to: CGPoint(x: rowRect.minX, y: rowRect.minY))
+            context.addLine(to: CGPoint(x: blockRect.maxX - FrontmatterBlockLayout.horizontalPadding, y: rowRect.minY))
+            context.setStrokeColor(AppTheme.uiSeparator.withAlphaComponent(0.9).cgColor)
+            context.setLineWidth(1)
+            context.strokePath()
+
+            if isExistingField {
+                let field = document.fields[index]
+                let isEditingThisRow = editingTarget == .existingValue(key: field.key)
+                drawText(field.key, in: keyRect, font: .monospacedSystemFont(ofSize: 12, weight: .regular), color: AppTheme.uiMutedText)
+                if !isEditingThisRow {
+                    drawText(field.displayValue, in: valueRect, font: .monospacedSystemFont(ofSize: 13, weight: .regular), color: field.url == nil ? AppTheme.uiPrimaryText : .systemBlue)
+                }
+                if isURLField {
+                    let editRect = FrontmatterBlockLayout.editRect(for: rowRect)
+                    drawPencilIcon(in: editRect, context: context, color: AppTheme.uiSecondaryText)
+                }
+                let deleteRect = FrontmatterBlockLayout.deleteRect(for: rowRect)
+                drawCrossIcon(in: deleteRect, context: context, color: AppTheme.uiSecondaryText)
+            } else {
+                let isEditingNewRow = editingTarget == .newField
+                let placeholderColor = AppTheme.uiMutedText.withAlphaComponent(0.7)
+                if !isEditingNewRow {
+                    drawSeparatedPlaceholder(
+                        keyRect: keyRect,
+                        valueRect: valueRect,
+                        placeholderColor: placeholderColor,
+                        context: context
+                    )
+                }
+                let addRect = FrontmatterBlockLayout.deleteRect(for: rowRect)
+                drawPlusIcon(in: addRect, context: context, color: AppTheme.uiSecondaryText)
+            }
+        }
+    }
+
+    private func drawSeparatedPlaceholder(
+        keyRect: CGRect,
+        valueRect: CGRect,
+        placeholderColor: UIColor,
+        context: CGContext
+    ) {
+        drawText("key", in: keyRect, font: .monospacedSystemFont(ofSize: 12, weight: .regular), color: placeholderColor)
+        drawText("value", in: valueRect, font: .monospacedSystemFont(ofSize: 13, weight: .regular), color: placeholderColor)
+    }
+
+    private func drawCrossIcon(in rect: CGRect, context: CGContext, color: UIColor) {
+        let inset = rect.width * 0.28
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: rect.minX + inset, y: rect.minY + inset))
+        path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.maxY - inset))
+        path.move(to: CGPoint(x: rect.maxX - inset, y: rect.minY + inset))
+        path.addLine(to: CGPoint(x: rect.minX + inset, y: rect.maxY - inset))
+        color.setStroke()
+        path.lineWidth = 1.6
+        path.lineCapStyle = .round
+        path.stroke()
+    }
+
+    private func drawPlusIcon(in rect: CGRect, context: CGContext, color: UIColor) {
+        let inset = rect.width * 0.26
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: rect.minX + inset, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.midY))
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY + inset))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY - inset))
+        color.setStroke()
+        path.lineWidth = 1.6
+        path.lineCapStyle = .round
+        path.stroke()
+    }
+
+    private func drawPencilIcon(in rect: CGRect, context: CGContext, color: UIColor) {
+        let inset = rect.width * 0.24
+        let body = UIBezierPath()
+        // Slanted line representing pencil shaft.
+        body.move(to: CGPoint(x: rect.minX + inset, y: rect.maxY - inset))
+        body.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.minY + inset))
+        // Underline indicating edit (small horizontal line below).
+        body.move(to: CGPoint(x: rect.minX + inset * 0.8, y: rect.maxY - inset * 0.5))
+        body.addLine(to: CGPoint(x: rect.maxX - inset * 0.8, y: rect.maxY - inset * 0.5))
+        color.setStroke()
+        body.lineWidth = 1.4
+        body.lineCapStyle = .round
+        body.stroke()
+    }
+
+    private func titleRect(in rect: CGRect) -> CGRect {
+        let leading = rect.minX
+            + FrontmatterBlockLayout.horizontalPadding
+            + FrontmatterBlockLayout.chevronWidth
+            + FrontmatterBlockLayout.iconTextGap
+        let trailing = rect.maxX - FrontmatterBlockLayout.horizontalPadding - FrontmatterBlockLayout.countWidth
+        return CGRect(x: leading, y: rect.minY, width: max(0, trailing - leading), height: FrontmatterBlockLayout.collapsedHeight)
+    }
+
+    private func countRect(in rect: CGRect) -> CGRect {
+        CGRect(
+            x: rect.maxX - FrontmatterBlockLayout.horizontalPadding - FrontmatterBlockLayout.countWidth,
+            y: rect.minY,
+            width: FrontmatterBlockLayout.countWidth,
+            height: FrontmatterBlockLayout.collapsedHeight
+        )
+    }
+
+    private func drawChevron(in rect: CGRect, context: CGContext) {
+        let centerX = rect.minX + FrontmatterBlockLayout.horizontalPadding + FrontmatterBlockLayout.chevronWidth / 2
+        let centerY = rect.minY + FrontmatterBlockLayout.collapsedHeight / 2
+        let size: CGFloat = 8
+        let path = UIBezierPath()
+        if isExpanded {
+            path.move(to: CGPoint(x: centerX - size * 0.45, y: centerY - size * 0.2))
+            path.addLine(to: CGPoint(x: centerX, y: centerY + size * 0.3))
+            path.addLine(to: CGPoint(x: centerX + size * 0.45, y: centerY - size * 0.2))
+        } else {
+            path.move(to: CGPoint(x: centerX - size * 0.25, y: centerY - size * 0.45))
+            path.addLine(to: CGPoint(x: centerX + size * 0.25, y: centerY))
+            path.addLine(to: CGPoint(x: centerX - size * 0.25, y: centerY + size * 0.45))
+        }
+        AppTheme.uiPrimaryText.setStroke()
+        path.lineWidth = 1.7
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        path.stroke()
+    }
+
+    private func drawText(
+        _ text: String,
+        in rect: CGRect,
+        font: UIFont,
+        color: UIColor,
+        alignment: NSTextAlignment = .left
+    ) {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = alignment
+        paragraphStyle.lineBreakMode = .byTruncatingTail
+        let attributed = NSAttributedString(
+            string: text,
+            attributes: [
+                .font: font,
+                .foregroundColor: color,
+                .paragraphStyle: paragraphStyle,
+            ]
+        )
+        let textSize = attributed.size()
+        let drawRect = CGRect(
+            x: rect.minX,
+            y: rect.midY - ceil(textSize.height) / 2,
+            width: rect.width,
+            height: ceil(textSize.height)
+        )
+        attributed.draw(in: drawRect)
+    }
+}
+
 struct TextKit2EditorView: UIViewControllerRepresentable {
     @Binding var text: String
     var autoFocus: Bool = false
@@ -2402,10 +2653,10 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
             onStatusChange: onFindStatusChange
         )
         if !context.coordinator.isUpdatingText,
-           !vc.textView.isFirstResponder,
            text != context.coordinator.lastPublishedText {
             let currentText = vc.textView.text ?? ""
-            if currentText != text {
+            if currentText != text,
+               !vc.textView.isFirstResponder || currentText.isEmpty {
                 vc.loadText(text, preservingVisiblePosition: true)
             }
         }
@@ -2413,7 +2664,7 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     }
 }
 
-final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, UIGestureRecognizerDelegate, PHPickerViewControllerDelegate {
+final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, UITextFieldDelegate, UIGestureRecognizerDelegate, PHPickerViewControllerDelegate {
     static let parentBottomToolbarClearance: CGFloat = 72
     static let keyboardToolbarReadingGap: CGFloat = 24
 
@@ -2474,6 +2725,15 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var findHighlightViews: [UIView] = []
     private var dividerLineViews: [Int: UIView] = [:]
     private var imageOverlayViews: [Int: UIImageView] = [:]
+    private var isFrontmatterBlockExpanded = false
+    private var frontmatterBlockView: FrontmatterBlockView?
+    private var frontmatterHeaderButton: UIButton?
+    private var frontmatterValueButtons: [Int: UIButton] = [:]
+    private var frontmatterDeleteButtons: [Int: UIButton] = [:]
+    private var frontmatterEditButtons: [Int: UIButton] = [:]
+    private weak var frontmatterEditingKeyField: UITextField?
+    private weak var frontmatterEditingField: UITextField?
+    private var frontmatterEditingTarget: FrontmatterEditingTarget?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -2499,7 +2759,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         textView.textColor = MarkdownTheme.bodyColor
         textView.backgroundColor = AppTheme.uiBackground
         textView.textContainerInset = UIEdgeInsets(
-            top: verticalTextInset,
+            top: editorTopTextInset,
             left: minimumHorizontalTextInset,
             bottom: verticalTextInset,
             right: minimumHorizontalTextInset
@@ -2658,7 +2918,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         pendingEditorPublishTask?.cancel()
         pendingEditorPublishTask = nil
         let contentOffsetToRestore = preservingVisiblePosition ? textView.contentOffset : nil
-        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: markdown)
+        isFrontmatterBlockExpanded = false
+        updateFrontmatterMetadata(for: markdown)
+        _ = syncReadableWidthInsets()
         coordinator?.beginApplyingEditorText(markdown)
         textView.text = markdown
         coordinator?.finishApplyingEditorText()
@@ -3565,7 +3827,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     func textViewDidChange(_ textView: UITextView) {
         let textStorageString = textView.textStorage.mutableString
-        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: textStorageString)
+        updateFrontmatterMetadata(for: textStorageString as String)
+        _ = syncReadableWidthInsets()
         invalidateRenderableBlockCache()
         if !isRestylingText {
             updateRevealedMarkdownRangesForSelection(restyle: false)
@@ -3813,6 +4076,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         }
 
         let location = recognizer.location(in: textView)
+        collapseFrontmatterIfTapOutside(point: location)
+
         guard let position = textView.closestPosition(to: location) else { return }
 
         let characterIndex = textView.offset(from: textView.beginningOfDocument, to: position)
@@ -3828,6 +4093,17 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         case .vaultDocument(let relativePath):
             onOpenDocumentLink?(relativePath)
         }
+    }
+
+    private func collapseFrontmatterIfTapOutside(point: CGPoint) {
+        guard isFrontmatterBlockExpanded,
+              let layout = frontmatterControlLayout(),
+              !layout.blockRect.contains(point) else {
+            return
+        }
+        finishFrontmatterEditing(commit: true)
+        isFrontmatterBlockExpanded = false
+        invalidateFrontmatterLayout()
     }
 
     func gestureRecognizer(
@@ -3953,6 +4229,19 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         return overlap + keyboardToolbarReadingGap
     }
 
+    private func updateFrontmatterMetadata(for markdown: String) {
+        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: markdown)
+        markdownDelegate.frontmatterDocument = EditableFrontmatterDocument(markdown: markdown)
+    }
+
+    private var frontmatterReservedHeight: CGFloat {
+        markdownDelegate.frontmatterDocument == nil ? 0 : FrontmatterBlockLayout.reservedTopInset
+    }
+
+    private var editorTopTextInset: CGFloat {
+        verticalTextInset + frontmatterReservedHeight
+    }
+
     private func syncReadableWidthInsets() -> Bool {
         guard isViewLoaded, textView != nil else { return false }
 
@@ -3965,7 +4254,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             constrainsToReadableWidth: constrainsToReadableWidth
         )
         let targetTextContainerInset = UIEdgeInsets(
-            top: verticalTextInset,
+            top: editorTopTextInset,
             left: horizontalTextInset,
             bottom: verticalTextInset,
             right: horizontalTextInset
@@ -4078,6 +4367,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             onContentOffsetYChange?(scrollView.contentOffset.y)
         }
         let blocks = visibleRenderableBlocks()
+        refreshFrontmatterControls()
         refreshTodoMarkerButtons(in: blocks)
         refreshImageOverlayViews(in: blocks)
         refreshFindHighlightOverlays()
@@ -4103,6 +4393,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
         let blocks = visibleRenderableBlocks()
+        refreshFrontmatterControls()
         refreshTodoMarkerButtons(in: blocks)
         refreshDividerLineViews(in: blocks)
         refreshImageOverlayViews(in: blocks)
@@ -4110,6 +4401,447 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func syncCollapsedXMLTagState() {
         markdownDelegate.collapsedXMLTagRanges = []
+    }
+
+    private struct FrontmatterControlLayout {
+        let document: EditableFrontmatterDocument
+        let blockRect: CGRect
+    }
+
+    private func frontmatterControlLayout() -> FrontmatterControlLayout? {
+        guard let document = markdownDelegate.frontmatterDocument else {
+            return nil
+        }
+
+        let contentLeading = textView.textContainerInset.left + textView.textContainer.lineFragmentPadding
+        let contentTrailing = textView.bounds.width
+            - textView.textContainerInset.right
+            - textView.textContainer.lineFragmentPadding
+        let leading = max(0, contentLeading - FrontmatterBlockLayout.horizontalPadding)
+        let trailing = min(textView.bounds.width, contentTrailing + FrontmatterBlockLayout.horizontalPadding)
+        let width = max(0, trailing - leading)
+        guard width > 0 else { return nil }
+
+        let blockRect = FrontmatterBlockLayout.blockRect(
+            point: CGPoint(x: leading, y: verticalTextInset),
+            contentWidth: width,
+            document: document,
+            isExpanded: isFrontmatterBlockExpanded
+        )
+        return FrontmatterControlLayout(document: document, blockRect: blockRect)
+    }
+
+    private func refreshFrontmatterControls() {
+        guard let layout = frontmatterControlLayout(),
+              layout.blockRect.intersects(textView.bounds.insetBy(dx: -8, dy: -80)) else {
+            clearFrontmatterControls()
+            return
+        }
+
+        let blockView = frontmatterBlockView ?? FrontmatterBlockView()
+        blockView.frame = layout.blockRect
+        blockView.configure(
+            document: layout.document,
+            isExpanded: isFrontmatterBlockExpanded,
+            editingTarget: frontmatterEditingTarget
+        )
+        if blockView.superview !== textView {
+            textView.addSubview(blockView)
+        }
+        frontmatterBlockView = blockView
+
+        let headerButton = frontmatterHeaderButton ?? makeFrontmatterHeaderButton()
+        headerButton.frame = FrontmatterBlockLayout.headerRect(in: layout.blockRect)
+        headerButton.accessibilityIdentifier = "frontmatter_metadata_header"
+        headerButton.accessibilityLabel = isFrontmatterBlockExpanded ? "Collapse metadata" : "Expand metadata"
+        if headerButton.superview !== textView {
+            textView.addSubview(headerButton)
+        }
+        frontmatterHeaderButton = headerButton
+
+        var activeValueIndexes: Set<Int> = []
+        var activeDeleteIndexes: Set<Int> = []
+        var activeEditIndexes: Set<Int> = []
+        if isFrontmatterBlockExpanded {
+            for index in 0..<FrontmatterBlockLayout.rowCount(for: layout.document) {
+                activeValueIndexes.insert(index)
+                let rowRect = FrontmatterBlockLayout.rowRect(at: index, in: layout.blockRect)
+                let isNewRow = index == FrontmatterBlockLayout.newFieldRowIndex(for: layout.document)
+                let isURLRow = !isNewRow && layout.document.fields[index].url != nil
+                let buttonRect: CGRect
+                if isNewRow {
+                    buttonRect = FrontmatterBlockLayout.valueRect(for: rowRect, blockWidth: layout.blockRect.width)
+                        .insetBy(dx: -4, dy: -5)
+                } else {
+                    buttonRect = FrontmatterBlockLayout.valueRect(
+                        for: rowRect,
+                        blockWidth: layout.blockRect.width,
+                        hasEditControl: isURLRow
+                    ).insetBy(dx: -4, dy: -5)
+                }
+                let button = frontmatterValueButtons[index] ?? makeFrontmatterValueButton(index: index)
+                button.tag = index
+                button.frame = buttonRect
+                if isNewRow {
+                    button.accessibilityIdentifier = "frontmatter_new_value"
+                    button.accessibilityLabel = "Add metadata value"
+                } else {
+                    let field = layout.document.fields[index]
+                    button.accessibilityIdentifier = "frontmatter_value_\(field.key)"
+                    button.accessibilityLabel = isURLRow
+                        ? "Open metadata link \(field.key)"
+                        : "Edit metadata value \(field.key)"
+                }
+                if button.superview !== textView {
+                    textView.addSubview(button)
+                }
+                frontmatterValueButtons[index] = button
+
+                let deleteButton = frontmatterDeleteButtons[index] ?? makeFrontmatterDeleteButton(index: index)
+                deleteButton.tag = index
+                deleteButton.frame = FrontmatterBlockLayout.deleteRect(for: rowRect).insetBy(dx: -6, dy: -6)
+                if isNewRow {
+                    deleteButton.accessibilityIdentifier = "frontmatter_new_field_add"
+                    deleteButton.accessibilityLabel = "Add metadata field"
+                } else {
+                    let field = layout.document.fields[index]
+                    deleteButton.accessibilityIdentifier = "frontmatter_delete_\(field.key)"
+                    deleteButton.accessibilityLabel = "Delete metadata \(field.key)"
+                }
+                if deleteButton.superview !== textView {
+                    textView.addSubview(deleteButton)
+                }
+                frontmatterDeleteButtons[index] = deleteButton
+                activeDeleteIndexes.insert(index)
+
+                if isURLRow {
+                    let editButton = frontmatterEditButtons[index] ?? makeFrontmatterEditButton(index: index)
+                    editButton.tag = index
+                    editButton.frame = FrontmatterBlockLayout.editRect(for: rowRect).insetBy(dx: -6, dy: -6)
+                    let field = layout.document.fields[index]
+                    editButton.accessibilityIdentifier = "frontmatter_edit_\(field.key)"
+                    editButton.accessibilityLabel = "Edit metadata value \(field.key)"
+                    if editButton.superview !== textView {
+                        textView.addSubview(editButton)
+                    }
+                    frontmatterEditButtons[index] = editButton
+                    activeEditIndexes.insert(index)
+                }
+            }
+        }
+
+        for (index, button) in frontmatterValueButtons where !activeValueIndexes.contains(index) {
+            button.removeFromSuperview()
+            frontmatterValueButtons.removeValue(forKey: index)
+        }
+        for (index, button) in frontmatterDeleteButtons where !activeDeleteIndexes.contains(index) {
+            button.removeFromSuperview()
+            frontmatterDeleteButtons.removeValue(forKey: index)
+        }
+        for (index, button) in frontmatterEditButtons where !activeEditIndexes.contains(index) {
+            button.removeFromSuperview()
+            frontmatterEditButtons.removeValue(forKey: index)
+        }
+
+        if let editingField = frontmatterEditingField,
+           let editingTarget = frontmatterEditingTarget,
+           let editingFrame = frontmatterEditingFrame(for: editingTarget, in: layout),
+           isFrontmatterBlockExpanded {
+            editingField.frame = editingFrame
+        }
+        if let editingKeyField = frontmatterEditingKeyField,
+           let layout = frontmatterControlLayout(),
+           let keyFrame = frontmatterNewKeyEditingFrame(in: layout),
+           isFrontmatterBlockExpanded {
+            editingKeyField.frame = keyFrame
+        }
+    }
+
+    private func makeFrontmatterHeaderButton() -> UIButton {
+        let button = UIButton(type: .custom)
+        button.backgroundColor = .clear
+        button.addTarget(self, action: #selector(toggleFrontmatterBlockExpansion), for: .touchUpInside)
+        return button
+    }
+
+    private func makeFrontmatterValueButton(index: Int) -> UIButton {
+        let button = UIButton(type: .custom)
+        button.tag = index
+        button.backgroundColor = .clear
+        button.addTarget(self, action: #selector(frontmatterValueTapped(_:)), for: .touchUpInside)
+        return button
+    }
+
+    private func makeFrontmatterDeleteButton(index: Int) -> UIButton {
+        let button = UIButton(type: .custom)
+        button.tag = index
+        button.backgroundColor = .clear
+        button.addTarget(self, action: #selector(frontmatterDeleteTapped(_:)), for: .touchUpInside)
+        return button
+    }
+
+    private func makeFrontmatterEditButton(index: Int) -> UIButton {
+        let button = UIButton(type: .custom)
+        button.tag = index
+        button.backgroundColor = .clear
+        button.addTarget(self, action: #selector(frontmatterEditTapped(_:)), for: .touchUpInside)
+        return button
+    }
+
+    private func clearFrontmatterControls() {
+        frontmatterBlockView?.removeFromSuperview()
+        frontmatterBlockView = nil
+        frontmatterHeaderButton?.removeFromSuperview()
+        frontmatterHeaderButton = nil
+        frontmatterValueButtons.values.forEach { $0.removeFromSuperview() }
+        frontmatterValueButtons.removeAll()
+        frontmatterDeleteButtons.values.forEach { $0.removeFromSuperview() }
+        frontmatterDeleteButtons.removeAll()
+        frontmatterEditButtons.values.forEach { $0.removeFromSuperview() }
+        frontmatterEditButtons.removeAll()
+        frontmatterEditingKeyField?.removeFromSuperview()
+        frontmatterEditingKeyField = nil
+        frontmatterEditingField?.removeFromSuperview()
+        frontmatterEditingField = nil
+        frontmatterEditingTarget = nil
+    }
+
+    @objc
+    private func toggleFrontmatterBlockExpansion() {
+        finishFrontmatterEditing(commit: true)
+        isFrontmatterBlockExpanded.toggle()
+        invalidateFrontmatterLayout()
+    }
+
+    @objc
+    private func frontmatterValueTapped(_ sender: UIButton) {
+        guard let document = markdownDelegate.frontmatterDocument,
+              sender.tag >= 0,
+              sender.tag < FrontmatterBlockLayout.rowCount(for: document) else {
+            return
+        }
+
+        if sender.tag == FrontmatterBlockLayout.newFieldRowIndex(for: document) {
+            beginEditingNewFrontmatterField()
+            return
+        }
+
+        let field = document.fields[sender.tag]
+        if let url = field.url {
+            UIApplication.shared.open(url)
+            return
+        }
+        beginEditingFrontmatterField(field)
+    }
+
+    @objc
+    private func frontmatterDeleteTapped(_ sender: UIButton) {
+        finishFrontmatterEditing(commit: true)
+        guard let document = markdownDelegate.frontmatterDocument,
+              sender.tag >= 0,
+              sender.tag < FrontmatterBlockLayout.rowCount(for: document) else {
+            return
+        }
+
+        if sender.tag == FrontmatterBlockLayout.newFieldRowIndex(for: document) {
+            beginEditingNewFrontmatterField()
+            return
+        }
+
+        deleteFrontmatterField(document.fields[sender.tag])
+    }
+
+    @objc
+    private func frontmatterEditTapped(_ sender: UIButton) {
+        guard let document = markdownDelegate.frontmatterDocument,
+              sender.tag >= 0,
+              sender.tag < document.fields.count else {
+            return
+        }
+        beginEditingFrontmatterField(document.fields[sender.tag])
+    }
+
+    private func beginEditingFrontmatterField(_ field: EditableFrontmatterField) {
+        guard let layout = frontmatterControlLayout(),
+              let valueRect = frontmatterEditingFrame(for: .existingValue(key: field.key), in: layout) else {
+            return
+        }
+
+        frontmatterEditingField?.removeFromSuperview()
+        let textField = makeFrontmatterTextField(frame: valueRect, text: field.value)
+        textField.accessibilityIdentifier = "frontmatter_value_editor_\(field.key)"
+        textView.addSubview(textField)
+        frontmatterEditingField = textField
+        frontmatterEditingTarget = .existingValue(key: field.key)
+        frontmatterBlockView?.configure(
+            document: layout.document,
+            isExpanded: isFrontmatterBlockExpanded,
+            editingTarget: frontmatterEditingTarget
+        )
+        textField.becomeFirstResponder()
+        textField.selectAll(nil)
+    }
+
+    private func beginEditingNewFrontmatterField() {
+        guard let layout = frontmatterControlLayout(),
+              let keyRect = frontmatterNewKeyEditingFrame(in: layout),
+              let valueRect = frontmatterEditingFrame(for: .newField, in: layout) else {
+            return
+        }
+
+        frontmatterEditingKeyField?.removeFromSuperview()
+        frontmatterEditingField?.removeFromSuperview()
+        let keyField = makeFrontmatterTextField(frame: keyRect, text: "", placeholder: "key")
+        keyField.accessibilityIdentifier = "frontmatter_new_key_editor"
+        keyField.returnKeyType = .next
+        let valueField = makeFrontmatterTextField(frame: valueRect, text: "", placeholder: "value")
+        valueField.accessibilityIdentifier = "frontmatter_new_value_editor"
+        valueField.returnKeyType = .done
+        textView.addSubview(keyField)
+        textView.addSubview(valueField)
+        frontmatterEditingKeyField = keyField
+        frontmatterEditingField = valueField
+        frontmatterBlockView?.configure(
+            document: layout.document,
+            isExpanded: isFrontmatterBlockExpanded,
+            editingTarget: .newField
+        )
+        frontmatterEditingTarget = .newField
+        keyField.becomeFirstResponder()
+    }
+
+    private func makeFrontmatterTextField(
+        frame: CGRect,
+        text: String,
+        placeholder: String? = nil
+    ) -> PaddedTextField {
+        let textField = PaddedTextField(frame: frame)
+        textField.text = text
+        textField.placeholder = placeholder
+        textField.font = UIFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        textField.textColor = AppTheme.uiPrimaryText
+        textField.tintColor = AppTheme.uiPrimaryText
+        textField.backgroundColor = FrontmatterBlockLayout.uiFieldBackgroundColor
+        textField.layer.cornerRadius = 4
+        textField.layer.masksToBounds = true
+        textField.borderStyle = .none
+        textField.returnKeyType = .done
+        textField.delegate = self
+        return textField
+    }
+
+    private func frontmatterEditingFrame(
+        for target: FrontmatterEditingTarget,
+        in layout: FrontmatterControlLayout
+    ) -> CGRect? {
+        let rowIndex: Int
+        let hasEditControl: Bool
+        switch target {
+        case .existingValue(let key):
+            guard let index = layout.document.fields.firstIndex(where: { $0.key == key }) else { return nil }
+            rowIndex = index
+            hasEditControl = layout.document.fields[index].url != nil
+        case .newField:
+            rowIndex = FrontmatterBlockLayout.newFieldRowIndex(for: layout.document)
+            hasEditControl = false
+        }
+
+        let rowRect = FrontmatterBlockLayout.rowRect(at: rowIndex, in: layout.blockRect)
+        return FrontmatterBlockLayout.valueRect(
+            for: rowRect,
+            blockWidth: layout.blockRect.width,
+            hasEditControl: hasEditControl
+        ).insetBy(dx: 0, dy: 4)
+    }
+
+    private func frontmatterNewKeyEditingFrame(in layout: FrontmatterControlLayout) -> CGRect? {
+        let rowRect = FrontmatterBlockLayout.rowRect(
+            at: FrontmatterBlockLayout.newFieldRowIndex(for: layout.document),
+            in: layout.blockRect
+        )
+        return FrontmatterBlockLayout.keyRect(for: rowRect, blockWidth: layout.blockRect.width)
+            .insetBy(dx: 0, dy: 4)
+    }
+
+    private func finishFrontmatterEditing(commit: Bool) {
+        guard let textField = frontmatterEditingField,
+              let target = frontmatterEditingTarget else {
+            return
+        }
+
+        let value = textField.text ?? ""
+        let keyValue = frontmatterEditingKeyField?.text ?? ""
+        frontmatterEditingKeyField?.removeFromSuperview()
+        frontmatterEditingKeyField = nil
+        textField.removeFromSuperview()
+        frontmatterEditingField = nil
+        frontmatterEditingTarget = nil
+
+        guard commit else { return }
+
+        let currentText = textView.text ?? ""
+        let updatedText: String
+        switch target {
+        case .existingValue(let key):
+            updatedText = EditableFrontmatterDocument.updatingField(key: key, value: value, in: currentText)
+        case .newField:
+            guard let parsed = EditableFrontmatterDocument.parsedFieldInput(key: keyValue, value: value) else { return }
+            updatedText = EditableFrontmatterDocument.addingField(key: parsed.key, value: parsed.value, in: currentText)
+        }
+        guard updatedText != currentText else { return }
+
+        let contentOffset = textView.contentOffset
+        let selectedRange = textView.selectedRange
+        let updatedLength = (updatedText as NSString).length
+        let selectionLocation = min(selectedRange.location, updatedLength)
+        let selection = NSRange(
+            location: selectionLocation,
+            length: min(selectedRange.length, max(0, updatedLength - selectionLocation))
+        )
+        applySelectionTransform(TextSelectionTransform(text: updatedText, selection: selection))
+        updateFrontmatterMetadata(for: updatedText)
+        invalidateFrontmatterLayout()
+        restoreContentOffset(contentOffset)
+    }
+
+    private func deleteFrontmatterField(_ field: EditableFrontmatterField) {
+        let currentText = textView.text ?? ""
+        let updatedText = EditableFrontmatterDocument.deletingField(key: field.key, in: currentText)
+        guard updatedText != currentText else { return }
+
+        let contentOffset = textView.contentOffset
+        let selectedRange = textView.selectedRange
+        let updatedLength = (updatedText as NSString).length
+        let selectionLocation = min(selectedRange.location, updatedLength)
+        let selection = NSRange(
+            location: selectionLocation,
+            length: min(selectedRange.length, max(0, updatedLength - selectionLocation))
+        )
+        applySelectionTransform(TextSelectionTransform(text: updatedText, selection: selection))
+        updateFrontmatterMetadata(for: updatedText)
+        invalidateFrontmatterLayout()
+        restoreContentOffset(contentOffset)
+    }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        if textField === frontmatterEditingKeyField {
+            frontmatterEditingField?.becomeFirstResponder()
+            return true
+        }
+        finishFrontmatterEditing(commit: true)
+        textView.becomeFirstResponder()
+        return true
+    }
+
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        if textField === frontmatterEditingField {
+            finishFrontmatterEditing(commit: true)
+        }
+    }
+
+    private func invalidateFrontmatterLayout() {
+        _ = syncReadableWidthInsets()
+        scheduleEditorOverlayRefresh()
     }
 
     private func invalidateRenderableBlockCache() {
@@ -4642,16 +5374,303 @@ private final class HyperlinkInsertionPopoverViewController: NSViewController, N
     }
 }
 
+private final class VerticallyCenteredTextFieldCell: NSTextFieldCell {
+    private func centeredRect(forBounds rect: NSRect) -> NSRect {
+        var titleRect = super.titleRect(forBounds: rect)
+        let minimumHeight = self.cellSize(forBounds: rect).height
+        titleRect.origin.y += (titleRect.height - minimumHeight) / 2
+        titleRect.size.height = minimumHeight
+        return titleRect
+    }
+
+    override func titleRect(forBounds rect: NSRect) -> NSRect {
+        centeredRect(forBounds: rect)
+    }
+
+    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        super.drawInterior(withFrame: centeredRect(forBounds: cellFrame), in: controlView)
+    }
+
+    override func edit(
+        withFrame rect: NSRect,
+        in controlView: NSView,
+        editor textObj: NSText,
+        delegate: Any?,
+        event: NSEvent?
+    ) {
+        super.edit(
+            withFrame: centeredRect(forBounds: rect),
+            in: controlView,
+            editor: textObj,
+            delegate: delegate,
+            event: event
+        )
+    }
+
+    override func select(
+        withFrame rect: NSRect,
+        in controlView: NSView,
+        editor textObj: NSText,
+        delegate: Any?,
+        start selStart: Int,
+        length selLength: Int
+    ) {
+        super.select(
+            withFrame: centeredRect(forBounds: rect),
+            in: controlView,
+            editor: textObj,
+            delegate: delegate,
+            start: selStart,
+            length: selLength
+        )
+    }
+}
+
+private final class FrontmatterBlockView: NSView {
+    var document: EditableFrontmatterDocument?
+    var isExpanded = true
+    var editingTarget: FrontmatterEditingTarget?
+
+    override var isFlipped: Bool { true }
+
+    func configure(
+        document: EditableFrontmatterDocument,
+        isExpanded: Bool,
+        editingTarget: FrontmatterEditingTarget?
+    ) {
+        self.document = document
+        self.isExpanded = isExpanded
+        self.editingTarget = editingTarget
+        needsDisplay = true
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = FrontmatterBlockLayout.nsSurfaceColor.cgColor
+        layer?.cornerRadius = FrontmatterBlockLayout.cornerRadius
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext,
+              let document else {
+            return
+        }
+
+        let blockRect = bounds.integral
+        let path = CGPath(
+            roundedRect: blockRect,
+            cornerWidth: FrontmatterBlockLayout.cornerRadius,
+            cornerHeight: FrontmatterBlockLayout.cornerRadius,
+            transform: nil
+        )
+        context.addPath(path)
+        context.setFillColor(FrontmatterBlockLayout.nsSurfaceColor.cgColor)
+        context.fillPath()
+        context.addPath(path)
+        context.setStrokeColor(AppTheme.nsSeparator.withAlphaComponent(0.9).cgColor)
+        context.setLineWidth(1)
+        context.strokePath()
+
+        drawChevron(in: blockRect, context: context)
+        drawText("Metadata", in: titleRect(in: blockRect), font: .systemFont(ofSize: 12, weight: .semibold), color: AppTheme.nsPrimaryText)
+        drawText(
+            "\(document.fields.count)",
+            in: countRect(in: blockRect),
+            font: .monospacedDigitSystemFont(ofSize: 12, weight: .regular),
+            color: AppTheme.nsMutedText,
+            alignment: .right
+        )
+
+        guard isExpanded else { return }
+        for index in 0..<FrontmatterBlockLayout.rowCount(for: document) {
+            let rowRect = FrontmatterBlockLayout.rowRect(at: index, in: blockRect)
+            let keyRect = FrontmatterBlockLayout.keyRect(for: rowRect, blockWidth: blockRect.width)
+            let isExistingField = index < document.fields.count
+            let isURLField = isExistingField && document.fields[index].url != nil
+            let valueRect = FrontmatterBlockLayout.valueRect(
+                for: rowRect,
+                blockWidth: blockRect.width,
+                hasEditControl: isURLField
+            )
+
+            context.move(to: CGPoint(x: rowRect.minX, y: rowRect.minY))
+            context.addLine(to: CGPoint(x: blockRect.maxX - FrontmatterBlockLayout.horizontalPadding, y: rowRect.minY))
+            context.setStrokeColor(AppTheme.nsSeparator.withAlphaComponent(0.9).cgColor)
+            context.setLineWidth(1)
+            context.strokePath()
+
+            if isExistingField {
+                let field = document.fields[index]
+                let isEditingThisRow = editingTarget == .existingValue(key: field.key)
+                drawText(field.key, in: keyRect, font: .monospacedSystemFont(ofSize: 12, weight: .regular), color: AppTheme.nsMutedText)
+                if !isEditingThisRow {
+                    drawText(field.displayValue, in: valueRect, font: .monospacedSystemFont(ofSize: 13, weight: .regular), color: field.url == nil ? AppTheme.nsPrimaryText : .linkColor)
+                }
+                if isURLField {
+                    let editRect = FrontmatterBlockLayout.editRect(for: rowRect)
+                    drawPencilIcon(in: editRect, context: context, color: AppTheme.nsSecondaryText)
+                }
+                let deleteRect = FrontmatterBlockLayout.deleteRect(for: rowRect)
+                drawCrossIcon(in: deleteRect, context: context, color: AppTheme.nsSecondaryText)
+            } else {
+                let isEditingNewRow = editingTarget == .newField
+                let placeholderColor = AppTheme.nsMutedText.withAlphaComponent(0.7)
+                if !isEditingNewRow {
+                    drawSeparatedPlaceholder(
+                        keyRect: keyRect,
+                        valueRect: valueRect,
+                        placeholderColor: placeholderColor,
+                        context: context
+                    )
+                }
+                let addRect = FrontmatterBlockLayout.deleteRect(for: rowRect)
+                drawPlusIcon(in: addRect, context: context, color: AppTheme.nsSecondaryText)
+            }
+        }
+    }
+
+    private func drawSeparatedPlaceholder(
+        keyRect: CGRect,
+        valueRect: CGRect,
+        placeholderColor: NSColor,
+        context: CGContext
+    ) {
+        drawText("key", in: keyRect, font: .monospacedSystemFont(ofSize: 12, weight: .regular), color: placeholderColor)
+        drawText("value", in: valueRect, font: .monospacedSystemFont(ofSize: 13, weight: .regular), color: placeholderColor)
+    }
+
+    private func drawCrossIcon(in rect: CGRect, context: CGContext, color: NSColor) {
+        let inset = rect.width * 0.28
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: rect.minX + inset, y: rect.minY + inset))
+        path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.maxY - inset))
+        path.move(to: CGPoint(x: rect.maxX - inset, y: rect.minY + inset))
+        path.addLine(to: CGPoint(x: rect.minX + inset, y: rect.maxY - inset))
+        context.addPath(path)
+        context.setStrokeColor(color.cgColor)
+        context.setLineWidth(1.6)
+        context.setLineCap(.round)
+        context.strokePath()
+    }
+
+    private func drawPlusIcon(in rect: CGRect, context: CGContext, color: NSColor) {
+        let inset = rect.width * 0.26
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: rect.minX + inset, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.midY))
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY + inset))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY - inset))
+        context.addPath(path)
+        context.setStrokeColor(color.cgColor)
+        context.setLineWidth(1.6)
+        context.setLineCap(.round)
+        context.strokePath()
+    }
+
+    private func drawPencilIcon(in rect: CGRect, context: CGContext, color: NSColor) {
+        let inset = rect.width * 0.24
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: rect.minX + inset, y: rect.maxY - inset))
+        path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.minY + inset))
+        path.move(to: CGPoint(x: rect.minX + inset * 0.8, y: rect.maxY - inset * 0.5))
+        path.addLine(to: CGPoint(x: rect.maxX - inset * 0.8, y: rect.maxY - inset * 0.5))
+        context.addPath(path)
+        context.setStrokeColor(color.cgColor)
+        context.setLineWidth(1.4)
+        context.setLineCap(.round)
+        context.strokePath()
+    }
+
+    private func titleRect(in rect: CGRect) -> CGRect {
+        let leading = rect.minX
+            + FrontmatterBlockLayout.horizontalPadding
+            + FrontmatterBlockLayout.chevronWidth
+            + FrontmatterBlockLayout.iconTextGap
+        let trailing = rect.maxX - FrontmatterBlockLayout.horizontalPadding - FrontmatterBlockLayout.countWidth
+        return CGRect(x: leading, y: rect.minY, width: max(0, trailing - leading), height: FrontmatterBlockLayout.collapsedHeight)
+    }
+
+    private func countRect(in rect: CGRect) -> CGRect {
+        CGRect(
+            x: rect.maxX - FrontmatterBlockLayout.horizontalPadding - FrontmatterBlockLayout.countWidth,
+            y: rect.minY,
+            width: FrontmatterBlockLayout.countWidth,
+            height: FrontmatterBlockLayout.collapsedHeight
+        )
+    }
+
+    private func drawChevron(in rect: CGRect, context: CGContext) {
+        let centerX = rect.minX + FrontmatterBlockLayout.horizontalPadding + FrontmatterBlockLayout.chevronWidth / 2
+        let centerY = rect.minY + FrontmatterBlockLayout.collapsedHeight / 2
+        let size: CGFloat = 8
+        let path = CGMutablePath()
+        if isExpanded {
+            path.move(to: CGPoint(x: centerX - size * 0.45, y: centerY - size * 0.2))
+            path.addLine(to: CGPoint(x: centerX, y: centerY + size * 0.3))
+            path.addLine(to: CGPoint(x: centerX + size * 0.45, y: centerY - size * 0.2))
+        } else {
+            path.move(to: CGPoint(x: centerX - size * 0.25, y: centerY - size * 0.45))
+            path.addLine(to: CGPoint(x: centerX + size * 0.25, y: centerY))
+            path.addLine(to: CGPoint(x: centerX - size * 0.25, y: centerY + size * 0.45))
+        }
+        context.addPath(path)
+        context.setStrokeColor(AppTheme.nsPrimaryText.cgColor)
+        context.setLineWidth(1.7)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        context.strokePath()
+    }
+
+    private func drawText(
+        _ text: String,
+        in rect: CGRect,
+        font: NSFont,
+        color: NSColor,
+        alignment: NSTextAlignment = .left
+    ) {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = alignment
+        paragraphStyle.lineBreakMode = .byTruncatingTail
+        let attributed = NSAttributedString(
+            string: text,
+            attributes: [
+                .font: font,
+                .foregroundColor: color,
+                .paragraphStyle: paragraphStyle,
+            ]
+        )
+        let textSize = attributed.size()
+        attributed.draw(in: CGRect(
+            x: rect.minX,
+            y: rect.midY - ceil(textSize.height) / 2,
+            width: rect.width,
+            height: ceil(textSize.height)
+        ))
+    }
+}
+
 private final class HyperlinkOpeningTextView: NSTextView {
     var openHyperlinkTarget: ((HyperlinkMarkdown.Target) -> Void)?
     var openHyperlinkTargetInNewWindow: ((HyperlinkMarkdown.Target) -> Void)?
     var shouldOpenHyperlinkAtIndex: ((Int) -> Bool)?
     var toggleTodoMarkerAtPoint: ((NSPoint) -> Bool)?
+    var handleFrontmatterClickAtPoint: ((NSPoint) -> Bool)?
     var importImageFiles: (([URL], Int) -> Bool)?
     private var hyperlinkTrackingArea: NSTrackingArea?
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if handleFrontmatterClickAtPoint?(point) == true {
+            return
+        }
+
         if toggleTodoMarkerAtPoint?(point) == true {
             return
         }
@@ -4772,6 +5791,7 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     var findNavigationRequest: EditorFindNavigationRequest?
     var onFindStatusChange: ((EditorFindStatus) -> Void)?
     var onCloseFind: (() -> Void)?
+    var onContentOffsetYChange: ((CGFloat) -> Void)?
 
     func makeCoordinator() -> TextKit2EditorCoordinator {
         TextKit2EditorCoordinator(text: $text, onTextChange: onTextChange, autoFocus: autoFocus)
@@ -4787,6 +5807,7 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
         vc.onOpenDocumentLinkInNewWindow = onOpenDocumentLinkInNewWindow
         vc.isFindVisible = isFindVisible
         vc.onCloseFind = onCloseFind
+        vc.onContentOffsetYChange = onContentOffsetYChange
         vc.updateFind(
             query: findQuery,
             navigationRequest: findNavigationRequest,
@@ -4804,21 +5825,23 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
         vc.onOpenDocumentLinkInNewWindow = onOpenDocumentLinkInNewWindow
         vc.isFindVisible = isFindVisible
         vc.onCloseFind = onCloseFind
+        vc.onContentOffsetYChange = onContentOffsetYChange
         vc.updateFind(
             query: findQuery,
             navigationRequest: findNavigationRequest,
             onStatusChange: onFindStatusChange
         )
         guard !context.coordinator.isUpdatingText else { return }
-        guard vc.textView.window?.firstResponder !== vc.textView else { return }
         guard text != context.coordinator.lastPublishedText else { return }
-        if vc.textView.string != text {
+        let isFirstResponder = vc.textView.window?.firstResponder === vc.textView
+        let currentText = vc.textView.string
+        if currentText != text, !isFirstResponder || currentText.isEmpty {
             vc.loadText(text)
         }
     }
 }
 
-final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, NSTextStorageDelegate, NSPopoverDelegate {
+final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, NSTextStorageDelegate, NSTextFieldDelegate, NSPopoverDelegate {
     var coordinator: TextKit2EditorCoordinator?
     var vaultRootURL: URL? {
         didSet {
@@ -4831,6 +5854,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     var onOpenDocumentLinkInNewWindow: ((String) -> Void)?
     var isFindVisible = false
     var onCloseFind: (() -> Void)?
+    var onContentOffsetYChange: ((CGFloat) -> Void)?
     private(set) var textView: NSTextView!
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
@@ -4865,6 +5889,11 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var findHighlightViews: [NSView] = []
     private var dividerLineViews: [Int: NSView] = [:]
     private var imageOverlayViews: [Int: NSImageView] = [:]
+    private var isFrontmatterBlockExpanded = false
+    private var frontmatterBlockView: FrontmatterBlockView?
+    private weak var frontmatterEditingKeyField: NSTextField?
+    private weak var frontmatterEditingField: NSTextField?
+    private var frontmatterEditingTarget: FrontmatterEditingTarget?
 
     override func loadView() {
         view = NSView()
@@ -4906,7 +5935,10 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         textView.font = MarkdownTheme.bodyFont
         textView.textColor = MarkdownTheme.bodyColor
         textView.backgroundColor = AppTheme.nsBackground
-        textView.textContainerInset = NSSize(width: minimumHorizontalTextInset, height: verticalTextInset)
+        textView.textContainerInset = NSSize(
+            width: minimumHorizontalTextInset,
+            height: editorTopTextInset
+        )
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
@@ -4937,6 +5969,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
         (textView as? HyperlinkOpeningTextView)?.toggleTodoMarkerAtPoint = { [weak self] point in
             self?.toggleTodoMarker(atTextViewPoint: point) ?? false
+        }
+        (textView as? HyperlinkOpeningTextView)?.handleFrontmatterClickAtPoint = { [weak self] point in
+            self?.handleFrontmatterClick(atTextViewPoint: point) ?? false
         }
         (textView as? HyperlinkOpeningTextView)?.importImageFiles = { [weak self] urls, characterIndex in
             self?.importAndInsertImages(fileURLs: urls, characterIndex: characterIndex) ?? false
@@ -5010,6 +6045,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             object: scrollView.contentView,
             queue: .main
         ) { [weak self] _ in
+            self?.publishContentOffsetY()
             self?.refreshEditorOverlays()
         }
     }
@@ -5031,11 +6067,31 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             minimumHorizontalInset: minimumHorizontalTextInset,
             constrainsToReadableWidth: true
         )
-        let targetInset = NSSize(width: horizontalInset, height: verticalTextInset)
+        let targetInset = NSSize(
+            width: horizontalInset,
+            height: editorTopTextInset
+        )
         guard textView.textContainerInset != targetInset else { return false }
 
         textView.textContainerInset = targetInset
         return true
+    }
+
+    private func updateFrontmatterMetadata(for markdown: String) {
+        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: markdown)
+        markdownDelegate.frontmatterDocument = EditableFrontmatterDocument(markdown: markdown)
+    }
+
+    private var frontmatterReservedHeight: CGFloat {
+        markdownDelegate.frontmatterDocument == nil ? 0 : FrontmatterBlockLayout.reservedTopInset
+    }
+
+    private var editorTopTextInset: CGFloat {
+        verticalTextInset + frontmatterReservedHeight
+    }
+
+    private func publishContentOffsetY() {
+        onContentOffsetYChange?(scrollView.contentView.bounds.origin.y)
     }
 
     func loadText(_ markdown: String) {
@@ -5047,7 +6103,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     }
 
     private func applyText(_ markdown: String) {
-        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: markdown)
+        isFrontmatterBlockExpanded = false
+        updateFrontmatterMetadata(for: markdown)
+        _ = syncTextContainerInsets()
         coordinator?.beginApplyingEditorText(markdown)
         textView.string = markdown
         coordinator?.finishApplyingEditorText()
@@ -5224,7 +6282,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     func textDidChange(_ notification: Notification) {
         DebugTrace.record("mac textDidChange")
-        markdownDelegate.frontmatterRange = MarkdownFrontmatter.range(in: textView.string)
+        updateFrontmatterMetadata(for: textView.string)
+        _ = syncTextContainerInsets()
         if !isRestylingText {
             updateRevealedMarkdownRangesForSelection(restyle: false)
             applyDividerRenderAttributesToTextStorage()
@@ -5996,6 +7055,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
+        refreshFrontmatterBlockView()
+        refreshFrontmatterEditingFieldFrame()
         refreshDividerLineViews()
         refreshImageOverlayViews()
         refreshFindHighlightOverlays()
@@ -6003,6 +7064,330 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     private func syncCollapsedXMLTagState() {
         markdownDelegate.collapsedXMLTagRanges = []
+    }
+
+    private struct FrontmatterControlLayout {
+        let document: EditableFrontmatterDocument
+        let blockRect: NSRect
+    }
+
+    private func frontmatterControlLayout() -> FrontmatterControlLayout? {
+        guard let document = markdownDelegate.frontmatterDocument else {
+            return nil
+        }
+
+        let inset = textView.textContainerInset.width
+        let padding = textView.textContainer?.lineFragmentPadding ?? 0
+        let contentLeading = inset + padding
+        let contentTrailing = textView.bounds.width - inset - padding
+        let leading = max(0, contentLeading - FrontmatterBlockLayout.horizontalPadding)
+        let trailing = min(textView.bounds.width, contentTrailing + FrontmatterBlockLayout.horizontalPadding)
+        let width = max(0, trailing - leading)
+        guard width > 0 else { return nil }
+
+        let blockRect = FrontmatterBlockLayout.blockRect(
+            point: CGPoint(x: leading, y: verticalTextInset),
+            contentWidth: width,
+            document: document,
+            isExpanded: isFrontmatterBlockExpanded
+        )
+        return FrontmatterControlLayout(document: document, blockRect: blockRect)
+    }
+
+    private func handleFrontmatterClick(atTextViewPoint point: NSPoint) -> Bool {
+        finishFrontmatterEditing(commit: true)
+        guard let layout = frontmatterControlLayout(),
+              layout.blockRect.contains(point) else {
+            if isFrontmatterBlockExpanded {
+                isFrontmatterBlockExpanded = false
+                invalidateFrontmatterLayout()
+            }
+            return false
+        }
+
+        if FrontmatterBlockLayout.headerRect(in: layout.blockRect).contains(point) {
+            toggleFrontmatterBlockExpansion()
+            return true
+        }
+
+        guard let rowIndex = FrontmatterBlockLayout.rowIndex(
+            at: point,
+            in: layout.blockRect,
+            document: layout.document,
+            isExpanded: isFrontmatterBlockExpanded
+        ) else {
+            return true
+        }
+
+        let rowRect = FrontmatterBlockLayout.rowRect(at: rowIndex, in: layout.blockRect)
+
+        if rowIndex == FrontmatterBlockLayout.newFieldRowIndex(for: layout.document) {
+            beginEditingNewFrontmatterField()
+            return true
+        }
+
+        let field = layout.document.fields[rowIndex]
+        if FrontmatterBlockLayout.deleteRect(for: rowRect).insetBy(dx: -6, dy: -6).contains(point) {
+            deleteFrontmatterField(field)
+            return true
+        }
+
+        let isURLField = field.url != nil
+        if isURLField,
+           FrontmatterBlockLayout.editRect(for: rowRect).insetBy(dx: -6, dy: -6).contains(point) {
+            beginEditingFrontmatterField(field)
+            return true
+        }
+
+        let valueRect = FrontmatterBlockLayout.valueRect(
+            for: rowRect,
+            blockWidth: layout.blockRect.width,
+            hasEditControl: isURLField
+        ).insetBy(dx: -4, dy: -5)
+        guard valueRect.contains(point) else { return true }
+
+        if let url = field.url {
+            NSWorkspace.shared.open(url)
+            return true
+        }
+        beginEditingFrontmatterField(field)
+        return true
+    }
+
+    private func toggleFrontmatterBlockExpansion() {
+        isFrontmatterBlockExpanded.toggle()
+        invalidateFrontmatterLayout()
+    }
+
+    private func refreshFrontmatterBlockView() {
+        guard let layout = frontmatterControlLayout(),
+              layout.blockRect.intersects(textView.visibleRect.insetBy(dx: -8, dy: -80)) else {
+            frontmatterBlockView?.removeFromSuperview()
+            frontmatterBlockView = nil
+            return
+        }
+
+        let blockView = frontmatterBlockView ?? FrontmatterBlockView()
+        blockView.frame = layout.blockRect
+        blockView.configure(
+            document: layout.document,
+            isExpanded: isFrontmatterBlockExpanded,
+            editingTarget: frontmatterEditingTarget
+        )
+        if blockView.superview !== textView {
+            textView.addSubview(blockView, positioned: .above, relativeTo: nil)
+        }
+        frontmatterBlockView = blockView
+    }
+
+    private func beginEditingFrontmatterField(_ field: EditableFrontmatterField) {
+        guard let layout = frontmatterControlLayout(),
+              let valueRect = frontmatterEditingFrame(for: .existingValue(key: field.key), in: layout) else {
+            return
+        }
+
+        frontmatterEditingKeyField?.removeFromSuperview()
+        frontmatterEditingKeyField = nil
+        frontmatterEditingField?.removeFromSuperview()
+        let textField = makeFrontmatterTextField(
+            frame: valueRect,
+            string: field.value,
+            placeholder: nil
+        )
+        textField.setAccessibilityIdentifier("frontmatter_value_editor_\(field.key)")
+        textView.addSubview(textField)
+        frontmatterEditingField = textField
+        frontmatterEditingTarget = .existingValue(key: field.key)
+        frontmatterBlockView?.configure(
+            document: layout.document,
+            isExpanded: isFrontmatterBlockExpanded,
+            editingTarget: frontmatterEditingTarget
+        )
+        textView.window?.makeFirstResponder(textField)
+        textField.currentEditor()?.selectAll(nil)
+    }
+
+    private func beginEditingNewFrontmatterField() {
+        guard let layout = frontmatterControlLayout(),
+              let keyRect = frontmatterNewKeyEditingFrame(in: layout),
+              let valueRect = frontmatterEditingFrame(for: .newField, in: layout) else {
+            return
+        }
+
+        frontmatterEditingKeyField?.removeFromSuperview()
+        frontmatterEditingField?.removeFromSuperview()
+        let keyField = makeFrontmatterTextField(frame: keyRect, string: "", placeholder: "key")
+        keyField.setAccessibilityIdentifier("frontmatter_new_key_editor")
+        let valueField = makeFrontmatterTextField(frame: valueRect, string: "", placeholder: "value")
+        valueField.setAccessibilityIdentifier("frontmatter_new_value_editor")
+        textView.addSubview(keyField)
+        textView.addSubview(valueField)
+        frontmatterEditingKeyField = keyField
+        frontmatterEditingField = valueField
+        frontmatterEditingTarget = .newField
+        frontmatterBlockView?.configure(
+            document: layout.document,
+            isExpanded: isFrontmatterBlockExpanded,
+            editingTarget: .newField
+        )
+        textView.window?.makeFirstResponder(keyField)
+    }
+
+    private func makeFrontmatterTextField(
+        frame: CGRect,
+        string: String,
+        placeholder: String?
+    ) -> NSTextField {
+        let textField = NSTextField(frame: frame)
+        let cell = VerticallyCenteredTextFieldCell(textCell: string)
+        cell.isEditable = true
+        cell.isSelectable = true
+        cell.isBordered = false
+        cell.drawsBackground = true
+        cell.backgroundColor = FrontmatterBlockLayout.nsFieldBackgroundColor
+        cell.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        cell.textColor = AppTheme.nsPrimaryText
+        cell.usesSingleLineMode = true
+        cell.lineBreakMode = .byTruncatingTail
+        cell.wraps = false
+        cell.isScrollable = true
+        cell.focusRingType = .none
+        if let placeholder {
+            cell.placeholderString = placeholder
+        }
+        textField.cell = cell
+        textField.stringValue = string
+        textField.delegate = self
+        textField.wantsLayer = true
+        textField.layer?.cornerRadius = 4
+        textField.layer?.masksToBounds = true
+        return textField
+    }
+
+    private func frontmatterEditingFrame(
+        for target: FrontmatterEditingTarget,
+        in layout: FrontmatterControlLayout
+    ) -> CGRect? {
+        let rowIndex: Int
+        let hasEditControl: Bool
+        switch target {
+        case .existingValue(let key):
+            guard let index = layout.document.fields.firstIndex(where: { $0.key == key }) else { return nil }
+            rowIndex = index
+            hasEditControl = layout.document.fields[index].url != nil
+        case .newField:
+            rowIndex = FrontmatterBlockLayout.newFieldRowIndex(for: layout.document)
+            hasEditControl = false
+        }
+
+        let rowRect = FrontmatterBlockLayout.rowRect(at: rowIndex, in: layout.blockRect)
+        return FrontmatterBlockLayout.valueRect(
+            for: rowRect,
+            blockWidth: layout.blockRect.width,
+            hasEditControl: hasEditControl
+        ).insetBy(dx: 0, dy: 6)
+    }
+
+    private func frontmatterNewKeyEditingFrame(in layout: FrontmatterControlLayout) -> CGRect? {
+        let rowRect = FrontmatterBlockLayout.rowRect(
+            at: FrontmatterBlockLayout.newFieldRowIndex(for: layout.document),
+            in: layout.blockRect
+        )
+        return FrontmatterBlockLayout.keyRect(for: rowRect, blockWidth: layout.blockRect.width)
+            .insetBy(dx: 0, dy: 6)
+    }
+
+    private func finishFrontmatterEditing(commit: Bool) {
+        guard let textField = frontmatterEditingField,
+              let target = frontmatterEditingTarget else {
+            return
+        }
+
+        let value = textField.stringValue
+        let keyValue = frontmatterEditingKeyField?.stringValue ?? ""
+        frontmatterEditingKeyField?.removeFromSuperview()
+        frontmatterEditingKeyField = nil
+        textField.removeFromSuperview()
+        frontmatterEditingField = nil
+        frontmatterEditingTarget = nil
+
+        guard commit else { return }
+
+        let updatedText: String
+        switch target {
+        case .existingValue(let key):
+            updatedText = EditableFrontmatterDocument.updatingField(key: key, value: value, in: textView.string)
+        case .newField:
+            guard let parsed = EditableFrontmatterDocument.parsedFieldInput(key: keyValue, value: value) else { return }
+            updatedText = EditableFrontmatterDocument.addingField(key: parsed.key, value: parsed.value, in: textView.string)
+        }
+        guard updatedText != textView.string else { return }
+
+        let selectedRange = textView.selectedRange()
+        let updatedLength = (updatedText as NSString).length
+        let selectionLocation = min(selectedRange.location, updatedLength)
+        let selection = NSRange(
+            location: selectionLocation,
+            length: min(selectedRange.length, max(0, updatedLength - selectionLocation))
+        )
+        applySelectionTransform(TextSelectionTransform(text: updatedText, selection: selection))
+        updateFrontmatterMetadata(for: updatedText)
+        invalidateFrontmatterLayout()
+    }
+
+    private func deleteFrontmatterField(_ field: EditableFrontmatterField) {
+        let currentText = textView.string
+        let updatedText = EditableFrontmatterDocument.deletingField(key: field.key, in: currentText)
+        guard updatedText != currentText else { return }
+
+        let selectedRange = textView.selectedRange()
+        let updatedLength = (updatedText as NSString).length
+        let selectionLocation = min(selectedRange.location, updatedLength)
+        let selection = NSRange(
+            location: selectionLocation,
+            length: min(selectedRange.length, max(0, updatedLength - selectionLocation))
+        )
+        applySelectionTransform(TextSelectionTransform(text: updatedText, selection: selection))
+        updateFrontmatterMetadata(for: updatedText)
+        invalidateFrontmatterLayout()
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        let endingField = obj.object as? NSTextField
+        guard endingField === frontmatterEditingField || endingField === frontmatterEditingKeyField else { return }
+
+        // If user tabbed/shifted between key and value fields, keep editing alive.
+        if let movement = obj.userInfo?["NSTextMovement"] as? Int,
+           movement == NSTextMovement.tab.rawValue,
+           endingField === frontmatterEditingKeyField,
+           let valueField = frontmatterEditingField {
+            textView.window?.makeFirstResponder(valueField)
+            return
+        }
+
+        finishFrontmatterEditing(commit: true)
+    }
+
+    private func refreshFrontmatterEditingFieldFrame() {
+        guard let editingField = frontmatterEditingField,
+              let editingTarget = frontmatterEditingTarget,
+              let layout = frontmatterControlLayout(),
+              let editingFrame = frontmatterEditingFrame(for: editingTarget, in: layout),
+              isFrontmatterBlockExpanded else {
+            return
+        }
+
+        editingField.frame = editingFrame
+        if let keyField = frontmatterEditingKeyField,
+           let keyFrame = frontmatterNewKeyEditingFrame(in: layout) {
+            keyField.frame = keyFrame
+        }
+    }
+
+    private func invalidateFrontmatterLayout() {
+        _ = syncTextContainerInsets()
+        textView.needsDisplay = true
+        scheduleEditorOverlayRefresh()
     }
 
     private func requestImageLoad(for url: URL) {
