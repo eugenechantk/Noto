@@ -778,6 +778,11 @@ struct VaultWorkspaceView: View {
     }
 
     private func updateSelectedNote(_ note: MarkdownNote) {
+        splitNoteHistory.replaceEntries(for: note)
+        #if os(iOS)
+        splitNoteStackNavigation.replaceEntries(for: note)
+        #endif
+
         guard selectedNote?.id == note.id ||
             selectedNote?.fileURL.standardizedFileURL == note.fileURL.standardizedFileURL else {
             return
@@ -785,13 +790,9 @@ struct VaultWorkspaceView: View {
 
         selectedNote = note
         selectedNoteStore = storeForDirectory(note.fileURL.deletingLastPathComponent())
-        splitNoteHistory.replaceEntries(for: note)
         if let currentEntry = currentSplitStackEntry {
             splitNoteHistory.replaceCurrent(currentEntry)
         }
-        #if os(iOS)
-        splitNoteStackNavigation.replaceEntries(for: note)
-        #endif
     }
 
     private func clearSplitSelection() {
