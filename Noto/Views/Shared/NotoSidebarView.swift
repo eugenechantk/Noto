@@ -81,6 +81,12 @@ struct NotoSidebarView: View {
                 newFolderName = ""
             }
         }
+        .onAppear {
+            expandToSelectedNote()
+        }
+        .onChange(of: selectedNote) { _, _ in
+            expandToSelectedNote()
+        }
         #if os(macOS)
         .background(currentDirectoryDropTarget)
         #endif
@@ -126,6 +132,40 @@ struct NotoSidebarView: View {
         .padding(.bottom, 6)
         .notoSidebarHeaderTopInset()
         .background(AppTheme.sidebarBackground)
+    }
+
+    private func expandToSelectedNote() {
+        guard let selectedNote else { return }
+        guard let relativePath = rootStore.vaultRelativePath(for: selectedNote.fileURL) else { return }
+        let folderPath = (relativePath as NSString).deletingLastPathComponent
+        guard !folderPath.isEmpty, folderPath != "." else {
+            if !folderStack.isEmpty {
+                folderStack = []
+            }
+            return
+        }
+        let components = folderPath.split(separator: "/").map(String.init)
+        // Skip the rebuild when the stack already points at this folder. Each
+        // rebuild allocates fresh, unloaded MarkdownNoteStore instances; if the
+        // new currentStore's directory path matches the old one, the
+        // DirectoryContentListView's .task(id:) won't re-fire and the new store
+        // is never loaded — leaving the sidebar visually empty.
+        if folderStack.map(\.title) == components {
+            return
+        }
+        var newStack: [SidebarDirectoryPage] = []
+        var currentURL = rootStore.vaultRootURL.standardizedFileURL
+        for component in components {
+            currentURL = currentURL.appendingPathComponent(component)
+            let store = MarkdownNoteStore(
+                directoryURL: currentURL,
+                vaultRootURL: rootStore.vaultRootURL,
+                autoload: false,
+                directoryLoader: rootStore.directoryLoader
+            )
+            newStack.append(SidebarDirectoryPage(store: store, title: component))
+        }
+        folderStack = newStack
     }
 
     @ViewBuilder
