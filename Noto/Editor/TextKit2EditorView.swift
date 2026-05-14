@@ -3057,8 +3057,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         textView.text = markdown
         coordinator?.finishApplyingEditorText()
         invalidateRenderableBlockCache()
-        updateTypingAttributes(documentText: markdown as NSString)
-        refreshFindMatches(in: markdown, preferredLocation: textView.selectedRange.location, scrollToSelection: false)
+        if let contentOffsetToRestore {
+            restoreContentOffset(contentOffsetToRestore)
+        }
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in
                 guard let tv = self?.textView else { return }
@@ -3069,12 +3070,19 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
                 self?.scheduleEditorOverlayRefresh()
             }
         }
-        scheduleEditorOverlayRefresh()
-        updatePageMentionSuggestions(in: markdown as NSString)
-        if let contentOffsetToRestore {
-            restoreContentOffset(contentOffsetToRestore)
+        // Defer non-visible work so the editor's first paint isn't blocked.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.textView != nil else { return }
+            self.updateTypingAttributes(documentText: markdown as NSString)
+            self.refreshFindMatches(
+                in: markdown,
+                preferredLocation: self.textView.selectedRange.location,
+                scrollToSelection: false
+            )
+            self.updatePageMentionSuggestions(in: markdown as NSString)
+            self.scheduleEditorOverlayRefresh()
+            self.schedulePrewarmLayout()
         }
-        schedulePrewarmLayout()
     }
 
     private func schedulePrewarmLayout() {
@@ -6305,8 +6313,6 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         coordinator?.beginApplyingEditorText(markdown)
         textView.string = markdown
         coordinator?.finishApplyingEditorText()
-        updateTypingAttributes()
-        refreshFindMatches(preferredLocation: textView.selectedRange().location, scrollToSelection: false)
         if coordinator?.autoFocus == true {
             DispatchQueue.main.async { [weak self] in
                 guard let tv = self?.textView else { return }
@@ -6316,9 +6322,18 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
                 self?.scheduleEditorOverlayRefresh()
             }
         }
-        scheduleEditorOverlayRefresh()
-        updatePageMentionSuggestions()
-        schedulePrewarmLayout()
+        // Defer non-visible work so the editor's first paint isn't blocked.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.textView != nil else { return }
+            self.updateTypingAttributes()
+            self.refreshFindMatches(
+                preferredLocation: self.textView.selectedRange().location,
+                scrollToSelection: false
+            )
+            self.updatePageMentionSuggestions()
+            self.scheduleEditorOverlayRefresh()
+            self.schedulePrewarmLayout()
+        }
     }
 
     private func schedulePrewarmLayout() {
