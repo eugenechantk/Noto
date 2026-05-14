@@ -101,14 +101,18 @@ struct NotoSidebarView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 44)
 
-            HStack {
+            HStack(spacing: 0) {
                 if !folderStack.isEmpty {
                     Button {
                         folderStack.removeLast()
                     } label: {
                         Label("Back", systemImage: "chevron.left")
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 16, weight: .medium))
+                            .frame(width: sidebarHeaderButtonSize, height: sidebarHeaderButtonSize)
+                            .contentShape(Rectangle())
                     }
-                    .labelStyle(.iconOnly)
+                    .buttonStyle(.plain)
                     .accessibilityIdentifier("sidebar_back_button")
                     .accessibilityLabel("Back")
                     .help("Back")
@@ -121,8 +125,12 @@ struct NotoSidebarView: View {
                     onIntent(.openSettings)
                 } label: {
                     Label("Settings", systemImage: "gearshape")
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 17, weight: .regular))
+                        .frame(width: sidebarHeaderButtonSize, height: sidebarHeaderButtonSize)
+                        .contentShape(Rectangle())
                 }
-                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("sidebar_settings_button")
                 .accessibilityLabel("Settings")
                 .help("Settings")
@@ -132,18 +140,30 @@ struct NotoSidebarView: View {
                     onIntent(.openSearch)
                 } label: {
                     Label("Search", systemImage: "magnifyingglass")
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 17, weight: .regular))
+                        .frame(width: sidebarHeaderButtonSize, height: sidebarHeaderButtonSize)
+                        .contentShape(Rectangle())
                 }
-                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("search_button")
                 .accessibilityLabel("Search")
                 .help("Search")
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 6)
         .padding(.top, 0)
-        .padding(.bottom, 6)
+        .padding(.bottom, 8)
         .notoSidebarHeaderTopInset()
         .background(AppTheme.sidebarBackground)
+    }
+
+    private var sidebarHeaderButtonSize: CGFloat {
+        #if os(iOS)
+        44
+        #else
+        28
+        #endif
     }
 
     private func expandToSelectedNote() {
