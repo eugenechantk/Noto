@@ -106,6 +106,7 @@ struct EditorNavigationChrome: ViewModifier {
             Button(action: onMoveRequested) {
                 Label("Move Note", systemImage: "folder")
             }
+            .keyboardShortcut("m", modifiers: [.command, .shift])
             .accessibilityIdentifier("move_note_menu_item")
 
             Button(role: .destructive, action: onDeleteRequested) {

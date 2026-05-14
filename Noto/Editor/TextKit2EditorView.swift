@@ -41,6 +41,7 @@ enum NoteEditorCommands {
     static let toggleHyperlink = Notification.Name("NoteEditorCommands.toggleHyperlink")
     static let showFind = Notification.Name("NoteEditorCommands.showFind")
     static let closeFind = Notification.Name("NoteEditorCommands.closeFind")
+    static let showMoveNote = Notification.Name("NoteEditorCommands.showMoveNote")
 
     static func requestToggleStrikethrough() {
         NotificationCenter.default.post(name: toggleStrikethrough, object: commandTarget)
@@ -64,6 +65,10 @@ enum NoteEditorCommands {
 
     static func requestCloseFind() {
         NotificationCenter.default.post(name: closeFind, object: commandTarget)
+    }
+
+    static func requestShowMoveNote() {
+        NotificationCenter.default.post(name: showMoveNote, object: commandTarget)
     }
 
     private static var commandTarget: Any? {
@@ -2729,6 +2734,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     var isFindVisible = false
     var onCloseFind: (() -> Void)?
     var onContentOffsetYChange: ((CGFloat) -> Void)?
+    private var lastContentOffsetPublishTime: Date = .distantPast
     private(set) var textView: UITextView!
     private let minimumHorizontalTextInset: CGFloat = 16
     private let maximumTextWidth: CGFloat = 600
@@ -4448,13 +4454,37 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         if scrollView === textView {
-            onContentOffsetYChange?(scrollView.contentOffset.y)
+            publishContentOffsetYThrottled(scrollView.contentOffset.y)
         }
         let blocks = visibleRenderableBlocks()
         refreshFrontmatterControls()
         refreshTodoMarkerButtons(in: blocks)
         refreshImageOverlayViews(in: blocks)
         refreshFindHighlightOverlays()
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate, scrollView === textView {
+            flushContentOffsetY(scrollView.contentOffset.y)
+        }
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        if scrollView === textView {
+            flushContentOffsetY(scrollView.contentOffset.y)
+        }
+    }
+
+    private func publishContentOffsetYThrottled(_ y: CGFloat) {
+        let now = Date()
+        guard now.timeIntervalSince(lastContentOffsetPublishTime) >= 0.2 else { return }
+        lastContentOffsetPublishTime = now
+        onContentOffsetYChange?(y)
+    }
+
+    private func flushContentOffsetY(_ y: CGFloat) {
+        lastContentOffsetPublishTime = Date()
+        onContentOffsetYChange?(y)
     }
 
     private func scheduleEditorOverlayRefresh() {
@@ -5939,6 +5969,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     var isFindVisible = false
     var onCloseFind: (() -> Void)?
     var onContentOffsetYChange: ((CGFloat) -> Void)?
+    private var lastContentOffsetPublishTime: Date = .distantPast
     private(set) var textView: NSTextView!
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
@@ -6176,7 +6207,11 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     }
 
     private func publishContentOffsetY() {
-        onContentOffsetYChange?(scrollView.contentView.bounds.origin.y)
+        let y = scrollView.contentView.bounds.origin.y
+        let now = Date()
+        guard now.timeIntervalSince(lastContentOffsetPublishTime) >= 0.2 else { return }
+        lastContentOffsetPublishTime = now
+        onContentOffsetYChange?(y)
     }
 
     func loadText(_ markdown: String) {

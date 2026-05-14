@@ -243,6 +243,20 @@ struct NoteNavigationHistory: Equatable {
         return false
     }
 
+    /// Removes the current entry and returns the entry that should now be selected
+    /// (the previous one if it exists, nil if history is now empty).
+    mutating func removeCurrent() -> NoteStackEntry? {
+        guard let currentIndex else { return nil }
+        entries.remove(at: currentIndex)
+        guard !entries.isEmpty else {
+            self.currentIndex = nil
+            return nil
+        }
+        let newIndex = currentIndex > 0 ? currentIndex - 1 : 0
+        self.currentIndex = newIndex
+        return entries[newIndex]
+    }
+
     mutating func clear() {
         entries.removeAll()
         currentIndex = nil
@@ -714,7 +728,11 @@ struct VaultWorkspaceView: View {
             isNew: entry.isNew,
             fileWatcher: fileWatcher,
             onDelete: {
-                handleWorkspaceIntent(.clearSelection)
+                if let entry = splitNoteHistory.removeCurrent() {
+                    selectSplitHistoryEntry(entry)
+                } else {
+                    handleWorkspaceIntent(.clearSelection)
+                }
             },
             onOpenTodayNote: {
                 handleWorkspaceIntent(.openToday)
@@ -736,7 +754,6 @@ struct VaultWorkspaceView: View {
             externallyDeletingNoteID: $externallyDeletingNoteID,
             chromeMode: splitEditorChromeMode
         )
-        .id(entry.note.id)
     }
 
     private var splitEditorChromeMode: EditorChromeMode {
@@ -1072,6 +1089,12 @@ struct DirectoryContentListView: View {
             store.loadItemsInBackground()
         }
         .onChange(of: fileWatcher?.changeCount) { _, _ in
+            guard let watcher = fileWatcher else { return }
+            let storeDir = store.directoryURL.standardizedFileURL
+            if let changedURL = watcher.lastChangedFileURL,
+               changedURL.deletingLastPathComponent().standardizedFileURL != storeDir {
+                return
+            }
             store.loadItemsInBackground()
         }
         .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { notification in
@@ -1082,7 +1105,7 @@ struct DirectoryContentListView: View {
             store.loadItemsInBackground()
         }
         .overlay {
-            if store.isLoadingItems {
+            if store.isLoadingItems && store.items.isEmpty {
                 ProgressView()
                     .allowsHitTesting(false)
             } else if store.items.isEmpty {
@@ -1332,7 +1355,7 @@ struct FolderContentView: View {
 }
 #endif
 
-// MARK: - Shared iOS Bottom Toolbar
+// MARK: - Shared App Bottom Toolbar
 
 #if os(iOS)
 enum NotoAppBottomToolbarKeyboardVisibility {
@@ -1351,19 +1374,21 @@ enum NotoAppBottomToolbarKeyboardVisibility {
         return visibleFrame.height > minimumVisibleHeight
     }
 }
+#endif
 
 private struct NotoAppBottomToolbarModifier: ViewModifier {
     var onOpenTodayNote: (() -> Void)?
     var onSearch: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
+    var isSidebarVisible: Bool = false
     @State private var isSoftwareKeyboardVisible = false
 
     func body(content: Content) -> some View {
         if !showsToolbar {
             content
         } else {
-            content.overlay(alignment: .bottom) {
-                if !isSoftwareKeyboardVisible {
+            let overlaid = content.overlay(alignment: .bottom) {
+                if !isSoftwareKeyboardVisible && !isSidebarVisible {
                     HStack {
                         Spacer(minLength: 0)
                         NotoAppBottomToolbar(
@@ -1375,14 +1400,20 @@ private struct NotoAppBottomToolbarModifier: ViewModifier {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.bottom, 8)
+                    .transition(.opacity)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
-                updateKeyboardVisibility(from: notification)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
-                updateKeyboardVisibility(from: notification)
-            }
+            #if os(iOS)
+            overlaid
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+                    updateKeyboardVisibility(from: notification)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
+                    updateKeyboardVisibility(from: notification)
+                }
+            #else
+            overlaid
+            #endif
         }
     }
 
@@ -1390,6 +1421,7 @@ private struct NotoAppBottomToolbarModifier: ViewModifier {
         onOpenTodayNote != nil || onSearch != nil || onCreateRootNote != nil
     }
 
+    #if os(iOS)
     private func updateKeyboardVisibility(from notification: Notification) {
         let frameInScreen = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
         let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
@@ -1402,6 +1434,7 @@ private struct NotoAppBottomToolbarModifier: ViewModifier {
             isSoftwareKeyboardVisible = isVisible
         }
     }
+    #endif
 }
 
 private struct NotoAppBottomToolbar: View {
@@ -1459,16 +1492,17 @@ extension View {
     func notoAppBottomToolbar(
         onOpenTodayNote: (() -> Void)?,
         onSearch: (() -> Void)?,
-        onCreateRootNote: (() -> Void)?
+        onCreateRootNote: (() -> Void)?,
+        isSidebarVisible: Bool = false
     ) -> some View {
         modifier(NotoAppBottomToolbarModifier(
             onOpenTodayNote: onOpenTodayNote,
             onSearch: onSearch,
-            onCreateRootNote: onCreateRootNote
+            onCreateRootNote: onCreateRootNote,
+            isSidebarVisible: isSidebarVisible
         ))
     }
 }
-#endif
 
 // MARK: - Note Search Sheet
 
@@ -1558,6 +1592,7 @@ struct NoteSearchSheet: View {
     @State private var query = ""
     @State private var scope: SearchScope = .titleAndContent
     @State private var results: [NoteSearchResult] = []
+    @State private var recentNotes: [NoteSearchResult] = []
     @State private var isPreparingIndex = false
     @State private var isSearching = false
     @State private var didFail = false
@@ -1610,6 +1645,7 @@ struct NoteSearchSheet: View {
         .accessibilityIdentifier("note_search_sheet")
         .task {
             isSearchFocused = true
+            loadRecentNotes()
             await prepareIndex()
         }
         .onChange(of: query) { _, _ in
@@ -1678,6 +1714,7 @@ struct NoteSearchSheet: View {
         }
         .task {
             isSearchFocused = true
+            loadRecentNotes()
             await prepareIndex()
         }
         .onChange(of: query) { _, _ in
@@ -1818,12 +1855,28 @@ struct NoteSearchSheet: View {
             .padding(.vertical, 12)
             #endif
 
+            let showingRecent = trimmedQuery.isEmpty
+            let displayResults = showingRecent ? recentNotes : results
+
             ScrollViewReader { proxy in
                 Group {
                 #if os(macOS)
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
+                        if showingRecent && !recentNotes.isEmpty {
+                            HStack {
+                                Text("Last edited")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(AppTheme.secondaryText)
+                                    .textCase(.uppercase)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.top, 10)
+                            .padding(.bottom, 4)
+                        }
+                        ForEach(Array(displayResults.enumerated()), id: \.element.id) { index, result in
                             Button {
                                 onSelect(result)
                                 closeSearch()
@@ -1851,24 +1904,46 @@ struct NoteSearchSheet: View {
                 .tint(AppTheme.primaryText)
                 .accessibilityIdentifier("note_search_results_list")
                 .onChange(of: selectedResultIndex) { _, selectedResultIndex in
-                    guard let selectedResultIndex, results.indices.contains(selectedResultIndex) else { return }
+                    guard let selectedResultIndex, displayResults.indices.contains(selectedResultIndex) else { return }
                     withAnimation(.easeOut(duration: 0.12)) {
-                        proxy.scrollTo(results[selectedResultIndex].id, anchor: .center)
+                        proxy.scrollTo(displayResults[selectedResultIndex].id, anchor: .center)
                     }
                 }
                 #else
                 List {
-                    ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
-                        Button {
-                            onSelect(result)
-                            closeSearch()
-                        } label: {
-                            NoteSearchResultRow(result: result)
+                    if showingRecent && !recentNotes.isEmpty {
+                        Section {
+                            ForEach(Array(recentNotes.enumerated()), id: \.element.id) { index, result in
+                                Button {
+                                    onSelect(result)
+                                    closeSearch()
+                                } label: {
+                                    NoteSearchResultRow(result: result)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("note_search_result_\(index)")
+                                .accessibilityLabel(result.title)
+                                .listRowBackground(AppTheme.background)
+                            }
+                        } header: {
+                            Text("Last edited")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(AppTheme.secondaryText)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("note_search_result_\(index)")
-                        .accessibilityLabel(result.title)
-                        .listRowBackground(AppTheme.background)
+                    } else {
+                        ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
+                            Button {
+                                onSelect(result)
+                                closeSearch()
+                            } label: {
+                                NoteSearchResultRow(result: result)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("note_search_result_\(index)")
+                            .accessibilityLabel(result.title)
+                            .listRowBackground(AppTheme.background)
+                        }
                     }
                 }
                 .listStyle(.plain)
@@ -1880,19 +1955,19 @@ struct NoteSearchSheet: View {
                 #endif
                 }
                 .overlay {
-                    if isPreparingIndex && results.isEmpty {
+                    if isPreparingIndex && showingRecent && recentNotes.isEmpty {
                         searchProgressIndicator(
                             title: "Indexing notes",
                             message: "Checking this vault for new, edited, moved, or deleted notes.",
                             accessibilityIdentifier: "note_search_indexing_indicator"
                         )
-                    } else if isSearching && results.isEmpty {
+                    } else if isSearching && results.isEmpty && !showingRecent {
                         searchProgressIndicator(
                             title: "Searching notes",
                             message: "Looking through the search index.",
                             accessibilityIdentifier: "note_search_loading_indicator"
                         )
-                    } else if results.isEmpty {
+                    } else if displayResults.isEmpty {
                         ContentUnavailableView(
                             emptyTitle,
                             systemImage: "magnifyingglass",
@@ -2032,7 +2107,7 @@ struct NoteSearchSheet: View {
             results = []
             isSearching = false
             #if os(macOS)
-            selectedResultIndex = nil
+            selectedResultIndex = recentNotes.isEmpty ? nil : 0
             #endif
             #if DEBUG
             updateDebug(path: "Idle", ["query empty"])
@@ -2087,6 +2162,106 @@ struct NoteSearchSheet: View {
         }
     }
 
+    private func loadRecentNotes() {
+        let rootURL = rootStore.vaultRootURL
+        let directoryLoader = rootStore.directoryLoader
+        Task {
+            let resolved = await Task.detached(priority: .userInitiated) {
+                let entries = Self.recentVaultNoteEntries(rootURL: rootURL, limit: 10)
+                let repository = NoteRepository(directoryURL: rootURL, vaultRootURL: rootURL)
+                return entries.map { entry -> (entry: RecentNoteEntry, record: VaultNoteRecord?) in
+                    (entry, repository.note(atVaultRelativePath: entry.relativePath))
+                }
+            }.value
+
+            recentNotes = resolved.map { resolvedEntry in
+                let entry = resolvedEntry.entry
+                let note: MarkdownNote
+                if let record = resolvedEntry.record {
+                    note = MarkdownNote(record: record)
+                } else {
+                    note = MarkdownNote(
+                        id: VaultDirectoryLoader.stableID(for: entry.fileURL),
+                        fileURL: entry.fileURL,
+                        title: entry.rawTitle,
+                        modifiedDate: entry.modifiedDate
+                    )
+                }
+                let store = MarkdownNoteStore(
+                    directoryURL: entry.fileURL.deletingLastPathComponent(),
+                    vaultRootURL: rootURL,
+                    autoload: false,
+                    directoryLoader: directoryLoader
+                )
+                return NoteSearchResult(
+                    id: "recent-\(note.id.uuidString)",
+                    note: note,
+                    store: store,
+                    relativePath: entry.relativePath,
+                    title: note.title.isEmpty ? entry.rawTitle : note.title,
+                    breadcrumb: entry.folderPath,
+                    snippet: "",
+                    kind: .note
+                )
+            }
+            #if os(macOS)
+            if trimmedQuery.isEmpty {
+                selectedResultIndex = recentNotes.isEmpty ? nil : 0
+            }
+            #endif
+        }
+    }
+
+    private struct RecentNoteEntry {
+        let relativePath: String
+        let rawTitle: String
+        let folderPath: String
+        let fileURL: URL
+        let modifiedDate: Date
+    }
+
+    nonisolated private static func recentVaultNoteEntries(rootURL: URL, limit: Int) -> [RecentNoteEntry] {
+        let standardRoot = rootURL.standardizedFileURL
+        guard let enumerator = FileManager.default.enumerator(
+            at: standardRoot,
+            includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var entries: [RecentNoteEntry] = []
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension.lowercased() == "md",
+                  let values = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .isDirectoryKey]),
+                  values.isDirectory != true,
+                  let modifiedDate = values.contentModificationDate else { continue }
+
+            let standardFile = fileURL.standardizedFileURL
+            let rootPath = standardRoot.path
+            let filePath = standardFile.path
+            let relativePath: String
+            if filePath.hasPrefix(rootPath + "/") {
+                relativePath = String(filePath.dropFirst(rootPath.count + 1))
+            } else {
+                relativePath = filePath
+            }
+            let rawTitle = fileURL.deletingPathExtension().lastPathComponent
+            let parentRelative = (relativePath as NSString).deletingLastPathComponent
+            let folderPath = parentRelative == "." ? "" : parentRelative
+            entries.append(RecentNoteEntry(
+                relativePath: relativePath,
+                rawTitle: rawTitle,
+                folderPath: folderPath,
+                fileURL: standardFile,
+                modifiedDate: modifiedDate
+            ))
+        }
+
+        return entries
+            .sorted { $0.modifiedDate > $1.modifiedDate }
+            .prefix(limit)
+            .map { $0 }
+    }
+
     private func handleSearchIndexDidChange(_ notification: Notification) {
         guard let vaultPath = notification.userInfo?["vaultPath"] as? String,
               vaultPath == rootStore.vaultRootURL.standardizedFileURL.path else {
@@ -2097,6 +2272,7 @@ struct NoteSearchSheet: View {
         updateDebug(path: debugPath, ["index changed for current vault"])
         #endif
         scheduleSearch()
+        loadRecentNotes()
     }
 
     nonisolated private static func searchNotes(query: String, scope: SearchScope, rootURL: URL) throws -> NoteSearchExecutionResult {
@@ -2222,14 +2398,20 @@ struct NoteSearchSheet: View {
 
     private func appResult(for result: SearchResult, rootStore: MarkdownNoteStore) -> NoteSearchResult {
         let relativePath = rootStore.vaultRelativePath(for: result.fileURL) ?? result.fileURL.lastPathComponent
-        let resolved = rootStore.note(atVaultRelativePath: relativePath)
-        let note = resolved?.note ?? MarkdownNote(
+        let noteTitle: String
+        switch result.kind {
+        case .note:
+            noteTitle = result.title
+        case .section:
+            noteTitle = result.fileURL.deletingPathExtension().lastPathComponent
+        }
+        let note = MarkdownNote(
             id: result.noteID,
             fileURL: result.fileURL,
-            title: result.fileURL.deletingPathExtension().lastPathComponent,
+            title: noteTitle,
             modifiedDate: result.updatedAt ?? Date()
         )
-        let store = resolved?.store ?? MarkdownNoteStore(
+        let store = MarkdownNoteStore(
             directoryURL: result.fileURL.deletingLastPathComponent(),
             vaultRootURL: rootStore.vaultRootURL,
             autoload: false,
@@ -2250,19 +2432,21 @@ struct NoteSearchSheet: View {
 
     #if os(macOS)
     private func moveSelection(_ direction: SearchResultSelectionDirection) {
-        guard !results.isEmpty else { return }
-        let currentIndex = selectedResultIndex ?? 0
+        let displayResults = trimmedQuery.isEmpty ? recentNotes : results
+        guard !displayResults.isEmpty else { return }
+        let currentIndex = selectedResultIndex ?? -1
         switch direction {
         case .up:
             selectedResultIndex = max(0, currentIndex - 1)
         case .down:
-            selectedResultIndex = min(results.count - 1, currentIndex + 1)
+            selectedResultIndex = min(displayResults.count - 1, currentIndex + 1)
         }
     }
 
     private func openSelectedResult() {
-        guard let selectedResultIndex, results.indices.contains(selectedResultIndex) else { return }
-        onSelect(results[selectedResultIndex])
+        let displayResults = trimmedQuery.isEmpty ? recentNotes : results
+        guard let selectedResultIndex, displayResults.indices.contains(selectedResultIndex) else { return }
+        onSelect(displayResults[selectedResultIndex])
         closeSearch()
     }
     #endif

@@ -151,7 +151,7 @@ struct NoteEditorScreen: View {
             onSearchRequested: showFind
         ))
         #endif
-        .task {
+        .task(id: note.id) {
             guard !session.hasLoaded else { return }
             await session.loadNoteContent()
         }
@@ -174,7 +174,11 @@ struct NoteEditorScreen: View {
             onNoteUpdated?(updatedNote)
         }
         .onChange(of: note) { _, updatedNote in
-            session.replaceNoteFromParent(updatedNote)
+            if updatedNote.id == session.note.id {
+                session.replaceNoteFromParent(updatedNote)
+            } else {
+                session.switchTo(note: updatedNote, store: store, isNew: isNew)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { notification in
             guard let snapshot = notification.object as? NoteSyncSnapshot else { return }
@@ -185,6 +189,12 @@ struct NoteEditorScreen: View {
             guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
             #endif
             showFind()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NoteEditorCommands.showMoveNote)) { notification in
+            #if os(macOS)
+            guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
+            #endif
+            showMoveSheet = true
         }
         .confirmationDialog("Delete this note?", isPresented: $showDeleteConfirmation) {
             Button("Delete Note", role: .destructive) {

@@ -6,9 +6,9 @@ private let sessionLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "c
 @MainActor
 @Observable
 final class NoteEditorSession {
-    let store: MarkdownNoteStore
+    var store: MarkdownNoteStore
     let vaultController: VaultController
-    let isNew: Bool
+    var isNew: Bool
 
     var note: MarkdownNote
     var content: String = ""
@@ -42,6 +42,51 @@ final class NoteEditorSession {
         )
         self.note = note
         self.isNew = isNew
+        if let cached = NoteContentCache.get(note.id) {
+            self.content = cached
+            self.latestEditorText = cached
+            self.lastPersistedText = cached
+            self.hasLoaded = true
+        }
+    }
+
+    /// Reuses this session for a different note without tearing down the view.
+    /// Persists pending edits for the outgoing note, then loads cached content
+    /// for the incoming note (or marks it unloaded if no cache hit).
+    func switchTo(note newNote: MarkdownNote, store newStore: MarkdownNoteStore, isNew newIsNew: Bool) {
+        guard newNote.id != note.id else {
+            store = newStore
+            isNew = newIsNew
+            return
+        }
+        persistFinalSnapshotIfNeeded(isExternallyDeleting: false)
+        renameTask?.cancel()
+        autosaveTask?.cancel()
+        renameTask = nil
+        autosaveTask = nil
+
+        NoteContentCache.set(note.id, content: latestEditorText)
+
+        store = newStore
+        isNew = newIsNew
+        note = newNote
+
+        if let cached = NoteContentCache.get(newNote.id) {
+            content = cached
+            latestEditorText = cached
+            lastPersistedText = cached
+            hasLoaded = true
+        } else {
+            content = ""
+            latestEditorText = ""
+            lastPersistedText = ""
+            hasLoaded = false
+        }
+        hasPendingLocalEdits = false
+        downloadFailed = false
+        isDownloading = false
+        pendingRemoteSnapshot = nil
+        isDeleting = false
     }
 
     func loadNoteContent() async {
@@ -179,7 +224,11 @@ final class NoteEditorSession {
     }
 
     func deleteCurrentNote() -> Bool {
-        vaultController.delete(note, in: store)
+        let deleted = vaultController.delete(note, in: store)
+        if deleted {
+            NoteContentCache.invalidate(note.id)
+        }
+        return deleted
     }
 
     func replaceNoteFromParent(_ updatedNote: MarkdownNote) {
@@ -227,6 +276,7 @@ final class NoteEditorSession {
         lastPersistedText = text
         hasPendingLocalEdits = false
         note = vaultController.updateMetadataFromContent(text, for: note, in: store)
+        NoteContentCache.set(note.id, content: text)
     }
 
     private func applyEditorText(_ newText: String, scheduleRename shouldScheduleRename: Bool) {
@@ -235,6 +285,7 @@ final class NoteEditorSession {
         hasPendingLocalEdits = true
         DebugTrace.record("editor apply text note=\(note.fileURL.lastPathComponent) scheduleRename=\(shouldScheduleRename)")
         note = vaultController.updateMetadataFromContent(newText, for: note, in: store)
+        NoteContentCache.set(note.id, content: newText)
         scheduleAutosave()
         if shouldScheduleRename, note.title != previousTitle {
             scheduleRename()
@@ -247,6 +298,7 @@ final class NoteEditorSession {
         let saveResult = vaultController.save(text, for: note, in: store)
         content = text
         note = saveResult.note
+        NoteContentCache.set(note.id, content: text)
         if saveResult.didWrite {
             lastPersistedText = text
             hasPendingLocalEdits = false

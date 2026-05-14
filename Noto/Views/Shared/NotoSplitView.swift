@@ -46,6 +46,11 @@ struct NotoSplitView<SidebarContent: View, DetailContent: View, IOSDetailRoot: V
             } detail: {
                 detail(toggleSidebar)
                     .notoBackgroundExtension()
+                    .notoAppBottomToolbar(
+                        onOpenTodayNote: onOpenTodayNote,
+                        onSearch: { isSearchPresented.toggle() },
+                        onCreateRootNote: onCreateRootNote
+                    )
             }
             .navigationSplitViewStyle(.prominentDetail)
             .navigationTitle("Noto")
@@ -107,15 +112,16 @@ struct NotoSplitView<SidebarContent: View, DetailContent: View, IOSDetailRoot: V
                     }
             }
             .background(AppTheme.background)
+            .notoAppBottomToolbar(
+                onOpenTodayNote: onOpenTodayNote,
+                onSearch: { isSearchPresented.toggle() },
+                onCreateRootNote: onCreateRootNote,
+                isSidebarVisible: isSidebarVisible
+            )
         }
         .navigationSplitViewStyle(.prominentDetail)
         .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .notoAppBottomToolbar(
-            onOpenTodayNote: onOpenTodayNote,
-            onSearch: { isSearchPresented.toggle() },
-            onCreateRootNote: onCreateRootNote
-        )
         .sheet(isPresented: $isSearchPresented) {
             NavigationStack {
                 NoteSearchSheet(rootStore: store) { result in

@@ -116,6 +116,18 @@ struct NotoSidebarView: View {
 
                 Spacer(minLength: 0)
 
+                #if os(iOS)
+                Button {
+                    onIntent(.openSettings)
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .labelStyle(.iconOnly)
+                .accessibilityIdentifier("sidebar_settings_button")
+                .accessibilityLabel("Settings")
+                .help("Settings")
+                #endif
+
                 Button {
                     onIntent(.openSearch)
                 } label: {

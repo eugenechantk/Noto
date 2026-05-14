@@ -103,11 +103,20 @@ private final class WindowHeightReaderView: NSView {
 #endif
 
 private struct NotoCommands: Commands {
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
+
     var body: some Commands {
         CommandMenu("Noto") {
             #if os(macOS)
             Button("New Note") {
                 NotificationCenter.default.post(name: NotoAppCommands.createNote, object: NotoCommandTarget.activeWindow)
+            }
+            .keyboardShortcut("n", modifiers: [.command])
+
+            Button("New Window") {
+                openWindow(id: "main", value: UUID().uuidString)
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
             #endif
@@ -125,6 +134,11 @@ private struct NotoCommands: Commands {
                 NoteEditorCommands.requestShowFind()
             }
             .keyboardShortcut("f", modifiers: [.command])
+
+            Button("Move Note") {
+                NoteEditorCommands.requestShowMoveNote()
+            }
+            .keyboardShortcut("m", modifiers: [.command, .shift])
 
             #if os(macOS)
             Button("Toggle Sidebar") {

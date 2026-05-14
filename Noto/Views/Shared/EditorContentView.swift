@@ -31,10 +31,12 @@ struct EditorContentView: View {
                 )
             } else if session.isDownloading {
                 downloadingView
-            } else if !session.hasLoaded {
-                loadingView
             } else {
                 editorBody
+                    .overlay {
+                        DelayedLoadingPlaceholder(session: session)
+                            .id(session.note.id)
+                    }
             }
         }
         .background(AppTheme.background)
@@ -48,17 +50,6 @@ struct EditorContentView: View {
         VStack(spacing: 12) {
             ProgressView()
             Text("Downloading from iCloud...")
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.secondaryText)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppTheme.background)
-    }
-
-    private var loadingView: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-            Text("Loading note...")
                 .font(.subheadline)
                 .foregroundStyle(AppTheme.secondaryText)
         }
@@ -208,6 +199,32 @@ private struct RemoteUpdateBanner: View {
             Rectangle()
                 .fill(AppTheme.separator)
                 .frame(height: 1)
+        }
+    }
+}
+
+private struct DelayedLoadingPlaceholder: View {
+    @Bindable var session: NoteEditorSession
+    @State private var isVisible = false
+
+    var body: some View {
+        Group {
+            if isVisible && !session.hasLoaded {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Loading note...")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.secondaryText)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppTheme.background)
+            }
+        }
+        .task {
+            guard !session.hasLoaded else { return }
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, !session.hasLoaded else { return }
+            isVisible = true
         }
     }
 }

@@ -25,10 +25,19 @@ final class VaultController {
     ) {
         self.vaultURL = vaultURL
         self.directoryLoader = directoryLoader
+        // Defer the vault scan off the main thread. The rootStore is only read
+        // on user-initiated actions (hyperlinks, breadcrumbs, today, search),
+        // so a synchronous load here would block first window paint when an
+        // editor session is constructed during window restoration. On an
+        // iCloud-backed vault the synchronous scan can stall 10s+ on cold
+        // metadata; loadItemsInBackground runs the enumeration on a detached
+        // userInitiated task instead.
         self.rootStore = MarkdownNoteStore(
             vaultURL: vaultURL,
+            autoload: false,
             directoryLoader: directoryLoader
         )
+        self.rootStore.loadItemsInBackground()
     }
 
     func loadRoot() {
