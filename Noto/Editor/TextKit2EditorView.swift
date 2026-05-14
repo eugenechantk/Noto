@@ -160,9 +160,8 @@ enum MarkdownImageLinkParser {
     private static let linkRegex = try! NSRegularExpression(
         pattern: #"^\s*(!)?\[([^\]]*)\]\(([^)\s]+)\)\s*$"#
     )
-    private static let imageURLHints = [
+    private static let imageURLExtensions = [
         ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".heic", ".heif", ".tiff", ".bmp",
-        "substackcdn.com/image/fetch",
     ]
 
     static func parse(from text: String) -> MarkdownImageLink? {
@@ -188,9 +187,12 @@ enum MarkdownImageLinkParser {
 
         // Fallback: any `[anything](url)` whose url looks like an image — handles
         // nested patterns like `[![](thumb-url)](full-url)` where the outer link
-        // target is the rendered image.
+        // target is the rendered image. Require URL to actually construct as a
+        // schemed URL so unrenderable links fall back to text rather than
+        // showing as gray image-block placeholders.
         if let (altText, urlString) = extractBalancedLinkParts(from: trimmed),
-           looksLikeImageURL(urlString) {
+           looksLikeImageURL(urlString),
+           URL(string: urlString)?.scheme != nil {
             return MarkdownImageLink(urlString: urlString, altText: altText)
         }
 
@@ -260,7 +262,10 @@ enum MarkdownImageLinkParser {
 
     static func looksLikeImageURL(_ urlString: String) -> Bool {
         let decoded = (urlString.removingPercentEncoding ?? urlString).lowercased()
-        return imageURLHints.contains { decoded.contains($0) }
+        // Strip fragment then query — only the path determines the format
+        let withoutFragment = decoded.split(separator: "#", maxSplits: 1).first.map(String.init) ?? decoded
+        let pathPortion = withoutFragment.split(separator: "?", maxSplits: 1).first.map(String.init) ?? withoutFragment
+        return imageURLExtensions.contains { pathPortion.hasSuffix($0) }
     }
 }
 
