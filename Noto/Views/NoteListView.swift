@@ -1077,7 +1077,7 @@ struct DirectoryContentListView: View {
             }
             .onDelete(perform: deleteItems)
             .listRowBackground(rowBackground)
-            .listRowInsets(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
+            .listRowInsets(rowInsets)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -1183,6 +1183,15 @@ struct DirectoryContentListView: View {
             AppTheme.background
         case .sidebar:
             Color.clear
+        }
+    }
+
+    private var rowInsets: EdgeInsets {
+        switch presentation {
+        case .content:
+            return EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+        case .sidebar:
+            return EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6)
         }
     }
 
@@ -2670,7 +2679,7 @@ struct FolderRow: View {
                     .foregroundStyle(AppTheme.secondaryText)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
     }
@@ -2700,7 +2709,7 @@ struct MarkdownNoteRow: View {
                     .foregroundStyle(AppTheme.secondaryText)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
     }
