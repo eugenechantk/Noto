@@ -46,11 +46,6 @@ struct NotoSplitView<SidebarContent: View, DetailContent: View, IOSDetailRoot: V
             } detail: {
                 detail(toggleSidebar)
                     .notoBackgroundExtension()
-                    .notoAppBottomToolbar(
-                        onOpenTodayNote: onOpenTodayNote,
-                        onSearch: { isSearchPresented.toggle() },
-                        onCreateRootNote: onCreateRootNote
-                    )
             }
             .navigationSplitViewStyle(.prominentDetail)
             .navigationTitle("Noto")
