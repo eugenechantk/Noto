@@ -2816,6 +2816,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private let verticalTextInset: CGFloat = 16
     private let markdownDelegate = MarkdownTextDelegate()
     private var prewarmLayoutTask: Task<Void, Never>?
+    private var findRefreshTask: Task<Void, Never>?
     private var todoMarkerButtons: [Int: TodoMarkerButton] = [:]
     private var pendingText: String?
     private var pendingTextPreservesVisiblePosition = false
@@ -3785,10 +3786,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         let didChangeQuery = normalizedQuery != findQuery
         if didChangeQuery {
             findQuery = normalizedQuery
-            refreshFindMatches(
-                preferredLocation: textView?.selectedRange.location ?? 0,
-                scrollToSelection: !normalizedQuery.isEmpty
-            )
+            scheduleFindRefresh(scrollToSelection: !normalizedQuery.isEmpty)
         } else if isViewLoaded, textView != nil {
             publishFindStatusIfNeeded()
         }
@@ -3799,7 +3797,53 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         }
 
         lastFindNavigationRequestID = navigationRequest.id
+        // Pressing next/prev should act on the latest query — flush pending debounce.
+        flushPendingFindRefresh()
         navigateFind(to: navigationRequest.direction)
+    }
+
+    private func scheduleFindRefresh(scrollToSelection: Bool) {
+        findRefreshTask?.cancel()
+
+        let delayMs = findRefreshDebounceMilliseconds(for: findQuery)
+        if delayMs == 0 {
+            refreshFindMatches(
+                preferredLocation: textView?.selectedRange.location ?? 0,
+                scrollToSelection: scrollToSelection
+            )
+            return
+        }
+
+        let capturedQuery = findQuery
+        findRefreshTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(delayMs))
+            guard !Task.isCancelled, let self else { return }
+            guard self.findQuery == capturedQuery else { return }
+            self.refreshFindMatches(
+                preferredLocation: self.textView?.selectedRange.location ?? 0,
+                scrollToSelection: scrollToSelection
+            )
+        }
+    }
+
+    private func flushPendingFindRefresh() {
+        guard findRefreshTask != nil else { return }
+        findRefreshTask?.cancel()
+        findRefreshTask = nil
+        refreshFindMatches(
+            preferredLocation: textView?.selectedRange.location ?? 0,
+            scrollToSelection: false
+        )
+    }
+
+    private func findRefreshDebounceMilliseconds(for query: String) -> Int {
+        // Short queries match almost everything in a long doc — wait longer
+        // so we don't spend each keystroke building a massive matches array.
+        let length = query.count
+        if length == 0 { return 0 }
+        if length <= 2 { return 400 }
+        if length == 3 { return 200 }
+        return 100
     }
 
     private func refreshFindMatches(preferredLocation: Int, scrollToSelection: Bool) {
@@ -6057,6 +6101,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
     private var prewarmLayoutTask: Task<Void, Never>?
+    private var findRefreshTask: Task<Void, Never>?
     private var pendingText: String?
     private var pageMentionSuggestionView: NSStackView?
     private var pageMentionSuggestionDocuments: [PageMentionDocument] = []
@@ -6379,10 +6424,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         let didChangeQuery = normalizedQuery != findQuery
         if didChangeQuery {
             findQuery = normalizedQuery
-            refreshFindMatches(
-                preferredLocation: textView?.selectedRange().location ?? 0,
-                scrollToSelection: !normalizedQuery.isEmpty
-            )
+            scheduleFindRefresh(scrollToSelection: !normalizedQuery.isEmpty)
         } else if isViewLoaded, textView != nil {
             publishFindStatusIfNeeded()
         }
@@ -6393,7 +6435,50 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
 
         lastFindNavigationRequestID = navigationRequest.id
+        flushPendingFindRefresh()
         navigateFind(to: navigationRequest.direction)
+    }
+
+    private func scheduleFindRefresh(scrollToSelection: Bool) {
+        findRefreshTask?.cancel()
+
+        let delayMs = findRefreshDebounceMilliseconds(for: findQuery)
+        if delayMs == 0 {
+            refreshFindMatches(
+                preferredLocation: textView?.selectedRange().location ?? 0,
+                scrollToSelection: scrollToSelection
+            )
+            return
+        }
+
+        let capturedQuery = findQuery
+        findRefreshTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(delayMs))
+            guard !Task.isCancelled, let self else { return }
+            guard self.findQuery == capturedQuery else { return }
+            self.refreshFindMatches(
+                preferredLocation: self.textView?.selectedRange().location ?? 0,
+                scrollToSelection: scrollToSelection
+            )
+        }
+    }
+
+    private func flushPendingFindRefresh() {
+        guard findRefreshTask != nil else { return }
+        findRefreshTask?.cancel()
+        findRefreshTask = nil
+        refreshFindMatches(
+            preferredLocation: textView?.selectedRange().location ?? 0,
+            scrollToSelection: false
+        )
+    }
+
+    private func findRefreshDebounceMilliseconds(for query: String) -> Int {
+        let length = query.count
+        if length == 0 { return 0 }
+        if length <= 2 { return 400 }
+        if length == 3 { return 200 }
+        return 100
     }
 
     private func refreshFindMatches(preferredLocation: Int, scrollToSelection: Bool) {
