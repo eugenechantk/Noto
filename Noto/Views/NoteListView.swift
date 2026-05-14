@@ -1077,7 +1077,7 @@ struct DirectoryContentListView: View {
             }
             .onDelete(perform: deleteItems)
             .listRowBackground(rowBackground)
-            .listRowInsets(EdgeInsets(top: 1, leading: 4, bottom: 1, trailing: 4))
+            .listRowInsets(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -1252,12 +1252,12 @@ private struct SidebarDirectoryRow: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
+        .padding(.vertical, 9)
+        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .background {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(isSelected ? AppTheme.selectedRowBackground : Color.clear)
         }
     }
