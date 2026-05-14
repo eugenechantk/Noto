@@ -1733,6 +1733,16 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
     var vaultRootURL: URL?
     var requestImageLoad: ((URL) -> Void)?
 
+    private let styledParagraphCache: NSCache<NSString, NSAttributedString> = {
+        let cache = NSCache<NSString, NSAttributedString>()
+        cache.countLimit = 2000
+        return cache
+    }()
+
+    func invalidateStyledParagraphCache() {
+        styledParagraphCache.removeAllObjects()
+    }
+
     func textContentStorage(
         _ textContentStorage: NSTextContentStorage,
         textParagraphWith range: NSRange
@@ -1755,14 +1765,25 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
             kind = MarkdownBlockKind.detect(from: text, vaultRootURL: vaultRootURL)
         }
 
-        // Style the visible text
-        let styled = MarkdownParagraphStyler.style(
-            text: text,
-            kind: kind,
-            paragraphLocation: range.location,
-            revealedHyperlinkRanges: revealedHyperlinkRanges,
-            revealedDividerRanges: revealedDividerRanges
-        )
+        // Position-dependent styling (hyperlinks, dividers, images) bypasses the cache
+        // because the styler's output for the same text varies by paragraphLocation.
+        let cacheKey = paragraphCacheKey(text: text, kind: kind, range: range)
+
+        let styled: NSAttributedString
+        if let cacheKey, let cached = styledParagraphCache.object(forKey: cacheKey) {
+            styled = cached
+        } else {
+            styled = MarkdownParagraphStyler.style(
+                text: text,
+                kind: kind,
+                paragraphLocation: range.location,
+                revealedHyperlinkRanges: revealedHyperlinkRanges,
+                revealedDividerRanges: revealedDividerRanges
+            )
+            if let cacheKey {
+                styledParagraphCache.setObject(styled, forKey: cacheKey)
+            }
+        }
 
         // Re-append the trailing newline so the paragraph's character count
         // matches the backing-store range that TextKit expects.
@@ -1775,6 +1796,34 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
         }
 
         return MarkdownParagraph(attributedString: result, blockKind: kind)
+    }
+
+    private func paragraphCacheKey(text: String, kind: MarkdownBlockKind, range: NSRange) -> NSString? {
+        if case .imageLink = kind {
+            return nil
+        }
+        if revealedHyperlinkRanges.contains(where: { NSIntersectionRange($0, range).length > 0 }) {
+            return nil
+        }
+        if revealedDividerRanges.contains(where: { NSIntersectionRange($0, range).length > 0 }) {
+            return nil
+        }
+        return "\(kindCacheToken(kind))|\(text)" as NSString
+    }
+
+    private func kindCacheToken(_ kind: MarkdownBlockKind) -> String {
+        switch kind {
+        case .paragraph: return "p"
+        case .heading(let level): return "h\(level)"
+        case .todo(let checked, let indent): return "t\(checked ? 1 : 0)-\(indent)"
+        case .bullet(let indent): return "b\(indent)"
+        case .orderedList(let number, let indent): return "o\(number)-\(indent)"
+        case .frontmatter: return "f"
+        case .imageLink: return "i"
+        case .divider: return "d"
+        case .xmlTag: return "x"
+        case .collapsedXMLTagContent: return "c"
+        }
     }
 
     private func newlineAttributes(for kind: MarkdownBlockKind, text: String) -> [NSAttributedString.Key: Any] {
@@ -2685,6 +2734,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private let maximumTextWidth: CGFloat = 600
     private let verticalTextInset: CGFloat = 16
     private let markdownDelegate = MarkdownTextDelegate()
+    private var prewarmLayoutTask: Task<Void, Never>?
     private var todoMarkerButtons: [Int: TodoMarkerButton] = [:]
     private var pendingText: String?
     private var pendingTextPreservesVisiblePosition = false
@@ -2921,6 +2971,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         isFrontmatterBlockExpanded = false
         updateFrontmatterMetadata(for: markdown)
         _ = syncReadableWidthInsets()
+        markdownDelegate.invalidateStyledParagraphCache()
         coordinator?.beginApplyingEditorText(markdown)
         textView.text = markdown
         coordinator?.finishApplyingEditorText()
@@ -2941,6 +2992,39 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         updatePageMentionSuggestions(in: markdown as NSString)
         if let contentOffsetToRestore {
             restoreContentOffset(contentOffsetToRestore)
+        }
+        schedulePrewarmLayout()
+    }
+
+    private func schedulePrewarmLayout() {
+        prewarmLayoutTask?.cancel()
+        prewarmLayoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            await self?.prewarmLayoutChunked()
+        }
+    }
+
+    private func prewarmLayoutChunked() async {
+        guard let textLayoutManager = textView?.textLayoutManager,
+              let textContentManager = textLayoutManager.textContentManager,
+              let textStorage = textView?.textStorage else { return }
+        let totalLength = textStorage.length
+        guard totalLength > 0 else { return }
+
+        let chunkSize = 4000
+        let documentStart = textContentManager.documentRange.location
+        var offset = 0
+        while offset < totalLength {
+            if Task.isCancelled { return }
+            let chunkEnd = min(offset + chunkSize, totalLength)
+            guard let startLocation = textContentManager.location(documentStart, offsetBy: offset),
+                  let endLocation = textContentManager.location(documentStart, offsetBy: chunkEnd),
+                  let chunkRange = NSTextRange(location: startLocation, end: endLocation) else {
+                break
+            }
+            textLayoutManager.ensureLayout(for: chunkRange)
+            offset = chunkEnd
+            await Task.yield()
         }
     }
 
@@ -5858,6 +5942,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private(set) var textView: NSTextView!
     private let scrollView = NSScrollView()
     private let markdownDelegate = MarkdownTextDelegate()
+    private var prewarmLayoutTask: Task<Void, Never>?
     private var pendingText: String?
     private var pageMentionSuggestionView: NSStackView?
     private var pageMentionSuggestionDocuments: [PageMentionDocument] = []
@@ -6106,6 +6191,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         isFrontmatterBlockExpanded = false
         updateFrontmatterMetadata(for: markdown)
         _ = syncTextContainerInsets()
+        markdownDelegate.invalidateStyledParagraphCache()
         coordinator?.beginApplyingEditorText(markdown)
         textView.string = markdown
         coordinator?.finishApplyingEditorText()
@@ -6122,6 +6208,39 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
         scheduleEditorOverlayRefresh()
         updatePageMentionSuggestions()
+        schedulePrewarmLayout()
+    }
+
+    private func schedulePrewarmLayout() {
+        prewarmLayoutTask?.cancel()
+        prewarmLayoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            await self?.prewarmLayoutChunked()
+        }
+    }
+
+    private func prewarmLayoutChunked() async {
+        guard let textLayoutManager = textView?.textLayoutManager,
+              let textContentManager = textLayoutManager.textContentManager,
+              let textStorage = textView?.textStorage else { return }
+        let totalLength = textStorage.length
+        guard totalLength > 0 else { return }
+
+        let chunkSize = 4000
+        let documentStart = textContentManager.documentRange.location
+        var offset = 0
+        while offset < totalLength {
+            if Task.isCancelled { return }
+            let chunkEnd = min(offset + chunkSize, totalLength)
+            guard let startLocation = textContentManager.location(documentStart, offsetBy: offset),
+                  let endLocation = textContentManager.location(documentStart, offsetBy: chunkEnd),
+                  let chunkRange = NSTextRange(location: startLocation, end: endLocation) else {
+                break
+            }
+            textLayoutManager.ensureLayout(for: chunkRange)
+            offset = chunkEnd
+            await Task.yield()
+        }
     }
 
     func updateFind(
