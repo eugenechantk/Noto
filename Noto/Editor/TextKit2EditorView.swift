@@ -171,21 +171,91 @@ enum MarkdownImageLinkParser {
 
         let nsText = trimmed as NSString
         let fullRange = NSRange(location: 0, length: nsText.length)
-        guard let match = linkRegex.firstMatch(in: trimmed, range: fullRange),
-              match.numberOfRanges >= 4 else {
-            return nil
+        if let match = linkRegex.firstMatch(in: trimmed, range: fullRange),
+           match.numberOfRanges >= 4 {
+            let hasImagePrefix = match.range(at: 1).location != NSNotFound
+            let altText = nsText.substring(with: match.range(at: 2))
+            let urlString = nsText.substring(with: match.range(at: 3))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !urlString.isEmpty {
+                let isEmptyImageLink = altText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    && looksLikeImageURL(urlString)
+                if hasImagePrefix || isEmptyImageLink {
+                    return MarkdownImageLink(urlString: urlString, altText: altText)
+                }
+            }
         }
 
-        let hasImagePrefix = match.range(at: 1).location != NSNotFound
-        let altText = nsText.substring(with: match.range(at: 2))
-        let urlString = nsText.substring(with: match.range(at: 3)).trimmingCharacters(in: .whitespacesAndNewlines)
+        // Fallback: any `[anything](url)` whose url looks like an image — handles
+        // nested patterns like `[![](thumb-url)](full-url)` where the outer link
+        // target is the rendered image.
+        if let (altText, urlString) = extractBalancedLinkParts(from: trimmed),
+           looksLikeImageURL(urlString) {
+            return MarkdownImageLink(urlString: urlString, altText: altText)
+        }
+
+        return nil
+    }
+
+    /// Extracts `[alt](url)` parts allowing balanced brackets inside `alt`.
+    /// Returns nil if the entire trimmed text is not a single link expression.
+    private static func extractBalancedLinkParts(from text: String) -> (alt: String, url: String)? {
+        guard text.hasPrefix("[") else { return nil }
+
+        var depth = 0
+        var altEnd: String.Index?
+        var idx = text.startIndex
+        while idx < text.endIndex {
+            switch text[idx] {
+            case "[": depth += 1
+            case "]":
+                depth -= 1
+                if depth == 0 {
+                    altEnd = idx
+                }
+            default: break
+            }
+            if altEnd != nil { break }
+            idx = text.index(after: idx)
+        }
+        guard let altEndIdx = altEnd else { return nil }
+
+        let afterAlt = text.index(after: altEndIdx)
+        guard afterAlt < text.endIndex, text[afterAlt] == "(" else { return nil }
+
+        var parenDepth = 0
+        var urlEnd: String.Index?
+        var i = afterAlt
+        while i < text.endIndex {
+            switch text[i] {
+            case "(": parenDepth += 1
+            case ")":
+                parenDepth -= 1
+                if parenDepth == 0 {
+                    urlEnd = i
+                }
+            default: break
+            }
+            if urlEnd != nil { break }
+            i = text.index(after: i)
+        }
+        guard let urlEndIdx = urlEnd else { return nil }
+
+        let afterURL = text.index(after: urlEndIdx)
+        if afterURL < text.endIndex {
+            let trailing = text[afterURL...]
+            guard trailing.allSatisfy(\.isWhitespace) else { return nil }
+        }
+
+        let altStart = text.index(after: text.startIndex)
+        let altText = String(text[altStart..<altEndIdx])
+
+        let urlStart = text.index(after: afterAlt)
+        let urlString = String(text[urlStart..<urlEndIdx])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !urlString.isEmpty else { return nil }
 
-        let isEmptyImageLink = altText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && looksLikeImageURL(urlString)
-        guard hasImagePrefix || isEmptyImageLink else { return nil }
-
-        return MarkdownImageLink(urlString: urlString, altText: altText)
+        return (altText, urlString)
     }
 
     static func looksLikeImageURL(_ urlString: String) -> Bool {
