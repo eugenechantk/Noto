@@ -1077,6 +1077,7 @@ struct DirectoryContentListView: View {
             }
             .onDelete(perform: deleteItems)
             .listRowBackground(rowBackground)
+            .listRowInsets(EdgeInsets(top: 1, leading: 4, bottom: 1, trailing: 4))
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
