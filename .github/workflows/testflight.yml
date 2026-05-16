@@ -50,7 +50,6 @@ jobs:
           bundler-cache: true
 
       - name: Check TestFlight configuration
-        id: preflight
         run: |
           missing=()
 
@@ -70,19 +69,11 @@ jobs:
           done
 
           if [ ${#missing[@]} -eq 0 ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           printf 'Missing TestFlight configuration: %s\n' "${missing[*]}"
-          echo "configured=false" >> "$GITHUB_OUTPUT"
-
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            exit 1
-          fi
-
-          echo "::notice::Skipping TestFlight upload because deployment secrets are not configured."
+          exit 1
 
       - name: Upload to TestFlight
-        if: steps.preflight.outputs.configured == 'true'
         run: bundle exec fastlane ios deploy_testflight

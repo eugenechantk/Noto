@@ -10,7 +10,7 @@ This repo now has a first-pass Fastlane lane and a GitHub Actions workflow for T
 - Signing: `match(type: "appstore", readonly: true)`
 - Upload: `upload_to_testflight` with App Store Connect API key auth
 
-Push runs skip the upload when deployment secrets are not configured, so normal `main` pushes stay green before TestFlight credentials exist. Manual runs fail during preflight when configuration is missing.
+Runs fail during preflight when deployment secrets are not configured. This keeps TestFlight CI honest: a green run means the upload lane actually had the required configuration.
 
 ## Required GitHub Secrets
 
