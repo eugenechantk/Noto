@@ -18,9 +18,23 @@ DerivedData/
 # Secrets (API keys)
 Secrets.swift
 Config/LocalSecrets.xcconfig
+fastlane/*.p8
+fastlane/.env*
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
 
 .flowdeck/
 .gstack/
+
+# Local automation/session artifacts
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+.codex/last-ios-device-app-path.txt
+.codex/merge-backups/
+.playwright-mcp/
+worktrees/
 
 # Local macOS Appium tooling
 .codex/appium/

@@ -1,0 +1,52 @@
+name: TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      changelog:
+        description: "Optional TestFlight changelog"
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Build and upload TestFlight
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      APP_IDENTIFIER: ${{ vars.APP_IDENTIFIER || secrets.APP_IDENTIFIER }}
+      DEVELOPER_TEAM_ID: ${{ secrets.DEVELOPER_TEAM_ID }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_GIT_BRANCH: ${{ vars.MATCH_GIT_BRANCH || 'main' }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_HIDE_TIMESTAMP: "1"
+      FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "120"
+      TESTFLIGHT_CHANGELOG: ${{ inputs.changelog }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Upload to TestFlight
+        run: bundle exec fastlane ios deploy_testflight
