@@ -106,7 +106,8 @@ platform :ios do
       api_key: api_key,
       ipa: "build/fastlane/Noto.ipa",
       changelog: ENV["TESTFLIGHT_CHANGELOG"],
-      skip_waiting_for_build_processing: !boolean_env("TESTFLIGHT_WAIT_FOR_PROCESSING", false)
+      uses_non_exempt_encryption: false,
+      skip_waiting_for_build_processing: !boolean_env("TESTFLIGHT_WAIT_FOR_PROCESSING", true)
     )
   end
 end
