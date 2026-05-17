@@ -75,5 +75,8 @@ jobs:
           printf 'Missing TestFlight configuration: %s\n' "${missing[*]}"
           exit 1
 
+      - name: Set build number
+        run: echo "BUILD_NUMBER=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_ENV"
+
       - name: Upload to TestFlight
         run: bundle exec fastlane ios deploy_testflight
