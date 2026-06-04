@@ -419,20 +419,23 @@ final class MarkdownNoteStore {
     /// Saves content immediately (writes file + updates list title). Does NOT rename.
     /// Only writes to disk and updates the `updated` timestamp if the content body has actually changed.
     @discardableResult
-    func saveContent(_ content: String, for note: MarkdownNote) -> SaveResult {
+    /// - Parameter force: when true, write even if the body is unchanged. Used for
+    ///   frontmatter-only edits (e.g. the Properties sheet), where the body comparison
+    ///   would otherwise treat a metadata change as a no-op and skip the write.
+    func saveContent(_ content: String, for note: MarkdownNote, force: Bool = false) -> SaveResult {
         let existingContent = noteRepository.readContent(of: note.vaultRecord)
         let existingBody = MarkdownNote.stripFrontmatter(existingContent)
         let newBody = MarkdownNote.stripFrontmatter(content)
 
-        DebugTrace.record("store save begin note=\(note.fileURL.lastPathComponent) existingBodyLen=\(existingBody.count) newBodyLen=\(newBody.count)")
+        DebugTrace.record("store save begin note=\(note.fileURL.lastPathComponent) existingBodyLen=\(existingBody.count) newBodyLen=\(newBody.count) force=\(force)")
 
-        guard existingBody != newBody else {
+        guard force || existingBody != newBody else {
             // No body change — don't write, don't update timestamp, don't touch items
             DebugTrace.record("store save skipped unchanged note=\(note.fileURL.lastPathComponent)")
             return SaveResult(note: note, didWrite: false)
         }
 
-        let result = noteRepository.saveContent(content, for: note.vaultRecord)
+        let result = noteRepository.saveContent(content, for: note.vaultRecord, force: force)
         DebugTrace.record("store write result note=\(note.fileURL.lastPathComponent) success=\(result.didWrite)")
         guard result.didWrite else {
             logger.error("Failed to save note \(note.fileURL.lastPathComponent)")

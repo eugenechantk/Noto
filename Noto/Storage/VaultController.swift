@@ -90,8 +90,8 @@ final class VaultController {
     }
 
     @discardableResult
-    func save(_ content: String, for note: MarkdownNote, in store: MarkdownNoteStore) -> MarkdownNoteStore.SaveResult {
-        store.saveContent(content, for: note)
+    func save(_ content: String, for note: MarkdownNote, in store: MarkdownNoteStore, force: Bool = false) -> MarkdownNoteStore.SaveResult {
+        store.saveContent(content, for: note, force: force)
     }
 
     @discardableResult

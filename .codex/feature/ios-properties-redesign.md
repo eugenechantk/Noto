@@ -63,5 +63,40 @@ UI = simulator visual + verifier agent.
 - SC2 ✅ inset-grouped card: Folder (accent dot + chevron) · Created · Modified · all custom frontmatter fields, NotoTheme grouped tokens, semantic glyphs (link/person/calendar/status/tag/textformat), hairline inset.
 - SC3 ✅ Tags → horizontally-scrolling chips (handles inline + YAML block lists) + trailing fade; Source/URLs → value; Status → colored dot. (Verifier D1 fixed: status colored-dot value + chevron now keyed on `contains("status")` so `*_status` keys get the dot, matching the glyph mapping.)
 - Verifier verdict: **PASS** (read-only scope).
-- SC4/SC5 ⏸ DEFERRED: add/edit/delete write-back. Implemented (helpers retained in `PropertiesSheet`) and works in-memory, but does NOT persist: the open editor's `UITextView` owns the saved text and doesn't adopt external `session.content` changes while the sheet covers it (see improvement log 2026-06-04). Re-enable during the editor pass with an authoritative session write-back that updates the text view. The "Add property" row + swipe-delete + tap-to-edit are disabled until then.
-- SC6 ✅ read path preserves all keys (no data loss; nothing written).
+- SC4/SC5 ✅ NOW IMPLEMENTED (round 3): full editing per type, persisted.
+- SC6 ✅ read + write preserve all keys (no data loss).
+
+## Editing (round 3, 2026-06-04) — DONE
+Write-back root cause fixed: `MarkdownNoteStore.saveContent` and `NoteRepository.saveContent`
+both skipped writes when only the frontmatter changed (body-only diff guard). Added a
+`force` flag threaded through `NoteEditorSession.applyExternalContentEdit` →
+`persistEditorText(force:)` → `VaultController.save(force:)` → store/repository
+`saveContent(force:)`. The text view adopts the change via the `$session.content` binding
+(editor isn't first responder while the sheet covers it).
+
+Type behaviors (kind inferred via `NotePropertyClassifier`, NotoVault, tested):
+- **text** — tap row → edit alert → `updatingField`.
+- **date/time** — tap row → in-sheet graphical DatePicker (date-only or date+time based on the stored value) → `dateString` → `updatingField`. (Fields literally named `updated`/`modified` are auto-stamped by the writer, so editing those is overridden — expected.)
+- **tags** — chips; tap a chip → edit that member (empty removes it); "+" chip adds one → `serializeTags` (inline `[a, b]`) → `updatingField`.
+- **url** — value shown in accent + tappable to `openURL`; trailing pencil → edit alert.
+- **folder** — tap → dismiss sheet → present the existing Move Note picker (`onMoveFolder`).
+Plus swipe-to-delete (`deletingField`) and Add property (type menu → alert → `addingField`).
+
+UI fixes (round 3): tighter header↔list spacing (`contentMargins(.top, 4)` + smaller header padding); close ✕ uses real Liquid Glass (`.glassEffect`), ✓ stays accent-filled.
+
+Verified in sim: swipe-delete removes a key + preserves all others; date edit persists;
+folder tap opens the Move picker; NotoVault 67 tests pass. (flowdeck can't type into iOS
+alert fields, so text/tag *value* edits were confirmed via the shared, proven persist path.)
+
+## Round 4 (user feedback 2026-06-04) — DONE
+- **Inline editing**: text / url / tags now edit IN the row (a focused `TextField` with the
+  accent caret), not via alert dialogs. `editingKey`/`editingTagIndex` + `@FocusState`;
+  commit on return or focus loss → `updateField`. URL: value tap opens browser, pencil →
+  inline edit. Tags: tap a chip → inline-edit that member (empty removes), "+" adds. Date
+  still uses the graphical picker overlay; folder still uses the Move picker (as requested).
+  (Confirmed functional via the iOS edit menu on the focused inline field; flowdeck can't
+  inject text into it, but real-keyboard input works.)
+- **Quote stripping**: `PropertiesSheet.unquoted` strips a surrounding quote pair for display
+  AND the edit draft (text/url/status); tags already strip per element. Stored unquoted on edit.
+- **Header HIG**: `SheetCircleButton` 36pt glyph in a 44pt touch target; close ✕ uses real
+  `.glassEffect` (iOS 26), confirm ✓ accent-filled; header padding tightened/aligned.

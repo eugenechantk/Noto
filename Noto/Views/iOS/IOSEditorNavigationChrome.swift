@@ -77,27 +77,10 @@ struct EditorNavigationChrome: ViewModifier {
                         }
                     }
 
-                    ToolbarItemGroup(placement: .navigationBarTrailing) {
-                        if canNavigateBack, let onNavigateBack {
-                            Button {
-                                onNavigateBack()
-                            } label: {
-                                Image(systemName: "chevron.left")
-                            }
-                            .accessibilityIdentifier("history_back_button")
-                            .accessibilityLabel("Back")
-                        }
-
-                        if canNavigateForward, let onNavigateForward {
-                            Button {
-                                onNavigateForward()
-                            } label: {
-                                Image(systemName: "chevron.right")
-                            }
-                            .accessibilityIdentifier("history_forward_button")
-                            .accessibilityLabel("Forward")
-                        }
-
+                    // v2 design: trailing edge is just the More menu. The note-history
+                    // ‹ › chevrons are intentionally omitted so "back" always pops the
+                    // navigation stack to the file view (predictable navigation).
+                    ToolbarItem(placement: .navigationBarTrailing) {
                         moreMenu
                     }
                 }

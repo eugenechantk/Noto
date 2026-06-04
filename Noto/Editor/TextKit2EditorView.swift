@@ -4504,7 +4504,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private var editorTopTextInset: CGFloat {
-        verticalTextInset + frontmatterReservedHeight
+        // v2: no inline metadata block — no top text inset at all.
+        rendersInlineFrontmatterBlock ? verticalTextInset + frontmatterReservedHeight : 0
     }
 
     private func syncReadableWidthInsets() -> Bool {

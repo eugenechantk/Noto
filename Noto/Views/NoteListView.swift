@@ -384,6 +384,7 @@ struct VaultWorkspaceView: View {
                             fileWatcher: fileWatcher,
                             onOpenTodayNote: { path.append(NoteRoute.todayNote) },
                             onCreateRootNote: createRootNoteAndPush,
+                            onOpenSearch: { handleWorkspaceIntent(.openSearch) },
                             onTapBreadcrumbLevel: { folderURL in
                                 path = NavigationPath()
                                 if folderURL.standardizedFileURL != vaultRootURL.standardizedFileURL {
@@ -1528,7 +1529,10 @@ private struct InteractivePopGestureEnabler: UIViewControllerRepresentable {
 
 #if os(iOS)
 enum NotoAppBottomToolbarKeyboardVisibility {
-    static let minimumVisibleHeight: CGFloat = 100
+    // Low enough to also catch the keyboard-accessory-only state (e.g. when a hardware
+    // keyboard is attached and the editor is being edited) so the floating dock hides
+    // whenever the keyboard/accessory toolbar is up.
+    static let minimumVisibleHeight: CGFloat = 44
 
     static func isSoftwareKeyboardVisible(frameInScreen: CGRect?, screenBounds: CGRect) -> Bool {
         guard let frameInScreen, !frameInScreen.isNull, !frameInScreen.isEmpty else {
@@ -1550,6 +1554,7 @@ private struct NotoAppBottomToolbarModifier: ViewModifier {
     var onSearch: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
     var isSidebarVisible: Bool = false
+    var hiddenByScroll: Bool = false
     @State private var isSoftwareKeyboardVisible = false
 
     func body(content: Content) -> some View {
@@ -1557,7 +1562,7 @@ private struct NotoAppBottomToolbarModifier: ViewModifier {
             content
         } else {
             let overlaid = content.overlay(alignment: .bottom) {
-                if !isSoftwareKeyboardVisible && !isSidebarVisible {
+                if !isSoftwareKeyboardVisible && !isSidebarVisible && !hiddenByScroll {
                     NotoAppBottomToolbar(
                         onOpenTodayNote: onOpenTodayNote,
                         onSearch: onSearch,
@@ -1565,7 +1570,8 @@ private struct NotoAppBottomToolbarModifier: ViewModifier {
                     )
                     .frame(maxWidth: .infinity)
                     .padding(.bottom, 8)
-                    .transition(.opacity)
+                    // Slides off the bottom edge when hidden by scroll.
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             #if os(iOS)
@@ -1740,13 +1746,15 @@ extension View {
         onOpenTodayNote: (() -> Void)?,
         onSearch: (() -> Void)?,
         onCreateRootNote: (() -> Void)?,
-        isSidebarVisible: Bool = false
+        isSidebarVisible: Bool = false,
+        hiddenByScroll: Bool = false
     ) -> some View {
         modifier(NotoAppBottomToolbarModifier(
             onOpenTodayNote: onOpenTodayNote,
             onSearch: onSearch,
             onCreateRootNote: onCreateRootNote,
-            isSidebarVisible: isSidebarVisible
+            isSidebarVisible: isSidebarVisible,
+            hiddenByScroll: hiddenByScroll
         ))
     }
 }

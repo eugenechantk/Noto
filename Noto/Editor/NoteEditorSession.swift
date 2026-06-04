@@ -126,6 +126,21 @@ final class NoteEditorSession {
         applyEditorText(newText, scheduleRename: true)
     }
 
+    /// Apply a structured edit made OUTSIDE the text view (e.g. the Properties
+    /// sheet editing frontmatter). Updates `content` so the bound editor text view
+    /// adopts the change, and persists synchronously so the edit survives even if
+    /// the editor never refocuses. Use for programmatic markdown replacement, not
+    /// for keystroke-driven edits (those go through `handleEditorChange`).
+    func applyExternalContentEdit(_ newMarkdown: String) {
+        guard !isDeleting, newMarkdown != content else { return }
+        DebugTrace.record("editor external edit note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(newMarkdown))")
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        latestEditorText = newMarkdown
+        hasPendingLocalEdits = true
+        persistEditorText(newMarkdown, force: true)
+    }
+
     func importImageAttachment(data: Data, suggestedFilename: String?) throws -> VaultImageAttachment {
         try vaultController.importImageAttachment(data: data, suggestedFilename: suggestedFilename, in: store)
     }
@@ -292,10 +307,10 @@ final class NoteEditorSession {
         }
     }
 
-    private func persistEditorText(_ text: String) {
+    private func persistEditorText(_ text: String, force: Bool = false) {
         DebugTrace.record("editor persist start note=\(note.fileURL.lastPathComponent) \(DebugTrace.textSummary(text))")
         note = vaultController.updateMetadataFromContent(text, for: note, in: store)
-        let saveResult = vaultController.save(text, for: note, in: store)
+        let saveResult = vaultController.save(text, for: note, in: store, force: force)
         content = text
         note = saveResult.note
         NoteContentCache.set(note.id, content: text)

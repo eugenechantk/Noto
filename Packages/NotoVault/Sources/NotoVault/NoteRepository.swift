@@ -92,12 +92,14 @@ public struct NoteRepository: Sendable {
     }
 
     @discardableResult
-    public func saveContent(_ content: String, for note: VaultNoteRecord, date: Date = Date()) -> VaultNoteSaveResult {
+    /// - Parameter force: write even when only the frontmatter changed (the body
+    ///   comparison would otherwise treat a metadata-only edit as a no-op).
+    public func saveContent(_ content: String, for note: VaultNoteRecord, date: Date = Date(), force: Bool = false) -> VaultNoteSaveResult {
         let existingContent = fileSystem.readString(from: note.fileURL) ?? ""
         let existingBody = VaultMarkdown.stripFrontmatter(existingContent)
         let newBody = VaultMarkdown.stripFrontmatter(content)
 
-        guard existingBody != newBody else {
+        guard force || existingBody != newBody else {
             return VaultNoteSaveResult(note: note, didWrite: false)
         }
 

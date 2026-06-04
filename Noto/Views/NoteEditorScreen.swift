@@ -12,6 +12,7 @@ struct NoteEditorScreen: View {
     var onDelete: (() -> Void)? = nil
     var onOpenTodayNote: (() -> Void)? = nil
     var onCreateRootNote: (() -> Void)? = nil
+    var onOpenSearch: (() -> Void)? = nil
     var onTapBreadcrumbLevel: ((URL) -> Void)? = nil
     var onNoteUpdated: ((MarkdownNote) -> Void)? = nil
     var onOpenDocumentLink: ((String) -> Void)? = nil
@@ -28,7 +29,10 @@ struct NoteEditorScreen: View {
     @State private var showMoveSheet = false
     #if os(iOS)
     @State private var showProperties = false
+    @State private var pendingMoveAfterProperties = false
     @State private var showsScrolledTitle = false
+    @State private var dockHiddenByScroll = false
+    @State private var lastDockScrollY: CGFloat = 0
     #endif
     @State private var statusCount = WordCounter.Count(words: 0, characters: 0)
     @State private var isFindVisible = false
@@ -54,6 +58,7 @@ struct NoteEditorScreen: View {
         onDelete: (() -> Void)? = nil,
         onOpenTodayNote: (() -> Void)? = nil,
         onCreateRootNote: (() -> Void)? = nil,
+        onOpenSearch: (() -> Void)? = nil,
         onTapBreadcrumbLevel: ((URL) -> Void)? = nil,
         onNoteUpdated: ((MarkdownNote) -> Void)? = nil,
         onOpenDocumentLink: ((String) -> Void)? = nil,
@@ -72,6 +77,7 @@ struct NoteEditorScreen: View {
         self.onDelete = onDelete
         self.onOpenTodayNote = onOpenTodayNote
         self.onCreateRootNote = onCreateRootNote
+        self.onOpenSearch = onOpenSearch
         self.onTapBreadcrumbLevel = onTapBreadcrumbLevel
         self.onNoteUpdated = onNoteUpdated
         self.onOpenDocumentLink = onOpenDocumentLink
@@ -141,16 +147,31 @@ struct NoteEditorScreen: View {
             onNavigateForward: onNavigateForward,
             onDismiss: { dismiss() }
         ))
-        .overlay {
-            navigationHistorySwipeEdges
-        }
-        .sheet(isPresented: $showProperties) {
-            PropertiesSheet(session: session) {
-                showProperties = false
+        // v2: no note-history edge-swipe — the leading edge swipe / back button does a
+        // normal NavigationStack pop back to the file view.
+        .sheet(isPresented: $showProperties, onDismiss: {
+            if pendingMoveAfterProperties {
+                pendingMoveAfterProperties = false
+                showMoveSheet = true
             }
+        }) {
+            PropertiesSheet(
+                session: session,
+                onClose: { showProperties = false },
+                onMoveFolder: {
+                    pendingMoveAfterProperties = true
+                    showProperties = false
+                }
+            )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
+        .notoAppBottomToolbar(
+            onOpenTodayNote: isCompactChrome ? onOpenTodayNote : nil,
+            onSearch: isCompactChrome ? onOpenSearch : nil,
+            onCreateRootNote: isCompactChrome ? onCreateRootNote : nil,
+            hiddenByScroll: dockHiddenByScroll
+        )
         #elseif os(macOS)
         .modifier(EditorNavigationChrome(
             mode: chromeMode,
@@ -322,8 +343,33 @@ struct NoteEditorScreen: View {
                 showsScrolledTitle = shouldShowTitle
             }
         }
+        // Hide the floating dock when scrolling down; reveal it when scrolling up
+        // (or near the top). A small threshold avoids jitter.
+        let delta = offsetY - lastDockScrollY
+        if offsetY <= 0 {
+            setDockHidden(false)
+            lastDockScrollY = offsetY
+        } else if abs(delta) > 6 {
+            setDockHidden(delta > 0 && offsetY > 40)
+            lastDockScrollY = offsetY
+        }
         #endif
     }
+
+    #if os(iOS)
+    private var isCompactChrome: Bool {
+        if case .compactNavigation = chromeMode { return true }
+        return false
+    }
+
+    private func setDockHidden(_ hidden: Bool) {
+        guard hidden != dockHiddenByScroll else { return }
+        // Hide quickly (snappy), reveal with a slightly softer curve.
+        withAnimation(hidden ? .easeOut(duration: 0.12) : .easeOut(duration: 0.2)) {
+            dockHiddenByScroll = hidden
+        }
+    }
+    #endif
 
     #if os(iOS)
     /// Number of YAML frontmatter fields — shown as the "Properties" subtitle in
