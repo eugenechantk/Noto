@@ -363,7 +363,7 @@ struct VaultWorkspaceView: View {
             NavigationStack(path: $path) {
                 FolderContentView(
                     store: store,
-                    title: "Notes",
+                    title: "Vault",
                     isRoot: true,
                     fileWatcher: fileWatcher,
                     onIntent: handleWorkspaceIntent,
@@ -413,7 +413,8 @@ struct VaultWorkspaceView: View {
                             ),
                             title: name,
                             fileWatcher: fileWatcher,
-                            onIntent: handleWorkspaceIntent
+                            onIntent: handleWorkspaceIntent,
+                            canOpenSettings: locationManager != nil
                         )
                     case .settings:
                         if let locationManager {
@@ -447,11 +448,6 @@ struct VaultWorkspaceView: View {
                     }
                 }
             }
-            .notoAppBottomToolbar(
-                onOpenTodayNote: { handleWorkspaceIntent(.openToday) },
-                onSearch: { handleWorkspaceIntent(.openSearch) },
-                onCreateRootNote: { handleWorkspaceIntent(.createNote(in: store)) }
-            )
             .sheet(isPresented: $isSearchPresented) {
                 NavigationStack {
                     NoteSearchSheet(rootStore: store) { result in
@@ -1053,11 +1049,15 @@ enum DirectoryContentListPresentation {
 }
 
 /// Shared directory page body that shows one directory's direct folders and notes.
+/// File-view sort order (folders are always alphabetical first; this orders notes).
+enum FileSortKey: Hashable { case recent, name }
+
 struct DirectoryContentListView: View {
     var store: MarkdownNoteStore
     var fileWatcher: VaultFileWatcher?
     var selectedNote: MarkdownNote?
     var presentation: DirectoryContentListPresentation = .content
+    var sort: FileSortKey = .recent
     var onOpenFolder: (NotoFolder, MarkdownNoteStore) -> Void
     var onOpenNote: (MarkdownNote, MarkdownNoteStore, Bool) -> Void
     var onDeleteItem: (DirectoryItem, MarkdownNoteStore) -> Void
@@ -1065,9 +1065,29 @@ struct DirectoryContentListView: View {
     var onNoteDrag: ((MarkdownNote) -> NSItemProvider)? = nil
     #endif
 
+    /// Folders first (alphabetical), then notes ordered by the chosen sort key.
+    private var displayedItems: [DirectoryItem] {
+        let folders = store.items.compactMap { item -> NotoFolder? in
+            if case .folder(let folder) = item { return folder }
+            return nil
+        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let notes = store.items.compactMap { item -> MarkdownNote? in
+            if case .note(let note) = item { return note }
+            return nil
+        }
+        let sortedNotes: [MarkdownNote]
+        switch sort {
+        case .recent:
+            sortedNotes = notes.sorted { $0.modifiedDate > $1.modifiedDate }
+        case .name:
+            sortedNotes = notes.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+        return folders.map(DirectoryItem.folder) + sortedNotes.map(DirectoryItem.note)
+    }
+
     var body: some View {
         List {
-            ForEach(store.items) { item in
+            ForEach(displayedItems) { item in
                 switch item {
                 case .folder(let folder):
                     folderButton(folder)
@@ -1180,7 +1200,7 @@ struct DirectoryContentListView: View {
     private var rowBackground: some View {
         switch presentation {
         case .content:
-            AppTheme.background
+            NotoTheme.background
         case .sidebar:
             Color.clear
         }
@@ -1198,7 +1218,7 @@ struct DirectoryContentListView: View {
     private var listBackground: some View {
         switch presentation {
         case .content:
-            AppTheme.background
+            NotoTheme.background
         case .sidebar:
             AppTheme.sidebarBackground
         }
@@ -1215,7 +1235,7 @@ struct DirectoryContentListView: View {
 
     private func deleteItems(at offsets: IndexSet) {
         for index in offsets {
-            onDeleteItem(store.items[index], store)
+            onDeleteItem(displayedItems[index], store)
         }
     }
 }
@@ -1283,6 +1303,16 @@ struct FolderContentView: View {
 
     @State private var showNewFolderAlert = false
     @State private var newFolderName = ""
+    @State private var sort: FileSortKey = .recent
+    @Environment(\.dismiss) private var dismiss
+
+    /// Parent folder name for the custom back button ("Vault" when the
+    /// parent is the vault root), matching the v2 design's "‹ Vault" control.
+    private var parentTitle: String {
+        let parent = store.directoryURL.deletingLastPathComponent().standardizedFileURL
+        if parent == store.vaultRootURL.standardizedFileURL { return "Vault" }
+        return parent.lastPathComponent
+    }
 
     init(
         store: MarkdownNoteStore,
@@ -1301,50 +1331,34 @@ struct FolderContentView: View {
     }
 
     var body: some View {
-        DirectoryContentListView(
-            store: store,
-            fileWatcher: fileWatcher,
-            presentation: .content,
-            onOpenFolder: { folder, parentStore in
-                onIntent(.openFolder(folder, parentStore: parentStore))
-            },
-            onOpenNote: { note, noteStore, isNew in
-                onIntent(.openNote(note, store: noteStore, isNew: isNew))
-            },
-            onDeleteItem: { item, noteStore in
-                onIntent(.deleteItem(item, in: noteStore))
-            }
-        )
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                if isRoot, canOpenSettings {
-                    Button {
-                        onIntent(.openSettings)
-                    } label: {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                    .labelStyle(.iconOnly)
-                    .accessibilityIdentifier("settings_button")
+        VStack(spacing: 0) {
+            topBar
+            fixedHeader
+            DirectoryContentListView(
+                store: store,
+                fileWatcher: fileWatcher,
+                presentation: .content,
+                sort: sort,
+                onOpenFolder: { folder, parentStore in
+                    onIntent(.openFolder(folder, parentStore: parentStore))
+                },
+                onOpenNote: { note, noteStore, isNew in
+                    onIntent(.openNote(note, store: noteStore, isNew: isNew))
+                },
+                onDeleteItem: { item, noteStore in
+                    onIntent(.deleteItem(item, in: noteStore))
                 }
-                Button(action: createNote) {
-                    Label("New Note", systemImage: "doc.badge.plus")
-                }
-                .labelStyle(.iconOnly)
-                .accessibilityIdentifier("new_note_button")
-                Menu {
-                    Button(action: { showNewFolderAlert = true }) {
-                        Label("New Folder", systemImage: "folder.badge.plus")
-                    }
-                    .accessibilityIdentifier("new_folder_button")
-                } label: {
-                    Label("More", systemImage: "plus")
-                }
-                .labelStyle(.iconOnly)
-                .accessibilityIdentifier("add_menu")
-            }
+            )
         }
+        .background(NotoTheme.background)
+        .background(InteractivePopGestureEnabler())
+        .toolbar(.hidden, for: .navigationBar)
+        .tint(NotoTheme.accent)
+        .notoAppBottomToolbar(
+            onOpenTodayNote: { onIntent(.openToday) },
+            onSearch: { onIntent(.openSearch) },
+            onCreateRootNote: { onIntent(.createNote(in: store)) }
+        )
         .alert("New Folder", isPresented: $showNewFolderAlert) {
             TextField("Folder name", text: $newFolderName)
             Button("Create") {
@@ -1362,6 +1376,151 @@ struct FolderContentView: View {
         onIntent(.createNote(in: store))
     }
 
+    /// "N folders · M notes" count for the fixed header.
+    private var countText: String? {
+        guard !store.items.isEmpty else { return nil }
+        let folders = store.items.filter { if case .folder = $0 { return true } else { return false } }.count
+        let notes = store.items.count - folders
+        var parts: [String] = []
+        if folders > 0 { parts.append("\(folders) \(folders == 1 ? "folder" : "folders")") }
+        if notes > 0 { parts.append("\(notes) \(notes == 1 ? "note" : "notes")") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Large title + count, pinned below the top bar so it stays fixed while the
+    /// list scrolls underneath (v2 design large-title block).
+    private var fixedHeader: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: NotoTheme.FontSize.largeTitle, weight: .bold))
+                    .foregroundStyle(NotoTheme.head)
+                    .lineLimit(1)
+                if let countText {
+                    Text(countText)
+                        .font(.system(size: NotoTheme.FontSize.subtitle))
+                        .foregroundStyle(NotoTheme.muted)
+                        .accessibilityIdentifier("folderCountSubtitle")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 6)
+            .padding(.bottom, 12)
+
+            Rectangle()
+                .fill(NotoTheme.separator)
+                .frame(height: 0.5)
+        }
+        .background(NotoTheme.background)
+        .accessibilityIdentifier("largeTitleHeader")
+    }
+
+    /// Bare-icon top bar matching the v2 design: a leading accent "‹ <parent>"
+    /// back button (nested only) and trailing new-folder · sort · more actions,
+    /// rendered as plain bar buttons (no Liquid Glass capsule).
+    private var topBar: some View {
+        HStack(spacing: 0) {
+            if !isRoot {
+                Button {
+                    dismiss()
+                } label: {
+                    HStack(spacing: 1) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .semibold))
+                        Text(parentTitle)
+                            .font(.system(size: NotoTheme.FontSize.rowTitle, weight: .medium))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(NotoTheme.accent)
+                }
+                .accessibilityIdentifier("back_button")
+            }
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 18) {
+                Button(action: createNote) {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 18, weight: .regular))
+                }
+                .accessibilityIdentifier("new_note_button")
+                .accessibilityLabel("New Note")
+
+                Menu {
+                    Picker("Sort", selection: $sort) {
+                        Label("Recent", systemImage: "clock").tag(FileSortKey.recent)
+                        Label("Name", systemImage: "textformat").tag(FileSortKey.name)
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease")
+                        .font(.system(size: 17, weight: .regular))
+                }
+                .accessibilityIdentifier("sort_menu")
+                .accessibilityLabel("Sort")
+
+                Menu {
+                    Button {
+                        showNewFolderAlert = true
+                    } label: {
+                        Label("New Folder", systemImage: "folder.badge.plus")
+                    }
+                    .accessibilityIdentifier("new_folder_button")
+                    if canOpenSettings {
+                        Divider()
+                        Button {
+                            onIntent(.openSettings)
+                        } label: {
+                            Label("Settings", systemImage: "gearshape")
+                        }
+                        .accessibilityIdentifier("settings_button")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 18, weight: .regular))
+                }
+                .accessibilityIdentifier("more_menu")
+                .accessibilityLabel("More")
+            }
+            .foregroundStyle(NotoTheme.head)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .frame(height: 48)
+        .background(NotoTheme.background)
+    }
+
+}
+
+/// Re-enables the edge-swipe-back (interactive pop) gesture, which SwiftUI
+/// disables when the navigation bar is hidden via `.toolbar(.hidden,…)`. The
+/// delegate only allows the gesture when there is a view controller to pop back
+/// to, so the root level is unaffected.
+private struct InteractivePopGestureEnabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        controller.view.backgroundColor = .clear
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        DispatchQueue.main.async {
+            guard let navigationController = uiViewController.navigationController else { return }
+            context.coordinator.navigationController = navigationController
+            navigationController.interactivePopGestureRecognizer?.isEnabled = true
+            navigationController.interactivePopGestureRecognizer?.delegate = context.coordinator
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        weak var navigationController: UINavigationController?
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            (navigationController?.viewControllers.count ?? 0) > 1
+        }
+    }
 }
 #endif
 
@@ -1399,15 +1558,11 @@ private struct NotoAppBottomToolbarModifier: ViewModifier {
         } else {
             let overlaid = content.overlay(alignment: .bottom) {
                 if !isSoftwareKeyboardVisible && !isSidebarVisible {
-                    HStack {
-                        Spacer(minLength: 0)
-                        NotoAppBottomToolbar(
-                            onOpenTodayNote: onOpenTodayNote,
-                            onSearch: onSearch,
-                            onCreateRootNote: onCreateRootNote
-                        )
-                        Spacer(minLength: 0)
-                    }
+                    NotoAppBottomToolbar(
+                        onOpenTodayNote: onOpenTodayNote,
+                        onSearch: onSearch,
+                        onCreateRootNote: onCreateRootNote
+                    )
                     .frame(maxWidth: .infinity)
                     .padding(.bottom, 8)
                     .transition(.opacity)
@@ -1452,49 +1607,131 @@ private struct NotoAppBottomToolbar: View {
     var onSearch: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
 
-    var body: some View {
-        HStack(spacing: 0) {
-            Button {
-                onOpenTodayNote?()
-            } label: {
-                toolbarLabel("Today", systemImage: "calendar")
-            }
-            .accessibilityIdentifier("today_button")
-            .accessibilityLabel("Today")
+    private static let capsuleHeight: CGFloat = 52
+    private static let innerCircle: CGFloat = 44
 
+    private var todayDay: String {
+        String(Calendar.current.component(.day, from: Date()))
+    }
+
+    var body: some View {
+        glassDockContainer {
+            dockContent
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+    }
+
+    private var dockContent: some View {
+        HStack(spacing: 8) {
+            // Today / calendar — capsule with the current day-of-month badge.
+            dockCapsule(padding: 4) {
+                Button {
+                    onOpenTodayNote?()
+                } label: {
+                    ZStack {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 21, weight: .regular))
+                            .foregroundStyle(NotoTheme.head)
+                        Text(todayDay)
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(NotoTheme.head)
+                            .offset(y: 5)
+                    }
+                    .frame(width: Self.innerCircle, height: Self.innerCircle)
+                    .contentShape(Rectangle())
+                }
+                .accessibilityIdentifier("today_button")
+                .accessibilityLabel("Today")
+            }
+
+            // Search — full-width pill with placeholder text.
             Button {
                 onSearch?()
             } label: {
-                toolbarLabel("Search", systemImage: "magnifyingglass")
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 19, weight: .regular))
+                        .foregroundStyle(NotoTheme.muted)
+                    Text("Search")
+                        .font(.system(size: NotoTheme.FontSize.body))
+                        .foregroundStyle(NotoTheme.muted)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 18)
+                .frame(maxWidth: .infinity)
+                .frame(height: Self.capsuleHeight)
+                .contentShape(Rectangle())
             }
             .accessibilityIdentifier("search_button")
             .accessibilityLabel("Search")
+            .dockGlass()
 
-            Button {
-                onCreateRootNote?()
-            } label: {
-                toolbarLabel("New Note", systemImage: "square.and.pencil")
+            // New note — capsule with an accent-tinted action circle.
+            dockCapsule(padding: 4) {
+                Button {
+                    onCreateRootNote?()
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 20, weight: .regular))
+                        .foregroundStyle(NotoTheme.head)
+                        .frame(width: Self.innerCircle, height: Self.innerCircle)
+                        .background(NotoTheme.accent.opacity(0.22), in: Circle())
+                        .overlay { Circle().stroke(NotoTheme.accent.opacity(0.40), lineWidth: 0.5) }
+                        .contentShape(Rectangle())
+                }
+                .accessibilityIdentifier("new_root_note_button")
+                .accessibilityLabel("New Note")
             }
-            .accessibilityIdentifier("new_root_note_button")
-            .accessibilityLabel("New Note")
-        }
-        .buttonStyle(.plain)
-        .font(.system(size: 18, weight: .medium))
-        .foregroundStyle(AppTheme.primaryText)
-        .padding(.horizontal, 8)
-        .frame(height: 48)
-        .background(.regularMaterial, in: Capsule())
-        .overlay {
-            Capsule()
-                .stroke(AppTheme.primaryText.opacity(0.08), lineWidth: 0.5)
         }
     }
 
-    private func toolbarLabel(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .labelStyle(.iconOnly)
-            .frame(width: 48, height: 48)
-            .contentShape(Rectangle())
+    private func dockCapsule<Content: View>(
+        padding: CGFloat,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .padding(.horizontal, padding)
+            .frame(height: Self.capsuleHeight)
+            .dockGlass()
+    }
+
+    /// Groups the dock's glass capsules for correct Liquid Glass blending and
+    /// rendering performance (iOS 26+); a passthrough on earlier OSes.
+    @ViewBuilder
+    private func glassDockContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        if #available(iOS 26, *) {
+            GlassEffectContainer(spacing: 8) { content() }
+        } else {
+            content()
+        }
+    }
+}
+
+private extension View {
+    /// Liquid Glass capsule for the floating dock (iOS 26+), falling back to a
+    /// translucent material capsule on earlier OSes.
+    @ViewBuilder
+    func dockGlass() -> some View {
+        if #available(iOS 26, *) {
+            glassEffect(.regular.interactive(), in: .capsule)
+        } else {
+            background(.regularMaterial, in: Capsule())
+                .overlay { Capsule().stroke(NotoTheme.head.opacity(0.08), lineWidth: 0.5) }
+        }
+    }
+
+    /// Glass capsule for the search dock pill + close button (iOS 26+), with a
+    /// translucent material fallback. Matches the `glassStyle` in
+    /// `Exp03ArticleV3Search` (rgba(28,30,36,0.55) + blur).
+    @ViewBuilder
+    func searchDockGlass() -> some View {
+        if #available(iOS 26, *) {
+            glassEffect(.regular.interactive(), in: .capsule)
+        } else {
+            background(.ultraThinMaterial, in: Capsule())
+                .overlay { Capsule().stroke(Color.white.opacity(0.10), lineWidth: 0.5) }
+        }
     }
 }
 
@@ -1623,53 +1860,27 @@ struct NoteSearchSheet: View {
         #if os(macOS)
         macOSSearchPanel
         #else
-        Group {
-            if didFail {
-                ContentUnavailableView(
-                    "Search Unavailable",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("Noto could not load notes from this vault.")
-                )
-            } else {
-                resultsList
+        iosSearchView
+            .background(NotoTheme.background.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .accessibilityIdentifier("note_search_sheet")
+            .task {
+                isSearchFocused = true
+                loadRecentNotes()
+                await prepareIndex()
             }
-        }
-        .background(AppTheme.background)
-        .navigationTitle("Search")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
-            #if os(iOS)
-            ToolbarItem(placement: .topBarTrailing) {
-                closeButton
+            .onChange(of: query) { _, _ in
+                scheduleSearch()
             }
-            #else
-            ToolbarItem(placement: .cancellationAction) {
-                closeButton
+            .onChange(of: scope) { _, _ in
+                scheduleSearch()
             }
-            #endif
-        }
-        .noteSearchField(text: $query)
-        .noteSearchFocused($isSearchFocused)
-        .accessibilityIdentifier("note_search_sheet")
-        .task {
-            isSearchFocused = true
-            loadRecentNotes()
-            await prepareIndex()
-        }
-        .onChange(of: query) { _, _ in
-            scheduleSearch()
-        }
-        .onChange(of: scope) { _, _ in
-            scheduleSearch()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .notoSearchIndexDidChange)) { notification in
-            handleSearchIndexDidChange(notification)
-        }
-        .onDisappear {
-            searchTask?.cancel()
-        }
+            .onReceive(NotificationCenter.default.publisher(for: .notoSearchIndexDidChange)) { notification in
+                handleSearchIndexDidChange(notification)
+            }
+            .onDisappear {
+                searchTask?.cancel()
+            }
         #endif
     }
 
@@ -1692,6 +1903,185 @@ struct NoteSearchSheet: View {
             dismiss()
         }
     }
+
+    #if os(iOS)
+    // MARK: - iOS v2 search surface (Exp03ArticleV3Search)
+
+    private var iosSearchView: some View {
+        let showingRecent = trimmedQuery.isEmpty
+        let displayResults = showingRecent ? recentNotes : results
+        return Group {
+            if didFail {
+                ContentUnavailableView(
+                    "Search Unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text("Noto could not load notes from this vault.")
+                )
+            } else {
+                iosResultsScroll(showingRecent: showingRecent, displayResults: displayResults)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            iosBottomControls(showingRecent: showingRecent)
+        }
+    }
+
+    @ViewBuilder
+    private func iosResultsScroll(showingRecent: Bool, displayResults: [NoteSearchResult]) -> some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                Color.clear.frame(height: 8)
+                iosSectionTitle(showingRecent ? "Last edited" : "Search results")
+                ForEach(Array(displayResults.enumerated()), id: \.element.id) { index, result in
+                    Button {
+                        onSelect(result)
+                        closeSearch()
+                    } label: {
+                        NotoSearchRowV2(result: result, query: trimmedQuery)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("note_search_result_\(index)")
+                    .accessibilityLabel(result.title)
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 0.5)
+                        .padding(.leading, 18)
+                }
+            }
+            .padding(.top, 54) // status-bar reserve / breathing room at top
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .scrollContentBackground(.hidden)
+        .background(NotoTheme.background)
+        .accessibilityIdentifier("note_search_results_list")
+        .overlay {
+            if isPreparingIndex && showingRecent && recentNotes.isEmpty {
+                searchProgressIndicator(
+                    title: "Indexing notes",
+                    message: "Checking this vault for new, edited, moved, or deleted notes.",
+                    accessibilityIdentifier: "note_search_indexing_indicator"
+                )
+            } else if isSearching && results.isEmpty && !showingRecent {
+                searchProgressIndicator(
+                    title: "Searching notes",
+                    message: "Looking through the search index.",
+                    accessibilityIdentifier: "note_search_loading_indicator"
+                )
+            } else if displayResults.isEmpty {
+                ContentUnavailableView(
+                    emptyTitle,
+                    systemImage: "magnifyingglass",
+                    description: Text(emptyDescription)
+                )
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("note_search_empty_state")
+            }
+        }
+    }
+
+    private func iosSectionTitle(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(0.6)
+            .foregroundStyle(NotoTheme.muted)
+            .padding(.horizontal, 18)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func iosBottomControls(showingRecent: Bool) -> some View {
+        VStack(spacing: 0) {
+            if !showingRecent {
+                iosSegmentedControl
+                    .padding(.horizontal, 12)
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
+            }
+            iosSearchDock
+        }
+        .background(NotoTheme.background)
+    }
+
+    private var iosSegmentedControl: some View {
+        HStack(spacing: 3) {
+            iosSegment(title: "Title + body", candidate: .titleAndContent)
+            iosSegment(title: "Title only", candidate: .title)
+        }
+        .padding(3)
+        .frame(height: 34)
+        .background(Color.white.opacity(0.06), in: Capsule())
+        .overlay { Capsule().stroke(Color.white.opacity(0.08), lineWidth: 0.5) }
+        .accessibilityIdentifier("search_segmented_control")
+    }
+
+    private func iosSegment(title: String, candidate: SearchScope) -> some View {
+        let isSelected = scope == candidate
+        return Button {
+            scope = candidate
+        } label: {
+            Text(title)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                .foregroundStyle(isSelected ? NotoTheme.head : NotoTheme.muted)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background {
+                    if isSelected {
+                        Capsule().fill(Color.white.opacity(0.12))
+                    }
+                }
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(candidate.accessibilityIdentifier)
+        .accessibilityLabel(candidate.accessibilityLabel)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+    }
+
+    private var iosSearchDock: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(NotoTheme.muted)
+                TextField("", text: $query, prompt: Text("Search or ask AI").foregroundColor(NotoTheme.muted))
+                    .focused($isSearchFocused)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .font(.system(size: 15))
+                    .foregroundStyle(NotoTheme.head)
+                    .tint(NotoTheme.accent)
+                    .accessibilityIdentifier("note_search_query_field")
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(NotoTheme.head)
+                    .frame(width: 28, height: 28)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 46)
+            .searchDockGlass()
+
+            Button {
+                closeSearch()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(NotoTheme.head)
+                    .frame(width: 46, height: 46)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .searchDockGlass()
+            .accessibilityIdentifier("note_search_cancel_button")
+            .accessibilityLabel("Close")
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+    }
+    #endif
 
     #if os(macOS)
     private var macOSSearchPanel: some View {
@@ -2462,6 +2852,109 @@ struct NoteSearchSheet: View {
     #endif
 }
 
+#if os(iOS)
+/// v2 search result row (`Exp03ArticleV3Search·Row`): file glyph · title (15/500)
+/// · "in <Folder> · <when>" (12/muted) · 2-line snippet with highlighted match.
+private struct NotoSearchRowV2: View {
+    let result: NoteSearchResult
+    let query: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            // Uniform document glyph on every row, matching the design's fileGlyph.
+            Image(systemName: "doc.text")
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(NotoTheme.muted)
+                .frame(width: 16)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(result.title)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(NotoTheme.head)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(NotoTheme.muted)
+                    .lineLimit(1)
+                if !result.snippet.isEmpty, result.snippet != result.title {
+                    Text(Self.highlightedSnippet(result.snippet, query: query))
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(NotoTheme.ink.opacity(0.85))
+                        .lineLimit(2)
+                        .padding(.top, 2)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    private var subtitle: String {
+        let folder = result.breadcrumb
+            .split(separator: "/")
+            .last
+            .map(String.init) ?? ""
+        let when = NotoRelativeDate.compactString(from: result.note.modifiedDate)
+        return folder.isEmpty ? when : "in \(folder) · \(when)"
+    }
+
+    /// Highlights every occurrence of the query terms in the snippet with the
+    /// amber match background, robust to case folding and multibyte snippets.
+    static func highlightedSnippet(_ snippet: String, query: String) -> AttributedString {
+        let terms = query.lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+            .filter { $0.count >= 2 }
+        guard !terms.isEmpty else { return AttributedString(snippet) }
+
+        let chars = Array(snippet)
+        let lower = Array(snippet.lowercased())
+        guard lower.count == chars.count else { return AttributedString(snippet) }
+
+        var matched = [Bool](repeating: false, count: chars.count)
+        for term in terms {
+            let needle = Array(term)
+            guard needle.count <= chars.count else { continue }
+            var i = 0
+            while i <= chars.count - needle.count {
+                var hit = true
+                for j in 0..<needle.count where lower[i + j] != needle[j] {
+                    hit = false
+                    break
+                }
+                if hit {
+                    for k in i..<(i + needle.count) { matched[k] = true }
+                    i += needle.count
+                } else {
+                    i += 1
+                }
+            }
+        }
+
+        var result = AttributedString()
+        var idx = 0
+        while idx < chars.count {
+            let isMatch = matched[idx]
+            var run = ""
+            while idx < chars.count, matched[idx] == isMatch {
+                run.append(chars[idx])
+                idx += 1
+            }
+            var piece = AttributedString(run)
+            if isMatch {
+                piece.backgroundColor = NotoTheme.statusAmber.opacity(0.32)
+                piece.foregroundColor = NotoTheme.head
+            }
+            result += piece
+        }
+        return result
+    }
+}
+#endif
+
 private struct NoteSearchResultRow: View {
     let result: NoteSearchResult
 
@@ -2665,29 +3158,38 @@ struct FolderRow: View {
     let folder: NotoFolder
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "folder.fill")
-                .foregroundStyle(AppTheme.secondaryText)
-                .font(.title3)
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 12) {
+            Image(systemName: "folder")
+                .font(.system(size: 18, weight: .regular))
+                .foregroundStyle(NotoTheme.muted)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(folder.name)
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.primaryText)
+                    .font(.system(size: NotoTheme.FontSize.rowTitle, weight: .semibold))
+                    .foregroundStyle(NotoTheme.head)
                     .lineLimit(1)
                 Text(folder.contentsSummary)
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryText)
+                    .font(.system(size: NotoTheme.FontSize.subtitle))
+                    .foregroundStyle(NotoTheme.muted)
+                    .lineLimit(1)
             }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(NotoTheme.faint)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("folderRow")
     }
 }
 
 private extension NotoFolder {
     var contentsSummary: String {
-        "\(itemCount) \(itemCount == 1 ? "file" : "files"), \(folderCount) \(folderCount == 1 ? "folder" : "folders")"
+        let total = itemCount + folderCount
+        return total == 0 ? "Empty" : "\(total) \(total == 1 ? "item" : "items")"
     }
 }
 
@@ -2695,22 +3197,26 @@ struct MarkdownNoteRow: View {
     let note: MarkdownNote
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "doc.text")
-                .foregroundStyle(AppTheme.secondaryText)
-                .font(.title3)
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 12) {
+            Image(systemName: "doc")
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(NotoTheme.muted)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(note.title)
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.primaryText)
+                    .font(.system(size: NotoTheme.FontSize.rowTitle, weight: .semibold))
+                    .foregroundStyle(NotoTheme.head)
                     .lineLimit(1)
-                Text(note.modifiedDate, style: .relative)
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryText)
+                Text(NotoRelativeDate.editedString(from: note.modifiedDate))
+                    .font(.system(size: NotoTheme.FontSize.subtitle))
+                    .foregroundStyle(NotoTheme.muted)
+                    .lineLimit(1)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("noteRow")
     }
 }

@@ -14,6 +14,10 @@ struct EditorNavigationChrome: ViewModifier {
     var onMoveRequested: () -> Void
     var onDeleteRequested: () -> Void
     var onSearchRequested: () -> Void
+    var onShowProperties: (() -> Void)?
+    var propertyCount: Int = 0
+    var showsScrolledTitle = false
+    var scrolledTitle = ""
     var canNavigateBack = false
     var canNavigateForward = false
     var onNavigateBack: (() -> Void)?
@@ -58,12 +62,19 @@ struct EditorNavigationChrome: ViewModifier {
                         }
                     }
 
+                    // v2 redesign: the minimal editor top bar is empty until the note
+                    // scrolls; then the note title rises into the center (scrolled state).
                     ToolbarItem(placement: .principal) {
-                        BreadcrumbBar(
-                            vaultRootURL: vaultRootURL,
-                            noteFileURL: noteFileURL,
-                            onTapLevel: onTapBreadcrumbLevel
-                        )
+                        if showsScrolledTitle {
+                            Text(scrolledTitle)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(NotoTheme.head)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: 240)
+                                .transition(.opacity)
+                                .accessibilityIdentifier("editor_scrolled_title")
+                        }
                     }
 
                     ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -95,11 +106,22 @@ struct EditorNavigationChrome: ViewModifier {
 
     private var moreMenu: some View {
         Menu {
+            // Search + Properties share the top section; Search sits above Properties.
             Button(action: onSearchRequested) {
                 Label("Search in Note", systemImage: "magnifyingglass")
             }
             .keyboardShortcut("f", modifiers: [.command])
             .accessibilityIdentifier("search_in_note_menu_item")
+
+            if let onShowProperties {
+                Button(action: onShowProperties) {
+                    // Two Text views in a menu button render as title + subtitle.
+                    Text("Properties")
+                    Text("\(propertyCount) \(propertyCount == 1 ? "property" : "properties")")
+                    Image(systemName: "info.circle")
+                }
+                .accessibilityIdentifier("properties_menu_item")
+            }
 
             Divider()
 

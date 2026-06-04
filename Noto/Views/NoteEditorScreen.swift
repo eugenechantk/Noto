@@ -26,6 +26,10 @@ struct NoteEditorScreen: View {
     @State private var session: NoteEditorSession
     @State private var showDeleteConfirmation = false
     @State private var showMoveSheet = false
+    #if os(iOS)
+    @State private var showProperties = false
+    @State private var showsScrolledTitle = false
+    #endif
     @State private var statusCount = WordCounter.Count(words: 0, characters: 0)
     @State private var isFindVisible = false
     @State private var findQuery = ""
@@ -101,7 +105,11 @@ struct NoteEditorScreen: View {
             initialContentOffsetY: initialEditorContentOffsetY,
             onContentOffsetYChange: persistEditorContentOffsetY
         )
+        #if os(iOS)
+        .background(NotoTheme.background)
+        #else
         .background(AppTheme.background)
+        #endif
         #if os(macOS)
         .background {
             NoteEditorWindowReader(window: $hostingWindow)
@@ -123,6 +131,10 @@ struct NoteEditorScreen: View {
             onMoveRequested: { showMoveSheet = true },
             onDeleteRequested: { showDeleteConfirmation = true },
             onSearchRequested: showFind,
+            onShowProperties: { showProperties = true },
+            propertyCount: propertyCount,
+            showsScrolledTitle: showsScrolledTitle,
+            scrolledTitle: MarkdownNote.titleFrom(session.content),
             canNavigateBack: canNavigateBack,
             canNavigateForward: canNavigateForward,
             onNavigateBack: onNavigateBack,
@@ -131,6 +143,13 @@ struct NoteEditorScreen: View {
         ))
         .overlay {
             navigationHistorySwipeEdges
+        }
+        .sheet(isPresented: $showProperties) {
+            PropertiesSheet(session: session) {
+                showProperties = false
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         #elseif os(macOS)
         .modifier(EditorNavigationChrome(
@@ -295,10 +314,24 @@ struct NoteEditorScreen: View {
         #if os(iOS)
         persistedScrollNotePath = session.note.fileURL.path
         persistedScrollOffsetY = Double(offsetY)
+        // Reveal the note title in the top bar once the document title scrolls
+        // out of view (v2 scrolled top-bar state).
+        let shouldShowTitle = offsetY > 48
+        if shouldShowTitle != showsScrolledTitle {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showsScrolledTitle = shouldShowTitle
+            }
+        }
         #endif
     }
 
     #if os(iOS)
+    /// Number of YAML frontmatter fields — shown as the "Properties" subtitle in
+    /// the More menu (replaces the old inline "Metadata N" block).
+    private var propertyCount: Int {
+        EditableFrontmatterDocument(markdown: session.content)?.fields.count ?? 0
+    }
+
     private var navigationHistorySwipeEdges: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {

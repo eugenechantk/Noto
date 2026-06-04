@@ -723,7 +723,7 @@ private enum MarkdownTheme {
     static let todoTextStartOffset = MarkdownVisualSpec.todoTextStartOffset
 
     #if os(iOS)
-    static let bodyColor: PlatformColor = AppTheme.uiPrimaryText
+    static let bodyColor: PlatformColor = NotoTheme.uiInk
     static let prefixColor: PlatformColor = AppTheme.uiMutedText
     static let checkedTextColor: PlatformColor = AppTheme.uiSecondaryText
     static let todoUncheckedColor: PlatformColor = .systemGray2
@@ -2857,6 +2857,11 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var findHighlightViews: [UIView] = []
     private var dividerLineViews: [Int: UIView] = [:]
     private var imageOverlayViews: [Int: UIImageView] = [:]
+    // v2 redesign: the inline "Metadata" frontmatter block is removed from the
+    // editor — properties are surfaced via the More menu → Properties sheet. The
+    // frontmatter text stays collapsed (~0 height) in the document. Set true to
+    // restore the legacy inline block (rendering code retained below).
+    private let rendersInlineFrontmatterBlock = false
     private var isFrontmatterBlockExpanded = false
     private var frontmatterBlockView: FrontmatterBlockView?
     private var frontmatterHeaderButton: UIButton?
@@ -2869,7 +2874,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = AppTheme.uiBackground
+        view.backgroundColor = NotoTheme.uiBackground
 
         // UITextView uses TextKit 2 by default on iOS 16+.
         // We hook into its existing stack via delegates.
@@ -2889,7 +2894,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
         textView.font = MarkdownTheme.bodyFont
         textView.textColor = MarkdownTheme.bodyColor
-        textView.backgroundColor = AppTheme.uiBackground
+        textView.backgroundColor = NotoTheme.uiBackground
+        textView.tintColor = NotoTheme.uiAccent
         textView.textContainerInset = UIEdgeInsets(
             top: editorTopTextInset,
             left: minimumHorizontalTextInset,
@@ -3119,20 +3125,27 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func makeInputAccessoryView() -> UIView {
-        let toolbar = EditorAccessoryView(frame: CGRect(x: 0, y: 0, width: 0, height: 56))
-        toolbar.backgroundColor = .clear
+        // v2 design (`NotoToolbarArticle`): full-width bar (#1A1C22) with a top
+        // hairline, a horizontally-scrolling rail of formatting icons, and a
+        // pinned "Done" (keyboard-dismiss) on the trailing edge behind a vertical
+        // hairline divider so it stays visible regardless of rail content.
+        let barHeight: CGFloat = 52
+        let toolbar = EditorAccessoryView(frame: CGRect(x: 0, y: 0, width: 0, height: barHeight))
+        toolbar.backgroundColor = UIColor(hex: 0x1A1C22)
         toolbar.accessibilityIdentifier = "note_editor_toolbar"
 
-        let glassEffect = UIGlassEffect()
-        glassEffect.isInteractive = true
-        let pill = UIVisualEffectView(effect: glassEffect)
-        pill.backgroundColor = .clear
-        pill.layer.cornerRadius = 22
-        pill.layer.cornerCurve = .continuous
-        pill.clipsToBounds = true
-        pill.translatesAutoresizingMaskIntoConstraints = false
+        let topHairline = UIView()
+        topHairline.translatesAutoresizingMaskIntoConstraints = false
+        topHairline.backgroundColor = UIColor.white.withAlphaComponent(0.10)
+        toolbar.addSubview(topHairline)
 
-        let stackView = UIStackView(arrangedSubviews: [
+        let rail = UIScrollView()
+        rail.translatesAutoresizingMaskIntoConstraints = false
+        rail.showsHorizontalScrollIndicator = false
+        rail.alwaysBounceHorizontal = true
+        rail.contentInsetAdjustmentBehavior = .never
+
+        let railStack = UIStackView(arrangedSubviews: [
             makeToolbarButton(
                 systemName: "checklist",
                 accessibilityIdentifier: "toggle_todo_button",
@@ -3169,28 +3182,61 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
                 accessibilityLabel: "Insert Image",
                 action: #selector(insertImageFromPhotoLibrary)
             ),
-            makeToolbarButton(
-                systemName: "keyboard.chevron.compact.down",
-                accessibilityIdentifier: "hide_keyboard_button",
-                accessibilityLabel: "Hide Keyboard",
-                action: #selector(hideSoftwareKeyboard)
-            ),
         ])
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        stackView.axis = .horizontal
-        stackView.alignment = .center
-        stackView.spacing = 16
+        railStack.translatesAutoresizingMaskIntoConstraints = false
+        railStack.axis = .horizontal
+        railStack.alignment = .center
+        railStack.spacing = 4
+        rail.addSubview(railStack)
 
-        toolbar.addSubview(pill)
-        pill.contentView.addSubview(stackView)
+        let pinned = UIView()
+        pinned.translatesAutoresizingMaskIntoConstraints = false
+
+        let divider = UIView()
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        divider.backgroundColor = UIColor.white.withAlphaComponent(0.10)
+        pinned.addSubview(divider)
+
+        let doneButton = makeToolbarButton(
+            systemName: "keyboard.chevron.compact.down",
+            accessibilityIdentifier: "hide_keyboard_button",
+            accessibilityLabel: "Hide Keyboard",
+            action: #selector(hideSoftwareKeyboard)
+        )
+        pinned.addSubview(doneButton)
+
+        toolbar.addSubview(rail)
+        toolbar.addSubview(pinned)
+
         NSLayoutConstraint.activate([
-            pill.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -12),
-            pill.topAnchor.constraint(equalTo: toolbar.topAnchor, constant: 4),
-            pill.heightAnchor.constraint(equalToConstant: 44),
+            topHairline.topAnchor.constraint(equalTo: toolbar.topAnchor),
+            topHairline.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
+            topHairline.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
+            topHairline.heightAnchor.constraint(equalToConstant: 0.5),
 
-            stackView.leadingAnchor.constraint(equalTo: pill.contentView.leadingAnchor, constant: 14),
-            stackView.trailingAnchor.constraint(equalTo: pill.contentView.trailingAnchor, constant: -14),
-            stackView.centerYAnchor.constraint(equalTo: pill.contentView.centerYAnchor),
+            rail.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
+            rail.topAnchor.constraint(equalTo: topHairline.bottomAnchor),
+            rail.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor),
+            rail.trailingAnchor.constraint(equalTo: pinned.leadingAnchor),
+
+            railStack.leadingAnchor.constraint(equalTo: rail.contentLayoutGuide.leadingAnchor, constant: 8),
+            railStack.trailingAnchor.constraint(equalTo: rail.contentLayoutGuide.trailingAnchor, constant: -8),
+            railStack.topAnchor.constraint(equalTo: rail.contentLayoutGuide.topAnchor),
+            railStack.bottomAnchor.constraint(equalTo: rail.contentLayoutGuide.bottomAnchor),
+            railStack.heightAnchor.constraint(equalTo: rail.frameLayoutGuide.heightAnchor),
+
+            pinned.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
+            pinned.topAnchor.constraint(equalTo: topHairline.bottomAnchor),
+            pinned.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor),
+
+            divider.leadingAnchor.constraint(equalTo: pinned.leadingAnchor),
+            divider.topAnchor.constraint(equalTo: pinned.topAnchor, constant: 9),
+            divider.bottomAnchor.constraint(equalTo: pinned.bottomAnchor, constant: -9),
+            divider.widthAnchor.constraint(equalToConstant: 0.5),
+
+            doneButton.leadingAnchor.constraint(equalTo: divider.trailingAnchor, constant: 6),
+            doneButton.trailingAnchor.constraint(equalTo: pinned.trailingAnchor, constant: -8),
+            doneButton.centerYAnchor.constraint(equalTo: pinned.centerYAnchor),
         ])
 
         return toolbar
@@ -3205,13 +3251,14 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
         button.setImage(UIImage(systemName: systemName), for: .normal)
-        button.tintColor = AppTheme.uiPrimaryText
+        // Idle glyph color per design (rgba(229,229,231,0.62)).
+        button.tintColor = AppTheme.uiPrimaryText.withAlphaComponent(0.62)
         button.accessibilityIdentifier = accessibilityIdentifier
         button.accessibilityLabel = accessibilityLabel
         button.addTarget(self, action: action, for: .touchUpInside)
         NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: 28),
-            button.heightAnchor.constraint(equalToConstant: 28),
+            button.widthAnchor.constraint(equalToConstant: 36),
+            button.heightAnchor.constraint(equalToConstant: 36),
         ])
         return button
     }
@@ -4452,7 +4499,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private var frontmatterReservedHeight: CGFloat {
-        markdownDelegate.frontmatterDocument == nil ? 0 : FrontmatterBlockLayout.reservedTopInset
+        guard rendersInlineFrontmatterBlock else { return 0 }
+        return markdownDelegate.frontmatterDocument == nil ? 0 : FrontmatterBlockLayout.reservedTopInset
     }
 
     private var editorTopTextInset: CGFloat {
@@ -4673,6 +4721,10 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func refreshFrontmatterControls() {
+        guard rendersInlineFrontmatterBlock else {
+            clearFrontmatterControls()
+            return
+        }
         guard let layout = frontmatterControlLayout(),
               layout.blockRect.intersects(textView.bounds.insetBy(dx: -8, dy: -80)) else {
             clearFrontmatterControls()
