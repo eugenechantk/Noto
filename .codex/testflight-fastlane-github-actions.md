@@ -9,6 +9,8 @@ This repo now has a first-pass Fastlane lane and a GitHub Actions workflow for T
 - Lane: `bundle exec fastlane ios deploy_testflight`
 - Signing: `match(type: "appstore", readonly: true)`
 - Upload: `upload_to_testflight` with App Store Connect API key auth
+- Build number: UTC timestamp in `YYYYMMDDHHMM` format unless `BUILD_NUMBER` is explicitly provided
+- Changelog: `TESTFLIGHT_CHANGELOG`; GitHub push runs default to the head commit message
 
 Runs fail during preflight when deployment secrets are not configured. This keeps TestFlight CI honest: a green run means the upload lane actually had the required configuration.
 
@@ -34,7 +36,7 @@ Run this after exporting the same env vars locally:
 ```sh
 bundle exec fastlane --env local ios verify_app_store_record
 bundle exec fastlane --env local ios bootstrap_match
-bundle exec fastlane --env local ios deploy_testflight
+TESTFLIGHT_CHANGELOG="Describe what changed in this build." bundle exec fastlane --env local ios deploy_testflight
 ```
 
 For a non-upload signing check after bootstrapping, run match directly:

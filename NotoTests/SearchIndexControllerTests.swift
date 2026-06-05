@@ -97,6 +97,15 @@ private final class AppSearchIndexProbe: @unchecked Sendable {
             removeFile: { [self] _, fileURL in
                 record("remove:\(fileURL.lastPathComponent)")
                 return SearchIndexStats(noteCount: 0, sectionCount: 0)
+            },
+            rebuildIndex: { [self] _ in
+                record("rebuild")
+                return SearchIndexRefreshResult(
+                    scanned: 1,
+                    upserted: 1,
+                    deleted: 0,
+                    stats: SearchIndexStats(noteCount: 1, sectionCount: 1)
+                )
             }
         )
     }

@@ -1981,6 +1981,10 @@ final class TextKit2EditorCoordinator {
     private(set) var isApplyingEditorText = false
     private(set) var lastPublishedText: String
     private var lastPublishedTextBeforeApplying: String?
+    /// Identity of the document currently loaded into the text view. Used to
+    /// force-load content when the editor is reused for a different note even
+    /// while it is the first responder (e.g. tapping a note link in-place).
+    var lastDocumentID: String?
 
     init(text: Binding<String>, onTextChange: ((String) -> Void)?, autoFocus: Bool) {
         _text = text
@@ -2729,6 +2733,7 @@ private final class FrontmatterBlockView: UIView {
 
 struct TextKit2EditorView: UIViewControllerRepresentable {
     @Binding var text: String
+    var documentID: String = ""
     var autoFocus: Bool = false
     var onTextChange: ((String) -> Void)?
     var vaultRootURL: URL?
@@ -2764,6 +2769,7 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
             onStatusChange: onFindStatusChange
         )
         vc.loadText(text)
+        context.coordinator.lastDocumentID = documentID
         vc.restoreInitialContentOffsetIfNeeded(id: scrollRestorationID, offsetY: initialContentOffsetY)
         return vc
     }
@@ -2781,6 +2787,18 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
             navigationRequest: findNavigationRequest,
             onStatusChange: onFindStatusChange
         )
+        // A different note has been loaded into this reused editor (e.g. tapping
+        // a note link in a split layout). Force the content in even while the
+        // text view is first responder, which the guard below would otherwise
+        // block.
+        if context.coordinator.lastDocumentID != documentID {
+            context.coordinator.lastDocumentID = documentID
+            if (vc.textView.text ?? "") != text {
+                vc.loadText(text)
+            }
+            vc.restoreInitialContentOffsetIfNeeded(id: scrollRestorationID, offsetY: initialContentOffsetY)
+            return
+        }
         if !context.coordinator.isUpdatingText,
            text != context.coordinator.lastPublishedText {
             let currentText = vc.textView.text ?? ""
@@ -2793,7 +2811,13 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     }
 }
 
-final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, UITextFieldDelegate, UIGestureRecognizerDelegate, PHPickerViewControllerDelegate {
+final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, UITextFieldDelegate, UIGestureRecognizerDelegate, PHPickerViewControllerDelegate, MarkdownRevealRenderingHost {
+    // MARK: MarkdownRevealRenderingHost primitives
+    var renderTextStorage: NSTextStorage? { textView.textStorage }
+    var renderSelectedRange: NSRange { textView.selectedRange }
+    var renderMarkdownDelegate: MarkdownTextDelegate { markdownDelegate }
+    func refreshTypingAttributes() { updateTypingAttributes() }
+
     static let parentBottomToolbarClearance: CGFloat = 72
     static let keyboardToolbarReadingGap: CGFloat = 24
 
@@ -2828,8 +2852,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var hyperlinkInsertionSheetViewController: HyperlinkInsertionSheetViewController?
     private var pendingPageMentionTriggerLocation: Int?
     private var suppressedPageMentionLocation: Int?
-    private var revealedHyperlinkRanges: [NSRange] = []
-    private var revealedDividerRanges: [NSRange] = []
+    var revealedHyperlinkRanges: [NSRange] = []
+    var revealedDividerRanges: [NSRange] = []
     private var hyperlinkRangesAtTapStart: [NSRange] = []
     private weak var hyperlinkTapRecognizer: UITapGestureRecognizer?
     private var isRestylingText = false
@@ -2844,9 +2868,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var currentScrollRestorationID: String?
     private var didRestoreInitialContentOffset = false
     private var loadingImageURLs: Set<URL> = []
-    private var cachedRenderableBlocks: [MarkdownRenderableBlock] = []
-    private var cachedRenderableBlocksText = ""
-    private var cachedCollapsedXMLTagRanges: [NSRange] = []
+    var cachedRenderableBlocks: [MarkdownRenderableBlock] = []
+    var cachedRenderableBlocksText = ""
+    var cachedCollapsedXMLTagRanges: [NSRange] = []
     private var findQuery = ""
     private var findMatches: [NSRange] = []
     private var selectedFindMatchIndex: Int?
@@ -3955,7 +3979,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         onFindStatusChange?(status)
     }
 
-    private func applyFindHighlights() {
+    func applyFindHighlights() {
         guard isViewLoaded, textView != nil else {
             return
         }
@@ -4143,185 +4167,6 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         }
     }
 
-    private func setRevealedHyperlinkRanges(_ ranges: [NSRange]) {
-        revealedHyperlinkRanges = ranges
-        markdownDelegate.revealedHyperlinkRanges = ranges
-    }
-
-    private func setRevealedDividerRanges(_ ranges: [NSRange]) {
-        revealedDividerRanges = ranges
-        markdownDelegate.revealedDividerRanges = ranges
-    }
-
-    private func updateRevealedMarkdownRangesForSelection(restyle: Bool) {
-        let text = textView.textStorage.mutableString
-        let hyperlinkRanges = hyperlinkRangesOnSelectedLines(in: text, selection: textView.selectedRange)
-        let dividerRanges = dividerRangesOnSelectedLines(in: text, selection: textView.selectedRange)
-        let previousHyperlinkRanges = revealedHyperlinkRanges
-        let previousDividerRanges = revealedDividerRanges
-        let changed = !nsRangesEqual(hyperlinkRanges, revealedHyperlinkRanges)
-            || !nsRangesEqual(dividerRanges, revealedDividerRanges)
-        guard changed else { return }
-
-        setRevealedHyperlinkRanges(hyperlinkRanges)
-        setRevealedDividerRanges(dividerRanges)
-        if restyle {
-            restyleTextPreservingSelection(
-                affectedHyperlinkRanges: previousHyperlinkRanges + hyperlinkRanges,
-                affectedDividerRanges: previousDividerRanges + dividerRanges
-            )
-        } else {
-            applyDividerRenderAttributesToTextStorage(in: previousDividerRanges + dividerRanges)
-            scheduleEditorOverlayRefresh()
-        }
-    }
-
-    private func hyperlinkRangesOnSelectedLines(in text: NSString, selection: NSRange) -> [NSRange] {
-        HyperlinkSelectionRanges.fullRangesOnSelectedLines(in: text, selection: selection)
-    }
-
-    private func dividerRangesOnSelectedLines(in text: NSString, selection: NSRange) -> [NSRange] {
-        DividerMarkdown.rangesOnSelectedLines(in: text, selection: selection)
-    }
-
-    private func nsRangesEqual(_ lhs: [NSRange], _ rhs: [NSRange]) -> Bool {
-        guard lhs.count == rhs.count else { return false }
-        for (left, right) in zip(lhs, rhs) {
-            guard NSEqualRanges(left, right) else { return false }
-        }
-        return true
-    }
-
-    private func restyleTextPreservingSelection(
-        affectedHyperlinkRanges: [NSRange]? = nil,
-        affectedDividerRanges: [NSRange]? = nil
-    ) {
-        applyHyperlinkRenderAttributesToTextStorage(in: affectedHyperlinkRanges)
-        applyDividerRenderAttributesToTextStorage(in: affectedDividerRanges)
-        applyFindHighlights()
-        updateTypingAttributes()
-        scheduleEditorOverlayRefresh()
-    }
-
-    private func applyHyperlinkRenderAttributesToTextStorage(in affectedRanges: [NSRange]? = nil) {
-        let textStorage = textView.textStorage
-        let matches: [HyperlinkMarkdown.Match]
-        if let affectedRanges {
-            matches = hyperlinkMatches(in: affectedRanges)
-        } else {
-            matches = HyperlinkMarkdown.matches(in: textView.text ?? "")
-        }
-
-        for match in matches {
-            guard let url = match.url else { continue }
-            let isRevealed = revealedHyperlinkRanges.contains { NSEqualRanges($0, match.fullRange) }
-            textStorage.removeAttribute(.link, range: match.fullRange)
-            textStorage.addAttributes([
-                .font: MarkdownTheme.bodyFont,
-                .foregroundColor: MarkdownTheme.bodyColor,
-                .underlineStyle: 0,
-            ], range: match.fullRange)
-
-            if !isRevealed {
-                textStorage.addAttributes([
-                    .link: url,
-                    .foregroundColor: MarkdownTheme.linkColor,
-                    .underlineStyle: NSUnderlineStyle.single.rawValue,
-                ], range: match.titleRange)
-            }
-
-            for syntaxRange in hyperlinkSyntaxRanges(for: match) {
-                if isRevealed {
-                    textStorage.addAttributes([
-                        .font: MarkdownTheme.bodyFont,
-                        .foregroundColor: MarkdownTheme.prefixColor,
-                        .underlineStyle: 0,
-                    ], range: syntaxRange)
-                } else {
-                    textStorage.addAttributes([
-                        .font: PlatformFont.systemFont(ofSize: MarkdownVisualSpec.hyperlinkSyntaxVisualWidth, weight: .regular),
-                        .foregroundColor: PlatformColor.clear,
-                        .underlineStyle: 0,
-                    ], range: syntaxRange)
-                }
-            }
-        }
-    }
-
-    private func hyperlinkMatches(in affectedRanges: [NSRange]) -> [HyperlinkMarkdown.Match] {
-        let nsText = textView.textStorage.mutableString
-        guard nsText.length > 0 else { return [] }
-
-        var matches: [HyperlinkMarkdown.Match] = []
-        var seenLocations: Set<Int> = []
-        for range in affectedRanges {
-            guard range.location != NSNotFound else { continue }
-            let safeLocation = max(0, min(range.location, nsText.length))
-            let safeLength = max(0, min(range.length, nsText.length - safeLocation))
-            let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: safeLength))
-            let lineText = nsText.substring(with: lineRange)
-            for match in HyperlinkMarkdown.matches(in: lineText) {
-                let documentMatch = HyperlinkMarkdown.Match(
-                    fullRange: NSRange(location: lineRange.location + match.fullRange.location, length: match.fullRange.length),
-                    titleRange: NSRange(location: lineRange.location + match.titleRange.location, length: match.titleRange.length),
-                    urlRange: NSRange(location: lineRange.location + match.urlRange.location, length: match.urlRange.length),
-                    title: match.title,
-                    urlText: match.urlText
-                )
-                guard seenLocations.insert(documentMatch.fullRange.location).inserted else { continue }
-                matches.append(documentMatch)
-            }
-        }
-        return matches
-    }
-
-    private func hyperlinkSyntaxRanges(for match: HyperlinkMarkdown.Match) -> [NSRange] {
-        [
-            NSRange(location: match.fullRange.location, length: 1),
-            NSRange(location: NSMaxRange(match.titleRange), length: 2),
-            match.urlRange,
-            NSRange(location: NSMaxRange(match.urlRange), length: 1),
-        ]
-    }
-
-    private func applyDividerRenderAttributesToTextStorage(in affectedRanges: [NSRange]? = nil) {
-        let textStorage = textView.textStorage
-        let blocks: [MarkdownRenderableBlock]
-        if let affectedRanges {
-            blocks = renderableBlocks(intersecting: affectedRanges)
-        } else {
-            blocks = currentRenderableBlocks()
-        }
-        var styledLocations: Set<Int> = []
-
-        for block in blocks where block.kind == .divider && !block.isCollapsedXMLTagContent {
-            guard styledLocations.insert(block.paragraphRange.location).inserted else {
-                continue
-            }
-            guard block.visibleLineRange.length > 0,
-                  NSMaxRange(block.visibleLineRange) <= textStorage.length else {
-                continue
-            }
-
-            let isRevealed = revealedDividerRanges.contains { NSEqualRanges($0, block.visibleLineRange) }
-            textStorage.addAttributes([
-                .font: MarkdownTheme.bodyFont,
-                .foregroundColor: isRevealed ? MarkdownTheme.bodyColor : UIColor.clear,
-                .paragraphStyle: MarkdownParagraphStyler.paragraphStyle(
-                    for: isRevealed ? .paragraph : .divider,
-                    text: block.lineText
-                ),
-            ], range: block.visibleLineRange)
-        }
-    }
-
-    private func dividerRefreshRangesForCurrentSelection() -> [NSRange] {
-        var ranges = revealedDividerRanges
-        if let selectedLineRange = selectedLineRange() {
-            ranges.append(selectedLineRange)
-        }
-        return ranges
-    }
 
     private func installHyperlinkTapRecognizer() {
         let recognizer = UITapGestureRecognizer(target: self, action: #selector(handleHyperlinkTap(_:)))
@@ -4663,7 +4508,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         onContentOffsetYChange?(y)
     }
 
-    private func scheduleEditorOverlayRefresh() {
+    func scheduleEditorOverlayRefresh() {
         guard !isOverlayRefreshScheduled else { return }
         isOverlayRefreshScheduled = true
         DispatchQueue.main.async { [weak self] in
@@ -5138,64 +4983,11 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         scheduleEditorOverlayRefresh()
     }
 
-    private func invalidateRenderableBlockCache() {
-        cachedRenderableBlocks = []
-        cachedRenderableBlocksText = ""
-        cachedCollapsedXMLTagRanges = []
-    }
-
-    private func currentRenderableBlocks() -> [MarkdownRenderableBlock] {
-        let text = textView.textStorage.mutableString
-        let collapsedXMLTagRanges = markdownDelegate.collapsedXMLTagRanges
-
-        if text as String == cachedRenderableBlocksText,
-           collapsedXMLTagRanges == cachedCollapsedXMLTagRanges {
-            return cachedRenderableBlocks
-        }
-
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: text,
-            collapsedXMLTagRanges: collapsedXMLTagRanges
-        )
-        cachedRenderableBlocks = blocks
-        cachedRenderableBlocksText = text as String
-        cachedCollapsedXMLTagRanges = collapsedXMLTagRanges
-        return blocks
-    }
-
-    private func renderableBlocks(intersecting ranges: [NSRange]) -> [MarkdownRenderableBlock] {
-        let text = textView.textStorage.mutableString
-        let collapsedXMLTagRanges = markdownDelegate.collapsedXMLTagRanges
-        var blocks: [MarkdownRenderableBlock] = []
-        var seenLocations: Set<Int> = []
-
-        for range in ranges {
-            for block in MarkdownSemanticAnalyzer.renderableBlocks(
-                in: text,
-                collapsedXMLTagRanges: collapsedXMLTagRanges,
-                intersecting: range
-            ) where seenLocations.insert(block.paragraphRange.location).inserted {
-                blocks.append(block)
-            }
-        }
-
-        return blocks
-    }
-
     private func visibleRenderableBlocks() -> [MarkdownRenderableBlock] {
         guard let visibleTextRange = visibleTextRange() else {
             return currentRenderableBlocks()
         }
         return renderableBlocks(intersecting: [visibleTextRange])
-    }
-
-    private func selectedLineRange() -> NSRange? {
-        let nsText = textView.textStorage.mutableString
-        guard nsText.length > 0, textView.selectedRange.location != NSNotFound else { return nil }
-
-        let safeLocation = max(0, min(textView.selectedRange.location, nsText.length))
-        let safeLength = max(0, min(textView.selectedRange.length, nsText.length - safeLocation))
-        return nsText.lineRange(for: NSRange(location: safeLocation, length: safeLength))
     }
 
     private func visibleTextRange() -> NSRange? {
@@ -6073,6 +5865,7 @@ private final class FindHighlightOverlayView: NSView {
 
 struct TextKit2EditorView: NSViewControllerRepresentable {
     @Binding var text: String
+    var documentID: String = ""
     var autoFocus: Bool = false
     var onTextChange: ((String) -> Void)?
     var vaultRootURL: URL?
@@ -6108,6 +5901,7 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
             onStatusChange: onFindStatusChange
         )
         vc.loadText(text)
+        context.coordinator.lastDocumentID = documentID
         return vc
     }
 
@@ -6125,6 +5919,17 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
             navigationRequest: findNavigationRequest,
             onStatusChange: onFindStatusChange
         )
+        // A different note has been loaded into this reused editor (e.g.
+        // clicking a note link in a split layout). Force the content in even
+        // while the text view is first responder, which the guard below would
+        // otherwise block.
+        if context.coordinator.lastDocumentID != documentID {
+            context.coordinator.lastDocumentID = documentID
+            if vc.textView.string != text {
+                vc.loadText(text)
+            }
+            return
+        }
         guard !context.coordinator.isUpdatingText else { return }
         guard text != context.coordinator.lastPublishedText else { return }
         let isFirstResponder = vc.textView.window?.firstResponder === vc.textView
@@ -6135,7 +5940,13 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     }
 }
 
-final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, NSTextStorageDelegate, NSTextFieldDelegate, NSPopoverDelegate {
+final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, NSTextStorageDelegate, NSTextFieldDelegate, NSPopoverDelegate, MarkdownRevealRenderingHost {
+    // MARK: MarkdownRevealRenderingHost primitives
+    var renderTextStorage: NSTextStorage? { textView.textStorage }
+    var renderSelectedRange: NSRange { textView.selectedRange() }
+    var renderMarkdownDelegate: MarkdownTextDelegate { markdownDelegate }
+    func refreshTypingAttributes() { updateTypingAttributes() }
+
     var coordinator: TextKit2EditorCoordinator?
     var vaultRootURL: URL? {
         didSet {
@@ -6166,11 +5977,14 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var hyperlinkObserver: NSObjectProtocol?
     private var hyperlinkInsertionPopover: NSPopover?
     private var scrollBoundsObserver: NSObjectProtocol?
-    private var revealedHyperlinkRanges: [NSRange] = []
-    private var revealedDividerRanges: [NSRange] = []
+    var revealedHyperlinkRanges: [NSRange] = []
+    var revealedDividerRanges: [NSRange] = []
     private var isRestylingText = false
     private var isOverlayRefreshScheduled = false
     private var isImageLayoutInvalidationScheduled = false
+    var cachedRenderableBlocks: [MarkdownRenderableBlock] = []
+    var cachedRenderableBlocksText = ""
+    var cachedCollapsedXMLTagRanges: [NSRange] = []
     private var lastOverlayLayoutSize: NSSize = .zero
     private let minimumHorizontalTextInset: CGFloat = 48
     private let maximumTextWidth: CGFloat = 600
@@ -6589,7 +6403,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         onFindStatusChange?(status)
     }
 
-    private func applyFindHighlights() {
+    func applyFindHighlights() {
         guard isViewLoaded, textView != nil else {
             return
         }
@@ -6666,15 +6480,18 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         DebugTrace.record("mac textDidChange")
         updateFrontmatterMetadata(for: textView.string)
         _ = syncTextContainerInsets()
+        invalidateRenderableBlockCache()
         if !isRestylingText {
             updateRevealedMarkdownRangesForSelection(restyle: false)
-            applyDividerRenderAttributesToTextStorage()
+            applyDividerRenderAttributesToTextStorage(in: dividerRefreshRangesForCurrentSelection())
         }
         flushTextToBinding()
         updateTypingAttributes()
         scheduleEditorOverlayRefresh()
         updatePageMentionSuggestions()
-        refreshFindMatches(preferredLocation: textView.selectedRange().location, scrollToSelection: false)
+        if !findQuery.isEmpty || !findMatches.isEmpty {
+            refreshFindMatches(preferredLocation: textView.selectedRange().location, scrollToSelection: false)
+        }
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
@@ -7293,132 +7110,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
     }
 
-    private func setRevealedHyperlinkRanges(_ ranges: [NSRange]) {
-        revealedHyperlinkRanges = ranges
-        markdownDelegate.revealedHyperlinkRanges = ranges
-    }
-
-    private func setRevealedDividerRanges(_ ranges: [NSRange]) {
-        revealedDividerRanges = ranges
-        markdownDelegate.revealedDividerRanges = ranges
-    }
-
-    private func updateRevealedMarkdownRangesForSelection(restyle: Bool) {
-        let hyperlinkRanges = hyperlinkRangesOnSelectedLines(in: textView.string, selection: textView.selectedRange())
-        let dividerRanges = dividerRangesOnSelectedLines(in: textView.string, selection: textView.selectedRange())
-        let changed = !nsRangesEqual(hyperlinkRanges, revealedHyperlinkRanges)
-            || !nsRangesEqual(dividerRanges, revealedDividerRanges)
-        guard changed else { return }
-
-        setRevealedHyperlinkRanges(hyperlinkRanges)
-        setRevealedDividerRanges(dividerRanges)
-        if restyle {
-            restyleTextPreservingSelection()
-        } else {
-            applyDividerRenderAttributesToTextStorage()
-            scheduleEditorOverlayRefresh()
-        }
-    }
-
-    private func hyperlinkRangesOnSelectedLines(in text: String, selection: NSRange) -> [NSRange] {
-        HyperlinkSelectionRanges.fullRangesOnSelectedLines(in: text, selection: selection)
-    }
-
-    private func dividerRangesOnSelectedLines(in text: String, selection: NSRange) -> [NSRange] {
-        DividerMarkdown.rangesOnSelectedLines(in: text, selection: selection)
-    }
-
-    private func nsRangesEqual(_ lhs: [NSRange], _ rhs: [NSRange]) -> Bool {
-        guard lhs.count == rhs.count else { return false }
-        for (left, right) in zip(lhs, rhs) {
-            guard NSEqualRanges(left, right) else { return false }
-        }
-        return true
-    }
-
-    private func restyleTextPreservingSelection() {
-        applyHyperlinkRenderAttributesToTextStorage()
-        applyDividerRenderAttributesToTextStorage()
-        applyFindHighlights()
-        updateTypingAttributes()
-        scheduleEditorOverlayRefresh()
-    }
-
-    private func applyHyperlinkRenderAttributesToTextStorage() {
-        guard let textStorage = textView.textStorage else { return }
-        let matches = HyperlinkMarkdown.matches(in: textView.string)
-
-        for match in matches {
-            guard let url = match.url else { continue }
-            let isRevealed = revealedHyperlinkRanges.contains { NSEqualRanges($0, match.fullRange) }
-            textStorage.removeAttribute(.link, range: match.fullRange)
-            textStorage.addAttributes([
-                .font: MarkdownTheme.bodyFont,
-                .foregroundColor: MarkdownTheme.bodyColor,
-                .underlineStyle: 0,
-            ], range: match.fullRange)
-
-            if !isRevealed {
-                textStorage.addAttributes([
-                    .link: url,
-                    .foregroundColor: MarkdownTheme.linkColor,
-                    .underlineStyle: NSUnderlineStyle.single.rawValue,
-                ], range: match.titleRange)
-            }
-
-            for syntaxRange in hyperlinkSyntaxRanges(for: match) {
-                if isRevealed {
-                    textStorage.addAttributes([
-                        .font: MarkdownTheme.bodyFont,
-                        .foregroundColor: MarkdownTheme.prefixColor,
-                        .underlineStyle: 0,
-                    ], range: syntaxRange)
-                } else {
-                    textStorage.addAttributes([
-                        .font: PlatformFont.systemFont(ofSize: MarkdownVisualSpec.hyperlinkSyntaxVisualWidth, weight: .regular),
-                        .foregroundColor: PlatformColor.clear,
-                        .underlineStyle: 0,
-                    ], range: syntaxRange)
-                }
-            }
-        }
-    }
-
-    private func hyperlinkSyntaxRanges(for match: HyperlinkMarkdown.Match) -> [NSRange] {
-        [
-            NSRange(location: match.fullRange.location, length: 1),
-            NSRange(location: NSMaxRange(match.titleRange), length: 2),
-            match.urlRange,
-            NSRange(location: NSMaxRange(match.urlRange), length: 1),
-        ]
-    }
-
-    private func applyDividerRenderAttributesToTextStorage() {
-        guard let textStorage = textView.textStorage else { return }
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.string,
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        )
-
-        for block in blocks where block.kind == .divider && !block.isCollapsedXMLTagContent {
-            guard block.visibleLineRange.length > 0,
-                  NSMaxRange(block.visibleLineRange) <= textStorage.length else {
-                continue
-            }
-
-            let isRevealed = revealedDividerRanges.contains { NSEqualRanges($0, block.visibleLineRange) }
-            textStorage.addAttributes([
-                .font: MarkdownTheme.bodyFont,
-                .foregroundColor: isRevealed ? MarkdownTheme.bodyColor : NSColor.clear,
-                .paragraphStyle: MarkdownParagraphStyler.paragraphStyle(
-                    for: isRevealed ? .paragraph : .divider,
-                    text: block.lineText
-                ),
-            ], range: block.visibleLineRange)
-        }
-    }
-
-    private func scheduleEditorOverlayRefresh() {
+    func scheduleEditorOverlayRefresh() {
         guard !isOverlayRefreshScheduled else { return }
         isOverlayRefreshScheduled = true
         DispatchQueue.main.async { [weak self] in
@@ -7821,10 +7513,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private func refreshDividerLineViews() {
         guard isViewLoaded, textView != nil else { return }
 
-        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
-            in: textView.string,
-            collapsedXMLTagRanges: markdownDelegate.collapsedXMLTagRanges
-        )
+        let blocks = currentRenderableBlocks()
         let visibleRect = textView.visibleRect.insetBy(dx: -8, dy: -80)
         var activeLocations: Set<Int> = []
 
@@ -8024,3 +7713,264 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 }
 
 #endif
+
+// MARK: - Shared Markdown Reveal Rendering
+
+/// Cross-platform coordination for revealing/hiding markdown syntax around the
+/// caret and re-applying hyperlink/divider render attributes. Both the iOS
+/// (`UITextView`) and macOS (`NSTextView`) editor controllers conform to this
+/// and share ONE implementation — all the work happens on `NSTextStorage`,
+/// which UIKit and AppKit both use. Only the few primitives below differ per
+/// platform. Extracting this here keeps the incremental, affected-range-scoped
+/// rendering identical on every platform instead of drifting per controller.
+@MainActor
+protocol MarkdownRevealRenderingHost: AnyObject {
+    var renderTextStorage: NSTextStorage? { get }
+    var renderSelectedRange: NSRange { get }
+    var renderMarkdownDelegate: MarkdownTextDelegate { get }
+
+    var revealedHyperlinkRanges: [NSRange] { get set }
+    var revealedDividerRanges: [NSRange] { get set }
+
+    var cachedRenderableBlocks: [MarkdownRenderableBlock] { get set }
+    var cachedRenderableBlocksText: String { get set }
+    var cachedCollapsedXMLTagRanges: [NSRange] { get set }
+
+    func scheduleEditorOverlayRefresh()
+    func applyFindHighlights()
+    func refreshTypingAttributes()
+}
+
+@MainActor
+extension MarkdownRevealRenderingHost {
+    /// Live document text as `NSString` (avoids bridging the whole document to
+    /// a Swift `String` on every keystroke / selection change).
+    var renderDocumentText: NSString {
+        renderTextStorage?.mutableString ?? ""
+    }
+
+    func setRevealedHyperlinkRanges(_ ranges: [NSRange]) {
+        revealedHyperlinkRanges = ranges
+        renderMarkdownDelegate.revealedHyperlinkRanges = ranges
+    }
+
+    func setRevealedDividerRanges(_ ranges: [NSRange]) {
+        revealedDividerRanges = ranges
+        renderMarkdownDelegate.revealedDividerRanges = ranges
+    }
+
+    func updateRevealedMarkdownRangesForSelection(restyle: Bool) {
+        let text = renderDocumentText
+        let hyperlinkRanges = HyperlinkSelectionRanges.fullRangesOnSelectedLines(in: text, selection: renderSelectedRange)
+        let dividerRanges = DividerMarkdown.rangesOnSelectedLines(in: text, selection: renderSelectedRange)
+        let previousHyperlinkRanges = revealedHyperlinkRanges
+        let previousDividerRanges = revealedDividerRanges
+        let changed = !nsRangesEqual(hyperlinkRanges, revealedHyperlinkRanges)
+            || !nsRangesEqual(dividerRanges, revealedDividerRanges)
+        guard changed else { return }
+
+        setRevealedHyperlinkRanges(hyperlinkRanges)
+        setRevealedDividerRanges(dividerRanges)
+        if restyle {
+            restyleTextPreservingSelection(
+                affectedHyperlinkRanges: previousHyperlinkRanges + hyperlinkRanges,
+                affectedDividerRanges: previousDividerRanges + dividerRanges
+            )
+        } else {
+            applyDividerRenderAttributesToTextStorage(in: previousDividerRanges + dividerRanges)
+            scheduleEditorOverlayRefresh()
+        }
+    }
+
+    func nsRangesEqual(_ lhs: [NSRange], _ rhs: [NSRange]) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        for (left, right) in zip(lhs, rhs) {
+            guard NSEqualRanges(left, right) else { return false }
+        }
+        return true
+    }
+
+    func restyleTextPreservingSelection(
+        affectedHyperlinkRanges: [NSRange]? = nil,
+        affectedDividerRanges: [NSRange]? = nil
+    ) {
+        applyHyperlinkRenderAttributesToTextStorage(in: affectedHyperlinkRanges)
+        applyDividerRenderAttributesToTextStorage(in: affectedDividerRanges)
+        applyFindHighlights()
+        refreshTypingAttributes()
+        scheduleEditorOverlayRefresh()
+    }
+
+    func applyHyperlinkRenderAttributesToTextStorage(in affectedRanges: [NSRange]? = nil) {
+        guard let textStorage = renderTextStorage else { return }
+        let matches: [HyperlinkMarkdown.Match]
+        if let affectedRanges {
+            matches = hyperlinkMatches(in: affectedRanges)
+        } else {
+            matches = HyperlinkMarkdown.matches(in: renderDocumentText as String)
+        }
+
+        for match in matches {
+            guard let url = match.url else { continue }
+            let isRevealed = revealedHyperlinkRanges.contains { NSEqualRanges($0, match.fullRange) }
+            textStorage.removeAttribute(.link, range: match.fullRange)
+            textStorage.addAttributes([
+                .font: MarkdownTheme.bodyFont,
+                .foregroundColor: MarkdownTheme.bodyColor,
+                .underlineStyle: 0,
+            ], range: match.fullRange)
+
+            if !isRevealed {
+                textStorage.addAttributes([
+                    .link: url,
+                    .foregroundColor: MarkdownTheme.linkColor,
+                    .underlineStyle: NSUnderlineStyle.single.rawValue,
+                ], range: match.titleRange)
+            }
+
+            for syntaxRange in hyperlinkSyntaxRanges(for: match) {
+                if isRevealed {
+                    textStorage.addAttributes([
+                        .font: MarkdownTheme.bodyFont,
+                        .foregroundColor: MarkdownTheme.prefixColor,
+                        .underlineStyle: 0,
+                    ], range: syntaxRange)
+                } else {
+                    textStorage.addAttributes([
+                        .font: PlatformFont.systemFont(ofSize: MarkdownVisualSpec.hyperlinkSyntaxVisualWidth, weight: .regular),
+                        .foregroundColor: PlatformColor.clear,
+                        .underlineStyle: 0,
+                    ], range: syntaxRange)
+                }
+            }
+        }
+    }
+
+    func hyperlinkMatches(in affectedRanges: [NSRange]) -> [HyperlinkMarkdown.Match] {
+        let nsText = renderDocumentText
+        guard nsText.length > 0 else { return [] }
+
+        var matches: [HyperlinkMarkdown.Match] = []
+        var seenLocations: Set<Int> = []
+        for range in affectedRanges {
+            guard range.location != NSNotFound else { continue }
+            let safeLocation = max(0, min(range.location, nsText.length))
+            let safeLength = max(0, min(range.length, nsText.length - safeLocation))
+            let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: safeLength))
+            let lineText = nsText.substring(with: lineRange)
+            for match in HyperlinkMarkdown.matches(in: lineText) {
+                let documentMatch = HyperlinkMarkdown.Match(
+                    fullRange: NSRange(location: lineRange.location + match.fullRange.location, length: match.fullRange.length),
+                    titleRange: NSRange(location: lineRange.location + match.titleRange.location, length: match.titleRange.length),
+                    urlRange: NSRange(location: lineRange.location + match.urlRange.location, length: match.urlRange.length),
+                    title: match.title,
+                    urlText: match.urlText
+                )
+                guard seenLocations.insert(documentMatch.fullRange.location).inserted else { continue }
+                matches.append(documentMatch)
+            }
+        }
+        return matches
+    }
+
+    func hyperlinkSyntaxRanges(for match: HyperlinkMarkdown.Match) -> [NSRange] {
+        [
+            NSRange(location: match.fullRange.location, length: 1),
+            NSRange(location: NSMaxRange(match.titleRange), length: 2),
+            match.urlRange,
+            NSRange(location: NSMaxRange(match.urlRange), length: 1),
+        ]
+    }
+
+    func applyDividerRenderAttributesToTextStorage(in affectedRanges: [NSRange]? = nil) {
+        guard let textStorage = renderTextStorage else { return }
+        let blocks: [MarkdownRenderableBlock]
+        if let affectedRanges {
+            blocks = renderableBlocks(intersecting: affectedRanges)
+        } else {
+            blocks = currentRenderableBlocks()
+        }
+        var styledLocations: Set<Int> = []
+
+        for block in blocks where block.kind == .divider && !block.isCollapsedXMLTagContent {
+            guard styledLocations.insert(block.paragraphRange.location).inserted else {
+                continue
+            }
+            guard block.visibleLineRange.length > 0,
+                  NSMaxRange(block.visibleLineRange) <= textStorage.length else {
+                continue
+            }
+
+            let isRevealed = revealedDividerRanges.contains { NSEqualRanges($0, block.visibleLineRange) }
+            textStorage.addAttributes([
+                .font: MarkdownTheme.bodyFont,
+                .foregroundColor: isRevealed ? MarkdownTheme.bodyColor : PlatformColor.clear,
+                .paragraphStyle: MarkdownParagraphStyler.paragraphStyle(
+                    for: isRevealed ? .paragraph : .divider,
+                    text: block.lineText
+                ),
+            ], range: block.visibleLineRange)
+        }
+    }
+
+    func dividerRefreshRangesForCurrentSelection() -> [NSRange] {
+        var ranges = revealedDividerRanges
+        if let selectedLineRange = selectedLineRange() {
+            ranges.append(selectedLineRange)
+        }
+        return ranges
+    }
+
+    func currentRenderableBlocks() -> [MarkdownRenderableBlock] {
+        let text = renderDocumentText
+        let collapsedXMLTagRanges = renderMarkdownDelegate.collapsedXMLTagRanges
+
+        if text as String == cachedRenderableBlocksText,
+           collapsedXMLTagRanges == cachedCollapsedXMLTagRanges {
+            return cachedRenderableBlocks
+        }
+
+        let blocks = MarkdownSemanticAnalyzer.renderableBlocks(
+            in: text,
+            collapsedXMLTagRanges: collapsedXMLTagRanges
+        )
+        cachedRenderableBlocks = blocks
+        cachedRenderableBlocksText = text as String
+        cachedCollapsedXMLTagRanges = collapsedXMLTagRanges
+        return blocks
+    }
+
+    func renderableBlocks(intersecting ranges: [NSRange]) -> [MarkdownRenderableBlock] {
+        let text = renderDocumentText
+        let collapsedXMLTagRanges = renderMarkdownDelegate.collapsedXMLTagRanges
+        var blocks: [MarkdownRenderableBlock] = []
+        var seenLocations: Set<Int> = []
+
+        for range in ranges {
+            for block in MarkdownSemanticAnalyzer.renderableBlocks(
+                in: text,
+                collapsedXMLTagRanges: collapsedXMLTagRanges,
+                intersecting: range
+            ) where seenLocations.insert(block.paragraphRange.location).inserted {
+                blocks.append(block)
+            }
+        }
+
+        return blocks
+    }
+
+    func invalidateRenderableBlockCache() {
+        cachedRenderableBlocks = []
+        cachedRenderableBlocksText = ""
+        cachedCollapsedXMLTagRanges = []
+    }
+
+    func selectedLineRange() -> NSRange? {
+        let nsText = renderDocumentText
+        guard nsText.length > 0, renderSelectedRange.location != NSNotFound else { return nil }
+
+        let safeLocation = max(0, min(renderSelectedRange.location, nsText.length))
+        let safeLength = max(0, min(renderSelectedRange.length, nsText.length - safeLocation))
+        return nsText.lineRange(for: NSRange(location: safeLocation, length: safeLength))
+    }
+}

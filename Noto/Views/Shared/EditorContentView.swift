@@ -100,6 +100,7 @@ struct EditorContentView: View {
         #if os(iOS)
         TextKit2EditorView(
             text: $session.content,
+            documentID: session.note.id.uuidString,
             autoFocus: session.isNew,
             onTextChange: session.handleEditorChange,
             vaultRootURL: session.store.vaultRootURL,
@@ -118,6 +119,7 @@ struct EditorContentView: View {
         #elseif os(macOS)
         TextKit2EditorView(
             text: $session.content,
+            documentID: session.note.id.uuidString,
             autoFocus: session.isNew,
             onTextChange: session.handleEditorChange,
             vaultRootURL: session.store.vaultRootURL,

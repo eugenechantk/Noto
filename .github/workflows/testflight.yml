@@ -37,7 +37,7 @@ jobs:
       FASTLANE_OPT_OUT_USAGE: "1"
       FASTLANE_HIDE_TIMESTAMP: "1"
       FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "120"
-      TESTFLIGHT_CHANGELOG: ${{ inputs.changelog }}
+      TESTFLIGHT_CHANGELOG: ${{ inputs.changelog || github.event.head_commit.message }}
 
     steps:
       - name: Checkout
@@ -74,9 +74,6 @@ jobs:
 
           printf 'Missing TestFlight configuration: %s\n' "${missing[*]}"
           exit 1
-
-      - name: Set build number
-        run: echo "BUILD_NUMBER=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_ENV"
 
       - name: Upload to TestFlight
         run: bundle exec fastlane ios deploy_testflight
