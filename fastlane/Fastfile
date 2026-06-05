@@ -13,18 +13,32 @@ def boolean_env(name, default)
   %w[1 true yes y].include?(value.downcase)
 end
 
+# Hong Kong is UTC+8 year-round (no daylight saving), so a fixed offset is safe
+# regardless of the CI runner's timezone.
+HONG_KONG_UTC_OFFSET = "+08:00".freeze
+
+def hong_kong_now
+  Time.now.getlocal(HONG_KONG_UTC_OFFSET)
+end
+
 def timestamp_build_number
-  ENV["BUILD_NUMBER"].to_s.strip.empty? ? Time.now.utc.strftime("%Y%m%d%H%M") : ENV["BUILD_NUMBER"].strip
+  return ENV["BUILD_NUMBER"].strip unless ENV["BUILD_NUMBER"].to_s.strip.empty?
+
+  # CFBundleVersion must be digits/dots only, so the build number is the Hong
+  # Kong timestamp without separators: YYYYMMDDHHMM.
+  hong_kong_now.strftime("%Y%m%d%H%M")
 end
 
 def testflight_changelog
+  # Prefix the notes with a readable Hong Kong timestamp so each build is
+  # identifiable as "YYYY-MM-DD HH:MM (HKT)" (the build number can't hold the
+  # separators).
+  stamp = "#{hong_kong_now.strftime('%Y-%m-%d %H:%M')} (HKT)"
+
   changelog = ENV["TESTFLIGHT_CHANGELOG"].to_s.strip
-  return changelog unless changelog.empty?
+  changelog = sh("git log -1 --pretty=%B", log: false).strip if changelog.empty?
 
-  git_message = sh("git log -1 --pretty=%B", log: false).strip
-  return git_message unless git_message.empty?
-
-  UI.user_error!("Missing TestFlight changelog. Set TESTFLIGHT_CHANGELOG before deploying.")
+  changelog.empty? ? stamp : "#{stamp}\n\n#{changelog}"
 end
 
 def app_store_connect_key
