@@ -266,59 +266,81 @@ private struct ToolStepView: View {
         }
     }
     private var canExpand: Bool { !step.hits.isEmpty }
+    private static let muted = Color(white: 0.925).opacity(0.55)
+
+    private var stepAction: String {
+        switch step.name {
+        case "grep": return "Searched"
+        case "read": return step.isRunning ? "Reading" : "Read"
+        case "list": return "Listed"
+        default: return step.name.capitalized
+        }
+    }
+    private var stepTarget: String {
+        let arg = (try? JSONSerialization.jsonObject(with: Data(step.arguments.utf8))) as? [String: Any]
+        switch step.name {
+        case "grep": if let q = arg?["query"] as? String, !q.isEmpty { return "‘\(q)’" }; return ""
+        case "read": if let p = arg?["path"] as? String { return NotoChatPath.title(p) }; return ""
+        case "list": if let p = arg?["path"] as? String, !p.isEmpty { return p }; return "the vault"
+        default: return ""
+        }
+    }
+    private var stepMeta: String {   // grep count only, e.g. " · 4 matches in 4 notes"
+        guard step.name == "grep", let s = step.summary, !s.isEmpty else { return "" }
+        return " · " + s
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Button { if canExpand { withAnimation { expanded.toggle() } } } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: glyph).font(.system(size: 12))
-                        .foregroundStyle(NotoChatTokens.faint).frame(width: 16)
-                    Text(step.title).font(NotoChatTokens.Font.toolLabel())
-                        .foregroundStyle(NotoChatTokens.faint).lineLimit(1)
-                    // Only grep shows a trailing count (e.g. "· 4 notes"); read/list don't.
-                    if step.name == "grep", let summary = step.summary, !summary.isEmpty {
-                        Text("· \(summary)").font(NotoChatTokens.Font.secondary())
-                            .foregroundStyle(NotoChatTokens.faint.opacity(0.85)).lineLimit(1)
-                    }
-                    Spacer(minLength: 4)
-                    if step.isRunning {
-                        ProgressView().controlSize(.mini).tint(NotoChatTokens.faint)
-                    } else if canExpand {
-                        Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(NotoChatTokens.faint)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(!canExpand)
-
-            // Expanded grep trace: one row per match → which note + the matching snippet.
-            if expanded {
-                VStack(alignment: .leading, spacing: 5) {
-                    ForEach(Array(step.hits.enumerated()), id: \.offset) { _, hit in
-                        Button { onOpenNote?(hit.path) } label: {
-                            (Text(NotoChatPath.title(hit.path)).foregroundStyle(NotoChatTokens.ink)
-                                + Text("  ›  ").foregroundStyle(NotoChatTokens.faint)
-                                + Text(hit.snippet.trimmingCharacters(in: .whitespaces)).foregroundStyle(NotoChatTokens.faint))
-                                .font(NotoChatTokens.Font.secondary())
-                                .lineLimit(2).multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
+        // Design's ToolBlock: a 1.5px left rule (the "trailing line") + indented content.
+        HStack(alignment: .top, spacing: 0) {
+            Rectangle().fill(Color.white.opacity(0.12)).frame(width: 1.5)
+            VStack(alignment: .leading, spacing: 5) {
+                Button { if canExpand { withAnimation { expanded.toggle() } } } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: glyph).font(.system(size: 13))
+                            .foregroundStyle(Color.white.opacity(0.45)).frame(width: 16)
+                        (Text(stepAction + (stepTarget.isEmpty ? "" : " ")).foregroundStyle(Self.muted)
+                            + Text(stepTarget).foregroundStyle(NotoChatTokens.ink)
+                            + Text(stepMeta).foregroundStyle(NotoChatTokens.faint))
+                            .font(.system(size: 13.5)).lineLimit(1).truncationMode(.tail)
+                        Spacer(minLength: 4)
+                        if step.isRunning {
+                            ProgressView().controlSize(.mini).tint(NotoChatTokens.faint)
+                        } else if canExpand {
+                            Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(NotoChatTokens.faint)
+                                .rotationEffect(.degrees(expanded ? 90 : 0))
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.vertical, 5)
+                    .contentShape(Rectangle())
                 }
-                .padding(.leading, 24)
-                .accessibilityIdentifier("toolStep.result")
+                .buttonStyle(.plain)
+                .disabled(!canExpand)
+
+                // Expanded grep trace: one row per match → note (muted) › snippet (faint).
+                if expanded {
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(Array(step.hits.enumerated()), id: \.offset) { _, hit in
+                            Button { onOpenNote?(hit.path) } label: {
+                                (Text(NotoChatPath.title(hit.path)).foregroundStyle(Self.muted)
+                                    + Text(" › ").foregroundStyle(Color.white.opacity(0.28))
+                                    + Text(hit.snippet.trimmingCharacters(in: .whitespaces)).foregroundStyle(NotoChatTokens.faint))
+                                    .font(.system(size: 12.5)).lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.leading, 24).padding(.bottom, 4)
+                    .accessibilityIdentifier("toolStep.result")
+                }
             }
+            .padding(.leading, 14)
         }
-        .padding(.leading, 2)
-        .overlay(alignment: .leading) {
-            Rectangle().fill(NotoChatTokens.hairline).frame(width: 1)
-                .padding(.leading, 7)
-        }
-        .padding(.leading, 8)
+        .padding(.leading, 3)
         .accessibilityIdentifier("toolStep.\(step.name)")
     }
 }
