@@ -84,6 +84,7 @@ struct ChatSheet: View {
                         .frame(width: 34, height: 34)
                         .chatGlassCircle()
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("chatSheet.close")
 
                 Spacer()
@@ -103,6 +104,13 @@ struct ChatSheet: View {
                         .frame(width: 34, height: 34)
                         .chatGlassCircle()
                 }
+                // Render the menu as a plain button so its label (the Liquid Glass
+                // circle) shows exactly like the ✕ close button — no default pill,
+                // chevron, or accent tint.
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
                 .accessibilityIdentifier("chatSheet.more")
             }
         }
@@ -495,15 +503,19 @@ extension View {
         #endif
     }
 
-    /// iOS/macOS 26 Liquid Glass circle for the sheet's close / more buttons,
-    /// with a translucent material fallback on earlier OSes.
+    /// iOS/macOS 26 Liquid Glass circle for the sheet's close / more buttons.
+    /// A faint fill + hairline border keep the circle legible even over the chat's
+    /// opaque background (where bare `glassEffect` has nothing to refract and reads
+    /// flat); a translucent material fallback covers earlier OSes.
     @ViewBuilder
     func chatGlassCircle() -> some View {
         if #available(iOS 26, macOS 26, *) {
-            glassEffect(.regular.interactive(), in: Circle())
+            background(Color.white.opacity(0.06), in: Circle())
+                .glassEffect(.regular.interactive(), in: Circle())
+                .overlay { Circle().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5) }
         } else {
             background(.ultraThinMaterial, in: Circle())
-                .overlay { Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5) }
+                .overlay { Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5) }
         }
     }
 }

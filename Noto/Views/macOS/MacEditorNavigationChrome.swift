@@ -34,8 +34,105 @@ struct EditorNavigationChrome: ViewModifier {
     // top bar spans the window, the sidebar is full-height (no floating gap), the traffic
     // lights are placed natively in the sidebar's top, and everything aligns — matching
     // the macOS apps (Notes/Mail). The native split provides the sidebar-toggle.
+    @ViewBuilder
     func body(content: Content) -> some View {
-        if showsEditorToolbar {
+        switch mode {
+        case .macInContent:
+            // safeAreaInset places the bar below the window title-bar inset, so it
+            // aligns with the sidebar/chat headers (not up at the traffic-light line).
+            content
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    inContentTopBar
+                }
+        case .macToolbar, .splitClean:
+            nativeToolbarBody(content)
+        case .compactNavigation:
+            content
+        }
+    }
+
+    // MARK: In-content top bar (when a chat sidebar is docked beside the editor)
+
+    private var inContentTopBar: some View {
+        ZStack {
+            // Center: scrolled title.
+            Text(scrolledTitle)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(NotoTheme.head)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: 360)
+                .opacity(showsScrolledTitle ? 1 : 0)
+                .animation(.easeInOut(duration: 0.2), value: showsScrolledTitle)
+                .accessibilityIdentifier("editor_scrolled_title")
+
+            HStack(spacing: 2) {
+                if let onToggleSidebar = leadingControls.onToggleSidebar,
+                   let sidebarSystemImage = leadingControls.sidebarSystemImage {
+                    inContentButton(sidebarSystemImage, id: "sidebar_toggle_button",
+                                    label: leadingControls.sidebarAccessibilityLabel ?? "Toggle Sidebar",
+                                    action: onToggleSidebar)
+                }
+                inContentButton("chevron.left", id: "note_history_back_button", label: "Back") {
+                    onNavigateBack?()
+                }
+                .disabled(!canNavigateBack)
+
+                Spacer(minLength: 0)
+
+                inContentButton("magnifyingglass", id: "editor_search_button", label: "Search in Note",
+                                shortcut: ("f", [.command]), action: onSearchRequested)
+                inContentMoreMenu
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 44)
+        .background(NotoTheme.background)
+    }
+
+    private func inContentButton(
+        _ systemImage: String,
+        id: String,
+        label: String,
+        shortcut: (Character, EventModifiers)? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        let button = Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(NotoTheme.head)
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(id)
+        .accessibilityLabel(label)
+        .help(label)
+        if let shortcut {
+            return AnyView(button.keyboardShortcut(KeyEquivalent(shortcut.0), modifiers: shortcut.1))
+        }
+        return AnyView(button)
+    }
+
+    private var inContentMoreMenu: some View {
+        Menu {
+            moreMenuItems
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(NotoTheme.head)
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityIdentifier("more_menu_button")
+        .accessibilityLabel("More")
+        .help("More")
+    }
+
+    private func nativeToolbarBody(_ content: Content) -> some View {
             content
                 .navigationTitle("")
                 .toolbar {
@@ -94,13 +191,10 @@ struct EditorNavigationChrome: ViewModifier {
                 // scroll-view background (#0E1116) — not a darker translucent bar — while
                 // the sidebar column keeps its native Liquid Glass under the toolbar.
                 .toolbarBackground(.hidden, for: .windowToolbar)
-        } else {
-            content
-        }
     }
 
-    private var moreMenu: some View {
-        Menu {
+    @ViewBuilder
+    private var moreMenuItems: some View {
             if let onShowProperties {
                 Button(action: onShowProperties) {
                     Text("Properties")
@@ -129,6 +223,12 @@ struct EditorNavigationChrome: ViewModifier {
                 .accessibilityIdentifier("editor_word_count_menu_item")
             Text("\(formatted(statusCount.characters)) characters")
                 .accessibilityIdentifier("editor_character_count_menu_item")
+    }
+
+    /// Native-toolbar variant of the more menu (used by `.macToolbar`).
+    private var moreMenu: some View {
+        Menu {
+            moreMenuItems
         } label: {
             Image(systemName: "ellipsis")
         }
@@ -136,15 +236,6 @@ struct EditorNavigationChrome: ViewModifier {
         .accessibilityIdentifier("more_menu_button")
         .accessibilityLabel("More")
         .help("More")
-    }
-
-    private var showsEditorToolbar: Bool {
-        switch mode {
-        case .macToolbar, .splitClean:
-            true
-        case .compactNavigation:
-            false
-        }
     }
 
     private func formatted(_ value: Int) -> String {

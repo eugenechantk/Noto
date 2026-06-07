@@ -481,6 +481,7 @@ struct VaultWorkspaceView: View {
             }
         }
         #elseif os(macOS)
+            HStack(spacing: 0) {
             NotoSplitView(
                 store: store,
                 isSearchPresented: $isSearchPresented,
@@ -516,9 +517,15 @@ struct VaultWorkspaceView: View {
                     EmptyView()
                 }
             )
-        // Liquid Glass floating chat button (bottom-right) that opens the AI chat
-        // as a trailing inspector sidebar. Hidden while the sidebar is open (the
-        // sidebar has its own close button). Routes to Settings if no key yet.
+                // macOS: dock the AI chat as a trailing sidebar next to the editor,
+                // so the window reads as | folder-sidebar + editor | chat sidebar |.
+                if showChat {
+                    Divider()
+                    chatSidebarPanel
+                }
+            }
+        // Liquid Glass floating chat button (bottom-right of the editor) that opens
+        // the chat sidebar. Hidden while the sidebar is open (it has its own close).
         .overlay(alignment: .bottomTrailing) {
             if !showChat {
                 Button {
@@ -536,10 +543,6 @@ struct VaultWorkspaceView: View {
                 .accessibilityIdentifier("macos_chat_button")
                 .accessibilityLabel("AI Chat")
             }
-        }
-        // macOS: dock the AI chat as a native trailing inspector next to the editor.
-        .inspector(isPresented: $showChat) {
-            chatInspectorContent
         }
         .background {
             WindowCommandReader(window: $hostingWindow)
@@ -598,17 +601,20 @@ struct VaultWorkspaceView: View {
         }
     }
 
-    /// macOS: the chat hosted as a trailing inspector sidebar next to the editor.
+    /// macOS: the chat as a fixed-width trailing sidebar column next to the editor.
     /// Opening a cited note keeps the sidebar open (it just changes the detail).
     @ViewBuilder
-    private var chatInspectorContent: some View {
+    private var chatSidebarPanel: some View {
         if let session = chatStore.session {
             ChatSheet(
                 session: session,
                 onOpenNote: { path in handleWorkspaceIntent(.openDocumentLink(path)) },
                 onClose: { showChat = false }
             )
-            .inspectorColumnWidth(min: 320, ideal: 380, max: 560)
+            .frame(width: 380)
+            // Extend into the title-bar inset so the chat header sits at the very top,
+            // level with the editor's in-content top bar (not pushed below it).
+            .ignoresSafeArea(.container, edges: .top)
         }
     }
 
@@ -827,7 +833,9 @@ struct VaultWorkspaceView: View {
 
     private var splitEditorChromeMode: EditorChromeMode {
         #if os(macOS)
-        .macToolbar
+        // In-content top bar so the editor's buttons follow the editor's right edge,
+        // leaving room for the docked AI chat sidebar to its right.
+        .macInContent
         #else
         .compactNavigation(showsInlineBackButton: false)
         #endif
