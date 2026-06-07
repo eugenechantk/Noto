@@ -46,6 +46,7 @@ struct ChatSheet: View {
                         draft: $session.draft,
                         mentioned: $session.pendingMentions,
                         isBusy: session.phase == .thinking || session.phase == .streaming,
+                        vaultURL: vaultURL,
                         onSend: send,
                         onAttach: { showAddContext = true }
                     )
@@ -455,11 +456,41 @@ private struct ComposerView: View {
     @Binding var draft: String
     @Binding var mentioned: [String]
     let isBusy: Bool
+    let vaultURL: URL
     let onSend: () -> Void
     let onAttach: () -> Void
 
+    @State private var allNotes: [VaultNoteRef] = []
+
+    /// The "@…" token currently being typed at the end of the draft (start index + query),
+    /// or nil. Triggers as soon as "@" is typed (empty query → browse all).
+    private var activeMention: (start: String.Index, query: String)? {
+        guard let at = draft.lastIndex(of: "@") else { return nil }
+        if at > draft.startIndex, !draft[draft.index(before: at)].isWhitespace { return nil }
+        let query = String(draft[draft.index(after: at)...])
+        if query.contains(where: { $0.isWhitespace }) { return nil }
+        return (at, query)
+    }
+
+    private var mentionSuggestions: [VaultNoteRef] {
+        guard let m = activeMention else { return [] }
+        let q = m.query.lowercased()
+        return allNotes
+            .filter { !mentioned.contains($0.path) }
+            .filter { q.isEmpty || $0.title.lowercased().contains(q) || $0.path.lowercased().contains(q) }
+            .prefix(6).map { $0 }
+    }
+
+    private func selectMention(_ note: VaultNoteRef) {
+        if !mentioned.contains(note.path) { mentioned.append(note.path) }
+        if let m = activeMention { draft = String(draft[draft.startIndex..<m.start]) }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if !mentionSuggestions.isEmpty {
+                mentionAutocomplete
+            }
             if !mentioned.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
@@ -519,6 +550,43 @@ private struct ComposerView: View {
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
         .accessibilityIdentifier("composer")
+        .task { allNotes = AddContextSheet.enumerateNotes(in: vaultURL) }
+    }
+
+    /// "@" autocomplete: matching notes shown above the input; tap to add as a mention.
+    private var mentionAutocomplete: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(mentionSuggestions) { note in
+                Button { selectMention(note) } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc").font(.system(size: 13))
+                            .foregroundStyle(NotoChatTokens.faint)
+                        Text(note.title)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(NotoChatTokens.ink).lineLimit(1)
+                        if !note.breadcrumb.isEmpty {
+                            Text(note.breadcrumb)
+                                .font(.system(size: 12))
+                                .foregroundStyle(NotoChatTokens.faint).lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 12).frame(height: 38)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("composer.mentionSuggestion.\(note.path)")
+                if note.id != mentionSuggestions.last?.id {
+                    Divider().overlay(Color.white.opacity(0.06))
+                }
+            }
+        }
+        .background(NotoChatTokens.pill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
+        }
+        .accessibilityIdentifier("composer.mentionAutocomplete")
     }
 }
 
