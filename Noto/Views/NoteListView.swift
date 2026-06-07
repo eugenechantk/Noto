@@ -516,6 +516,24 @@ struct VaultWorkspaceView: View {
                     EmptyView()
                 }
             )
+        // Liquid Glass floating chat button (bottom-right), mirroring the iPad dock's
+        // chat entry. Opens the AI chat sheet (or Settings if no OpenRouter key yet).
+        .overlay(alignment: .bottomTrailing) {
+            Button {
+                handleWorkspaceIntent(.openChat)
+            } label: {
+                Image(systemName: "bubble.left")
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundStyle(NotoTheme.head)
+                    .frame(width: 52, height: 52)
+                    .chatGlassCircle()
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(24)
+            .accessibilityIdentifier("macos_chat_button")
+            .accessibilityLabel("AI Chat")
+        }
         .background {
             WindowCommandReader(window: $hostingWindow)
                 .frame(width: 0, height: 0)
