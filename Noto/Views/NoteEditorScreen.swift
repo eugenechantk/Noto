@@ -38,6 +38,7 @@ struct NoteEditorScreen: View {
     @State private var dockHiddenByScroll = false
     @State private var showChat = false
     @State private var showChatKeyAlert = false
+    @StateObject private var chatStore = ChatSessionStore()
     @State private var lastDockScrollY: CGFloat = 0
     #endif
     @State private var statusCount = WordCounter.Count(words: 0, characters: 0)
@@ -187,8 +188,8 @@ struct NoteEditorScreen: View {
             hiddenByScroll: dockHiddenByScroll || isFindVisible
         )
         .sheet(isPresented: $showChat) {
-            if let apiKey = OpenRouterKeyStore.load() {
-                ChatSheet(apiKey: apiKey, vaultURL: store.vaultRootURL, initialMention: noteVaultRelativePath)
+            if let session = chatStore.session {
+                ChatSheet(session: session)
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
@@ -406,7 +407,10 @@ struct NoteEditorScreen: View {
     }
 
     private func presentChat() {
-        if OpenRouterKeyStore.hasKey { showChat = true } else { showChatKeyAlert = true }
+        guard let apiKey = OpenRouterKeyStore.load(), !apiKey.isEmpty else { showChatKeyAlert = true; return }
+        // Reuse the existing session so the conversation persists across dismiss/reopen.
+        chatStore.ensure(apiKey: apiKey, vaultURL: store.vaultRootURL, seedMention: noteVaultRelativePath)
+        showChat = true
     }
 
     private var isCompactChrome: Bool {

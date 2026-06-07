@@ -20,6 +20,9 @@ final class ChatSession: ObservableObject {
     @Published private(set) var phase: Phase = .idle
     /// Display title for the sheet header (custom name, else first user message).
     @Published private(set) var title: String = "New chat"
+    /// Composer state — held here so it survives the sheet being dismissed/reopened.
+    @Published var draft: String = ""
+    @Published var pendingMentions: [String] = []
 
     enum Phase: Equatable {
         case idle
@@ -91,7 +94,7 @@ final class ChatSession: ObservableObject {
     // MARK: Dependencies
 
     private let agent: ChatAgent
-    private let vaultURL: URL
+    let vaultURL: URL
     private var history: [ChatMessage] = []
     private var streamTask: Task<Void, Never>?
 
@@ -129,6 +132,8 @@ final class ChatSession: ObservableObject {
         transcriptID = UUID()
         transcriptCreatedAt = Date()
         title = "New chat"
+        draft = ""
+        pendingMentions = []
         phase = .idle
     }
 
@@ -350,6 +355,22 @@ final class ChatSession: ObservableObject {
             }
         }
         return "Something went wrong. Please try again."
+    }
+}
+
+/// Holds a single persistent `ChatSession` behind a sheet so the conversation,
+/// draft, and pending mentions survive the sheet being dismissed and reopened.
+/// Held as a `@StateObject` by the presenter (stable identity).
+@MainActor
+final class ChatSessionStore: ObservableObject {
+    @Published private(set) var session: ChatSession?
+
+    func ensure(apiKey: String, vaultURL: URL, seedMention: String? = nil) {
+        if session == nil {
+            let s = ChatSession(apiKey: apiKey, vaultURL: vaultURL)
+            if let seedMention { s.pendingMentions = [seedMention] }
+            session = s
+        }
     }
 }
 

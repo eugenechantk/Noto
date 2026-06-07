@@ -5,26 +5,17 @@ import SwiftUI
 /// with interleaved tool trace + SOURCES) and the composer.
 /// See `.claude/notochat-ui/component-breakdown.md`.
 struct ChatSheet: View {
-    @StateObject private var session: ChatSession
+    /// The session is owned by the presenter so the conversation, draft, and
+    /// pending mentions survive the sheet being dismissed and reopened.
+    @ObservedObject var session: ChatSession
     @Environment(\.dismiss) private var dismiss
 
-    private let vaultURL: URL
-    @State private var draft = ""
-    @State private var mentioned: [String]
     @State private var showAddContext = false
     @State private var showHistory = false
     @State private var showRename = false
     @State private var renameText = ""
 
-    /// - Parameters:
-    ///   - apiKey: OpenRouter key (Keychain).
-    ///   - vaultURL: vault root.
-    ///   - initialMention: vault-relative path pre-attached when opened from a note.
-    init(apiKey: String, vaultURL: URL, initialMention: String? = nil) {
-        _session = StateObject(wrappedValue: ChatSession(apiKey: apiKey, vaultURL: vaultURL))
-        self.vaultURL = vaultURL
-        _mentioned = State(initialValue: initialMention.map { [$0] } ?? [])
-    }
+    private var vaultURL: URL { session.vaultURL }
 
     var body: some View {
         ZStack {
@@ -37,8 +28,8 @@ struct ChatSheet: View {
                     messageList
                 }
                 ComposerView(
-                    draft: $draft,
-                    mentioned: $mentioned,
+                    draft: $session.draft,
+                    mentioned: $session.pendingMentions,
                     isBusy: session.phase == .thinking || session.phase == .streaming,
                     onSend: send,
                     onAttach: { showAddContext = true }
@@ -49,8 +40,8 @@ struct ChatSheet: View {
         .preferredColorScheme(.dark)
         .tint(NotoChatTokens.accent)
         .sheet(isPresented: $showAddContext) {
-            AddContextSheet(vaultURL: vaultURL, initiallySelected: Set(mentioned)) { sel in
-                mentioned = sel.sorted()
+            AddContextSheet(vaultURL: vaultURL, initiallySelected: Set(session.pendingMentions)) { sel in
+                session.pendingMentions = sel.sorted()
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
@@ -72,32 +63,50 @@ struct ChatSheet: View {
     // MARK: Header (grabber + title + •••)
 
     private var header: some View {
-        HStack {
+        ZStack {
+            // Center: title
             Text(session.title)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(NotoChatTokens.head)
                 .lineLimit(1)
+                .frame(maxWidth: 210)
                 .accessibilityIdentifier("chatSheet.title")
-            Spacer()
-            Menu {
-                Button("New chat", systemImage: "square.and.pencil") { session.reset() }
-                Button("Chat history", systemImage: "clock") { showHistory = true }
-                Button("Attach files", systemImage: "paperclip") { showAddContext = true }
-                if session.canManage {
-                    Button("Rename chat", systemImage: "pencil") { renameText = session.title; showRename = true }
-                    Button("Delete chat", systemImage: "trash", role: .destructive) { session.deleteCurrentChat() }
+
+            HStack {
+                // Left: close (Liquid Glass circle)
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(NotoChatTokens.ink)
+                        .frame(width: 34, height: 34)
+                        .chatGlassCircle()
                 }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(NotoChatTokens.ink)
-                    .frame(width: 36, height: 36)
+                .accessibilityIdentifier("chatSheet.close")
+
+                Spacer()
+
+                // Right: more actions (Liquid Glass circle)
+                Menu {
+                    Button("New chat", systemImage: "square.and.pencil") { session.reset() }
+                    Button("Chat history", systemImage: "clock") { showHistory = true }
+                    Button("Attach files", systemImage: "paperclip") { showAddContext = true }
+                    if session.canManage {
+                        Button("Rename chat", systemImage: "pencil") { renameText = session.title; showRename = true }
+                        Button("Delete chat", systemImage: "trash", role: .destructive) { session.deleteCurrentChat() }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(NotoChatTokens.ink)
+                        .frame(width: 34, height: 34)
+                        .chatGlassCircle()
+                }
+                .accessibilityIdentifier("chatSheet.more")
             }
-            .accessibilityIdentifier("chatSheet.more")
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .frame(height: 48)
+        .padding(.horizontal, 14)
+        .padding(.top, 8)
+        .frame(height: 52)
     }
 
     private var emptyState: some View {
@@ -137,9 +146,9 @@ struct ChatSheet: View {
     }
 
     private func send() {
-        let text = draft
-        draft = ""
-        session.send(text, mentioned: mentioned)
+        let text = session.draft
+        session.draft = ""
+        session.send(text, mentioned: session.pendingMentions)
     }
 }
 
@@ -387,6 +396,22 @@ private struct ComposerView: View {
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
         .accessibilityIdentifier("composer")
+    }
+}
+
+// MARK: - Liquid Glass circular control (sheet header)
+
+private extension View {
+    /// iOS 26 Liquid Glass circle for the sheet's close / more buttons,
+    /// with a translucent material fallback on earlier OSes.
+    @ViewBuilder
+    func chatGlassCircle() -> some View {
+        if #available(iOS 26, *) {
+            glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            background(.ultraThinMaterial, in: Circle())
+                .overlay { Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5) }
+        }
     }
 }
 

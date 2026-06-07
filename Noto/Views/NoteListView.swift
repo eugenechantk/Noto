@@ -289,6 +289,7 @@ struct VaultWorkspaceView: View {
     @State private var isApplyingSplitHistoryNavigation = false
     @State private var showSettings = false
     @State private var showChat = false
+    @StateObject private var chatStore = ChatSessionStore()
     @State private var hasRestoredSelection = false
     #if os(iOS)
     @State private var splitNoteStackNavigation = NoteStackNavigationState()
@@ -549,17 +550,19 @@ struct VaultWorkspaceView: View {
 
     /// Open the AI chat sheet, or route to Settings if no OpenRouter key is stored yet.
     private func presentChat() {
-        guard OpenRouterKeyStore.hasKey else {
+        guard let apiKey = OpenRouterKeyStore.load(), !apiKey.isEmpty else {
             handleWorkspaceIntent(.openSettings)
             return
         }
+        // Reuse the existing session so the conversation persists across dismiss/reopen.
+        chatStore.ensure(apiKey: apiKey, vaultURL: store.vaultRootURL)
         showChat = true
     }
 
     @ViewBuilder
     private var chatSheetContent: some View {
-        if let apiKey = OpenRouterKeyStore.load() {
-            ChatSheet(apiKey: apiKey, vaultURL: store.vaultRootURL)
+        if let session = chatStore.session {
+            ChatSheet(session: session)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
