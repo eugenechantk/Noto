@@ -153,6 +153,12 @@ struct NotoSidebarView: View {
                         }
                         Divider()
                         Button {
+                            onIntent(.openChat)
+                        } label: {
+                            Label("AI Chat", systemImage: "bubble.left")
+                        }
+                        .accessibilityIdentifier("sidebar_chat_button")
+                        Button {
                             onIntent(.openSettings)
                         } label: {
                             Label("Settings", systemImage: "gearshape")
@@ -259,20 +265,6 @@ struct NotoSidebarView: View {
                 .accessibilityLabel("Settings")
                 .help("Settings")
                 #endif
-
-                Button {
-                    onIntent(.openChat)
-                } label: {
-                    Label("AI Chat", systemImage: "bubble.left")
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: 17, weight: .regular))
-                        .frame(width: sidebarHeaderButtonSize, height: sidebarHeaderButtonSize)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("sidebar_chat_button")
-                .accessibilityLabel("AI Chat")
-                .help("AI Chat")
 
                 Button {
                     onIntent(.openSearch)
