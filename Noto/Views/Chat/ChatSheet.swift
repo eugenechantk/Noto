@@ -268,6 +268,13 @@ private struct ToolStepView: View {
     private var canExpand: Bool { !step.hits.isEmpty }
     private static let muted = Color(white: 0.925).opacity(0.55)
 
+    /// Grep-result note titles can be long enough to push the snippet off-row; cap them with an
+    /// ellipsis so the matched snippet always stays visible after the "›".
+    private static func truncatedTitle(_ path: String, max: Int = 22) -> String {
+        let t = NotoChatPath.title(path)
+        return t.count > max ? String(t.prefix(max - 1)).trimmingCharacters(in: .whitespaces) + "…" : t
+    }
+
     private var stepAction: String {
         switch step.name {
         case "grep": return "Searched"
@@ -323,7 +330,7 @@ private struct ToolStepView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         ForEach(Array(step.hits.enumerated()), id: \.offset) { _, hit in
                             Button { onOpenNote?(hit.path) } label: {
-                                (Text(NotoChatPath.title(hit.path)).foregroundStyle(Self.muted)
+                                (Text(Self.truncatedTitle(hit.path)).foregroundStyle(Self.muted)
                                     + Text(" › ").foregroundStyle(Color.white.opacity(0.28))
                                     + Text(hit.snippet.trimmingCharacters(in: .whitespaces)).foregroundStyle(NotoChatTokens.faint))
                                     .font(.system(size: 12.5)).lineLimit(2)
@@ -391,16 +398,15 @@ private struct DocChip: View {
 private struct ThinkingIndicator: View {
     @State private var on = false
     var body: some View {
-        HStack(spacing: 8) {
-            NotoEyebrow()
-            HStack(spacing: 4) {
-                ForEach(0..<3) { i in
-                    Circle().fill(NotoChatTokens.faint).frame(width: 5, height: 5)
-                        .opacity(on ? 1 : 0.3)
-                        .animation(.easeInOut(duration: 0.6).repeatForever().delay(Double(i) * 0.15), value: on)
-                }
+        // Just the animated dots — no "✶ NOTO" eyebrow before the loading state.
+        HStack(spacing: 4) {
+            ForEach(0..<3) { i in
+                Circle().fill(NotoChatTokens.faint).frame(width: 5, height: 5)
+                    .opacity(on ? 1 : 0.3)
+                    .animation(.easeInOut(duration: 0.6).repeatForever().delay(Double(i) * 0.15), value: on)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear { on = true }
     }
 }
