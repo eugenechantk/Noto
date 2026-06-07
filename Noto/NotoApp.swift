@@ -70,6 +70,13 @@ private struct DefaultWindowHeightReader: NSViewRepresentable {
             guard let window, configuredWindow !== window else { return }
             configuredWindow = window
 
+            // Match the window/title-bar background to the editor body so the top bar
+            // doesn't read as a different shade from the main text background. The
+            // transparent titlebar lets the window's #0E1116 background paint the top
+            // bar instead of AppKit's darker default titlebar backing.
+            window.backgroundColor = NotoTheme.nsBackground
+            window.titlebarAppearsTransparent = true
+
             DispatchQueue.main.async {
                 Self.expandToVisibleScreenHeight(window)
             }
@@ -392,7 +399,14 @@ struct MainAppView: View {
             readwiseSyncController: readwiseSyncController,
             initialDocumentLink: initialDocumentLink
         )
+            // macOS: the window root extends full-height under the (material-hidden) toolbar,
+            // so it must use the editor body color (#0E1116) — not the darker app bg (#0A0A0A)
+            // — for the top bar to read as the same tint as the editor.
+            #if os(macOS)
+            .background(NotoTheme.background)
+            #else
             .background(AppTheme.background)
+            #endif
             .foregroundStyle(AppTheme.primaryText)
             .tint(AppTheme.primaryText)
             .task {

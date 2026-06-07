@@ -38,16 +38,31 @@ struct NotoSplitView<SidebarContent: View, DetailContent: View, IOSDetailRoot: V
     }
 
     #if os(macOS)
+    // v2 design (NotoMac): a floating Liquid Glass source-list sidebar + editor detail.
+    // On macOS 26 (Tahoe) NavigationSplitView provides the floating glass sidebar,
+    // resizable column, and correct traffic-light placement NATIVELY — we keep the
+    // native split (a custom panel would draw over the traffic lights) and only theme
+    // the content. (No backgroundExtensionEffect: with side-by-side native columns the
+    // detail doesn't sit behind the sidebar, and the effect's mirrored blur read as a
+    // distracting reflection at the top.)
     private var macOSSplitView: some View {
         ZStack {
             NavigationSplitView(columnVisibility: $columnVisibility) {
                 sidebar($sidebarSearchText, toggleSidebar)
-                    .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 460)
+                    .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 480)
+                    .environment(\.notoSidebarVisible, isSidebarVisible)
             } detail: {
+                // Let the editor's NSView extend under the (material-hidden) window toolbar
+                // so the top bar reads as the editor's own #0E1116 body color. The editor's
+                // scroll view is pinned to the NSView safe-area guide (see the macOS editor
+                // controller), so the text still clips below the toolbar and does NOT smear
+                // behind the buttons on scroll. The sidebar column keeps its Liquid Glass.
                 detail(toggleSidebar)
-                    .notoBackgroundExtension()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(NotoTheme.background)
+                    .ignoresSafeArea(.container, edges: .top)
             }
-            .navigationSplitViewStyle(.prominentDetail)
+            .navigationSplitViewStyle(.balanced)
             .navigationTitle("Noto")
 
             if isSearchPresented {

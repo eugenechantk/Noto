@@ -61,13 +61,14 @@ struct NotoSidebarView: View {
             }
             #endif
         }
-        .background(AppTheme.sidebarBackground)
+        .notoSidebarBackground()
         .notoSidebarOwnsTopEdge()
         .overlay(alignment: .trailing) {
             Rectangle()
                 .fill(AppTheme.separator.opacity(0.85))
                 .frame(width: 0.5)
                 .allowsHitTesting(false)
+                .notoSidebarHidesTrailingRule()
         }
         .contextMenu {
             sidebarContextMenu
@@ -92,7 +93,130 @@ struct NotoSidebarView: View {
         #endif
     }
 
+    @ViewBuilder
     private var sidebarHeader: some View {
+        vaultSidebarHeader
+    }
+
+    /// v2 design (VaultSidebarContent): explorer nav row (accent `‹ parent` back ·
+    /// new-folder + ⋯ more) over a large folder title + "N folders · M notes" counts.
+    /// Shared across iPhone, iPad, and macOS.
+    private var vaultSidebarHeader: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 0) {
+                if !folderStack.isEmpty {
+                    Button {
+                        folderStack.removeLast()
+                    } label: {
+                        HStack(spacing: 1) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 17, weight: .semibold))
+                            Text(parentTitle)
+                                .font(.system(size: 16, weight: .medium))
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(NotoTheme.accent)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("sidebar_back_button")
+                    .accessibilityLabel("Back")
+                }
+
+                Spacer(minLength: 0)
+
+                // iOS/iPadOS AND macOS: new-folder + more live in the content header,
+                // on the same nav row as the `‹ back` button (matching the iPad layout).
+                HStack(spacing: 20) {
+                    Button {
+                        showNewFolderAlert = true
+                    } label: {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 17, weight: .regular))
+                            .foregroundStyle(NotoTheme.head)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("sidebar_new_folder_button")
+                    .accessibilityLabel("New Folder")
+
+                    Menu {
+                        Button {
+                            onIntent(.createNote(in: currentStore))
+                        } label: {
+                            Label("New Note", systemImage: "doc.badge.plus")
+                        }
+                        Button {
+                            showNewFolderAlert = true
+                        } label: {
+                            Label("New Folder", systemImage: "folder.badge.plus")
+                        }
+                        Divider()
+                        Button {
+                            onIntent(.openSettings)
+                        } label: {
+                            Label("Settings", systemImage: "gearshape")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(NotoTheme.head)
+                            .frame(width: 22, height: 22)
+                            .contentShape(Rectangle())
+                    }
+                    .menuIndicator(.hidden)
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .accessibilityIdentifier("sidebar_more_button")
+                    .accessibilityLabel("More")
+                }
+            }
+            .frame(minHeight: 22)
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(currentPage.title)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(NotoTheme.head)
+                    .lineLimit(1)
+                Text(countsSummary)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(NotoTheme.muted)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+            .padding(.bottom, 10)
+
+            Rectangle()
+                .fill(NotoTheme.hairline)
+                .frame(height: 0.5)
+        }
+        .notoSidebarHeaderTopInset()
+        .notoSidebarHeaderBackground()
+    }
+
+    private var parentTitle: String {
+        if folderStack.count >= 2 {
+            return folderStack[folderStack.count - 2].title
+        }
+        return "Vault"
+    }
+
+    private var countsSummary: String {
+        let folderCount = currentStore.items.reduce(into: 0) { count, item in
+            if case .folder = item { count += 1 }
+        }
+        let noteCount = currentStore.items.reduce(into: 0) { count, item in
+            if case .note = item { count += 1 }
+        }
+        let folderPart = "\(folderCount) folder" + (folderCount == 1 ? "" : "s")
+        let notePart = "\(noteCount) note" + (noteCount == 1 ? "" : "s")
+        return "\(folderPart) · \(notePart)"
+    }
+
+    private var legacySidebarHeader: some View {
         ZStack {
             Text(currentPage.title)
                 .font(.headline)
@@ -155,7 +279,7 @@ struct NotoSidebarView: View {
         .padding(.top, 0)
         .padding(.bottom, 8)
         .notoSidebarHeaderTopInset()
-        .background(AppTheme.sidebarBackground)
+        .notoSidebarHeaderBackground()
     }
 
     private var sidebarHeaderButtonSize: CGFloat {
@@ -348,7 +472,58 @@ private extension View {
         #if os(iOS)
         safeAreaPadding(.top)
         #else
+        // macOS v2: the native split already insets content below the title bar, so
+        // no extra top reserve — the nav row sits at the same level as the editor's
+        // detail toolbar. Traffic lights are repositioned into the sidebar top via
+        // the window chrome (NotoApp).
         self
         #endif
+    }
+
+    /// v2: translucent Liquid Glass sidebar. The panel container provides the glass
+    /// (macOS `macSidebarGlassPanel()`), so the sidebar's own background is clear there;
+    /// iOS paints one uniform dark surface.
+    @ViewBuilder
+    func notoSidebarBackground() -> some View {
+        #if os(iOS)
+        // One uniform dark surface across header + list + bottom. The list paints
+        // AppTheme.sidebarBackground (0x111113) opaquely, so matching it here removes
+        // the two-tone seam (lighter glass at top/bottom vs dark rows region).
+        self.background(AppTheme.sidebarBackground)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func notoSidebarHeaderBackground() -> some View {
+        #if os(iOS)
+        self
+        #else
+        self
+        #endif
+    }
+
+    /// The flush trailing hairline reads wrong against the translucent glass panel.
+    @ViewBuilder
+    func notoSidebarHidesTrailingRule() -> some View {
+        #if os(iOS)
+        self.hidden()
+        #else
+        self.hidden()
+        #endif
+    }
+}
+
+/// Whether the navigation split sidebar is currently expanded. Set by the split
+/// container so the sidebar's toolbar actions can hide when it collapses.
+private struct NotoSidebarVisibleKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var notoSidebarVisible: Bool {
+        get { self[NotoSidebarVisibleKey.self] }
+        set { self[NotoSidebarVisibleKey.self] = newValue }
     }
 }

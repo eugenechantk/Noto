@@ -6187,6 +6187,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var dividerLineViews: [Int: NSView] = [:]
     private var imageOverlayViews: [Int: NSImageView] = [:]
     private var isFrontmatterBlockExpanded = false
+    // v2 redesign: the inline "Metadata" frontmatter block is removed — properties
+    // live in the More menu / form sheet, matching iOS. Suppress draw + reserved inset.
+    private let rendersInlineFrontmatterBlock = false
     private var frontmatterBlockView: FrontmatterBlockView?
     private weak var frontmatterEditingKeyField: NSTextField?
     private weak var frontmatterEditingField: NSTextField?
@@ -6194,6 +6197,12 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
 
     override func loadView() {
         view = NSView()
+        // The detail extends under the (material-hidden) window toolbar, so this view's
+        // backing fills the top-bar strip. Paint it the editor body color (#0E1116) so the
+        // top bar reads as the same tint as the text. The scroll view is pinned to the
+        // safe-area guide below, keeping the actual text clipped under the toolbar.
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NotoTheme.nsBackground.cgColor
     }
 
     override func viewDidLoad() {
@@ -6231,7 +6240,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         textView.isAutomaticTextReplacementEnabled = false
         textView.font = MarkdownTheme.bodyFont
         textView.textColor = MarkdownTheme.bodyColor
-        textView.backgroundColor = AppTheme.nsBackground
+        textView.backgroundColor = NotoTheme.nsBackground
+        textView.drawsBackground = true
         textView.textContainerInset = NSSize(
             width: minimumHorizontalTextInset,
             height: editorTopTextInset
@@ -6278,6 +6288,11 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
+        // Match the scroll view's backing (and its top content-inset zone under the window
+        // toolbar) to the editor body so the transparent top bar reads as the same #0E1116
+        // tint as the text, instead of AppKit's darker default control background.
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = NotoTheme.nsBackground
         scrollView.contentInsets = NSEdgeInsets(
             top: 0,
             left: 0,
@@ -6287,10 +6302,15 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         scrollView.documentView = textView
         scrollView.contentView.postsBoundsChangedNotifications = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
+        // The view extends under the window toolbar (so its #0E1116 backing fills the top
+        // bar), but the scroll view is pinned to the safe-area guide so text clips below the
+        // toolbar and never smears behind the buttons on scroll. Disable AppKit's automatic
+        // content insets so we don't double-inset on top of the safe-area constraint.
+        scrollView.automaticallyAdjustsContentInsets = false
         view.addSubview(scrollView)
 
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -6380,7 +6400,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     }
 
     private var frontmatterReservedHeight: CGFloat {
-        markdownDelegate.frontmatterDocument == nil ? 0 : FrontmatterBlockLayout.reservedTopInset
+        guard rendersInlineFrontmatterBlock else { return 0 }
+        return markdownDelegate.frontmatterDocument == nil ? 0 : FrontmatterBlockLayout.reservedTopInset
     }
 
     private var editorTopTextInset: CGFloat {
@@ -7542,6 +7563,11 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     }
 
     private func refreshFrontmatterBlockView() {
+        guard rendersInlineFrontmatterBlock else {
+            frontmatterBlockView?.removeFromSuperview()
+            frontmatterBlockView = nil
+            return
+        }
         guard let layout = frontmatterControlLayout(),
               layout.blockRect.intersects(textView.visibleRect.insetBy(dx: -8, dy: -80)) else {
             frontmatterBlockView?.removeFromSuperview()

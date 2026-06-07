@@ -24,6 +24,15 @@ struct EditorNavigationChrome: ViewModifier {
     var onNavigateForward: (() -> Void)?
     var onDismiss: () -> Void
 
+    // iPad design: the detail toolbar trailing group is `search + more` (two buttons).
+    // The iPhone minimal editor is `back · more` only (search lives in the ••• menu),
+    // so the standalone search button is gated to regular width.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var showsTrailingSearchButton: Bool {
+        horizontalSizeClass == .regular
+    }
+
     private static let countFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -34,33 +43,41 @@ struct EditorNavigationChrome: ViewModifier {
         content
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(hidesSystemBackButton)
+            // Compact: hide the system back button and provide bare custom buttons (no
+            // Liquid Glass), but KEEP the system nav bar so its scroll-edge background +
+            // principal title animations are preserved. The interactive swipe-back is
+            // re-enabled by InteractivePopGestureEnabler since the system back is hidden.
+            .navigationBarBackButtonHidden(isCompactNavigation ? true : hidesSystemBackButton)
             .toolbar {
                 if case .compactNavigation = mode {
-                    if !leadingControls.isEmpty {
-                        ToolbarItemGroup(placement: .navigationBarLeading) {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        HStack(spacing: 2) {
                             if let onToggleSidebar = leadingControls.onToggleSidebar,
                                let sidebarSystemImage = leadingControls.sidebarSystemImage {
                                 Button {
                                     onToggleSidebar()
                                 } label: {
                                     Image(systemName: sidebarSystemImage)
+                                        .font(.system(size: 18, weight: .regular))
                                 }
+                                .buttonStyle(.plain)
                                 .accessibilityIdentifier("sidebar_toggle_button")
                                 .accessibilityLabel(leadingControls.sidebarAccessibilityLabel ?? "Toggle Sidebar")
                             }
 
-                            if leadingControls.showsBackButton, let onBack = leadingControls.onBack {
-                                Button {
-                                    onBack()
-                                } label: {
-                                    Image(systemName: "chevron.left")
-                                }
-                                .accessibilityIdentifier("back_button")
-                                .accessibilityLabel("Back")
+                            Button {
+                                onDismiss()
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 18, weight: .semibold))
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("back_button")
+                            .accessibilityLabel("Back")
                         }
+                        .foregroundStyle(NotoTheme.head)
                     }
+                    .plainToolbarBackground()
 
                     // v2 redesign: the minimal editor top bar is empty until the note
                     // scrolls; then the note title rises into the center (scrolled state).
@@ -77,14 +94,43 @@ struct EditorNavigationChrome: ViewModifier {
                         }
                     }
 
-                    // v2 design: trailing edge is just the More menu. The note-history
-                    // ‹ › chevrons are intentionally omitted so "back" always pops the
-                    // navigation stack to the file view (predictable navigation).
+                    // v2 design: bare TRAILING group. iPad = `search + more` (two
+                    // buttons); iPhone = `more` only (search is in the ••• menu).
+                    // Note-history chevrons are omitted so back always pops to the file view.
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        moreMenu
+                        HStack(spacing: 2) {
+                            if showsTrailingSearchButton {
+                                Button(action: onSearchRequested) {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.system(size: 18, weight: .regular))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("editor_search_button")
+                                .accessibilityLabel("Search in Note")
+                            }
+                            moreMenu
+                                .buttonStyle(.plain)
+                        }
+                        .foregroundStyle(NotoTheme.head)
                     }
+                    .plainToolbarBackground()
                 }
             }
+            .background(compactPopEnabler)
+    }
+
+    private var isCompactNavigation: Bool {
+        if case .compactNavigation = mode { return true }
+        return false
+    }
+
+    @ViewBuilder
+    private var compactPopEnabler: some View {
+        if isCompactNavigation {
+            InteractivePopGestureEnabler()
+        } else {
+            Color.clear
+        }
     }
 
     private var moreMenu: some View {
@@ -124,6 +170,7 @@ struct EditorNavigationChrome: ViewModifier {
                 .accessibilityIdentifier("editor_character_count_menu_item")
         } label: {
             Image(systemName: "ellipsis")
+                .font(.system(size: 18, weight: .regular))
         }
         .accessibilityIdentifier("more_menu_button")
     }
@@ -241,6 +288,19 @@ private struct BreadcrumbBar: View {
             result.append(Level(name: component, url: currentURL))
         }
         return result
+    }
+}
+
+private extension ToolbarContent {
+    /// Removes the iOS 26 shared Liquid Glass container background from a toolbar item,
+    /// leaving a bare icon. No-op on earlier OSes.
+    @ToolbarContentBuilder
+    func plainToolbarBackground() -> some ToolbarContent {
+        if #available(iOS 26.0, *) {
+            self.sharedBackgroundVisibility(.hidden)
+        } else {
+            self
+        }
     }
 }
 #endif
