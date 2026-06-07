@@ -52,5 +52,37 @@ enum OpenRouterKeyStore {
         SecItemDelete(baseQuery as CFDictionary)
     }
 
+    /// The user's own saved key (if any), else nil.
     static var hasKey: Bool { load()?.isEmpty == false }
+
+    /// The key the chat should use: the user's saved key, else the bundled default
+    /// key shipped with the build. Lets chat work out-of-the-box without BYO.
+    static func resolvedKey() -> String? {
+        if let k = load(), !k.isEmpty { return k }
+        return bundledKey()
+    }
+
+    /// True when chat can run (user key or bundled default present).
+    static var isAvailable: Bool { resolvedKey()?.isEmpty == false }
+
+    /// Bundled default key, written into the app at build time from the
+    /// `NOTO_OPENROUTER_KEY` build setting (see the "Generate Secrets" build phase),
+    /// mirroring `BundleReadwiseBundledTokenProvider`.
+    static func bundledKey() -> String? {
+        if let url = Bundle.main.url(forResource: "OpenRouterDefaultKey", withExtension: "txt"),
+           let raw = try? String(contentsOf: url, encoding: .utf8) {
+            return normalized(raw)
+        }
+        if let raw = Bundle.main.object(forInfoDictionaryKey: "NotoOpenRouterDefaultKey") as? String {
+            return normalized(raw)
+        }
+        return nil
+    }
+
+    private static func normalized(_ value: String) -> String? {
+        let t = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Guard against an unsubstituted build-setting placeholder (e.g. "$(NOTO_…)").
+        guard !t.isEmpty, !t.contains("$(") else { return nil }
+        return t
+    }
 }

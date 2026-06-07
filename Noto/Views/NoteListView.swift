@@ -571,9 +571,10 @@ struct VaultWorkspaceView: View {
         #endif
     }
 
-    /// Open the AI chat sheet, or route to Settings if no OpenRouter key is stored yet.
+    /// Open the AI chat sheet. Uses the user's key or the bundled default; only
+    /// routes to Settings if neither is available.
     private func presentChat() {
-        guard let apiKey = OpenRouterKeyStore.load(), !apiKey.isEmpty else {
+        guard let apiKey = OpenRouterKeyStore.resolvedKey() else {
             handleWorkspaceIntent(.openSettings)
             return
         }

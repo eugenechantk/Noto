@@ -335,15 +335,16 @@
 			);
 			inputPaths = (
 			);
-			name = "Generate Readwise Secrets";
+			name = "Generate Secrets";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ReadwiseDefaultToken.txt",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/OpenRouterDefaultKey.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nOUTPUT=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ReadwiseDefaultToken.txt\"\nrm -f \"$OUTPUT\"\nif [ -n \"${NOTO_READWISE_TOKEN:-}\" ]; then\n  mkdir -p \"$(dirname \"$OUTPUT\")\"\n  /usr/bin/printf \"%s\" \"$NOTO_READWISE_TOKEN\" > \"$OUTPUT\"\nfi\n";
+			shellScript = "set -e\nwrite_secret() {\n  OUT=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/$1\"\n  rm -f \"$OUT\"\n  if [ -n \"$2\" ]; then\n    mkdir -p \"$(dirname \"$OUT\")\"\n    /usr/bin/printf \"%s\" \"$2\" > \"$OUT\"\n  fi\n}\nwrite_secret ReadwiseDefaultToken.txt \"${NOTO_READWISE_TOKEN:-}\"\nwrite_secret OpenRouterDefaultKey.txt \"${NOTO_OPENROUTER_KEY:-}\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

@@ -410,7 +410,7 @@ struct NoteEditorScreen: View {
     }
 
     private func presentChat() {
-        guard let apiKey = OpenRouterKeyStore.load(), !apiKey.isEmpty else { showChatKeyAlert = true; return }
+        guard let apiKey = OpenRouterKeyStore.resolvedKey() else { showChatKeyAlert = true; return }
         // Reuse the existing session so the conversation persists across dismiss/reopen.
         chatStore.ensure(apiKey: apiKey, vaultURL: store.vaultRootURL, seedMention: noteVaultRelativePath)
         showChat = true
