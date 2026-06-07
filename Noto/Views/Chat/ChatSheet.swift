@@ -91,7 +91,6 @@ struct ChatSheet: View {
                 Menu {
                     Button("New chat", systemImage: "square.and.pencil") { session.reset() }
                     Button("Chat history", systemImage: "clock") { showHistory = true }
-                    Button("Attach files", systemImage: "paperclip") { showAddContext = true }
                     if session.canManage {
                         Button("Rename chat", systemImage: "pencil") { renameText = session.title; showRename = true }
                         Button("Delete chat", systemImage: "trash", role: .destructive) { session.deleteCurrentChat() }
