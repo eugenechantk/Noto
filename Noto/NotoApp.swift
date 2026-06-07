@@ -17,6 +17,7 @@ enum NotoAppCommands {
     static let toggleSidebar = Notification.Name("NotoAppCommands.toggleSidebar")
     static let showSearch = Notification.Name("NotoAppCommands.showSearch")
     static let createNote = Notification.Name("NotoAppCommands.createNote")
+    static let openChat = Notification.Name("NotoAppCommands.openChat")
 }
 
 #if os(macOS)
@@ -157,6 +158,11 @@ private struct NotoCommands: Commands {
                 NotificationCenter.default.post(name: NotoAppCommands.showSearch, object: NotoCommandTarget.activeWindow)
             }
             .keyboardShortcut("k", modifiers: [.command])
+
+            Button("AI Chat") {
+                NotificationCenter.default.post(name: NotoAppCommands.openChat, object: NotoCommandTarget.activeWindow)
+            }
+            .keyboardShortcut("l", modifiers: [.command])
 
             Button("Bold") {
                 NoteEditorCommands.requestToggleBold()

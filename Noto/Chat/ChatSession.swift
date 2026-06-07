@@ -123,6 +123,13 @@ final class ChatSession: ObservableObject {
     }
 
     /// Start a fresh conversation (••• → New chat).
+    /// Attach a note as a pending mention if not already present (dedup). Used to
+    /// auto-attach the active editor document when the chat is opened.
+    func attachMention(_ path: String) {
+        guard !path.isEmpty, !pendingMentions.contains(path) else { return }
+        pendingMentions.append(path)
+    }
+
     func reset() {
         streamTask?.cancel(); streamTask = nil
         turns = []

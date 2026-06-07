@@ -357,6 +357,9 @@ struct VaultWorkspaceView: View {
                     showSettings = true
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openChat)) { _ in
+                presentChat()
+            }
             .onChange(of: selectedNote?.fileURL) { _, newURL in
                 persistLastOpenedNoteURL(newURL)
             }
@@ -479,6 +482,9 @@ struct VaultWorkspaceView: View {
                     handleWorkspaceIntent(.openSettings)
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openChat)) { _ in
+                presentChat()
+            }
         }
         #elseif os(macOS)
             NotoSplitView(
@@ -560,6 +566,10 @@ struct VaultWorkspaceView: View {
                 showSettings = true
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openChat)) { notification in
+            guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
+            presentChat()
+        }
         .onChange(of: selectedNote?.fileURL) { _, newURL in
             persistLastOpenedNoteURL(newURL)
         }
@@ -579,8 +589,21 @@ struct VaultWorkspaceView: View {
             return
         }
         // Reuse the existing session so the conversation persists across dismiss/reopen.
-        chatStore.ensure(apiKey: apiKey, vaultURL: store.vaultRootURL)
+        chatStore.ensure(apiKey: apiKey, vaultURL: store.vaultRootURL, seedMention: activeDocVaultRelativePath)
+        // Auto-attach the document open in the editor/detail (iPad/macOS).
+        if let path = activeDocVaultRelativePath { chatStore.session?.attachMention(path) }
         showChat = true
+    }
+
+    /// Vault-relative path of the document currently open in the detail/editor, if any.
+    private var activeDocVaultRelativePath: String? {
+        guard let url = selectedNote?.fileURL else { return nil }
+        let base = store.vaultRootURL.standardizedFileURL.path
+        let full = url.standardizedFileURL.path
+        guard full.hasPrefix(base) else { return nil }
+        var rel = String(full.dropFirst(base.count))
+        if rel.hasPrefix("/") { rel.removeFirst() }
+        return rel.isEmpty ? nil : rel
     }
 
     @ViewBuilder

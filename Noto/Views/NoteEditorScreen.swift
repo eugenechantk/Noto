@@ -413,6 +413,8 @@ struct NoteEditorScreen: View {
         guard let apiKey = OpenRouterKeyStore.resolvedKey() else { showChatKeyAlert = true; return }
         // Reuse the existing session so the conversation persists across dismiss/reopen.
         chatStore.ensure(apiKey: apiKey, vaultURL: store.vaultRootURL, seedMention: noteVaultRelativePath)
+        // Auto-attach the active document — also for an already-open session.
+        if let path = noteVaultRelativePath { chatStore.session?.attachMention(path) }
         showChat = true
     }
 
