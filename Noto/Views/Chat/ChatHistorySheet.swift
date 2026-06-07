@@ -6,6 +6,8 @@ import SwiftUI
 /// See `.claude/notochat-ui/component-breakdown.md`.
 struct ChatHistorySheet: View {
     let vaultURL: URL
+    /// Called with the chosen chat's file URL to resume it.
+    let onSelect: (URL) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var chats: [PastChat] = []
 
@@ -23,20 +25,28 @@ struct ChatHistorySheet: View {
                 } else {
                     List {
                         ForEach(chats) { chat in
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack {
-                                    Text(chat.title).font(.system(size: 16, weight: .semibold))
-                                        .foregroundStyle(NotoChatTokens.head).lineLimit(1)
-                                    Spacer()
-                                    Text(chat.relativeDate).font(NotoChatTokens.Font.secondary())
-                                        .foregroundStyle(NotoChatTokens.faint)
+                            Button {
+                                onSelect(chat.url)
+                                dismiss()
+                            } label: {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack {
+                                        Text(chat.title).font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(NotoChatTokens.head).lineLimit(1)
+                                        Spacer()
+                                        Text(chat.relativeDate).font(NotoChatTokens.Font.secondary())
+                                            .foregroundStyle(NotoChatTokens.faint)
+                                    }
+                                    if !chat.snippet.isEmpty {
+                                        Text(chat.snippet).font(NotoChatTokens.Font.secondary())
+                                            .foregroundStyle(NotoChatTokens.faint).lineLimit(1)
+                                    }
                                 }
-                                if !chat.snippet.isEmpty {
-                                    Text(chat.snippet).font(NotoChatTokens.Font.secondary())
-                                        .foregroundStyle(NotoChatTokens.faint).lineLimit(1)
-                                }
+                                .padding(.vertical, 4)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
-                            .padding(.vertical, 4)
+                            .buttonStyle(.plain)
                             .listRowBackground(Color.clear)
                             .accessibilityIdentifier("chatHistory.row")
                         }
@@ -69,6 +79,7 @@ struct ChatHistorySheet: View {
 
     struct PastChat: Identifiable {
         let id = UUID()
+        let url: URL
         let title: String
         let snippet: String
         let modified: Date
@@ -85,6 +96,7 @@ struct ChatHistorySheet: View {
             let content = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
             let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
             out.append(PastChat(
+                url: url,
                 title: Self.title(from: content, fallback: url.deletingPathExtension().lastPathComponent),
                 snippet: Self.snippet(from: content),
                 modified: modified

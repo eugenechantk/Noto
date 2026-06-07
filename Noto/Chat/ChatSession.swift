@@ -1,5 +1,6 @@
 import Foundation
 import NotoChat
+import NotoVault
 
 /// View-model that drives one AI chat conversation: owns a `ChatAgent`, runs
 /// `sendStreaming` in a Task, and publishes the streamed answer + interleaved
@@ -17,6 +18,8 @@ final class ChatSession: ObservableObject {
 
     @Published private(set) var turns: [ChatTurn] = []
     @Published private(set) var phase: Phase = .idle
+    /// Display title for the sheet header (custom name, else first user message).
+    @Published private(set) var title: String = "New chat"
 
     enum Phase: Equatable {
         case idle
@@ -96,6 +99,11 @@ final class ChatSession: ObservableObject {
     private var transcriptID = UUID()
     private var transcriptCreatedAt = Date()
     private var allMentioned: [String] = []
+    private var customTitle: String?
+    private var lastSources: [String] = []
+
+    /// True once there's a saved/active conversation (enables Rename/Delete).
+    var canManage: Bool { !turns.isEmpty }
 
     /// - Parameters:
     ///   - apiKey: OpenRouter key (BYO, from Keychain).
@@ -116,8 +124,60 @@ final class ChatSession: ObservableObject {
         turns = []
         history = []
         allMentioned = []
+        customTitle = nil
+        lastSources = []
         transcriptID = UUID()
         transcriptCreatedAt = Date()
+        title = "New chat"
+        phase = .idle
+    }
+
+    private let fs: any VaultFileSystem = CoordinatedVaultFileSystem()
+
+    // MARK: Manage the current chat
+
+    private var chatsDir: URL { vaultURL.appendingPathComponent("Chats") }
+    private var currentTitle: String { customTitle ?? firstUserText().map { String($0.prefix(60)) } ?? "Chat" }
+    private func fileURL(forTitle title: String) -> URL {
+        chatsDir.appendingPathComponent(ChatTranscript(title: title).fileName())
+    }
+
+    /// Rename the current chat: delete the old file, re-save under the new title.
+    func rename(to newTitle: String) {
+        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !turns.isEmpty else { return }
+        let oldURL = fileURL(forTitle: currentTitle)
+        customTitle = trimmed
+        title = trimmed
+        fs.delete(at: oldURL)
+        persist()
+    }
+
+    /// Delete the current chat's file and start fresh.
+    func deleteCurrentChat() {
+        fs.delete(at: fileURL(forTitle: currentTitle))
+        reset()
+    }
+
+    /// Load a past chat (from the history list) so it can be viewed and continued.
+    func loadTranscript(from url: URL) {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        let parsed = Self.parse(text, fallbackTitle: url.deletingPathExtension().lastPathComponent)
+        streamTask?.cancel(); streamTask = nil
+        transcriptID = parsed.id ?? UUID()
+        transcriptCreatedAt = parsed.created ?? Date()
+        customTitle = parsed.title
+        title = parsed.title
+        allMentioned = parsed.mentioned
+        lastSources = parsed.sources
+        history = parsed.turns.map { $0.role == .user ? .user($0.text) : .assistant($0.text) }
+        turns = parsed.turns.enumerated().map { idx, t in
+            ChatTurn(
+                role: t.role == .user ? .user : .assistant,
+                blocks: [.text(id: UUID(), t.text)],
+                sources: (t.role == .assistant && idx == parsed.turns.count - 1) ? parsed.sources : []
+            )
+        }
         phase = .idle
     }
 
@@ -131,6 +191,7 @@ final class ChatSession: ObservableObject {
 
         for m in mentioned where !allMentioned.contains(m) { allMentioned.append(m) }
         turns.append(ChatTurn(role: .user, blocks: [.text(id: UUID(), trimmed)], mentioned: mentioned))
+        title = currentTitle
         var assistant = ChatTurn(role: .assistant, blocks: [])
         turns.append(assistant)
         let assistantIndex = turns.count - 1
@@ -188,25 +249,26 @@ final class ChatSession: ObservableObject {
             turns[i].sources = result.sources
             turns[i].hitRoundLimit = result.hitRoundLimit
             history = result.messages
+            lastSources = result.sources
             phase = .idle
-            persist(latestSources: result.sources)
+            persist()
         }
     }
 
     /// Save the chat to `<vault>/Chats/` as a markdown note (chats are first-class notes).
-    private func persist(latestSources: [String]) {
-        let title = firstUserText().map { String($0.prefix(60)) } ?? "Chat"
+    private func persist() {
+        guard !turns.isEmpty else { return }
         let transcript = ChatTranscript(
             id: transcriptID,
-            title: title,
+            title: currentTitle,
             createdAt: transcriptCreatedAt,
             modifiedAt: Date(),
             model: agent.model,
             mentioned: allMentioned,
-            sources: latestSources,
+            sources: lastSources,
             turns: history.filter { $0.role == .user || $0.role == .assistant }
         )
-        saveTranscript(transcript, toChatsDirectory: vaultURL.appendingPathComponent("Chats"))
+        saveTranscript(transcript, toChatsDirectory: chatsDir)
     }
 
     private func firstUserText() -> String? {
@@ -214,6 +276,68 @@ final class ChatSession: ObservableObject {
             if case .text(_, let s)? = turn.blocks.first { return s }
         }
         return nil
+    }
+
+    // MARK: Transcript parsing (resume-from-history)
+
+    struct ParsedTranscript {
+        var id: UUID?
+        var created: Date?
+        var title: String
+        var mentioned: [String]
+        var sources: [String]
+        var turns: [(role: ChatRole, text: String)]
+    }
+
+    /// Parse a saved `Chats/*.md` (frontmatter + `## You` / `## Noto` sections).
+    static func parse(_ text: String, fallbackTitle: String) -> ParsedTranscript {
+        var id: UUID?
+        var created: Date?
+        var title = fallbackTitle
+        var mentioned: [String] = []
+        var sources: [String] = []
+        var turns: [(role: ChatRole, text: String)] = []
+
+        let lines = text.components(separatedBy: "\n")
+        var i = 0
+        if lines.first?.trimmingCharacters(in: .whitespaces) == "---" {
+            i = 1
+            var listKey: String?
+            while i < lines.count, lines[i].trimmingCharacters(in: .whitespaces) != "---" {
+                let line = lines[i].trimmingCharacters(in: .whitespaces)
+                if line.hasPrefix("- "), let key = listKey {
+                    let val = String(line.dropFirst(2))
+                    if key == "mentioned" { mentioned.append(val) } else if key == "sources" { sources.append(val) }
+                } else if let colon = line.firstIndex(of: ":") {
+                    let key = String(line[..<colon]).trimmingCharacters(in: .whitespaces)
+                    let val = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+                    listKey = (val.isEmpty && (key == "mentioned" || key == "sources")) ? key : nil
+                    if key == "id" { id = UUID(uuidString: val) }
+                    if key == "created" { created = ISO8601DateFormatter().date(from: val) }
+                }
+                i += 1
+            }
+            i += 1
+        }
+        var role: ChatRole?
+        var buffer: [String] = []
+        func flush() {
+            if let r = role {
+                let content = buffer.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !content.isEmpty { turns.append((r, content)) }
+            }
+            buffer = []
+        }
+        while i < lines.count {
+            let t = lines[i].trimmingCharacters(in: .whitespaces)
+            if t == "## You" { flush(); role = .user }
+            else if t == "## Noto" { flush(); role = .assistant }
+            else if t.hasPrefix("# ") && !t.hasPrefix("## ") { title = String(t.dropFirst(2)) }
+            else if role != nil { buffer.append(lines[i]) }
+            i += 1
+        }
+        flush()
+        return ParsedTranscript(id: id, created: created, title: title, mentioned: mentioned, sources: sources, turns: turns)
     }
 
     // MARK: Helpers

@@ -13,6 +13,8 @@ struct ChatSheet: View {
     @State private var mentioned: [String]
     @State private var showAddContext = false
     @State private var showHistory = false
+    @State private var showRename = false
+    @State private var renameText = ""
 
     /// - Parameters:
     ///   - apiKey: OpenRouter key (Keychain).
@@ -22,14 +24,6 @@ struct ChatSheet: View {
         _session = StateObject(wrappedValue: ChatSession(apiKey: apiKey, vaultURL: vaultURL))
         self.vaultURL = vaultURL
         _mentioned = State(initialValue: initialMention.map { [$0] } ?? [])
-    }
-
-    private var titleText: String {
-        session.turns.first(where: { $0.role == .user })
-            .flatMap { turn -> String? in
-                if case .text(_, let s)? = turn.blocks.first { return s } else { return nil }
-            }
-            .map { String($0.prefix(40)) } ?? "New chat"
     }
 
     var body: some View {
@@ -62,9 +56,16 @@ struct ChatSheet: View {
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showHistory) {
-            ChatHistorySheet(vaultURL: vaultURL)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+            ChatHistorySheet(vaultURL: vaultURL) { url in
+                session.loadTranscript(from: url)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .alert("Rename chat", isPresented: $showRename) {
+            TextField("Title", text: $renameText)
+            Button("Rename") { session.rename(to: renameText) }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
@@ -72,7 +73,7 @@ struct ChatSheet: View {
 
     private var header: some View {
         HStack {
-            Text(titleText)
+            Text(session.title)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(NotoChatTokens.head)
                 .lineLimit(1)
@@ -82,6 +83,10 @@ struct ChatSheet: View {
                 Button("New chat", systemImage: "square.and.pencil") { session.reset() }
                 Button("Chat history", systemImage: "clock") { showHistory = true }
                 Button("Attach files", systemImage: "paperclip") { showAddContext = true }
+                if session.canManage {
+                    Button("Rename chat", systemImage: "pencil") { renameText = session.title; showRename = true }
+                    Button("Delete chat", systemImage: "trash", role: .destructive) { session.deleteCurrentChat() }
+                }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 18, weight: .semibold))
