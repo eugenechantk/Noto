@@ -38,7 +38,7 @@ struct NoteEditorScreen: View {
     @State private var dockHiddenByScroll = false
     @State private var showChat = false
     @State private var showChatKeyAlert = false
-    @StateObject private var chatStore = ChatSessionStore()
+    @EnvironmentObject private var chatStore: ChatSessionStore
     @State private var lastDockScrollY: CGFloat = 0
     #endif
     @State private var statusCount = WordCounter.Count(words: 0, characters: 0)

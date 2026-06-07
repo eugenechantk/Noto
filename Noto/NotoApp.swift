@@ -372,6 +372,10 @@ struct MainAppView: View {
     @State private var store: MarkdownNoteStore
     @State private var fileWatcher = VaultFileWatcher()
     @State private var dailyNotePrewarmer = DailyNotePrewarmer()
+    // One AI-chat session shared across the whole workspace (list + pushed editor),
+    // so the chat sheet keeps its state when navigation changes the underlying page
+    // (e.g. tapping a citation pushes the editor). Owned here, read via @EnvironmentObject.
+    @StateObject private var chatStore = ChatSessionStore()
     @Environment(\.scenePhase) private var scenePhase
 
     init(
@@ -399,6 +403,7 @@ struct MainAppView: View {
             readwiseSyncController: readwiseSyncController,
             initialDocumentLink: initialDocumentLink
         )
+            .environmentObject(chatStore)
             // macOS: the window root extends full-height under the (material-hidden) toolbar,
             // so it must use the editor body color (#0E1116) — not the darker app bg (#0A0A0A)
             // — for the top bar to read as the same tint as the editor.

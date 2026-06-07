@@ -537,17 +537,35 @@ struct MarkdownText: View {
     private enum Block { case heading(String), bullet(String), paragraph(String) }
 
     private func blocks() -> [Block] {
-        raw.split(separator: "\n", omittingEmptySubsequences: false).compactMap { lineSub in
-            let line = String(lineSub)
-            let t = line.trimmingCharacters(in: .whitespaces)
-            if t.isEmpty { return nil }
+        var result: [Block] = []
+        // The block currently being extended by lazy continuation lines. Markdown joins a
+        // soft-wrapped line (a non-blank line with no block marker) into the preceding block.
+        // Without this, a wrapped bullet's continuation became its own left-flush paragraph —
+        // so the first line (after "• ") sat further right than the rest of the item.
+        var open: Block?
+        func close() { if let o = open { result.append(o); open = nil } }
+
+        for lineSub in raw.split(separator: "\n", omittingEmptySubsequences: false) {
+            let t = String(lineSub).trimmingCharacters(in: .whitespaces)
+            if t.isEmpty { close(); continue }
             // Drop any trailing `[n]: path` citation reference-definition lines (the package
             // already strips them from the final answer; this guards the streamed text too).
-            if t.range(of: "^\\[\\d+\\]:\\s", options: .regularExpression) != nil { return nil }
-            if t.hasPrefix("## ") { return .heading(String(t.dropFirst(3))) }
-            if t.hasPrefix("# ") { return .heading(String(t.dropFirst(2))) }
-            if t.hasPrefix("- ") || t.hasPrefix("* ") { return .bullet(String(t.dropFirst(2))) }
-            return .paragraph(t)
+            if t.range(of: "^\\[\\d+\\]:\\s", options: .regularExpression) != nil { continue }
+            if t.hasPrefix("## ") { close(); result.append(.heading(String(t.dropFirst(3)))); continue }
+            if t.hasPrefix("# ") { close(); result.append(.heading(String(t.dropFirst(2)))); continue }
+            if t.hasPrefix("- ") || t.hasPrefix("* ") {
+                close()
+                open = .bullet(String(t.dropFirst(2)).trimmingCharacters(in: .whitespaces))
+                continue
+            }
+            // Lazy continuation: fold into the open bullet/paragraph; otherwise start a paragraph.
+            switch open {
+            case .bullet(let s): open = .bullet(s + " " + t)
+            case .paragraph(let s): open = .paragraph(s + " " + t)
+            default: open = .paragraph(t)
+            }
         }
+        close()
+        return result
     }
 }

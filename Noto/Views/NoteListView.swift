@@ -289,7 +289,7 @@ struct VaultWorkspaceView: View {
     @State private var isApplyingSplitHistoryNavigation = false
     @State private var showSettings = false
     @State private var showChat = false
-    @StateObject private var chatStore = ChatSessionStore()
+    @EnvironmentObject private var chatStore: ChatSessionStore
     @State private var hasRestoredSelection = false
     #if os(iOS)
     @State private var splitNoteStackNavigation = NoteStackNavigationState()
