@@ -346,6 +346,9 @@ struct VaultWorkspaceView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showChat) {
+                chatSheetContent
+            }
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { _ in
                 openTodayNote()
             }
