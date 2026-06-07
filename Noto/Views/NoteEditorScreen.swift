@@ -189,9 +189,12 @@ struct NoteEditorScreen: View {
         )
         .sheet(isPresented: $showChat) {
             if let session = chatStore.session {
-                ChatSheet(session: session)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
+                ChatSheet(session: session, onOpenNote: { path in
+                    showChat = false
+                    onOpenDocumentLink?(path)
+                })
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
         }
         .alert("Add your OpenRouter API key", isPresented: $showChatKeyAlert) {

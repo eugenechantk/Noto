@@ -42,7 +42,7 @@ import Testing
             switch event {
             case .toolCallStarted(let name, let args):
                 print("  → tool: \(name)(\(args))")
-            case .toolCallFinished(let name, let summary):
+            case .toolCallFinished(let name, let summary, _):
                 print("  ✓ \(name): \(summary)")
             case .textDelta(let delta):
                 streamed += delta
@@ -76,7 +76,7 @@ import Testing
         for try await event in agent.sendStreaming(question) {
             switch event {
             case .toolCallStarted(let name, let args): print("  → \(name)(\(args))")
-            case .toolCallFinished(let name, let summary): print("  ✓ \(name): \(summary)")
+            case .toolCallFinished(let name, let summary, _): print("  ✓ \(name): \(summary)")
             case .textDelta: break
             case .finished(let r): result = r
             }

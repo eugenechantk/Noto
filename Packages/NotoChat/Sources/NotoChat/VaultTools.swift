@@ -59,6 +59,8 @@ public struct ToolRunResult: Sendable, Equatable {
     /// Vault-relative paths this tool exposed to the model (grep hit files, the read file). The
     /// agent uses this to ground citations: only files actually surfaced can be cited.
     public var surfacedPaths: [String] = []
+    /// Per-match (note, snippet) for grep — drives the expanded tool-trace "note › snippet" rows.
+    public var hits: [GrepHit] = []
 }
 
 // MARK: - VaultTools
@@ -182,9 +184,11 @@ public struct VaultTools: Sendable {
             }
             let hits = grep(query: query, path: path, filter: filter)
             let files = Array(Set(hits.map(\.path))).sorted()
+            let noteCount = files.count
             return .init(output: Self.format(hits: hits, query: query), readPath: nil,
-                         summary: "\(hits.count) match\(hits.count == 1 ? "" : "es")",
-                         surfacedPaths: files)
+                         summary: "\(hits.count) match\(hits.count == 1 ? "" : "es") in \(noteCount) note\(noteCount == 1 ? "" : "s")",
+                         surfacedPaths: files,
+                         hits: Array(hits.prefix(8)))
         case "read":
             guard let path = args["path"] as? String, !path.isEmpty else {
                 return .init(output: "Error: read requires a \"path\".", readPath: nil, summary: "read: bad args")

@@ -8,6 +8,8 @@ struct ChatSheet: View {
     /// The session is owned by the presenter so the conversation, draft, and
     /// pending mentions survive the sheet being dismissed and reopened.
     @ObservedObject var session: ChatSession
+    /// Open a cited note (tapped citation / SOURCES row): the presenter dismisses + navigates.
+    var onOpenNote: ((String) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     @State private var showAddContext = false
@@ -125,7 +127,7 @@ struct ChatSheet: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
                     ForEach(session.turns) { turn in
-                        ChatTurnView(turn: turn).id(turn.id)
+                        ChatTurnView(turn: turn, onOpenNote: openNote).id(turn.id)
                     }
                     if session.phase == .thinking {
                         ThinkingIndicator()
@@ -150,16 +152,22 @@ struct ChatSheet: View {
         session.draft = ""
         session.send(text, mentioned: session.pendingMentions)
     }
+
+    /// Tapped a citation / SOURCES row — hand the note to the presenter (which dismisses + opens it).
+    private func openNote(_ path: String) {
+        onOpenNote?(path)
+    }
 }
 
 // MARK: - Turn routing
 
 private struct ChatTurnView: View {
     let turn: ChatSession.ChatTurn
+    var onOpenNote: ((String) -> Void)?
     var body: some View {
         switch turn.role {
         case .user: UserMessageView(turn: turn)
-        case .assistant: AIReplyView(turn: turn)
+        case .assistant: AIReplyView(turn: turn, onOpenNote: onOpenNote)
         }
     }
 }
@@ -195,6 +203,8 @@ private struct UserMessageView: View {
 
 private struct AIReplyView: View {
     let turn: ChatSession.ChatTurn
+    var onOpenNote: ((String) -> Void)?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             NotoEyebrow()
@@ -203,11 +213,11 @@ private struct AIReplyView: View {
                 case .text(_, let s):
                     MarkdownText(s)
                 case .tool(let step):
-                    ToolStepView(step: step)
+                    ToolStepView(step: step, onOpenNote: onOpenNote)
                 }
             }
             if !turn.sources.isEmpty {
-                SourcesView(sources: turn.sources)
+                SourcesView(sources: turn.sources, onOpenNote: onOpenNote)
             }
             if turn.hitRoundLimit {
                 Text("I couldn't fully resolve that — try narrowing the question.")
@@ -215,6 +225,15 @@ private struct AIReplyView: View {
                     .foregroundStyle(NotoChatTokens.faint)
             }
         }
+        .tint(NotoChatTokens.accent)
+        // Inline [n] citations are rendered as `noto-cite:n` links → open sources[n-1].
+        .environment(\.openURL, OpenURLAction { url in
+            guard url.scheme == "noto-cite",
+                  let n = Int(url.absoluteString.replacingOccurrences(of: "noto-cite:", with: "")),
+                  n >= 1, n <= turn.sources.count else { return .systemAction }
+            onOpenNote?(turn.sources[n - 1])
+            return .handled
+        })
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("chat.aiReply")
     }
@@ -235,6 +254,7 @@ private struct NotoEyebrow: View {
 
 private struct ToolStepView: View {
     let step: ChatSession.ToolStep
+    var onOpenNote: ((String) -> Void)?
     @State private var expanded = false
 
     private var glyph: String {
@@ -245,19 +265,25 @@ private struct ToolStepView: View {
         default: return "wrench.and.screwdriver"
         }
     }
+    private var canExpand: Bool { !step.hits.isEmpty }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button { withAnimation { expanded.toggle() } } label: {
-                HStack(spacing: 8) {
+            Button { if canExpand { withAnimation { expanded.toggle() } } } label: {
+                HStack(spacing: 6) {
                     Image(systemName: glyph).font(.system(size: 12))
                         .foregroundStyle(NotoChatTokens.faint).frame(width: 16)
                     Text(step.title).font(NotoChatTokens.Font.toolLabel())
                         .foregroundStyle(NotoChatTokens.faint).lineLimit(1)
+                    // Only grep shows a trailing count (e.g. "· 4 notes"); read/list don't.
+                    if step.name == "grep", let summary = step.summary, !summary.isEmpty {
+                        Text("· \(summary)").font(NotoChatTokens.Font.secondary())
+                            .foregroundStyle(NotoChatTokens.faint.opacity(0.85)).lineLimit(1)
+                    }
                     Spacer(minLength: 4)
                     if step.isRunning {
                         ProgressView().controlSize(.mini).tint(NotoChatTokens.faint)
-                    } else if let summary = step.summary, !summary.isEmpty {
+                    } else if canExpand {
                         Image(systemName: expanded ? "chevron.down" : "chevron.right")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(NotoChatTokens.faint)
@@ -265,14 +291,26 @@ private struct ToolStepView: View {
                 }
             }
             .buttonStyle(.plain)
-            .disabled(step.isRunning || (step.summary ?? "").isEmpty)
+            .disabled(!canExpand)
 
-            if expanded, let summary = step.summary, !summary.isEmpty {
-                Text(summary)
-                    .font(NotoChatTokens.Font.secondary())
-                    .foregroundStyle(NotoChatTokens.faint)
-                    .padding(.leading, 24)
-                    .accessibilityIdentifier("toolStep.result")
+            // Expanded grep trace: one row per match → which note + the matching snippet.
+            if expanded {
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(Array(step.hits.enumerated()), id: \.offset) { _, hit in
+                        Button { onOpenNote?(hit.path) } label: {
+                            (Text(NotoChatPath.title(hit.path)).foregroundStyle(NotoChatTokens.ink)
+                                + Text("  ›  ").foregroundStyle(NotoChatTokens.faint)
+                                + Text(hit.snippet.trimmingCharacters(in: .whitespaces)).foregroundStyle(NotoChatTokens.faint))
+                                .font(NotoChatTokens.Font.secondary())
+                                .lineLimit(2).multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.leading, 24)
+                .accessibilityIdentifier("toolStep.result")
             }
         }
         .padding(.leading, 2)
@@ -289,18 +327,24 @@ private struct ToolStepView: View {
 
 private struct SourcesView: View {
     let sources: [String]
+    var onOpenNote: ((String) -> Void)?
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("SOURCES").font(NotoChatTokens.Font.eyebrow()).tracking(1.0)
                 .foregroundStyle(NotoChatTokens.faint)
             ForEach(Array(sources.enumerated()), id: \.element) { idx, path in
-                HStack(spacing: 8) {
-                    Text("\(idx + 1)").font(NotoChatTokens.Font.secondary())
-                        .foregroundStyle(NotoChatTokens.accent).frame(width: 14)
-                    Image(systemName: "doc").font(.system(size: 12)).foregroundStyle(NotoChatTokens.faint)
-                    Text(NotoChatPath.title(path)).font(NotoChatTokens.Font.secondary())
-                        .foregroundStyle(NotoChatTokens.ink).lineLimit(1)
+                Button { onOpenNote?(path) } label: {
+                    HStack(spacing: 8) {
+                        Text("\(idx + 1)").font(NotoChatTokens.Font.secondary())
+                            .foregroundStyle(NotoChatTokens.accent).frame(width: 14)
+                        Image(systemName: "doc").font(.system(size: 12)).foregroundStyle(NotoChatTokens.faint)
+                        Text(NotoChatPath.title(path)).font(NotoChatTokens.Font.secondary())
+                            .foregroundStyle(NotoChatTokens.ink).lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("sources.row.\(path)")
             }
         }
@@ -354,16 +398,25 @@ private struct ComposerView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(mentioned, id: \.self) { path in
-                            HStack(spacing: 4) {
-                                Image(systemName: "doc").font(.system(size: 11))
-                                Text(NotoChatPath.title(path)).font(NotoChatTokens.Font.secondary()).lineLimit(1)
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc").font(.system(size: 12))
+                                    .foregroundStyle(NotoChatTokens.faint)
+                                Text(NotoChatPath.title(path))
+                                    .font(.system(size: 12.5, weight: .medium))
+                                    .foregroundStyle(NotoChatTokens.ink).lineLimit(1)
                                 Button { mentioned.removeAll { $0 == path } } label: {
-                                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                                    Image(systemName: "xmark").font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(Color.white.opacity(0.55))
                                 }.buttonStyle(.plain)
                             }
-                            .foregroundStyle(NotoChatTokens.faint)
-                            .padding(.horizontal, 9).padding(.vertical, 5)
-                            .background(NotoChatTokens.userPill, in: Capsule())
+                            .padding(.leading, 9).padding(.trailing, 6)
+                            .frame(height: 27)
+                            .background(Color.white.opacity(0.06),
+                                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                            }
                             .accessibilityIdentifier("composer.mentionTag.\(path)")
                         }
                     }
@@ -446,7 +499,13 @@ struct MarkdownText: View {
     }
 
     private func inline(_ s: String) -> Text {
-        if let attr = try? AttributedString(markdown: s,
+        // Turn bare inline citations `[n]` into tappable links (handled by AIReplyView's
+        // openURL → opens the cited note). Skip `[n](…)` and `[n]:` which aren't citations.
+        let linked = s.replacingOccurrences(
+            of: "\\[(\\d+)\\](?![(:])",
+            with: "[$1](noto-cite:$1)",
+            options: .regularExpression)
+        if let attr = try? AttributedString(markdown: linked,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
             return Text(attr)
         }
@@ -460,6 +519,9 @@ struct MarkdownText: View {
             let line = String(lineSub)
             let t = line.trimmingCharacters(in: .whitespaces)
             if t.isEmpty { return nil }
+            // Drop any trailing `[n]: path` citation reference-definition lines (the package
+            // already strips them from the final answer; this guards the streamed text too).
+            if t.range(of: "^\\[\\d+\\]:\\s", options: .regularExpression) != nil { return nil }
             if t.hasPrefix("## ") { return .heading(String(t.dropFirst(3))) }
             if t.hasPrefix("# ") { return .heading(String(t.dropFirst(2))) }
             if t.hasPrefix("- ") || t.hasPrefix("* ") { return .bullet(String(t.dropFirst(2))) }

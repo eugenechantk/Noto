@@ -22,14 +22,13 @@ import Testing
          .finished(reason: "tool_calls")]
     }
 
-    // Real models write the final answer in the same turn as the cite call.
-    private func citeCallRound(paths: [String], answer: String? = nil) -> [ChatStreamEvent] {
-        let json = "{\"paths\":[" + paths.map { "\"\($0)\"" }.joined(separator: ",") + "]}"
-        var events: [ChatStreamEvent] = []
-        if let answer { events.append(.textDelta(answer)) }
-        events.append(.toolCalls([ToolCall(id: "cite1", function: .init(name: "cite", arguments: json))]))
-        events.append(.finished(reason: "tool_calls"))
-        return events
+    // Final answer turn: inline-cited text plus trailing `[n]: path` reference lines (no cite tool).
+    private func answerRound(_ answer: String, refs: [String] = []) -> [ChatStreamEvent] {
+        var text = answer
+        if !refs.isEmpty {
+            text += "\n\n" + refs.enumerated().map { "[\($0.offset + 1)]: \($0.element)" }.joined(separator: "\n")
+        }
+        return [.textDelta(text), .finished(reason: "stop")]
     }
 
     @Test func runsToolRoundThenAnswersAndCollectsSources() async throws {
@@ -65,7 +64,7 @@ import Testing
         for try await event in agent.sendStreaming("q") {
             switch event {
             case .toolCallStarted(let name, _): if name == "read" { sawToolStart = true }
-            case .toolCallFinished(let name, _): if name == "read" { sawToolFinish = true }
+            case .toolCallFinished(let name, _, _): if name == "read" { sawToolFinish = true }
             case .textDelta(let d): text += d
             case .finished: break
             }
@@ -118,15 +117,16 @@ import Testing
     @Test func citesGrepSurfacedFilesWithoutReading() async throws {
         let root = try vault()
         defer { TempVault.remove(root) }
-        // grep surfaces Note.md → model cites it (no read) → it becomes a source.
+        // grep surfaces Note.md → model cites it inline (no read) → it becomes a source,
+        // and the trailing `[1]: path` reference line is stripped from the answer.
         let client = ScriptedClient(rounds: [
             grepCallRound(query: "answer"),
-            citeCallRound(paths: ["Note.md"], answer: "It's 42, per your note."),
+            answerRound("It's 42, per your note. [1]", refs: ["Note.md"]),
         ])
         let agent = ChatAgent(client: client, tools: VaultTools(root: root))
 
         let result = try await agent.send("What's the answer?")
-        #expect(result.answer == "It's 42, per your note.")
+        #expect(result.answer == "It's 42, per your note. [1]")
         #expect(result.sources == ["Note.md"]) // cited from grep, never read
     }
 
@@ -135,9 +135,8 @@ import Testing
         defer { TempVault.remove(root) }
         // Model cites a path the tools never surfaced → it must be dropped (grounded citations).
         let client = ScriptedClient(rounds: [
-            grepCallRound(query: "answer"),          // surfaces Note.md
-            citeCallRound(paths: ["Ghost.md"]),      // not a surfaced file
-            [.textDelta("done"), .finished(reason: "stop")],
+            grepCallRound(query: "answer"),                       // surfaces Note.md
+            answerRound("done [1]", refs: ["Ghost.md"]),          // Ghost.md not surfaced
         ])
         let agent = ChatAgent(client: client, tools: VaultTools(root: root))
 

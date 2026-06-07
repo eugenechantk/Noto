@@ -63,10 +63,11 @@ final class ChatSession: ObservableObject {
     /// (collapsed = the call, expanded = the result/summary).
     struct ToolStep: Identifiable, Equatable {
         let id = UUID()
-        var name: String        // "grep" | "read" | "list" | "cite"
+        var name: String        // "grep" | "read" | "list"
         var arguments: String   // raw JSON args from the model
         var summary: String?    // result summary (nil while running)
         var isRunning: Bool
+        var hits: [GrepHit] = [] // grep: per-match (note, snippet) for the expanded trace
 
         /// Humanized verb + target for the collapsed row, e.g. Searched 'pricing'.
         var title: String { ToolStep.humanize(name: name, arguments: arguments) }
@@ -230,13 +231,14 @@ final class ChatSession: ObservableObject {
             phase = .streaming
             turns[i].blocks.append(.tool(ToolStep(name: name, arguments: arguments, summary: nil, isRunning: true)))
 
-        case .toolCallFinished(let name, let summary):
+        case .toolCallFinished(let name, let summary, let hits):
             // Mark the most recent running step with this name as done.
             if let idx = turns[i].blocks.lastIndex(where: {
                 if case .tool(let s) = $0 { return s.isRunning && s.name == name } else { return false }
             }), case .tool(var step) = turns[i].blocks[idx] {
                 step.isRunning = false
                 step.summary = summary
+                step.hits = hits
                 turns[i].blocks[idx] = .tool(step)
             }
 

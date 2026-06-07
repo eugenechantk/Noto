@@ -562,9 +562,12 @@ struct VaultWorkspaceView: View {
     @ViewBuilder
     private var chatSheetContent: some View {
         if let session = chatStore.session {
-            ChatSheet(session: session)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+            ChatSheet(session: session, onOpenNote: { path in
+                showChat = false
+                handleWorkspaceIntent(.openDocumentLink(path))
+            })
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
     }
 
