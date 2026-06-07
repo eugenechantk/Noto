@@ -1,5 +1,59 @@
 import SwiftUI
 
+/// The past-chats list (title · snippet · relative date), rendered INLINE inside
+/// the chat panel (••• → Chat history) rather than a modal sheet. Chats are saved
+/// as `.md` notes in `<vault>/Chats/`, so this is that folder as rows.
+struct ChatHistoryList: View {
+    let vaultURL: URL
+    /// Called with the chosen chat's file URL to resume it.
+    let onSelect: (URL) -> Void
+    @State private var chats: [ChatHistorySheet.PastChat] = []
+
+    var body: some View {
+        Group {
+            if chats.isEmpty {
+                VStack {
+                    Spacer()
+                    Text("No chats yet")
+                        .font(NotoChatTokens.Font.body())
+                        .foregroundStyle(NotoChatTokens.faint)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                List {
+                    ForEach(chats) { chat in
+                        Button { onSelect(chat.url) } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack {
+                                    Text(chat.title).font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(NotoChatTokens.head).lineLimit(1)
+                                    Spacer()
+                                    Text(chat.relativeDate).font(NotoChatTokens.Font.secondary())
+                                        .foregroundStyle(NotoChatTokens.faint)
+                                }
+                                if !chat.snippet.isEmpty {
+                                    Text(chat.snippet).font(NotoChatTokens.Font.secondary())
+                                        .foregroundStyle(NotoChatTokens.faint).lineLimit(1)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(Color.clear)
+                        .accessibilityIdentifier("chatHistory.row")
+                    }
+                }
+                .listStyle(.plain).scrollContentBackground(.hidden)
+            }
+        }
+        .task { chats = ChatHistorySheet.loadChats(in: vaultURL) }
+        .accessibilityIdentifier("chatHistory.list")
+    }
+}
+
 /// Past chats, presented as its own sheet (••• → Chat history). Chats are
 /// saved as `.md` notes in `<vault>/Chats/`, so this is effectively that
 /// folder rendered as title · snippet · relative date rows.

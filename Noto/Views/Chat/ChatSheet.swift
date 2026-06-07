@@ -27,18 +27,26 @@ struct ChatSheet: View {
             NotoChatTokens.bg.ignoresSafeArea()
             VStack(spacing: 0) {
                 header
-                if session.turns.isEmpty {
+                if showHistory {
+                    // History shown inline in the panel (not a modal sheet).
+                    ChatHistoryList(vaultURL: vaultURL) { url in
+                        session.loadTranscript(from: url)
+                        showHistory = false
+                    }
+                } else if session.turns.isEmpty {
                     emptyState
                 } else {
                     messageList
                 }
-                ComposerView(
-                    draft: $session.draft,
-                    mentioned: $session.pendingMentions,
-                    isBusy: session.phase == .thinking || session.phase == .streaming,
-                    onSend: send,
-                    onAttach: { showAddContext = true }
-                )
+                if !showHistory {
+                    ComposerView(
+                        draft: $session.draft,
+                        mentioned: $session.pendingMentions,
+                        isBusy: session.phase == .thinking || session.phase == .streaming,
+                        onSend: send,
+                        onAttach: { showAddContext = true }
+                    )
+                }
             }
         }
         .accessibilityIdentifier("chatSheet")
@@ -47,12 +55,6 @@ struct ChatSheet: View {
         .sheet(isPresented: $showAddContext) {
             AddContextSheet(vaultURL: vaultURL, initiallySelected: Set(session.pendingMentions)) { sel in
                 session.pendingMentions = sel.sorted()
-            }
-            .chatLargeSheet()
-        }
-        .sheet(isPresented: $showHistory) {
-            ChatHistorySheet(vaultURL: vaultURL) { url in
-                session.loadTranscript(from: url)
             }
             .chatLargeSheet()
         }
@@ -67,8 +69,8 @@ struct ChatSheet: View {
 
     private var header: some View {
         ZStack {
-            // Center: title
-            Text(session.title)
+            // Center: title (or "Chat history" while browsing past chats)
+            Text(showHistory ? "Chat history" : session.title)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(NotoChatTokens.head)
                 .lineLimit(1)
@@ -76,10 +78,13 @@ struct ChatSheet: View {
                 .accessibilityIdentifier("chatSheet.title")
 
             HStack {
-                // Left: close (Liquid Glass circle)
-                Button { if let onClose { onClose() } else { dismiss() } } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
+                // Left: close — or, while browsing history, a back arrow to the chat.
+                Button {
+                    if showHistory { showHistory = false }
+                    else if let onClose { onClose() } else { dismiss() }
+                } label: {
+                    Image(systemName: showHistory ? "chevron.left" : "xmark")
+                        .font(.system(size: showHistory ? 15 : 13, weight: .bold))
                         .foregroundStyle(NotoChatTokens.ink)
                         .frame(width: 34, height: 34)
                         .chatGlassCircle()
@@ -89,7 +94,10 @@ struct ChatSheet: View {
 
                 Spacer()
 
-                // Right: more actions (Liquid Glass circle)
+                // Right: more actions (hidden while browsing history)
+                if showHistory {
+                    Color.clear.frame(width: 34, height: 34)
+                } else {
                 Menu {
                     Button("New chat", systemImage: "square.and.pencil") { session.reset() }
                     Button("Chat history", systemImage: "clock") { showHistory = true }
@@ -112,6 +120,7 @@ struct ChatSheet: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .accessibilityIdentifier("chatSheet.more")
+                }
             }
         }
         .padding(.horizontal, 14)
@@ -462,7 +471,9 @@ private struct ComposerView: View {
                 Button(action: onAttach) {
                     Image(systemName: "plus").font(.system(size: 16, weight: .medium))
                         .foregroundStyle(NotoChatTokens.ink).frame(width: 28, height: 28)
+                        .contentShape(Circle())
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("composer.attach")
 
                 TextField("Ask anything…", text: $draft, axis: .vertical)
@@ -475,7 +486,9 @@ private struct ComposerView: View {
                     Image(systemName: "arrow.up").font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.white).frame(width: 32, height: 32)
                         .background(NotoChatTokens.accent, in: Circle())
+                        .contentShape(Circle())
                 }
+                .buttonStyle(.plain)
                 .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isBusy)
                 .opacity(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isBusy ? 0.4 : 1)
                 .accessibilityIdentifier("composer.send")

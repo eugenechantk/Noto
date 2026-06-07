@@ -38,12 +38,22 @@ struct EditorNavigationChrome: ViewModifier {
     func body(content: Content) -> some View {
         switch mode {
         case .macInContent:
-            // safeAreaInset places the bar below the window title-bar inset, so it
-            // aligns with the sidebar/chat headers (not up at the traffic-light line).
+            // Keep a (near-empty) native toolbar so the unified window chrome stays:
+            // full-height source-list sidebar + traffic lights placed in the sidebar
+            // top. The editor's own controls render IN-CONTENT below the title-bar
+            // strip (via safeAreaInset), so they follow the editor's right edge and
+            // align with the chat sidebar's header (also below the strip).
             content
                 .safeAreaInset(edge: .top, spacing: 0) {
                     inContentTopBar
                 }
+                .navigationTitle("")
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Color.clear.frame(width: 1, height: 1)
+                    }
+                }
+                .toolbarBackground(.hidden, for: .windowToolbar)
         case .macToolbar, .splitClean:
             nativeToolbarBody(content)
         case .compactNavigation:

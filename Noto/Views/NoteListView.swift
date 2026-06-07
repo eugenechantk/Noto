@@ -481,7 +481,6 @@ struct VaultWorkspaceView: View {
             }
         }
         #elseif os(macOS)
-            HStack(spacing: 0) {
             NotoSplitView(
                 store: store,
                 isSearchPresented: $isSearchPresented,
@@ -509,6 +508,20 @@ struct VaultWorkspaceView: View {
                 },
                 detail: { onToggleSidebar in
                     splitDetailView(onToggleSidebar: onToggleSidebar)
+                        // Chat toggle on the DETAIL toolbar so it sits on the RIGHT of
+                        // the editor's top bar (a split-level toolbar lands on the left).
+                        // Native Liquid Glass toolbar button (HIG inspector toggle).
+                        .toolbar {
+                            ToolbarItem(placement: .primaryAction) {
+                                Button {
+                                    if showChat { showChat = false } else { handleWorkspaceIntent(.openChat) }
+                                } label: {
+                                    Image(systemName: "bubble.left")
+                                }
+                                .help("AI Chat")
+                                .accessibilityIdentifier("macos_chat_toggle")
+                            }
+                        }
                 },
                 iosDetailRoot: { _ in
                     EmptyView()
@@ -517,32 +530,11 @@ struct VaultWorkspaceView: View {
                     EmptyView()
                 }
             )
-                // macOS: dock the AI chat as a trailing sidebar next to the editor,
-                // so the window reads as | folder-sidebar + editor | chat sidebar |.
-                if showChat {
-                    Divider()
-                    chatSidebarPanel
-                }
-            }
-        // Liquid Glass floating chat button (bottom-right of the editor) that opens
-        // the chat sidebar. Hidden while the sidebar is open (it has its own close).
-        .overlay(alignment: .bottomTrailing) {
-            if !showChat {
-                Button {
-                    handleWorkspaceIntent(.openChat)
-                } label: {
-                    Image(systemName: "bubble.left")
-                        .font(.system(size: 20, weight: .regular))
-                        .foregroundStyle(NotoTheme.head)
-                        .frame(width: 52, height: 52)
-                        .chatGlassCircle()
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .padding(24)
-                .accessibilityIdentifier("macos_chat_button")
-                .accessibilityLabel("AI Chat")
-            }
+        // macOS: dock the AI chat as a native trailing inspector next to the editor.
+        // The inspector + native toolbar keep the full-height sidebar, traffic lights,
+        // and Liquid Glass toolbar buttons; chat controls live in the inspector toolbar.
+        .inspector(isPresented: $showChat) {
+            chatInspectorContent
         }
         .background {
             WindowCommandReader(window: $hostingWindow)
@@ -601,20 +593,17 @@ struct VaultWorkspaceView: View {
         }
     }
 
-    /// macOS: the chat as a fixed-width trailing sidebar column next to the editor.
-    /// Opening a cited note keeps the sidebar open (it just changes the detail).
+    /// macOS: the chat hosted in a native trailing inspector next to the editor.
+    /// Opening a cited note keeps the inspector open (it just changes the detail).
     @ViewBuilder
-    private var chatSidebarPanel: some View {
+    private var chatInspectorContent: some View {
         if let session = chatStore.session {
             ChatSheet(
                 session: session,
                 onOpenNote: { path in handleWorkspaceIntent(.openDocumentLink(path)) },
                 onClose: { showChat = false }
             )
-            .frame(width: 380)
-            // Extend into the title-bar inset so the chat header sits at the very top,
-            // level with the editor's in-content top bar (not pushed below it).
-            .ignoresSafeArea(.container, edges: .top)
+            .inspectorColumnWidth(min: 320, ideal: 380, max: 560)
         }
     }
 
@@ -833,9 +822,9 @@ struct VaultWorkspaceView: View {
 
     private var splitEditorChromeMode: EditorChromeMode {
         #if os(macOS)
-        // In-content top bar so the editor's buttons follow the editor's right edge,
-        // leaving room for the docked AI chat sidebar to its right.
-        .macInContent
+        // Native window toolbar: full-height source-list sidebar, traffic lights placed
+        // in the sidebar, and Liquid Glass toolbar buttons (macOS 26, per the HIG).
+        .macToolbar
         #else
         .compactNavigation(showsInlineBackButton: false)
         #endif
