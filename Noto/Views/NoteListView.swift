@@ -358,7 +358,7 @@ struct VaultWorkspaceView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openChat)) { _ in
-                presentChat()
+                toggleChat()
             }
             .onChange(of: selectedNote?.fileURL) { _, newURL in
                 persistLastOpenedNoteURL(newURL)
@@ -483,7 +483,7 @@ struct VaultWorkspaceView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openChat)) { _ in
-                presentChat()
+                toggleChat()
             }
         }
         #elseif os(macOS)
@@ -520,7 +520,7 @@ struct VaultWorkspaceView: View {
                         .toolbar {
                             ToolbarItem(placement: .primaryAction) {
                                 Button {
-                                    if showChat { showChat = false } else { handleWorkspaceIntent(.openChat) }
+                                    toggleChat()
                                 } label: {
                                     Image(systemName: "bubble.left")
                                 }
@@ -568,7 +568,7 @@ struct VaultWorkspaceView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openChat)) { notification in
             guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
-            presentChat()
+            toggleChat()
         }
         .onChange(of: selectedNote?.fileURL) { _, newURL in
             persistLastOpenedNoteURL(newURL)
@@ -579,6 +579,12 @@ struct VaultWorkspaceView: View {
             openInitialDocumentLinkOrRestore()
         }
         #endif
+    }
+
+    /// Toggle the AI chat: close it if open, otherwise open it. Used by ⌘L and the
+    /// macOS toolbar toggle.
+    private func toggleChat() {
+        if showChat { showChat = false } else { presentChat() }
     }
 
     /// Open the AI chat sheet. Uses the user's key or the bundled default; only
