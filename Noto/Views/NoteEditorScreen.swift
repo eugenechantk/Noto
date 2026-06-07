@@ -36,6 +36,8 @@ struct NoteEditorScreen: View {
     @State private var pendingMoveAfterProperties = false
     #if os(iOS)
     @State private var dockHiddenByScroll = false
+    @State private var showChat = false
+    @State private var showChatKeyAlert = false
     @State private var lastDockScrollY: CGFloat = 0
     #endif
     @State private var statusCount = WordCounter.Count(words: 0, characters: 0)
@@ -181,8 +183,21 @@ struct NoteEditorScreen: View {
             onOpenTodayNote: showsEditorDock ? onOpenTodayNote : nil,
             onSearch: showsEditorDock ? onOpenSearch : nil,
             onCreateRootNote: showsEditorDock ? onCreateRootNote : nil,
+            onOpenChat: showsEditorDock ? { presentChat() } : nil,
             hiddenByScroll: dockHiddenByScroll || isFindVisible
         )
+        .sheet(isPresented: $showChat) {
+            if let apiKey = OpenRouterKeyStore.load() {
+                ChatSheet(apiKey: apiKey, vaultURL: store.vaultRootURL, initialMention: noteVaultRelativePath)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+        .alert("Add your OpenRouter API key", isPresented: $showChatKeyAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Open Settings to add your OpenRouter API key, then you can chat about this note.")
+        }
         #elseif os(macOS)
         .modifier(EditorNavigationChrome(
             mode: chromeMode,
@@ -380,6 +395,20 @@ struct NoteEditorScreen: View {
     }
 
     #if os(iOS)
+    /// The current note's vault-relative path (pre-attached as chat context).
+    private var noteVaultRelativePath: String? {
+        let base = store.vaultRootURL.standardizedFileURL.path
+        let full = session.note.fileURL.standardizedFileURL.path
+        guard full.hasPrefix(base) else { return nil }
+        var rel = String(full.dropFirst(base.count))
+        if rel.hasPrefix("/") { rel.removeFirst() }
+        return rel.isEmpty ? nil : rel
+    }
+
+    private func presentChat() {
+        if OpenRouterKeyStore.hasKey { showChat = true } else { showChatKeyAlert = true }
+    }
+
     private var isCompactChrome: Bool {
         if case .compactNavigation = chromeMode { return true }
         return false

@@ -10,6 +10,8 @@ struct SettingsView: View {
     @State private var isTokenSheetPresented = false
     @State private var isRebuildingIndex = false
     @State private var indexRebuildMessage: String?
+    @State private var openRouterKeyInput = ""
+    @State private var openRouterKeySaved = OpenRouterKeyStore.hasKey
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -63,6 +65,37 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(AppTheme.secondaryText)
                 }
+            }
+
+            Section {
+                SecureField("OpenRouter API key", text: $openRouterKeyInput)
+                    .textContentType(.password)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("settings.openRouterKey")
+                HStack {
+                    Button("Save key") {
+                        OpenRouterKeyStore.save(openRouterKeyInput)
+                        openRouterKeyInput = ""
+                        openRouterKeySaved = OpenRouterKeyStore.hasKey
+                    }
+                    .disabled(openRouterKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("settings.saveOpenRouterKey")
+                    if openRouterKeySaved {
+                        Spacer()
+                        Button("Clear", role: .destructive) {
+                            OpenRouterKeyStore.delete()
+                            openRouterKeySaved = false
+                        }
+                    }
+                }
+            } header: {
+                Text("AI Chat")
+            } footer: {
+                Text(openRouterKeySaved
+                     ? "An OpenRouter API key is stored in your Keychain. Chat is enabled."
+                     : "Add your OpenRouter API key to chat with your notes. Stored only in your device Keychain.")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryText)
             }
 
             Section {

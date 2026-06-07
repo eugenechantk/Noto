@@ -32,6 +32,7 @@ enum VaultWorkspaceIntent {
     case openToday
     case openSearch
     case closeSearch
+    case openChat
     case openSettings
     case createNote(in: MarkdownNoteStore)
     case createNoteInDirectory(URL)
@@ -287,6 +288,7 @@ struct VaultWorkspaceView: View {
     @State private var splitNoteHistory = NoteNavigationHistory()
     @State private var isApplyingSplitHistoryNavigation = false
     @State private var showSettings = false
+    @State private var showChat = false
     @State private var hasRestoredSelection = false
     #if os(iOS)
     @State private var splitNoteStackNavigation = NoteStackNavigationState()
@@ -459,6 +461,9 @@ struct VaultWorkspaceView: View {
                 .presentationDragIndicator(.visible)
                 .noteSearchSheetPresentationStyle()
             }
+            .sheet(isPresented: $showChat) {
+                chatSheetContent
+            }
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { _ in
                 handleWorkspaceIntent(.openToday)
             }
@@ -542,6 +547,24 @@ struct VaultWorkspaceView: View {
         #endif
     }
 
+    /// Open the AI chat sheet, or route to Settings if no OpenRouter key is stored yet.
+    private func presentChat() {
+        guard OpenRouterKeyStore.hasKey else {
+            handleWorkspaceIntent(.openSettings)
+            return
+        }
+        showChat = true
+    }
+
+    @ViewBuilder
+    private var chatSheetContent: some View {
+        if let apiKey = OpenRouterKeyStore.load() {
+            ChatSheet(apiKey: apiKey, vaultURL: store.vaultRootURL)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
     private func handleWorkspaceIntent(_ intent: VaultWorkspaceIntent) {
         switch intent {
         case .openNote(let note, let noteStore, let isNew):
@@ -571,6 +594,8 @@ struct VaultWorkspaceView: View {
             isSearchPresented = true
         case .closeSearch:
             isSearchPresented = false
+        case .openChat:
+            presentChat()
         case .openSettings:
             guard locationManager != nil else { return }
             #if os(iOS)
@@ -1434,7 +1459,8 @@ struct FolderContentView: View {
         .notoAppBottomToolbar(
             onOpenTodayNote: { onIntent(.openToday) },
             onSearch: { onIntent(.openSearch) },
-            onCreateRootNote: { onIntent(.createNote(in: store)) }
+            onCreateRootNote: { onIntent(.createNote(in: store)) },
+            onOpenChat: { onIntent(.openChat) }
         )
         .alert("New Folder", isPresented: $showNewFolderAlert) {
             TextField("Folder name", text: $newFolderName)
@@ -1629,6 +1655,7 @@ private struct NotoAppBottomToolbarModifier: ViewModifier {
     var onOpenTodayNote: (() -> Void)?
     var onSearch: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
+    var onOpenChat: (() -> Void)?
     var isSidebarVisible: Bool = false
     var hiddenByScroll: Bool = false
     @State private var isSoftwareKeyboardVisible = false
@@ -1642,7 +1669,8 @@ private struct NotoAppBottomToolbarModifier: ViewModifier {
                     NotoAppBottomToolbar(
                         onOpenTodayNote: onOpenTodayNote,
                         onSearch: onSearch,
-                        onCreateRootNote: onCreateRootNote
+                        onCreateRootNote: onCreateRootNote,
+                        onOpenChat: onOpenChat
                     )
                     .frame(maxWidth: .infinity)
                     .padding(.bottom, 8)
@@ -1688,6 +1716,7 @@ private struct NotoAppBottomToolbar: View {
     var onOpenTodayNote: (() -> Void)?
     var onSearch: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
+    var onOpenChat: (() -> Void)?
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -1765,6 +1794,23 @@ private struct NotoAppBottomToolbar: View {
             .accessibilityLabel("Search")
             .dockGlass()
 
+            // Chat — capsule that opens the AI chat sheet (daily · search · chat · new).
+            if let onOpenChat {
+                dockCapsule(padding: 4) {
+                    Button {
+                        onOpenChat()
+                    } label: {
+                        Image(systemName: "bubble.left")
+                            .font(.system(size: 20, weight: .regular))
+                            .foregroundStyle(NotoTheme.head)
+                            .frame(width: Self.innerCircle, height: Self.innerCircle)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityIdentifier("chat_button")
+                    .accessibilityLabel("Chat")
+                }
+            }
+
             // New note — capsule with an accent-tinted action circle.
             dockCapsule(padding: 4) {
                 Button {
@@ -1838,6 +1884,7 @@ extension View {
         onOpenTodayNote: (() -> Void)?,
         onSearch: (() -> Void)?,
         onCreateRootNote: (() -> Void)?,
+        onOpenChat: (() -> Void)? = nil,
         isSidebarVisible: Bool = false,
         hiddenByScroll: Bool = false
     ) -> some View {
@@ -1845,6 +1892,7 @@ extension View {
             onOpenTodayNote: onOpenTodayNote,
             onSearch: onSearch,
             onCreateRootNote: onCreateRootNote,
+            onOpenChat: onOpenChat,
             isSidebarVisible: isSidebarVisible,
             hiddenByScroll: hiddenByScroll
         ))

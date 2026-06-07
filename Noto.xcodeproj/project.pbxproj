@@ -10,6 +10,7 @@
 		58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */; };
 		58A1D0018A1D001000000002 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */; };
 		58A1D0018A1D001000000007 /* NotoSearch in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000008 /* NotoSearch */; };
+		58A1D0018A1D00100000000C /* NotoChat in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D00100000000B /* NotoChat */; };
 		5DB7BFB72F97BDEB0018E268 /* NotoIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */; };
 		5DFAED8F2F5F135300F3DACD /* NotoVault in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD000B000000000000000B /* NotoVault */; };
 		5DFAED902F5F135300F3DACD /* NotoVault in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF000B000000000000000B /* NotoVault */; };
@@ -94,6 +95,7 @@
 				5DFAED8F2F5F135300F3DACD /* NotoVault in Frameworks */,
 				58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */,
 				58A1D0018A1D001000000007 /* NotoSearch in Frameworks */,
+				58A1D0018A1D00100000000C /* NotoChat in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -204,6 +206,7 @@
 				CCDD000B000000000000000B /* NotoVault */,
 				58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */,
 				58A1D0018A1D001000000008 /* NotoSearch */,
+				58A1D0018A1D00100000000B /* NotoChat */,
 			);
 			productName = Noto;
 			productReference = 5DF5FAFE2F0EC372008EDC76 /* Noto.app */;
@@ -274,6 +277,7 @@
 				AABB000B000000000000000B /* XCLocalSwiftPackageReference "Packages/NotoVault" */,
 				5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "Packages/NotoReadwiseSync" */,
 				DD2E424822EC2E30DB9B7950 /* XCLocalSwiftPackageReference "Packages/NotoSearch" */,
+				58A1D0018A1D00100000000A /* XCLocalSwiftPackageReference "Packages/NotoChat" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DF5FAFF2F0EC372008EDC76 /* Products */;
@@ -793,6 +797,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoSearch;
 		};
+		58A1D0018A1D00100000000A /* XCLocalSwiftPackageReference "Packages/NotoChat" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoChat;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -807,6 +815,10 @@
 		58A1D0018A1D001000000008 /* NotoSearch */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoSearch;
+		};
+		58A1D0018A1D00100000000B /* NotoChat */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoChat;
 		};
 		CCDD000B000000000000000B /* NotoVault */ = {
 			isa = XCSwiftPackageProductDependency;
