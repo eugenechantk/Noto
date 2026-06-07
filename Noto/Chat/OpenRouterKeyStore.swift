@@ -11,24 +11,16 @@ enum OpenRouterKeyStore {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         delete()
         guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else { return }
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
-        ]
+        var query = baseQuery
+        query[kSecValueData as String] = data
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
         SecItemAdd(query as CFDictionary, nil)
     }
 
     static func load() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+        var query = baseQuery
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
               let data = item as? Data,
@@ -37,12 +29,20 @@ enum OpenRouterKeyStore {
     }
 
     static func delete() {
-        let query: [String: Any] = [
+        SecItemDelete(baseQuery as CFDictionary)
+    }
+
+    /// Shared key-class attributes. `kSecUseDataProtectionKeychain` is required so
+    /// macOS uses the modern (iOS-style) data-protection keychain instead of the
+    /// legacy file-based keychain — the latter isn't reliably writable from a
+    /// sandboxed macOS app, so the key silently failed to persist there.
+    private static var baseQuery: [String: Any] {
+        [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
         ]
-        SecItemDelete(query as CFDictionary)
     }
 
     static var hasKey: Bool { load()?.isEmpty == false }
