@@ -45,15 +45,13 @@ struct ChatSheet: View {
             AddContextSheet(vaultURL: vaultURL, initiallySelected: Set(session.pendingMentions)) { sel in
                 session.pendingMentions = sel.sorted()
             }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+            .chatLargeSheet()
         }
         .sheet(isPresented: $showHistory) {
             ChatHistorySheet(vaultURL: vaultURL) { url in
                 session.loadTranscript(from: url)
             }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+            .chatLargeSheet()
         }
         .alert("Rename chat", isPresented: $showRename) {
             TextField("Title", text: $renameText)
@@ -481,12 +479,24 @@ private struct ComposerView: View {
 
 // MARK: - Liquid Glass circular control (sheet header)
 
-private extension View {
-    /// iOS 26 Liquid Glass circle for the sheet's close / more buttons,
+extension View {
+    /// Large sheet presentation on iOS/iPadOS; a no-op on macOS where sheets size
+    /// to their content and `presentationDetents` is unavailable.
+    @ViewBuilder
+    func chatLargeSheet() -> some View {
+        #if os(iOS)
+        presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        #else
+        frame(minWidth: 480, minHeight: 600)
+        #endif
+    }
+
+    /// iOS/macOS 26 Liquid Glass circle for the sheet's close / more buttons,
     /// with a translucent material fallback on earlier OSes.
     @ViewBuilder
     func chatGlassCircle() -> some View {
-        if #available(iOS 26, *) {
+        if #available(iOS 26, macOS 26, *) {
             glassEffect(.regular.interactive(), in: Circle())
         } else {
             background(.ultraThinMaterial, in: Circle())

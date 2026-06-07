@@ -523,8 +523,11 @@ struct VaultWorkspaceView: View {
         .sheet(isPresented: $showSettings) {
             if let locationManager {
                 SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
-                    .frame(minWidth: 400, minHeight: 200)
+                    .frame(minWidth: 460, minHeight: 600)
             }
+        }
+        .sheet(isPresented: $showChat) {
+            chatSheetContent
         }
         .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { notification in
             guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
@@ -569,8 +572,7 @@ struct VaultWorkspaceView: View {
                 showChat = false
                 handleWorkspaceIntent(.openDocumentLink(path))
             })
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+            .chatLargeSheet()
         }
     }
 
