@@ -75,5 +75,19 @@ jobs:
           printf 'Missing TestFlight configuration: %s\n' "${missing[*]}"
           exit 1
 
+      - name: Write bundled secrets (LocalSecrets.xcconfig)
+        env:
+          NOTO_OPENROUTER_KEY: ${{ secrets.NOTO_OPENROUTER_KEY }}
+          NOTO_READWISE_TOKEN: ${{ secrets.NOTO_READWISE_TOKEN }}
+        run: |
+          mkdir -p Config
+          {
+            printf 'NOTO_READWISE_TOKEN = %s\n' "${NOTO_READWISE_TOKEN}"
+            printf 'NOTO_OPENROUTER_KEY = %s\n' "${NOTO_OPENROUTER_KEY}"
+          } > Config/LocalSecrets.xcconfig
+          # Report presence only (never print the values).
+          [ -n "${NOTO_OPENROUTER_KEY}" ] && echo "OpenRouter key: present" || echo "OpenRouter key: MISSING (chat will route to Settings)"
+          [ -n "${NOTO_READWISE_TOKEN}" ] && echo "Readwise token: present" || echo "Readwise token: missing"
+
       - name: Upload to TestFlight
         run: bundle exec fastlane ios deploy_testflight
