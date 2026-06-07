@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// The AI chat surface, presented as a large-detent sheet over the file list
 /// or editor. Renders the conversation (user pill + note-native AI markdown
@@ -137,6 +140,8 @@ struct ChatSheet: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture { Self.dismissKeyboard() }
     }
 
     private var messageList: some View {
@@ -158,10 +163,22 @@ struct ChatSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
             }
+            // Tapping the conversation (or dragging it) dismisses the keyboard.
+            // simultaneousGesture so citation links still fire on the same tap.
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(TapGesture().onEnded { Self.dismissKeyboard() })
             .onChange(of: session.turns.count) { _, _ in
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
         }
+    }
+
+    /// Resign first responder to hide the software keyboard (iOS/iPadOS). No-op
+    /// elsewhere (macOS has no software keyboard).
+    static func dismissKeyboard() {
+        #if canImport(UIKit)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        #endif
     }
 
     private func send() {
