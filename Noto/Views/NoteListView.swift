@@ -1099,6 +1099,7 @@ struct DirectoryContentListView: View {
             .onDelete(perform: deleteItems)
             .listRowBackground(rowBackground)
             .listRowInsets(rowInsets)
+            .listRowSeparator(hidesRowSeparator ? .hidden : .automatic)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -1151,7 +1152,8 @@ struct DirectoryContentListView: View {
                 FolderRow(folder: folder)
             case .sidebar:
                 SidebarDirectoryRow(
-                    systemImage: "folder.fill",
+                    kind: .folder,
+                    systemImage: "folder",
                     title: folder.name,
                     subtitle: folder.contentsSummary,
                     isSelected: false
@@ -1174,9 +1176,10 @@ struct DirectoryContentListView: View {
                 MarkdownNoteRow(note: note)
             case .sidebar:
                 SidebarDirectoryRow(
+                    kind: .file,
                     systemImage: "doc",
                     title: note.title,
-                    subtitle: note.modifiedDate.formatted(.relative(presentation: .numeric)),
+                    subtitle: "Edited \(note.modifiedDate.formatted(.relative(presentation: .numeric)))",
                     isSelected: isSelected
                 )
             }
@@ -1198,6 +1201,14 @@ struct DirectoryContentListView: View {
         #endif
     }
 
+    private var hidesRowSeparator: Bool {
+        #if os(iOS) || os(macOS)
+        return presentation == .sidebar
+        #else
+        return false
+        #endif
+    }
+
     private var rowBackground: some View {
         switch presentation {
         case .content:
@@ -1212,7 +1223,11 @@ struct DirectoryContentListView: View {
         case .content:
             return EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
         case .sidebar:
+            #if os(iOS) || os(macOS)
+            return EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
+            #else
             return EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6)
+            #endif
         }
     }
 
@@ -1221,7 +1236,13 @@ struct DirectoryContentListView: View {
         case .content:
             NotoTheme.background
         case .sidebar:
+            #if os(macOS)
+            // The floating glass panel supplies the background; keep the list clear
+            // so the glass shows uniformly (no opaque seam).
+            Color.clear
+            #else
             AppTheme.sidebarBackground
+            #endif
         }
     }
 
@@ -1257,12 +1278,51 @@ private extension View {
 }
 
 private struct SidebarDirectoryRow: View {
+    enum Kind { case folder, file }
+    var kind: Kind = .file
     let systemImage: String
     let title: String
     let subtitle: String
     let isSelected: Bool
 
     var body: some View {
+        #if os(iOS) || os(macOS)
+        // v2 design: VaultSidebarContent rows — glyph · title (15/600) · subtitle
+        // (12/muted) · chevron (folders). Active file row gets an accent-tint bg.
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(glyphColor)
+                .frame(width: 18, alignment: .center)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 15, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(titleColor)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(NotoTheme.muted)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+            if kind == .folder {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(NotoTheme.faint)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .background(isSelected ? NotoTheme.selectedRowBackground : Color.clear)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(NotoTheme.hairline).frame(height: 0.5)
+        }
+        #else
         HStack(spacing: 8) {
             Image(systemName: systemImage)
                 .font(.body.weight(isSelected ? .semibold : .regular))
@@ -1290,7 +1350,23 @@ private struct SidebarDirectoryRow: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(isSelected ? AppTheme.selectedRowBackground : Color.clear)
         }
+        #endif
     }
+
+    #if os(iOS) || os(macOS)
+    private var glyphColor: Color {
+        switch kind {
+        case .folder:
+            return NotoTheme.ink.opacity(0.80)   // design: rgba(236,236,238,0.80)
+        case .file:
+            return isSelected ? NotoTheme.accent : NotoTheme.muted
+        }
+    }
+
+    private var titleColor: Color {
+        isSelected ? NotoTheme.head : NotoTheme.ink
+    }
+    #endif
 }
 
 #if os(iOS)
@@ -1497,7 +1573,7 @@ struct FolderContentView: View {
 /// disables when the navigation bar is hidden via `.toolbar(.hidden,…)`. The
 /// delegate only allows the gesture when there is a view controller to pop back
 /// to, so the root level is unaffected.
-private struct InteractivePopGestureEnabler: UIViewControllerRepresentable {
+struct InteractivePopGestureEnabler: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         let controller = UIViewController()
         controller.view.backgroundColor = .clear
@@ -1613,8 +1689,22 @@ private struct NotoAppBottomToolbar: View {
     var onSearch: (() -> Void)?
     var onCreateRootNote: (() -> Void)?
 
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
     private static let capsuleHeight: CGFloat = 52
     private static let innerCircle: CGFloat = 44
+
+    /// iPad (regular width) shows a centered compact dock with a fixed-width search pill;
+    /// iPhone (compact) stretches the search pill full-width.
+    private var isRegularWidth: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .regular
+        #else
+        true
+        #endif
+    }
 
     private var todayDay: String {
         String(Calendar.current.component(.day, from: Date()))
@@ -1626,6 +1716,7 @@ private struct NotoAppBottomToolbar: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var dockContent: some View {
@@ -1665,7 +1756,8 @@ private struct NotoAppBottomToolbar: View {
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 18)
-                .frame(maxWidth: .infinity)
+                .frame(width: isRegularWidth ? 220 : nil)
+                .frame(maxWidth: isRegularWidth ? nil : .infinity)
                 .frame(height: Self.capsuleHeight)
                 .contentShape(Rectangle())
             }
@@ -1706,7 +1798,7 @@ private struct NotoAppBottomToolbar: View {
     /// rendering performance (iOS 26+); a passthrough on earlier OSes.
     @ViewBuilder
     private func glassDockContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        if #available(iOS 26, *) {
+        if #available(iOS 26, macOS 26, *) {
             GlassEffectContainer(spacing: 8) { content() }
         } else {
             content()
@@ -1719,7 +1811,7 @@ private extension View {
     /// translucent material capsule on earlier OSes.
     @ViewBuilder
     func dockGlass() -> some View {
-        if #available(iOS 26, *) {
+        if #available(iOS 26, macOS 26, *) {
             glassEffect(.regular.interactive(), in: .capsule)
         } else {
             background(.regularMaterial, in: Capsule())
@@ -1732,7 +1824,7 @@ private extension View {
     /// `Exp03ArticleV3Search` (rgba(28,30,36,0.55) + blur).
     @ViewBuilder
     func searchDockGlass() -> some View {
-        if #available(iOS 26, *) {
+        if #available(iOS 26, macOS 26, *) {
             glassEffect(.regular.interactive(), in: .capsule)
         } else {
             background(.ultraThinMaterial, in: Capsule())

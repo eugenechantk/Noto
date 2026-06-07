@@ -1,6 +1,8 @@
 import SwiftUI
 #if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
 #endif
 
 /// Design tokens for the Noto v2 redesign (claude.ai/design "Noto System").
@@ -37,6 +39,9 @@ enum NotoTheme {
     /// Accent-tinted selection background for the active row.
     static let selectedRowBackground = rgb(0xFF6A2E, 0.12)
 
+    /// iPad sidebar glass tint, painted over a blur — design `rgba(34,38,46,0.55)`.
+    static let sidebarGlass = rgb(0x22262E, 0.55)
+
     // MARK: Type ramp (points)
     enum FontSize {
         static let largeTitle: CGFloat = 33   // file-view large title
@@ -51,5 +56,9 @@ enum NotoTheme {
     static let uiBackground = UIColor(red: 0x0E / 255.0, green: 0x11 / 255.0, blue: 0x16 / 255.0, alpha: 1)
     static let uiInk        = UIColor(red: 0xEC / 255.0, green: 0xEC / 255.0, blue: 0xEE / 255.0, alpha: 1)
     static let uiAccent     = UIColor(red: 0xFF / 255.0, green: 0x6A / 255.0, blue: 0x2E / 255.0, alpha: 1)
+    #elseif os(macOS)
+    static let nsBackground = NSColor(red: 0x0E / 255.0, green: 0x11 / 255.0, blue: 0x16 / 255.0, alpha: 1)
+    static let nsInk        = NSColor(red: 0xEC / 255.0, green: 0xEC / 255.0, blue: 0xEE / 255.0, alpha: 1)
+    static let nsAccent     = NSColor(red: 0xFF / 255.0, green: 0x6A / 255.0, blue: 0x2E / 255.0, alpha: 1)
     #endif
 }

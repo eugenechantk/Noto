@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// In-note find bar (v2 design `FindBar` / `NoTabsFindInText`): a full-width glass
+/// pill (magnifier + query with accent caret + "n / total" count + prev/next) plus a
+/// separate glass "Done" pill. Sits at the bottom, above the keyboard.
 struct EditorFindBar: View {
     @Binding var query: String
     var status: EditorFindStatus
@@ -11,40 +14,23 @@ struct EditorFindBar: View {
     var body: some View {
         controls
         .buttonStyle(.plain)
-        .font(.system(size: 13, weight: .medium))
-        .foregroundStyle(AppTheme.primaryText)
         .onAppear {
             DispatchQueue.main.async {
                 isSearchFieldFocused = true
             }
         }
-        .onKeyPress(.downArrow) {
-            onNavigate(.next)
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            onNavigate(.next)
-            return .handled
-        }
-        .onKeyPress(.upArrow) {
-            onNavigate(.previous)
-            return .handled
-        }
-        .onKeyPress(.leftArrow) {
-            onNavigate(.previous)
-            return .handled
-        }
-        .onKeyPress(.escape) {
-            onClose()
-            return .handled
-        }
+        .onKeyPress(.downArrow) { onNavigate(.next); return .handled }
+        .onKeyPress(.rightArrow) { onNavigate(.next); return .handled }
+        .onKeyPress(.upArrow) { onNavigate(.previous); return .handled }
+        .onKeyPress(.leftArrow) { onNavigate(.previous); return .handled }
+        .onKeyPress(.escape) { onClose(); return .handled }
     }
 
     @ViewBuilder
     private var controls: some View {
         #if os(iOS)
         if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 10) {
+            GlassEffectContainer(spacing: 8) {
                 controlRow
             }
         } else {
@@ -58,16 +44,16 @@ struct EditorFindBar: View {
     private var controlRow: some View {
         HStack(spacing: 8) {
             searchPill
-            closeButton
+            doneButton
         }
         .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
     }
 
     private var searchPill: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(AppTheme.mutedText)
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(NotoTheme.muted)
                 .accessibilityHidden(true)
 
             TextField("Find in Note", text: $query)
@@ -78,37 +64,29 @@ struct EditorFindBar: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 #endif
-                .frame(width: 128)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(NotoTheme.head)
+                .tint(NotoTheme.accent)
+                .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("editor_find_field")
                 .onSubmit {
                     onNavigate(.next)
                 }
 
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 24, height: 24)
-                        .foregroundStyle(AppTheme.mutedText)
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .accessibilityIdentifier("editor_find_clear_query_button")
-                .accessibilityLabel("Clear Search Text")
+            if status.matchCount > 0 {
+                Text(countText)
+                    .font(.system(size: 13))
+                    .monospacedDigit()
+                    .foregroundStyle(NotoTheme.muted)
+                    .accessibilityIdentifier("editor_find_count")
             }
-
-            Divider()
-                .frame(height: 18)
-                .overlay(AppTheme.primaryText.opacity(0.12))
-                .padding(.horizontal, 2)
 
             Button {
                 onNavigate(.previous)
             } label: {
                 Image(systemName: "chevron.up")
-                    .frame(width: 36, height: Self.controlHeight)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 34, height: 34)
             }
             .disabled(status.matchCount == 0)
             .contentShape(Rectangle())
@@ -119,41 +97,43 @@ struct EditorFindBar: View {
                 onNavigate(.next)
             } label: {
                 Image(systemName: "chevron.down")
-                    .frame(width: 36, height: Self.controlHeight)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 34, height: 34)
             }
             .disabled(status.matchCount == 0)
             .contentShape(Rectangle())
             .accessibilityIdentifier("editor_find_next_button")
             .accessibilityLabel("Next Occurrence")
         }
-        .padding(.leading, 9)
+        .foregroundStyle(NotoTheme.head)
+        .padding(.leading, 16)
         .padding(.trailing, 7)
         .frame(height: Self.controlHeight)
+        .frame(maxWidth: .infinity)
         .editorFindGlassCapsule()
-        .overlay {
-            Capsule()
-                .stroke(AppTheme.primaryText.opacity(0.10), lineWidth: 0.5)
-        }
         .accessibilityIdentifier("editor_find_search_field")
     }
 
-    private var closeButton: some View {
+    private var doneButton: some View {
         Button(action: onClose) {
-            Image(systemName: "xmark")
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: Self.controlHeight, height: Self.controlHeight)
-                .editorFindGlassCircle()
-                .overlay {
-                    Circle()
-                        .stroke(AppTheme.primaryText.opacity(0.10), lineWidth: 0.5)
-                }
+            Text("Done")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(NotoTheme.accent)
+                .padding(.horizontal, 18)
+                .frame(height: Self.controlHeight)
+                .editorFindGlassCapsule()
         }
-        .contentShape(Circle())
+        .contentShape(Capsule())
         .accessibilityIdentifier("editor_find_close_button")
-        .accessibilityLabel("Close Search")
+        .accessibilityLabel("Done")
     }
 
-    private static let controlHeight: CGFloat = 44
+    private var countText: String {
+        let current = (status.selectedMatchIndex ?? 0) + 1
+        return "\(current) / \(status.matchCount)"
+    }
+
+    private static let controlHeight: CGFloat = 48
 }
 
 private extension View {
@@ -164,22 +144,10 @@ private extension View {
             glassEffect(.regular.interactive(), in: .capsule)
         } else {
             background(.regularMaterial, in: Capsule())
+                .overlay { Capsule().stroke(Color.white.opacity(0.10), lineWidth: 0.5) }
         }
         #else
         background(.regularMaterial, in: Capsule())
-        #endif
-    }
-
-    @ViewBuilder
-    func editorFindGlassCircle() -> some View {
-        #if os(iOS)
-        if #available(iOS 26.0, *) {
-            glassEffect(.regular.interactive(), in: .circle)
-        } else {
-            background(.regularMaterial, in: Circle())
-        }
-        #else
-        background(.regularMaterial, in: Circle())
         #endif
     }
 }

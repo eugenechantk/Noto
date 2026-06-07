@@ -20,6 +20,9 @@ struct EditorContentView: View {
     var onContentOffsetYChange: ((CGFloat) -> Void)?
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #if os(iOS)
+    @State private var keyboardHeight: CGFloat = 0
+    #endif
 
     var body: some View {
         Group {
@@ -44,7 +47,34 @@ struct EditorContentView: View {
             guard isFindVisible else { return }
             closeFind()
         }
+        #if os(iOS)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+            updateKeyboardHeight(from: note)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { note in
+            updateKeyboardHeight(from: note, hiding: true)
+        }
+        #endif
     }
+
+    #if os(iOS)
+    private func updateKeyboardHeight(from note: Notification, hiding: Bool = false) {
+        let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+        let height: CGFloat
+        if hiding {
+            height = 0
+        } else if let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+            let screen = UIScreen.main.bounds
+            let overlap = max(0, screen.maxY - frame.minY)
+            height = overlap
+        } else {
+            height = 0
+        }
+        withAnimation(.easeOut(duration: duration)) {
+            keyboardHeight = height
+        }
+    }
+    #endif
 
     private var downloadingView: some View {
         VStack(spacing: 12) {
@@ -59,7 +89,7 @@ struct EditorContentView: View {
 
     private var editorBody: some View {
         GeometryReader { geometry in
-            ZStack(alignment: .topTrailing) {
+            ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
                     if session.pendingRemoteSnapshot != nil {
                         RemoteUpdateBanner(
@@ -77,13 +107,10 @@ struct EditorContentView: View {
                         onNavigate: onFindNavigate,
                         onClose: closeFind
                     )
-                    .padding(.top, findBarTopPadding(safeAreaTop: geometry.safeAreaInsets.top))
-                    .padding(.trailing, findBarTrailingPadding)
-                    .frame(maxWidth: .infinity, alignment: .topTrailing)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.18, anchor: .topTrailing)),
-                        removal: .opacity.combined(with: .scale(scale: 0.92, anchor: .topTrailing))
-                    ))
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, findBarBottomInset(safeAreaBottom: geometry.safeAreaInsets.bottom))
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(3)
                 }
             }
@@ -92,6 +119,16 @@ struct EditorContentView: View {
         .background(AppTheme.background)
         #if os(iOS)
         .ignoresSafeArea(edges: [.top, .bottom])
+        #endif
+    }
+
+    /// Sits the find bar just above the keyboard (full width). When the keyboard is
+    /// down, rests above the home indicator.
+    private func findBarBottomInset(safeAreaBottom: CGFloat) -> CGFloat {
+        #if os(iOS)
+        keyboardHeight > 0 ? keyboardHeight + 8 : max(safeAreaBottom, 12) + 8
+        #else
+        12
         #endif
     }
 
@@ -131,7 +168,8 @@ struct EditorContentView: View {
             findQuery: findQuery,
             findNavigationRequest: findNavigationRequest,
             onFindStatusChange: handleFindStatusChange,
-            onCloseFind: closeFind
+            onCloseFind: closeFind,
+            onContentOffsetYChange: onContentOffsetYChange
         )
         #endif
     }

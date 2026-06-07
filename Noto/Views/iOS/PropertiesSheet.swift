@@ -3,7 +3,8 @@ import SwiftUI
 import NotoVault
 
 /// v2 Properties sheet (`NotoPropertyList` / `noto-properties-hig.jsx`) presented over the
-/// editor. Renders the note's YAML frontmatter as an inset-grouped iOS list and edits it
+/// editor on iPhone/iPad. macOS uses its own native grouped `Form` (`MacPropertiesForm`).
+/// Renders the note's YAML frontmatter as an inset-grouped list and edits it
 /// through `EditableFrontmatterDocument` + `session.applyExternalContentEdit`, which
 /// preserves every key and persists synchronously (no data loss).
 ///
@@ -62,12 +63,15 @@ struct PropertiesSheet: View {
         }
         .background(NotoTheme.groupedBackground.ignoresSafeArea())
         .accessibilityIdentifier("properties_sheet")
+        // Commit any in-progress inline edit when dismissed by ANY route (incl. backdrop tap
+        // in the iPad overlay), not just the close button.
+        .onDisappear { commitInlineEdit() }
         .alert("New \(newPropertyType.label) Property", isPresented: $isAddingProperty) {
             TextField("Name", text: $newPropertyKey)
-                .textInputAutocapitalization(.never)
+                .propertiesNoAutocap()
                 .autocorrectionDisabled()
             TextField(newPropertyType.valuePlaceholder, text: $newPropertyValue)
-                .textInputAutocapitalization(.never)
+                .propertiesNoAutocap()
                 .autocorrectionDisabled()
             Button("Cancel", role: .cancel) { resetAddState() }
             Button("Add") { commitAdd() }
@@ -82,21 +86,15 @@ struct PropertiesSheet: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(NotoTheme.head)
             HStack {
+                // Editing auto-commits, so close IS confirm — a single ✕ (no paired ✓).
                 SheetCircleButton(kind: .close) {
                     commitInlineEdit()
                     onClose()
                     dismiss()
                 }
                 .accessibilityIdentifier("properties_close_button")
-                .accessibilityLabel("Close")
-                Spacer()
-                SheetCircleButton(kind: .confirm) {
-                    commitInlineEdit()
-                    onClose()
-                    dismiss()
-                }
-                .accessibilityIdentifier("properties_confirm_button")
                 .accessibilityLabel("Done")
+                Spacer()
             }
         }
         .padding(.horizontal, 12)
@@ -114,13 +112,7 @@ struct PropertiesSheet: View {
                 dateRow(key: "modified", label: "Modified", glyph: "clock", absolute: false)
                 ForEach(customFields) { field in
                     propertyRow(for: field)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                deleteField(field.key)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
+                        .modifier(DeletePropertyAction(key: field.key, onDelete: deleteField))
                 }
                 addPropertyRow
             }
@@ -128,7 +120,7 @@ struct PropertiesSheet: View {
             .listRowSeparatorTint(NotoTheme.separator)
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         }
-        .listStyle(.insetGrouped)
+        .propertiesListStyle()
         .scrollContentBackground(.hidden)
         .background(NotoTheme.groupedBackground)
         .contentMargins(.top, 12, for: .scrollContent)
@@ -245,7 +237,7 @@ struct PropertiesSheet: View {
         TextField("", text: $draft)
             .focused($fieldFocused)
             .multilineTextAlignment(.trailing)
-            .textInputAutocapitalization(.never)
+            .propertiesNoAutocap()
             .autocorrectionDisabled()
             .submitLabel(.done)
             .foregroundStyle(NotoTheme.head)
@@ -301,7 +293,7 @@ struct PropertiesSheet: View {
     private var inlineTagField: some View {
         TextField("tag", text: $draft)
             .focused($fieldFocused)
-            .textInputAutocapitalization(.never)
+            .propertiesNoAutocap()
             .autocorrectionDisabled()
             .submitLabel(.done)
             .font(.system(size: 13.5))
@@ -624,6 +616,36 @@ struct TagChip: View {
             .padding(.horizontal, 9)
             .frame(height: 24)
             .background(NotoTheme.chipFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+}
+
+// MARK: - Helpers
+
+/// Swipe-to-delete affordance for a custom property row.
+private struct DeletePropertyAction: ViewModifier {
+    let key: String
+    let onDelete: (String) -> Void
+
+    func body(content: Content) -> some View {
+        content.swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                onDelete(key)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func propertiesListStyle() -> some View {
+        self.listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder
+    func propertiesNoAutocap() -> some View {
+        self.textInputAutocapitalization(.never)
     }
 }
 #endif

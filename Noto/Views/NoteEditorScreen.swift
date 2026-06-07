@@ -27,10 +27,14 @@ struct NoteEditorScreen: View {
     @State private var session: NoteEditorSession
     @State private var showDeleteConfirmation = false
     @State private var showMoveSheet = false
-    #if os(iOS)
+    // Cross-platform: reveal the note title in the top bar once the document title
+    // scrolls out of view (iPad + macOS share this scrolled top-bar behavior).
+    @State private var showsScrolledTitle = false
+    // Cross-platform: the Properties sheet (and the "move after properties" hand-off) are
+    // presented on iPad and macOS alike.
     @State private var showProperties = false
     @State private var pendingMoveAfterProperties = false
-    @State private var showsScrolledTitle = false
+    #if os(iOS)
     @State private var dockHiddenByScroll = false
     @State private var lastDockScrollY: CGFloat = 0
     #endif
@@ -92,6 +96,9 @@ struct NoteEditorScreen: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -114,7 +121,7 @@ struct NoteEditorScreen: View {
         #if os(iOS)
         .background(NotoTheme.background)
         #else
-        .background(AppTheme.background)
+        .background(NotoTheme.background)
         #endif
         #if os(macOS)
         .background {
@@ -137,7 +144,7 @@ struct NoteEditorScreen: View {
             onMoveRequested: { showMoveSheet = true },
             onDeleteRequested: { showDeleteConfirmation = true },
             onSearchRequested: showFind,
-            onShowProperties: { showProperties = true },
+            onShowProperties: { withAnimation(.easeInOut(duration: 0.18)) { showProperties = true } },
             propertyCount: propertyCount,
             showsScrolledTitle: showsScrolledTitle,
             scrolledTitle: MarkdownNote.titleFrom(session.content),
@@ -149,7 +156,12 @@ struct NoteEditorScreen: View {
         ))
         // v2: no note-history edge-swipe — the leading edge swipe / back button does a
         // normal NavigationStack pop back to the file view.
-        .sheet(isPresented: $showProperties, onDismiss: {
+        // iPhone (compact) keeps the native bottom sheet (swipe-to-dismiss). iPad (regular)
+        // uses the tap-outside-to-dismiss overlay applied cross-platform below.
+        .sheet(isPresented: Binding(
+            get: { showProperties && horizontalSizeClass != .regular },
+            set: { if !$0 { showProperties = false } }
+        ), onDismiss: {
             if pendingMoveAfterProperties {
                 pendingMoveAfterProperties = false
                 showMoveSheet = true
@@ -163,14 +175,13 @@ struct NoteEditorScreen: View {
                     showProperties = false
                 }
             )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+            .propertiesSheetPresentation(isRegularWidth: false)
         }
         .notoAppBottomToolbar(
-            onOpenTodayNote: isCompactChrome ? onOpenTodayNote : nil,
-            onSearch: isCompactChrome ? onOpenSearch : nil,
-            onCreateRootNote: isCompactChrome ? onCreateRootNote : nil,
-            hiddenByScroll: dockHiddenByScroll
+            onOpenTodayNote: showsEditorDock ? onOpenTodayNote : nil,
+            onSearch: showsEditorDock ? onOpenSearch : nil,
+            onCreateRootNote: showsEditorDock ? onCreateRootNote : nil,
+            hiddenByScroll: dockHiddenByScroll || isFindVisible
         )
         #elseif os(macOS)
         .modifier(EditorNavigationChrome(
@@ -188,9 +199,21 @@ struct NoteEditorScreen: View {
             onTapBreadcrumbLevel: onTapBreadcrumbLevel,
             onMoveRequested: { showMoveSheet = true },
             onDeleteRequested: { showDeleteConfirmation = true },
-            onSearchRequested: showFind
+            onSearchRequested: showFind,
+            onShowProperties: { withAnimation(.easeInOut(duration: 0.18)) { showProperties = true } },
+            propertyCount: propertyCount,
+            showsScrolledTitle: showsScrolledTitle,
+            scrolledTitle: MarkdownNote.titleFrom(session.content)
         ))
         #endif
+        // Tap-outside-to-dismiss Properties panel — used on macOS and iPad (regular width).
+        // iPhone keeps the native bottom sheet above. SwiftUI sheets never dismiss on an
+        // outside tap, so the panel is a dimmed overlay whose backdrop closes it.
+        .overlay {
+            if showsPropertiesPanel {
+                propertiesPanelOverlay { propertiesPanelContent }
+            }
+        }
         .task(id: note.id) {
             guard !session.hasLoaded else { return }
             await session.loadNoteContent()
@@ -332,17 +355,17 @@ struct NoteEditorScreen: View {
     }
 
     private func persistEditorContentOffsetY(_ offsetY: CGFloat) {
-        #if os(iOS)
-        persistedScrollNotePath = session.note.fileURL.path
-        persistedScrollOffsetY = Double(offsetY)
         // Reveal the note title in the top bar once the document title scrolls
-        // out of view (v2 scrolled top-bar state).
+        // out of view (v2 scrolled top-bar state — iPad + macOS).
         let shouldShowTitle = offsetY > 48
         if shouldShowTitle != showsScrolledTitle {
             withAnimation(.easeInOut(duration: 0.2)) {
                 showsScrolledTitle = shouldShowTitle
             }
         }
+        #if os(iOS)
+        persistedScrollNotePath = session.note.fileURL.path
+        persistedScrollOffsetY = Double(offsetY)
         // Hide the floating dock when scrolling down; reveal it when scrolling up
         // (or near the top). A small threshold avoids jitter.
         let delta = offsetY - lastDockScrollY
@@ -362,6 +385,12 @@ struct NoteEditorScreen: View {
         return false
     }
 
+    /// The in-editor floating dock belongs to the iPhone (compact width) only. On iPad the
+    /// split view (`NotoSplitView`) owns the dock, so don't double it up here.
+    private var showsEditorDock: Bool {
+        isCompactChrome && horizontalSizeClass == .compact
+    }
+
     private func setDockHidden(_ hidden: Bool) {
         guard hidden != dockHiddenByScroll else { return }
         // Hide quickly (snappy), reveal with a slightly softer curve.
@@ -371,13 +400,70 @@ struct NoteEditorScreen: View {
     }
     #endif
 
-    #if os(iOS)
     /// Number of YAML frontmatter fields — shown as the "Properties" subtitle in
-    /// the More menu (replaces the old inline "Metadata N" block).
+    /// the More menu (replaces the old inline "Metadata N" block). Cross-platform.
     private var propertyCount: Int {
         EditableFrontmatterDocument(markdown: session.content)?.fields.count ?? 0
     }
 
+    // MARK: Properties panel (tap-outside-to-dismiss) — macOS + iPad
+
+    /// macOS always uses the dismissable overlay; iOS uses it only at regular width
+    /// (iPhone/compact keeps the native bottom sheet).
+    private var showsPropertiesPanel: Bool {
+        #if os(macOS)
+        showProperties
+        #else
+        showProperties && horizontalSizeClass == .regular
+        #endif
+    }
+
+    @ViewBuilder
+    private var propertiesPanelContent: some View {
+        #if os(macOS)
+        MacPropertiesForm(
+            session: session,
+            onClose: { dismissProperties() },
+            onMoveFolder: { dismissPropertiesThenMove() }
+        )
+        #else
+        PropertiesSheet(
+            session: session,
+            onClose: { dismissProperties() },
+            onMoveFolder: { dismissPropertiesThenMove() }
+        )
+        #endif
+    }
+
+    /// Dimmed backdrop (tap to dismiss) + a centered, clipped panel card.
+    @ViewBuilder
+    private func propertiesPanelOverlay<Panel: View>(@ViewBuilder _ panel: () -> Panel) -> some View {
+        ZStack {
+            Rectangle()
+                .fill(Color.black.opacity(0.4))
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { dismissProperties() }
+            panel()
+                .frame(width: 520, height: 580)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.45), radius: 28, y: 14)
+                .padding(28)
+        }
+        .transition(.opacity)
+    }
+
+    private func dismissProperties() {
+        withAnimation(.easeInOut(duration: 0.18)) { showProperties = false }
+    }
+
+    /// Folder row tapped inside the panel: close the panel, then open the move sheet.
+    private func dismissPropertiesThenMove() {
+        dismissProperties()
+        DispatchQueue.main.async { showMoveSheet = true }
+    }
+
+    #if os(iOS)
     private var navigationHistorySwipeEdges: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
@@ -556,6 +642,26 @@ private struct NoteEditorWindowReader: NSViewRepresentable {
             if window !== view.window {
                 window = view.window
             }
+        }
+    }
+}
+#endif
+
+#if os(iOS)
+private extension View {
+    /// Properties presentation: a centered FORM SHEET on iPad (regular width) per the v2
+    /// design; a bottom sheet with detents on iPhone (compact).
+    @ViewBuilder
+    func propertiesSheetPresentation(isRegularWidth: Bool) -> some View {
+        if isRegularWidth {
+            if #available(iOS 18.0, *) {
+                self.presentationSizing(.form)
+            } else {
+                self.presentationDetents([.large])
+            }
+        } else {
+            self.presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
 }

@@ -33,7 +33,7 @@ struct SheetCircleButton: View {
         case .confirm:
             glyph.background(NotoTheme.accent, in: Circle())
         case .close:
-            if #available(iOS 26, *) {
+            if #available(iOS 26, macOS 26, *) {
                 glyph.glassEffect(.regular.interactive(), in: .circle)
             } else {
                 glyph
