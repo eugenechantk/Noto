@@ -10,6 +10,9 @@ struct ChatSheet: View {
     @ObservedObject var session: ChatSession
     /// Open a cited note (tapped citation / SOURCES row): the presenter dismisses + navigates.
     var onOpenNote: ((String) -> Void)?
+    /// Explicit close action. Used when hosted in a macOS inspector sidebar (no sheet
+    /// `dismiss` to call); falls back to the environment `dismiss` for sheet presentation.
+    var onClose: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     @State private var showAddContext = false
@@ -74,7 +77,7 @@ struct ChatSheet: View {
 
             HStack {
                 // Left: close (Liquid Glass circle)
-                Button { dismiss() } label: {
+                Button { if let onClose { onClose() } else { dismiss() } } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(NotoChatTokens.ink)

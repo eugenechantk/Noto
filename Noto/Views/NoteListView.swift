@@ -516,23 +516,30 @@ struct VaultWorkspaceView: View {
                     EmptyView()
                 }
             )
-        // Liquid Glass floating chat button (bottom-right), mirroring the iPad dock's
-        // chat entry. Opens the AI chat sheet (or Settings if no OpenRouter key yet).
+        // Liquid Glass floating chat button (bottom-right) that opens the AI chat
+        // as a trailing inspector sidebar. Hidden while the sidebar is open (the
+        // sidebar has its own close button). Routes to Settings if no key yet.
         .overlay(alignment: .bottomTrailing) {
-            Button {
-                handleWorkspaceIntent(.openChat)
-            } label: {
-                Image(systemName: "bubble.left")
-                    .font(.system(size: 20, weight: .regular))
-                    .foregroundStyle(NotoTheme.head)
-                    .frame(width: 52, height: 52)
-                    .chatGlassCircle()
-                    .contentShape(Circle())
+            if !showChat {
+                Button {
+                    handleWorkspaceIntent(.openChat)
+                } label: {
+                    Image(systemName: "bubble.left")
+                        .font(.system(size: 20, weight: .regular))
+                        .foregroundStyle(NotoTheme.head)
+                        .frame(width: 52, height: 52)
+                        .chatGlassCircle()
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(24)
+                .accessibilityIdentifier("macos_chat_button")
+                .accessibilityLabel("AI Chat")
             }
-            .buttonStyle(.plain)
-            .padding(24)
-            .accessibilityIdentifier("macos_chat_button")
-            .accessibilityLabel("AI Chat")
+        }
+        // macOS: dock the AI chat as a native trailing inspector next to the editor.
+        .inspector(isPresented: $showChat) {
+            chatInspectorContent
         }
         .background {
             WindowCommandReader(window: $hostingWindow)
@@ -543,9 +550,6 @@ struct VaultWorkspaceView: View {
                 SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
                     .frame(minWidth: 460, minHeight: 600)
             }
-        }
-        .sheet(isPresented: $showChat) {
-            chatSheetContent
         }
         .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { notification in
             guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
@@ -591,6 +595,20 @@ struct VaultWorkspaceView: View {
                 handleWorkspaceIntent(.openDocumentLink(path))
             })
             .chatLargeSheet()
+        }
+    }
+
+    /// macOS: the chat hosted as a trailing inspector sidebar next to the editor.
+    /// Opening a cited note keeps the sidebar open (it just changes the detail).
+    @ViewBuilder
+    private var chatInspectorContent: some View {
+        if let session = chatStore.session {
+            ChatSheet(
+                session: session,
+                onOpenNote: { path in handleWorkspaceIntent(.openDocumentLink(path)) },
+                onClose: { showChat = false }
+            )
+            .inspectorColumnWidth(min: 320, ideal: 380, max: 560)
         }
     }
 
