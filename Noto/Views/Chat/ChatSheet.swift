@@ -22,6 +22,8 @@ struct ChatSheet: View {
     @State private var showHistory = false
     @State private var showRename = false
     @State private var renameText = ""
+    /// Measured height of the floating composer; used as the conversation's bottom inset.
+    @State private var composerHeight: CGFloat = 84
 
     private var vaultURL: URL { session.vaultURL }
 
@@ -41,18 +43,36 @@ struct ChatSheet: View {
                 } else {
                     messageList
                 }
-                if !showHistory {
-                    ComposerView(
-                        draft: $session.draft,
-                        mentioned: $session.pendingMentions,
-                        isBusy: session.phase == .thinking || session.phase == .streaming,
-                        vaultURL: vaultURL,
-                        onSend: send,
-                        onAttach: { showAddContext = true }
+            }
+        }
+        // Floating composer: the conversation scrolls BENEATH it (messageList adds a
+        // bottom inset = composerHeight so the last reply clears it), with a fade.
+        .overlay(alignment: .bottom) {
+            if !showHistory {
+                ComposerView(
+                    draft: $session.draft,
+                    mentioned: $session.pendingMentions,
+                    isBusy: session.phase == .thinking || session.phase == .streaming,
+                    vaultURL: vaultURL,
+                    onSend: send,
+                    onAttach: { showAddContext = true }
+                )
+                .background(alignment: .bottom) {
+                    LinearGradient(
+                        colors: [NotoChatTokens.bg.opacity(0), NotoChatTokens.bg.opacity(0.95), NotoChatTokens.bg],
+                        startPoint: .top, endPoint: .bottom
                     )
+                    .ignoresSafeArea(edges: .bottom)
+                    .allowsHitTesting(false)
+                }
+                .background {
+                    GeometryReader { g in
+                        Color.clear.preference(key: ComposerHeightKey.self, value: g.size.height)
+                    }
                 }
             }
         }
+        .onPreferenceChange(ComposerHeightKey.self) { composerHeight = $0 }
         .accessibilityIdentifier("chatSheet")
         .preferredColorScheme(.dark)
         .tint(NotoChatTokens.accent)
@@ -159,7 +179,9 @@ struct ChatSheet: View {
                         Text(msg).font(NotoChatTokens.Font.secondary())
                             .foregroundStyle(NotoChatTokens.faint)
                     }
-                    Color.clear.frame(height: 1).id("bottom")
+                    // Bottom inset so the last reply scrolls clear of the floating
+                    // composer; the scroll anchor sits at the end of this spacer.
+                    Color.clear.frame(height: composerHeight + 8).id("bottom")
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -451,6 +473,11 @@ private struct ThinkingIndicator: View {
 }
 
 // MARK: - Composer (mention tags above field + send)
+
+private struct ComposerHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 84
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
 
 private struct ComposerView: View {
     @Binding var draft: String
