@@ -37,18 +37,27 @@ You have tools:
 - grep(query, path?) — case-insensitive search across the vault's notes; returns paths + line numbers + snippets.
 - read(path, start_line?, end_line?) — open a note (or a line range) by its vault-relative path.
 - list(path?) — list a folder's contents.
-- cite(paths) — record the exact vault paths of the notes your answer used.
+- cite(paths) — record, IN ORDER, the exact vault paths of the notes your answer cites.
 
 Workflow:
 1. Use grep to find relevant notes (issue focused queries).
 2. read a note when you need its full content; you may answer directly from grep snippets when they
    are already enough.
-3. When you have enough, write your final Markdown answer AND call `cite` once in the SAME message,
-   passing the exact vault paths of EVERY note you drew on — whether from a grep snippet or a full
-   read. Copy the paths verbatim from the tool results. Do not call any other tool in that message.
+3. When you have enough, write your final Markdown answer AND call `cite` once in the SAME message.
+   Do not call any other tool in that message.
+
+Inline citations (REQUIRED):
+- Cite your sources INLINE with bracketed numbers in the answer text — e.g. "The floor is $29 [1],
+  down from $39 [2]." Put the marker right after the clause it supports.
+- The numbers are 1-based and refer to the ORDER of paths in your `cite` call: [1] = the first path
+  you pass to cite, [2] = the second, and so on. Number each distinct note once, in the order it is
+  first referenced; reuse the same number for later references to that note.
+- Every inline [n] MUST have a matching path in `cite`, and every cited path SHOULD be referenced by
+  at least one inline [n]. Copy paths verbatim from the tool results.
+- Do NOT write a "Sources" list yourself — the app renders one from your `cite` call.
 
 Ground every claim in the user's notes. Be concise and write in Markdown. If the vault doesn't
-contain the answer, say so plainly rather than guessing.
+contain the answer, say so plainly rather than guessing (and cite nothing).
 """
 
 /// Runs the agentic grep→read→answer loop over a vault using an `LLMClienting` backend.
@@ -96,7 +105,7 @@ public struct ChatAgent: Sendable {
                                                          history: history, sources: &attached)
 
                     var seenPaths = Set<String>()     // files surfaced by grep/read — the citation whitelist
-                    var citedSources = Set<String>()  // declared via cite, validated against seenPaths
+                    var citedOrdered: [String] = []   // declared via cite, IN ORDER (defines [n] numbering)
                     var readSources = Set<String>()   // files actually read (fallback citations)
                     let toolset = VaultTools.toolDefinitions + [Self.citeToolDefinition]
 
@@ -127,7 +136,7 @@ public struct ChatAgent: Sendable {
                             messages.append(.assistant(answer))
                             continuation.yield(.finished(AgentResult(
                                 answer: answer,
-                                sources: finalSources(attached: attached, cited: citedSources, read: readSources),
+                                sources: finalSources(attached: attached, citedOrdered: citedOrdered, read: readSources),
                                 messages: messages, rounds: rounds, hitRoundLimit: false)))
                             continuation.finish()
                             return
@@ -142,7 +151,7 @@ public struct ChatAgent: Sendable {
                                                                 arguments: call.function.arguments))
                             if call.function.name == "cite" {
                                 let accepted = recordCitations(call.function.arguments, seenPaths: seenPaths)
-                                citedSources.formUnion(accepted)
+                                for p in accepted where !citedOrdered.contains(p) { citedOrdered.append(p) }
                                 messages.append(.toolResult("Recorded \(accepted.count) source(s).",
                                                             callID: call.id, name: "cite"))
                                 continuation.yield(.toolCallFinished(name: "cite", summary: "\(accepted.count) source(s)"))
@@ -161,7 +170,7 @@ public struct ChatAgent: Sendable {
                             let answer = text.isEmpty ? lastNonEmptyText : text
                             continuation.yield(.finished(AgentResult(
                                 answer: answer,
-                                sources: finalSources(attached: attached, cited: citedSources, read: readSources),
+                                sources: finalSources(attached: attached, citedOrdered: citedOrdered, read: readSources),
                                 messages: messages, rounds: rounds, hitRoundLimit: false)))
                             continuation.finish()
                             return
@@ -171,7 +180,7 @@ public struct ChatAgent: Sendable {
                     // Hit the round cap without a final answer.
                     continuation.yield(.finished(AgentResult(
                         answer: "I reached the tool-call limit before finishing. Try narrowing the question.",
-                        sources: finalSources(attached: attached, cited: citedSources, read: readSources),
+                        sources: finalSources(attached: attached, citedOrdered: citedOrdered, read: readSources),
                         messages: messages, rounds: rounds, hitRoundLimit: true)))
                     continuation.finish()
                 } catch {
@@ -216,12 +225,19 @@ public struct ChatAgent: Sendable {
         return f.string(from: Date())
     }
 
-    /// Sources = attached (mentioned) files, plus the model's explicit citations if it declared
-    /// any, otherwise everything it read (fallback).
-    private func finalSources(attached: Set<String>, cited: Set<String>, read: Set<String>) -> [String] {
-        var result = attached
-        result.formUnion(cited.isEmpty ? read : cited)
-        return result.sorted()
+    /// Sources, ordered to match the inline `[n]` markers in the answer.
+    /// When the model cited, the order is its `cite` order (so [1] == sources[0]); any attached
+    /// context it didn't explicitly cite is appended after. With no citations, fall back to the
+    /// attached + read files (sorted).
+    private func finalSources(attached: Set<String>, citedOrdered: [String], read: Set<String>) -> [String] {
+        guard !citedOrdered.isEmpty else {
+            return attached.union(read).sorted()
+        }
+        var seen = Set<String>()
+        var out: [String] = []
+        for p in citedOrdered where seen.insert(p).inserted { out.append(p) }
+        for p in attached.sorted() where seen.insert(p).inserted { out.append(p) }
+        return out
     }
 
     /// Parse a `cite` call's `paths`, accepting only paths the tools actually surfaced (exact, else
@@ -239,23 +255,26 @@ public struct ChatAgent: Sendable {
                 accepted.append(match)
             }
         }
-        return Array(Set(accepted))
+        // Order-preserving dedup: cite order defines the inline [n] numbering.
+        var seen = Set<String>()
+        return accepted.filter { seen.insert($0).inserted }
     }
 
     /// The `cite` tool — handled by the agent (not the filesystem). Lets the model declare which
     /// notes its answer used, from grep snippets or full reads.
     static let citeToolDefinition = ToolDefinition(function: .init(
         name: "cite",
-        description: "Record the exact vault paths of the notes your answer used (from grep snippets "
-            + "or full reads). Call once, right before your final answer. Copy paths verbatim from "
-            + "the tool results.",
+        description: "Record, IN ORDER, the exact vault paths your answer cites inline. The first "
+            + "path is [1], the second [2], etc., matching the bracketed numbers in your answer "
+            + "text. Call once, in your final answer message. Copy paths verbatim from the tool "
+            + "results.",
         parameters: .object([
             "type": .string("object"),
             "properties": .object([
                 "paths": .object([
                     "type": .string("array"),
                     "items": .object(["type": .string("string")]),
-                    "description": .string("Vault-relative paths of the notes used.")
+                    "description": .string("Vault-relative paths of the cited notes, in the order they are cited inline ([1] = first).")
                 ])
             ]),
             "required": .array([.string("paths")])
