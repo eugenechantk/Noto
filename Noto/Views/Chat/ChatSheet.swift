@@ -245,10 +245,14 @@ private struct AIReplyView: View {
         .tint(NotoChatTokens.accent)
         // Inline [n] citations are rendered as `noto-cite:n` links → open sources[n-1].
         .environment(\.openURL, OpenURLAction { url in
-            guard url.scheme == "noto-cite",
-                  let n = Int(url.absoluteString.replacingOccurrences(of: "noto-cite:", with: "")),
-                  n >= 1, n <= turn.sources.count else { return .systemAction }
-            onOpenNote?(turn.sources[n - 1])
+            // Always consume noto-cite links so they never fall through to a system
+            // URL open (which on macOS pops the default browser). Open the note when
+            // the citation index is valid; otherwise no-op.
+            guard url.scheme == "noto-cite" else { return .systemAction }
+            if let n = Int(url.host ?? url.lastPathComponent),
+               n >= 1, n <= turn.sources.count {
+                onOpenNote?(turn.sources[n - 1])
+            }
             return .handled
         })
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -533,30 +537,60 @@ extension View {
     }
 }
 
+// MARK: - Shared markdown type ramp
+
+extension MarkdownVisualSpec.Font {
+    /// Bridge the editor's platform-neutral font spec to a SwiftUI font, so the AI
+    /// chat renders headings/body/code at the SAME sizes and weights as the editor.
+    var swiftUIFont: Font {
+        let w: Font.Weight
+        switch weight {
+        case .regular: w = .regular
+        case .medium: w = .medium
+        case .semibold: w = .semibold
+        case .bold: w = .bold
+        }
+        return isMonospaced
+            ? .system(size: pointSize, weight: w, design: .monospaced)
+            : .system(size: pointSize, weight: w)
+    }
+}
+
 // MARK: - Lightweight markdown block renderer (note-native)
 
-/// Renders a markdown string as note-native blocks: `##` headings, `-`/`*`
-/// bullets, and paragraphs, with inline markdown (bold/italic/`code`) via
-/// AttributedString. Good enough for the streaming AI answer; can be replaced
-/// by the editor's renderer later.
+/// Renders a markdown string as note-native blocks: `#`/`##`/`###` headings,
+/// `-`/`*` bullets, and paragraphs, with inline markdown (bold/italic/`code`) via
+/// AttributedString — using the editor's shared `MarkdownVisualSpec` type ramp.
 struct MarkdownText: View {
     let raw: String
     init(_ raw: String) { self.raw = raw }
+
+    // Share the editor's markdown type ramp (MarkdownVisualSpec) so AI replies and
+    // the note editor render headings/body/code at the same sizes and weights.
+    private static let bodyFont = MarkdownVisualSpec.bodyFont.swiftUIFont
+    private static func headingFont(_ level: Int) -> Font {
+        switch level {
+        case 1: return MarkdownVisualSpec.h1Font.swiftUIFont
+        case 2: return MarkdownVisualSpec.h2Font.swiftUIFont
+        default: return MarkdownVisualSpec.h3Font.swiftUIFont
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(blocks().enumerated()), id: \.offset) { _, block in
                 switch block {
-                case .heading(let s):
-                    inline(s).font(NotoChatTokens.Font.h2()).foregroundStyle(NotoChatTokens.head)
+                case .heading(let level, let s):
+                    inline(s).font(Self.headingFont(level)).foregroundStyle(NotoChatTokens.head)
                         .padding(.top, 4)
                 case .bullet(let s):
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("•").foregroundStyle(NotoChatTokens.ink)
-                        inline(s).foregroundStyle(NotoChatTokens.ink)
+                        Text("•").font(Self.bodyFont).foregroundStyle(NotoChatTokens.ink)
+                        inline(s).font(Self.bodyFont).foregroundStyle(NotoChatTokens.ink)
+                            .lineSpacing(3)
                     }
                 case .paragraph(let s):
-                    inline(s).font(NotoChatTokens.Font.body()).foregroundStyle(NotoChatTokens.ink)
+                    inline(s).font(Self.bodyFont).foregroundStyle(NotoChatTokens.ink)
                         .lineSpacing(3)
                 }
             }
@@ -568,7 +602,7 @@ struct MarkdownText: View {
         // openURL → opens the cited note). Skip `[n](…)` and `[n]:` which aren't citations.
         let linked = s.replacingOccurrences(
             of: "\\[(\\d+)\\](?![(:])",
-            with: "[$1](noto-cite:$1)",
+            with: "[$1](noto-cite://$1)",
             options: .regularExpression)
         if let attr = try? AttributedString(markdown: linked,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
@@ -577,7 +611,7 @@ struct MarkdownText: View {
         return Text(s)
     }
 
-    private enum Block { case heading(String), bullet(String), paragraph(String) }
+    private enum Block { case heading(Int, String), bullet(String), paragraph(String) }
 
     private func blocks() -> [Block] {
         var result: [Block] = []
@@ -594,8 +628,9 @@ struct MarkdownText: View {
             // Drop any trailing `[n]: path` citation reference-definition lines (the package
             // already strips them from the final answer; this guards the streamed text too).
             if t.range(of: "^\\[\\d+\\]:\\s", options: .regularExpression) != nil { continue }
-            if t.hasPrefix("## ") { close(); result.append(.heading(String(t.dropFirst(3)))); continue }
-            if t.hasPrefix("# ") { close(); result.append(.heading(String(t.dropFirst(2)))); continue }
+            if t.hasPrefix("### ") { close(); result.append(.heading(3, String(t.dropFirst(4)))); continue }
+            if t.hasPrefix("## ") { close(); result.append(.heading(2, String(t.dropFirst(3)))); continue }
+            if t.hasPrefix("# ") { close(); result.append(.heading(1, String(t.dropFirst(2)))); continue }
             if t.hasPrefix("- ") || t.hasPrefix("* ") {
                 close()
                 open = .bullet(String(t.dropFirst(2)).trimmingCharacters(in: .whitespaces))
