@@ -483,7 +483,11 @@ private struct ComposerView: View {
 
     private func selectMention(_ note: VaultNoteRef) {
         if !mentioned.contains(note.path) { mentioned.append(note.path) }
-        if let m = activeMention { draft = String(draft[draft.startIndex..<m.start]) }
+        // Replace the "@query" being typed with the note's file name inline, so the
+        // message reads naturally (e.g. "tell me about @$100M Offers ").
+        if let m = activeMention {
+            draft = String(draft[draft.startIndex..<m.start]) + "@" + note.title + " "
+        }
     }
 
     var body: some View {
