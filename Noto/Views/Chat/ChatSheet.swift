@@ -186,10 +186,9 @@ struct ChatSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
             }
-            // Tapping the conversation (or dragging it) dismisses the keyboard.
-            // simultaneousGesture so citation links still fire on the same tap.
+            // Dragging the conversation dismisses the keyboard. (No tap gesture here —
+            // it would swallow citation-link taps; the empty state handles tap-dismiss.)
             .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(TapGesture().onEnded { Self.dismissKeyboard() })
             .onChange(of: session.turns.count) { _, _ in
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
@@ -426,7 +425,9 @@ private struct SourcesView: View {
                 Button { onOpenNote?(path) } label: {
                     HStack(spacing: 8) {
                         Text("\(idx + 1)").font(NotoChatTokens.Font.secondary())
-                            .foregroundStyle(NotoChatTokens.accent).frame(width: 14)
+                            .foregroundStyle(NotoChatTokens.accent)
+                            .lineLimit(1).fixedSize()
+                            .frame(minWidth: 16, alignment: .trailing)
                         Image(systemName: "doc").font(.system(size: 12)).foregroundStyle(NotoChatTokens.faint)
                         Text(NotoChatPath.title(path)).font(NotoChatTokens.Font.secondary())
                             .foregroundStyle(NotoChatTokens.ink).lineLimit(1)
@@ -539,11 +540,13 @@ private struct ComposerView: View {
                             }
                             .padding(.leading, 9).padding(.trailing, 6)
                             .frame(height: 27)
-                            .background(Color.white.opacity(0.06),
+                            // Opaque background so the tag doesn't show the conversation
+                            // text behind it when the composer floats over the chat.
+                            .background(NotoChatTokens.pill,
                                         in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                                    .stroke(Color.white.opacity(0.14), lineWidth: 0.5)
                             }
                             .accessibilityIdentifier("composer.mentionTag.\(path)")
                         }
@@ -693,38 +696,59 @@ struct MarkdownText: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        // Per-block trailing spacing (shared MarkdownVisualSpec values) for legibility.
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(blocks().enumerated()), id: \.offset) { _, block in
                 switch block {
                 case .heading(let level, let s):
                     inline(s).font(Self.headingFont(level)).foregroundStyle(NotoChatTokens.head)
-                        .padding(.top, 4)
+                        .padding(.top, 6)
+                        .padding(.bottom, MarkdownVisualSpec.listItemSpacing)
                 case .bullet(let s):
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text("•").font(Self.bodyFont).foregroundStyle(NotoChatTokens.ink)
                         inline(s).font(Self.bodyFont).foregroundStyle(NotoChatTokens.ink)
                             .lineSpacing(3)
                     }
+                    .padding(.bottom, MarkdownVisualSpec.listItemSpacing)
                 case .paragraph(let s):
                     inline(s).font(Self.bodyFont).foregroundStyle(NotoChatTokens.ink)
                         .lineSpacing(3)
+                        .padding(.bottom, MarkdownVisualSpec.paragraphSpacing)
                 }
             }
         }
     }
 
     private func inline(_ s: String) -> Text {
-        // Turn bare inline citations `[n]` into tappable links (handled by AIReplyView's
-        // openURL → opens the cited note). Skip `[n](…)` and `[n]:` which aren't citations.
-        let linked = s.replacingOccurrences(
-            of: "\\[(\\d+)\\](?![(:])",
-            with: "[$1](noto-cite://$1)",
-            options: .regularExpression)
+        let linked = Self.linkifyCitations(s)
         if let attr = try? AttributedString(markdown: linked,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
             return Text(attr)
         }
         return Text(s)
+    }
+
+    /// Turn inline citations into tappable links: `[1]` and grouped `[4, 9, 17]` both
+    /// become individual `noto-cite://n` links (one per number). Skips `[n](…)` links
+    /// and `[n]:` reference definitions.
+    static func linkifyCitations(_ s: String) -> String {
+        let pattern = "\\[(\\d+(?:\\s*,\\s*\\d+)*)\\](?![(:])"
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return s }
+        let ns = s as NSString
+        var out = ""
+        var last = 0
+        for m in re.matches(in: s, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            let inner = ns.substring(with: m.range(at: 1))
+            let nums = inner.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            out += nums.map { "[\($0)](noto-cite://\($0))" }.joined(separator: ", ")
+            last = m.range.location + m.range.length
+        }
+        out += ns.substring(from: last)
+        return out
     }
 
     private enum Block { case heading(Int, String), bullet(String), paragraph(String) }

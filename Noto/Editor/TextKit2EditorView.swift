@@ -669,6 +669,10 @@ enum MarkdownVisualSpec {
     static let h3Font = Font(pointSize: 18, weight: .semibold)
     static let codeFont = Font(pointSize: 16, weight: .regular, isMonospaced: true)
 
+    // Trailing spacing for legibility, shared by the editor and the AI chat renderer.
+    static let paragraphSpacing: CGFloat = 8   // after a body paragraph
+    static let listItemSpacing: CGFloat = 4    // after a list item (bullet/ordered/todo)
+
     // Legacy list indent values kept for inactive block-editor compatibility.
     static let listBaseIndent: CGFloat = 12
     static let listIndentStep: CGFloat = 4
@@ -811,6 +815,7 @@ enum MarkdownParagraphStyler {
             paraStyle.firstLineHeadIndent = indentPt + contentIndent - hiddenPrefixWidth - trailingSpaceCompensation
             paraStyle.headIndent = indentPt + contentIndent
             paraStyle.paragraphSpacingBefore = 4
+            paraStyle.paragraphSpacing = MarkdownVisualSpec.listItemSpacing
 
         case .bullet(let indent):
             let indentPt = sourceIndentWidth(for: kind, text: text, indentLevel: indent)
@@ -818,6 +823,7 @@ enum MarkdownParagraphStyler {
             paraStyle.firstLineHeadIndent = indentPt
             paraStyle.headIndent = indentPt + contentIndent
             paraStyle.paragraphSpacingBefore = 4
+            paraStyle.paragraphSpacing = MarkdownVisualSpec.listItemSpacing
 
         case .orderedList(_, let indent):
             let indentPt = sourceIndentWidth(for: kind, text: text, indentLevel: indent)
@@ -825,6 +831,7 @@ enum MarkdownParagraphStyler {
             paraStyle.firstLineHeadIndent = indentPt
             paraStyle.headIndent = indentPt + contentIndent
             paraStyle.paragraphSpacingBefore = 4
+            paraStyle.paragraphSpacing = MarkdownVisualSpec.listItemSpacing
 
         case .frontmatter:
             paraStyle.lineSpacing = 0
@@ -859,6 +866,7 @@ enum MarkdownParagraphStyler {
 
         case .paragraph:
             paraStyle.paragraphSpacingBefore = paragraphUsesListSpacingWhileTyping(text) ? 4 : 6
+            paraStyle.paragraphSpacing = MarkdownVisualSpec.paragraphSpacing
         }
 
         return paraStyle
