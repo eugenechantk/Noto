@@ -670,8 +670,8 @@ enum MarkdownVisualSpec {
     static let codeFont = Font(pointSize: 16, weight: .regular, isMonospaced: true)
 
     // Trailing spacing for legibility, shared by the editor and the AI chat renderer.
-    static let paragraphSpacing: CGFloat = 8   // after a body paragraph
-    static let listItemSpacing: CGFloat = 4    // after a list item (bullet/ordered/todo)
+    static let paragraphSpacing: CGFloat = 14  // after a body paragraph
+    static let listItemSpacing: CGFloat = 8    // after a list item (bullet/ordered/todo)
 
     // Legacy list indent values kept for inactive block-editor compatibility.
     static let listBaseIndent: CGFloat = 12
