@@ -40,3 +40,4 @@ worktrees/
 .codex/appium/
 scripts/appium_mac_*.sh
 scripts/appium_mac_*.mjs
+.claude/spikes/artifacts/
