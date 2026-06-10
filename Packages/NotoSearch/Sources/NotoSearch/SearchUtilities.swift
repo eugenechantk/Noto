@@ -16,6 +16,12 @@ enum SearchUtilities {
         return uuid
     }
 
+    static func contentHash(_ data: Data) -> String {
+        var hash = FNV1a128()
+        hash.update(data)
+        return hash.uuid.uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+    }
+
     static func relativePath(for fileURL: URL, in rootURL: URL) -> String {
         let rootPath = rootURL.standardizedFileURL.path
         let filePath = fileURL.standardizedFileURL.path
@@ -36,12 +42,22 @@ private struct FNV1a128 {
 
     mutating func update(_ string: String) {
         for byte in string.utf8 {
-            high ^= UInt64(byte)
-            high &*= 0x100000001b3
-            low ^= UInt64(byte)
-            low &*= 0x100000001b3
-            low ^= high.rotateLeft(13)
+            update(byte)
         }
+    }
+
+    mutating func update(_ data: Data) {
+        for byte in data {
+            update(byte)
+        }
+    }
+
+    private mutating func update(_ byte: UInt8) {
+        high ^= UInt64(byte)
+        high &*= 0x100000001b3
+        low ^= UInt64(byte)
+        low &*= 0x100000001b3
+        low ^= high.rotateLeft(13)
     }
 
     var uuid: UUID {

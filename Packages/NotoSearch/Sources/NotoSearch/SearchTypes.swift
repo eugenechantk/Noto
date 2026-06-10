@@ -18,6 +18,8 @@ public struct SearchDocument: Identifiable, Sendable, Equatable {
     public let contentHash: String
     public let plainText: String
     public let sections: [SearchSection]
+    /// Creation timestamp from frontmatter `created:`, when present.
+    public let createdAt: Date?
 
     public init(
         id: UUID,
@@ -26,7 +28,8 @@ public struct SearchDocument: Identifiable, Sendable, Equatable {
         folderPath: String,
         contentHash: String,
         plainText: String,
-        sections: [SearchSection]
+        sections: [SearchSection],
+        createdAt: Date? = nil
     ) {
         self.id = id
         self.relativePath = relativePath
@@ -35,6 +38,7 @@ public struct SearchDocument: Identifiable, Sendable, Equatable {
         self.contentHash = contentHash
         self.plainText = plainText
         self.sections = sections
+        self.createdAt = createdAt
     }
 }
 
@@ -86,11 +90,14 @@ public struct SearchIndexedDocument: Sendable, Equatable {
     public let document: SearchDocument
     public let fileModifiedAt: Date
     public let fileSize: Int
+    /// Filesystem creation date — fallback when frontmatter has no `created:`.
+    public let fileCreatedAt: Date?
 
-    public init(document: SearchDocument, fileModifiedAt: Date, fileSize: Int) {
+    public init(document: SearchDocument, fileModifiedAt: Date, fileSize: Int, fileCreatedAt: Date? = nil) {
         self.document = document
         self.fileModifiedAt = fileModifiedAt
         self.fileSize = fileSize
+        self.fileCreatedAt = fileCreatedAt
     }
 }
 
@@ -119,6 +126,7 @@ public struct SearchResult: Identifiable, Sendable, Equatable {
     public let lineStart: Int?
     public let score: Double
     public let updatedAt: Date?
+    public let createdAt: Date?
 
     public init(
         id: UUID,
@@ -130,7 +138,8 @@ public struct SearchResult: Identifiable, Sendable, Equatable {
         snippet: String,
         lineStart: Int?,
         score: Double,
-        updatedAt: Date?
+        updatedAt: Date?,
+        createdAt: Date? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -142,6 +151,47 @@ public struct SearchResult: Identifiable, Sendable, Equatable {
         self.lineStart = lineStart
         self.score = score
         self.updatedAt = updatedAt
+        self.createdAt = createdAt
+    }
+}
+
+/// Range constraints on a note's created / last-updated timestamps.
+/// Bounds are inclusive. A note with an unknown created date fails any
+/// created-bound check (rows self-heal to known values on the next refresh).
+public struct SearchDateFilter: Sendable, Equatable {
+    public var createdAfter: Date?
+    public var createdBefore: Date?
+    public var updatedAfter: Date?
+    public var updatedBefore: Date?
+
+    public init(
+        createdAfter: Date? = nil,
+        createdBefore: Date? = nil,
+        updatedAfter: Date? = nil,
+        updatedBefore: Date? = nil
+    ) {
+        self.createdAfter = createdAfter
+        self.createdBefore = createdBefore
+        self.updatedAfter = updatedAfter
+        self.updatedBefore = updatedBefore
+    }
+
+    public var isActive: Bool {
+        createdAfter != nil || createdBefore != nil || updatedAfter != nil || updatedBefore != nil
+    }
+
+    public func matches(created: Date?, updated: Date?) -> Bool {
+        if createdAfter != nil || createdBefore != nil {
+            guard let created else { return false }
+            if let bound = createdAfter, created < bound { return false }
+            if let bound = createdBefore, created > bound { return false }
+        }
+        if updatedAfter != nil || updatedBefore != nil {
+            guard let updated else { return false }
+            if let bound = updatedAfter, updated < bound { return false }
+            if let bound = updatedBefore, updated > bound { return false }
+        }
+        return true
     }
 }
 

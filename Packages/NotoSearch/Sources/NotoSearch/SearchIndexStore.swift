@@ -58,7 +58,8 @@ public final class SearchIndexStore {
             folder_path TEXT NOT NULL,
             file_modified_at TEXT NOT NULL,
             file_size INTEGER NOT NULL DEFAULT 0,
-            content_hash TEXT NOT NULL
+            content_hash TEXT NOT NULL,
+            created_at TEXT
         );
 
         CREATE TABLE IF NOT EXISTS sections (
@@ -105,7 +106,7 @@ public final class SearchIndexStore {
             try execute("DELETE FROM sections;")
             try execute("DELETE FROM notes;")
             for entry in documents {
-                try upsert(entry.document, fileModifiedAt: entry.fileModifiedAt, fileSize: entry.fileSize, withinTransaction: true)
+                try upsert(entry.document, fileModifiedAt: entry.fileModifiedAt, fileSize: entry.fileSize, fileCreatedAt: entry.fileCreatedAt, withinTransaction: true)
             }
         }
         return try stats()
@@ -117,9 +118,9 @@ public final class SearchIndexStore {
         })
     }
 
-    public func upsert(_ document: SearchDocument, fileModifiedAt: Date, fileSize: Int = 0) throws {
+    public func upsert(_ document: SearchDocument, fileModifiedAt: Date, fileSize: Int = 0, fileCreatedAt: Date? = nil) throws {
         try transaction {
-            try upsert(document, fileModifiedAt: fileModifiedAt, fileSize: fileSize, withinTransaction: true)
+            try upsert(document, fileModifiedAt: fileModifiedAt, fileSize: fileSize, fileCreatedAt: fileCreatedAt, withinTransaction: true)
         }
     }
 
@@ -149,9 +150,9 @@ public final class SearchIndexStore {
         return true
     }
 
-    public func noteCatalog() throws -> [(noteID: UUID, relativePath: String, contentHash: String, fileModifiedAt: Date?, fileSize: Int)] {
-        var rows: [(UUID, String, String, Date?, Int)] = []
-        try query("SELECT note_id, relative_path, content_hash, file_modified_at, file_size FROM notes;") { stmt in
+    public func noteCatalog() throws -> [(noteID: UUID, relativePath: String, contentHash: String, fileModifiedAt: Date?, fileSize: Int, createdAt: Date?)] {
+        var rows: [(UUID, String, String, Date?, Int, Date?)] = []
+        try query("SELECT note_id, relative_path, content_hash, file_modified_at, file_size, created_at FROM notes;") { stmt in
             guard let idText = textColumn(stmt, 0), let id = UUID(uuidString: idText),
                   let path = textColumn(stmt, 1),
                   let hash = textColumn(stmt, 2) else {
@@ -159,9 +160,23 @@ public final class SearchIndexStore {
             }
             let modifiedAt = textColumn(stmt, 3).flatMap { SearchUtilities.iso8601.date(from: $0) }
             let fileSize = Int(sqlite3_column_int64(stmt, 4))
-            rows.append((id, path, hash, modifiedAt, fileSize))
+            let createdAt = textColumn(stmt, 5).flatMap { SearchUtilities.iso8601.date(from: $0) }
+            rows.append((id, path, hash, modifiedAt, fileSize, createdAt))
         }
         return rows
+    }
+
+    /// Per-note created/updated dates for filtering result sets (e.g. the
+    /// semantic leg, whose hits don't carry dates).
+    public func noteDates() throws -> [UUID: (created: Date?, updated: Date?)] {
+        var map: [UUID: (Date?, Date?)] = [:]
+        try query("SELECT note_id, created_at, file_modified_at FROM notes;") { stmt in
+            guard let idText = textColumn(stmt, 0), let id = UUID(uuidString: idText) else { return }
+            let created = textColumn(stmt, 1).flatMap { SearchUtilities.iso8601.date(from: $0) }
+            let updated = textColumn(stmt, 2).flatMap { SearchUtilities.iso8601.date(from: $0) }
+            map[id] = (created, updated)
+        }
+        return map
     }
 
     public func stats() throws -> SearchIndexStats {
@@ -171,7 +186,7 @@ public final class SearchIndexStore {
         )
     }
 
-    public func search(query: String, scope: SearchScope = .titleAndContent, vaultURL: URL, limit: Int = 50) throws -> [SearchResult] {
+    public func search(query: String, scope: SearchScope = .titleAndContent, vaultURL: URL, limit: Int = 50, dateFilter: SearchDateFilter = SearchDateFilter()) throws -> [SearchResult] {
         let ftsQuery = switch scope {
         case .title:
             MarkdownSearchEngine.titleOnlyFTSQuery(for: query)
@@ -183,9 +198,28 @@ public final class SearchIndexStore {
         var results: [(result: SearchResult, rank: Double)] = []
         let terms = MarkdownSearchEngine.boostTerms(for: query)
         let candidateLimit = max(limit * 4, limit)
-        try searchNotes(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, results: &results)
+        try searchNotes(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, results: &results)
         if scope == .titleAndContent {
-            try searchSections(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, results: &results)
+            try searchSections(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, results: &results)
+        }
+
+        // Recall fallback (bug 019): the default AND semantics hide notes that
+        // match only some terms of a multi-concept query. When the strict pass
+        // leaves headroom, rerun with OR and let BM25 rank partial matches —
+        // full matches still score better and stay on top. Title-only scope is
+        // a precision mode and keeps strict semantics.
+        if scope == .titleAndContent,
+           results.count < limit,
+           let orQuery = MarkdownSearchEngine.orFTSQuery(for: query) {
+            var seenResultIDs = Set(results.map(\.result.id))
+            var orResults: [(result: SearchResult, rank: Double)] = []
+            try searchNotes(ftsQuery: orQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, results: &orResults)
+            if scope == .titleAndContent {
+                try searchSections(ftsQuery: orQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, results: &orResults)
+            }
+            for entry in orResults where seenResultIDs.insert(entry.result.id).inserted {
+                results.append(entry)
+            }
         }
 
         return results
@@ -197,13 +231,15 @@ public final class SearchIndexStore {
             .map(\.result)
     }
 
-    private func upsert(_ document: SearchDocument, fileModifiedAt: Date, fileSize: Int, withinTransaction: Bool) throws {
+    private func upsert(_ document: SearchDocument, fileModifiedAt: Date, fileSize: Int, fileCreatedAt: Date? = nil, withinTransaction: Bool) throws {
         try deleteNote(noteID: document.id, withinTransaction: withinTransaction)
 
+        // Frontmatter `created:` wins; filesystem creation date is the fallback.
+        let createdAt = document.createdAt ?? fileCreatedAt
         try run(
             """
-            INSERT INTO notes (note_id, relative_path, title, folder_path, file_modified_at, file_size, content_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO notes (note_id, relative_path, title, folder_path, file_modified_at, file_size, content_hash, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
             """,
             [
                 .text(document.id.uuidString),
@@ -213,6 +249,7 @@ public final class SearchIndexStore {
                 .text(SearchUtilities.iso8601.string(from: fileModifiedAt)),
                 .int(fileSize),
                 .text(document.contentHash),
+                createdAt.map { SQLiteValue.text(SearchUtilities.iso8601.string(from: $0)) } ?? .null,
             ]
         )
 
@@ -265,20 +302,23 @@ public final class SearchIndexStore {
         terms: [String],
         vaultURL: URL,
         limit: Int,
+        dateFilter: SearchDateFilter = SearchDateFilter(),
         results: inout [(result: SearchResult, rank: Double)]
     ) throws {
+        let (dateSQL, dateValues) = Self.dateFilterClause(dateFilter, prefix: "n")
         try query(
             """
             SELECT n.note_id, n.relative_path, n.title, n.folder_path, n.file_modified_at,
                    bm25(note_fts, 5.0, 1.5, 1.0) AS rank,
-                   snippet(note_fts, 2, '', '', '...', 24) AS snippet
+                   snippet(note_fts, 2, '', '', '...', 24) AS snippet,
+                   n.created_at
             FROM note_fts
             JOIN notes n ON n.note_id = note_fts.note_id
-            WHERE note_fts MATCH ?
+            WHERE note_fts MATCH ?\(dateSQL)
             ORDER BY rank
             LIMIT ?;
             """,
-            [.text(ftsQuery), .int(limit)]
+            [.text(ftsQuery)] + dateValues + [.int(limit)]
         ) { stmt in
             guard let noteIDText = textColumn(stmt, 0), let noteID = UUID(uuidString: noteIDText),
                   let relativePath = textColumn(stmt, 1),
@@ -289,6 +329,7 @@ public final class SearchIndexStore {
             }
             let rank = sqlite3_column_double(stmt, 5)
             let snippet = textColumn(stmt, 6) ?? ""
+            let createdAt = textColumn(stmt, 7).flatMap { SearchUtilities.iso8601.date(from: $0) }
             let modifiedAt = SearchUtilities.iso8601.date(from: modifiedAtText)
             let adjustedRank = rank
                 + noteBoost(title: title, folderPath: folderPath, query: rawQuery, terms: terms)
@@ -305,7 +346,8 @@ public final class SearchIndexStore {
                     snippet: snippet.isEmpty ? title : snippet,
                     lineStart: nil,
                     score: -adjustedRank,
-                    updatedAt: modifiedAt
+                    updatedAt: modifiedAt,
+                    createdAt: createdAt
                 ),
                 adjustedRank
             ))
@@ -318,21 +360,24 @@ public final class SearchIndexStore {
         terms: [String],
         vaultURL: URL,
         limit: Int,
+        dateFilter: SearchDateFilter = SearchDateFilter(),
         results: inout [(result: SearchResult, rank: Double)]
     ) throws {
+        let (dateSQL, dateValues) = Self.dateFilterClause(dateFilter, prefix: "n")
         try query(
             """
             SELECT s.section_id, s.note_id, s.heading, s.level, s.line_start, n.relative_path, n.title, n.folder_path, n.file_modified_at,
                    bm25(section_fts, 5.0, 1.0) AS rank,
-                   snippet(section_fts, 1, '', '', '...', 24) AS snippet
+                   snippet(section_fts, 1, '', '', '...', 24) AS snippet,
+                   n.created_at
             FROM section_fts
             JOIN sections s ON s.section_id = section_fts.section_id
             JOIN notes n ON n.note_id = s.note_id
-            WHERE section_fts MATCH ?
+            WHERE section_fts MATCH ?\(dateSQL)
             ORDER BY rank
             LIMIT ?;
             """,
-            [.text(ftsQuery), .int(limit)]
+            [.text(ftsQuery)] + dateValues + [.int(limit)]
         ) { stmt in
             guard let sectionIDText = textColumn(stmt, 0), let sectionID = UUID(uuidString: sectionIDText),
                   let noteIDText = textColumn(stmt, 1), let noteID = UUID(uuidString: noteIDText),
@@ -347,6 +392,7 @@ public final class SearchIndexStore {
             let lineStart = Int(sqlite3_column_int(stmt, 4))
             let rank = sqlite3_column_double(stmt, 9)
             let snippet = textColumn(stmt, 10) ?? ""
+            let createdAt = textColumn(stmt, 11).flatMap { SearchUtilities.iso8601.date(from: $0) }
             let modifiedAt = SearchUtilities.iso8601.date(from: modifiedAtText)
             let adjustedRank = rank
                 + sectionBoost(heading: heading, noteTitle: noteTitle, folderPath: folderPath, query: rawQuery, terms: terms)
@@ -364,11 +410,37 @@ public final class SearchIndexStore {
                     snippet: snippet.isEmpty ? heading : snippet,
                     lineStart: lineStart,
                     score: -adjustedRank,
-                    updatedAt: modifiedAt
+                    updatedAt: modifiedAt,
+                    createdAt: createdAt
                 ),
                 adjustedRank
             ))
         }
+    }
+
+    /// WHERE-clause fragment + bind values for a date filter. ISO 8601 strings
+    /// (same formatter everywhere) compare correctly as text.
+    private static func dateFilterClause(_ filter: SearchDateFilter, prefix: String) -> (sql: String, values: [SQLiteValue]) {
+        var clauses: [String] = []
+        var values: [SQLiteValue] = []
+        if let bound = filter.createdAfter {
+            clauses.append("\(prefix).created_at IS NOT NULL AND \(prefix).created_at >= ?")
+            values.append(.text(SearchUtilities.iso8601.string(from: bound)))
+        }
+        if let bound = filter.createdBefore {
+            clauses.append("\(prefix).created_at IS NOT NULL AND \(prefix).created_at <= ?")
+            values.append(.text(SearchUtilities.iso8601.string(from: bound)))
+        }
+        if let bound = filter.updatedAfter {
+            clauses.append("\(prefix).file_modified_at >= ?")
+            values.append(.text(SearchUtilities.iso8601.string(from: bound)))
+        }
+        if let bound = filter.updatedBefore {
+            clauses.append("\(prefix).file_modified_at <= ?")
+            values.append(.text(SearchUtilities.iso8601.string(from: bound)))
+        }
+        guard !clauses.isEmpty else { return ("", []) }
+        return (" AND " + clauses.map { "(\($0))" }.joined(separator: " AND "), values)
     }
 
     private func sectionBreadcrumb(relativePath: String, heading: String, level: Int?) -> String {
@@ -429,6 +501,12 @@ public final class SearchIndexStore {
 
         if !noteColumns.contains("file_size") {
             try execute("ALTER TABLE notes ADD COLUMN file_size INTEGER NOT NULL DEFAULT 0;")
+        }
+
+        if !noteColumns.contains("created_at") {
+            // Nullable on purpose: rows from the pre-created_at schema stay NULL
+            // and the indexer re-indexes them once to backfill.
+            try execute("ALTER TABLE notes ADD COLUMN created_at TEXT;")
         }
     }
 

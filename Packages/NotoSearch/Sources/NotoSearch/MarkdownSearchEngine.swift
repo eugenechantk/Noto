@@ -61,6 +61,25 @@ public struct MarkdownSearchEngine {
             .filter { !$0.isEmpty }
     }
 
+    /// OR-joined variant for recall fallback: a multi-concept query like
+    /// "vibe code remote control" requires every term under the default AND
+    /// semantics, so a note matching only "vibe coding" is invisible. The OR
+    /// variant lets partial matches compete — BM25 still ranks fuller matches
+    /// higher. Returns nil for single-token or phrase-quoted queries (quotes
+    /// signal the user wants precision).
+    static func orFTSQuery(for query: String) -> String? {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("\"") else { return nil }
+        let tokens = trimmed
+            .components(separatedBy: CharacterSet.alphanumericsAndUnderscore.inverted)
+            .map { $0.lowercased() }
+            .filter { !$0.isEmpty }
+        guard tokens.count >= 2 else { return nil }
+        return tokens
+            .map { token in token.count >= 2 ? "\(token)*" : token }
+            .joined(separator: " OR ")
+    }
+
     static func titleOnlyFTSQuery(for query: String) -> String {
         let ftsQuery = ftsQuery(for: query)
         guard !ftsQuery.isEmpty else { return "" }

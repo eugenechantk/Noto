@@ -41,7 +41,8 @@ public struct MarkdownSearchIndexer: Sendable {
                 return try SearchIndexedDocument(
                     document: extractor.extract(fileURL: file.url),
                     fileModifiedAt: file.modifiedAt,
-                    fileSize: file.fileSize
+                    fileSize: file.fileSize,
+                    fileCreatedAt: file.createdAt
                 )
             } catch {
                 return nil
@@ -67,7 +68,10 @@ public struct MarkdownSearchIndexer: Sendable {
         for file in files {
             if let entry = catalog[file.relativePath],
                entry.fileSize == file.fileSize,
-               Self.matchesStoredModifiedDate(entry.fileModifiedAt, file.modifiedAt) {
+               Self.matchesStoredModifiedDate(entry.fileModifiedAt, file.modifiedAt),
+               entry.createdAt != nil {
+                // createdAt == nil means a pre-created_at schema row: fall
+                // through and re-index once so date filters see every note.
                 continue
             }
             guard file.isAvailableForIndexing else {
@@ -81,11 +85,13 @@ public struct MarkdownSearchIndexer: Sendable {
             } catch {
                 continue
             }
-            if catalog[file.relativePath]?.contentHash == document.contentHash {
+            if let entry = catalog[file.relativePath],
+               entry.contentHash == document.contentHash,
+               entry.createdAt != nil {
                 continue
             }
 
-            try store.upsert(document, fileModifiedAt: file.modifiedAt, fileSize: file.fileSize)
+            try store.upsert(document, fileModifiedAt: file.modifiedAt, fileSize: file.fileSize, fileCreatedAt: file.createdAt)
             upserted += 1
         }
 
@@ -108,6 +114,7 @@ public struct MarkdownSearchIndexer: Sendable {
 
         let values = try? normalizedURL.resourceValues(forKeys: [
             .contentModificationDateKey,
+            .creationDateKey,
             .fileSizeKey,
             .ubiquitousItemDownloadingStatusKey,
         ])
@@ -122,7 +129,8 @@ public struct MarkdownSearchIndexer: Sendable {
         try store.upsert(
             document,
             fileModifiedAt: values?.contentModificationDate ?? Date(),
-            fileSize: values?.fileSize ?? 0
+            fileSize: values?.fileSize ?? 0,
+            fileCreatedAt: values?.creationDate
         )
         return try store.stats()
     }
@@ -146,6 +154,7 @@ public struct MarkdownSearchIndexer: Sendable {
             includingPropertiesForKeys: [
                 .isDirectoryKey,
                 .contentModificationDateKey,
+                .creationDateKey,
                 .fileSizeKey,
                 .ubiquitousItemDownloadingStatusKey,
             ],
@@ -159,6 +168,7 @@ public struct MarkdownSearchIndexer: Sendable {
             let values = try? url.resourceValues(forKeys: [
                 .isDirectoryKey,
                 .contentModificationDateKey,
+                .creationDateKey,
                 .fileSizeKey,
                 .ubiquitousItemDownloadingStatusKey,
             ])
@@ -178,6 +188,7 @@ public struct MarkdownSearchIndexer: Sendable {
                     url: normalizedURL,
                     relativePath: SearchUtilities.relativePath(for: normalizedURL, in: rootURL),
                     modifiedAt: values?.contentModificationDate ?? .distantPast,
+                    createdAt: values?.creationDate,
                     fileSize: values?.fileSize ?? 0,
                     isAvailableForIndexing: values?.ubiquitousItemDownloadingStatus.map { $0 == .current } ?? true
                 )
@@ -214,6 +225,7 @@ private struct MarkdownFileSnapshot {
     let url: URL
     let relativePath: String
     let modifiedAt: Date
+    let createdAt: Date?
     let fileSize: Int
     let isAvailableForIndexing: Bool
 }

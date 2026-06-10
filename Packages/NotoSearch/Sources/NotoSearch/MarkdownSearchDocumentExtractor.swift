@@ -27,18 +27,19 @@ public struct MarkdownSearchDocumentExtractor: Sendable {
             folderPath: folderPath,
             contentHash: SearchUtilities.contentHash(markdown),
             plainText: plainText,
-            sections: sections
+            sections: sections,
+            createdAt: parsed.createdAt
         )
     }
 
-    private func parseFrontmatter(_ markdown: String) -> (id: UUID?, body: String, bodyStartLine: Int) {
+    private func parseFrontmatter(_ markdown: String) -> (id: UUID?, createdAt: Date?, body: String, bodyStartLine: Int) {
         guard markdown.hasPrefix("---\n") || markdown == "---" else {
-            return (nil, markdown, 1)
+            return (nil, nil, markdown, 1)
         }
 
         let lines = markdown.components(separatedBy: .newlines)
         guard lines.first == "---" else {
-            return (nil, markdown, 1)
+            return (nil, nil, markdown, 1)
         }
 
         var closingIndex: Int?
@@ -47,23 +48,32 @@ public struct MarkdownSearchDocumentExtractor: Sendable {
             break
         }
         guard let closingIndex else {
-            return (nil, markdown, 1)
+            return (nil, nil, markdown, 1)
         }
 
         let frontmatterLines = lines[1..<closingIndex]
         let id = frontmatterLines
             .first { $0.trimmingCharacters(in: .whitespaces).hasPrefix("id:") }
             .flatMap { line -> UUID? in
-                let raw = line
-                    .split(separator: ":", maxSplits: 1)
-                    .dropFirst()
-                    .joined(separator: ":")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+                let raw = frontmatterValue(of: line)
                 return UUID(uuidString: raw)
             }
+        let createdAt = frontmatterLines
+            .first { $0.trimmingCharacters(in: .whitespaces).hasPrefix("created:") }
+            .flatMap { line -> Date? in
+                SearchUtilities.iso8601.date(from: frontmatterValue(of: line))
+            }
         let bodyLines = lines.dropFirst(closingIndex + 1)
-        return (id, bodyLines.joined(separator: "\n"), closingIndex + 2)
+        return (id, createdAt, bodyLines.joined(separator: "\n"), closingIndex + 2)
+    }
+
+    private func frontmatterValue(of line: String) -> String {
+        line
+            .split(separator: ":", maxSplits: 1)
+            .dropFirst()
+            .joined(separator: ":")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
     }
 
     private func title(in body: String) -> String? {
@@ -203,7 +213,7 @@ public struct MarkdownSearchDocumentExtractor: Sendable {
         return result
     }
 
-    private static func readMarkdown(from url: URL) throws -> String {
+    static func readMarkdown(from url: URL) throws -> String {
         var result: Result<String, Error>?
         var coordinationError: NSError?
         let coordinator = NSFileCoordinator()
