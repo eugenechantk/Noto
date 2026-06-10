@@ -1,0 +1,9 @@
+== Design Reference image chunk ==
+image|.attachments/app screenshot.jpg|settings screen|5-5|vision-ocr-labels-v1|2:39 Settings Storage Vault Location On This Device Change Vault Changing your vault returns you to the welcome screen where you can create or open a different vault. Search Refresh search index Rebuild semantic index 9 notes • 60 chunks Re
+
+== Solar dashboard remote-image chunk ==
+Captures/The $120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money.md|https://pbs.twimg.com/media/G_Ma125W8AEGVIw.jpg|296|vision-ocr-labels-v1|9. Suno Solar Energy Hub Earning CO, Offset 34,578.00 US6 6.12 KG Total System Output 312 Daily Energy Balance 326 kW 4,89 kW - 205 k. +075kW • 35 t7 58 © 1K ila 211K Sunlight Hours Captured 12:10TS 6:10 M 6 hr Battery poopic 2à Design Twit
+
+== kind counts ==
+image|212
+text|2577
