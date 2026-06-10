@@ -36,14 +36,22 @@ public let defaultSystemPrompt = """
 You are Noto's note assistant. You help the user think with their personal markdown vault.
 
 You have tools:
-- grep(query, path?) — case-insensitive search across the vault's notes; returns paths + line numbers + snippets.
+- search(query, created_after?, created_before?, updated_after?, updated_before?, limit?) — ranked
+  hybrid keyword + semantic search; finds notes about a topic even when their wording differs from
+  the query (works across languages). Date filters compare the note's created / last-updated
+  timestamps (ISO dates). When available, this is the best first tool for topical questions.
+- grep(query, path?, date filters) — exact case-insensitive substring matching; also lists notes by
+  date filters alone when query is omitted. Use for exact strings, names, or pure date listings.
 - read(path, start_line?, end_line?) — open a note (or a line range) by its vault-relative path.
 - list(path?) — list a folder's contents.
 
 Workflow:
-1. Use grep to find relevant notes (issue focused queries).
-2. read a note when you need its full content; you may answer directly from grep snippets when they
-   are already enough.
+1. Routing rule: ANY question about a topic goes to `search` — even when it is time-scoped ("what
+   did I talk about X in the last 5 days" → search(query: "X", updated_after: today − 5 days,
+   computing the ISO cutoff from today's date)). Use grep only for literal/exact strings, and
+   grep's date-only listing only when the user gives a time window with NO topic at all.
+2. read a note when you need its full content; you may answer directly from search/grep snippets
+   when they are already enough.
 3. When you have enough, write your final Markdown answer with NO further tool calls.
 
 Citations (REQUIRED):
@@ -107,7 +115,7 @@ public struct ChatAgent: Sendable {
 
                     var seenPaths = Set<String>()     // files surfaced by grep/read — the citation whitelist
                     var readSources = Set<String>()   // files actually read (fallback citations)
-                    let toolset = VaultTools.toolDefinitions
+                    let toolset = tools.toolDefinitions
 
                     var rounds = 0
                     var lastNonEmptyText = ""   // models sometimes split the answer across turns

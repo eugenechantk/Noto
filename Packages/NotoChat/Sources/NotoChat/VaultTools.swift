@@ -71,24 +71,40 @@ public struct ToolRunResult: Sendable, Equatable {
 public struct VaultTools: Sendable {
     public let root: URL
     private let fs: any VaultFileSystem
+    let searchProvider: (any ChatSearchProviding)?
 
-    public init(root: URL, fileSystem: any VaultFileSystem = CoordinatedVaultFileSystem()) {
+    public init(
+        root: URL,
+        fileSystem: any VaultFileSystem = CoordinatedVaultFileSystem(),
+        searchProvider: (any ChatSearchProviding)? = nil
+    ) {
         self.root = root.standardizedFileURL
         self.fs = fileSystem
+        self.searchProvider = searchProvider
     }
 
     // MARK: Tool schemas advertised to the model
 
+    /// Legacy fixed set (no hybrid search) — prefer the instance property.
     public static let toolDefinitions: [ToolDefinition] = [grepDefinition, readDefinition, listDefinition]
+
+    /// Tools advertised to the model for this session. `search` appears only
+    /// when the app injected a hybrid search provider.
+    public var toolDefinitions: [ToolDefinition] {
+        searchProvider == nil
+            ? [Self.grepDefinition, Self.readDefinition, Self.listDefinition]
+            : [Self.searchDefinition, Self.grepDefinition, Self.readDefinition, Self.listDefinition]
+    }
 
     static let grepDefinition = ToolDefinition(function: .init(
         name: "grep",
-        description: "Search and filter the vault's markdown notes. With a `query`, returns matching "
-            + "lines (path + line number + snippet). Omit `query` to instead LIST the notes matching "
-            + "only the date filters (e.g. notes modified in the last few days). Combine `query` with "
-            + "date filters to search recent notes. Date filters compare the note's frontmatter "
-            + "created and updated timestamps; pass ISO dates (YYYY-MM-DD). To answer 'last N days', "
-            + "compute the cutoff from today's date and pass it as updated_after.",
+        description: "EXACT substring matching over the vault's markdown notes — use only when the "
+            + "user's words must appear literally (names, identifiers, quoted phrases), or omit "
+            + "`query` to LIST notes matching only the date filters when NO topic is given. For any "
+            + "topical question — including time-scoped ones like 'what did I write about X "
+            + "recently' — prefer the `search` tool, which also takes the same date filters. Date "
+            + "filters compare the note's created and updated timestamps; pass ISO dates "
+            + "(YYYY-MM-DD).",
         parameters: .object([
             "type": .string("object"),
             "properties": .object([
@@ -168,6 +184,8 @@ public struct VaultTools: Sendable {
     public func run(_ call: ToolCall) -> ToolRunResult {
         let args = Self.parseArguments(call.function.arguments)
         switch call.function.name {
+        case "search":
+            return runSearch(args)
         case "grep":
             let query = (args["query"] as? String) ?? ""
             let path = args["path"] as? String
