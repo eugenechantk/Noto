@@ -19,6 +19,7 @@ actor SearchIndexController {
     func refresh(vaultURL: URL) async throws -> SearchIndexRefreshResult {
         let result = try await coordinator.refresh(vaultURL: vaultURL)
         await postIndexDidChange(vaultURL: vaultURL)
+        await SemanticIndexCoordinator.shared.scheduleRefresh(vaultURL: vaultURL)
         return result
     }
 
@@ -28,6 +29,7 @@ actor SearchIndexController {
     func refresh(vaultURL: URL, fileURL: URL) async throws -> SearchIndexStats {
         let stats = try await coordinator.refresh(vaultURL: vaultURL, fileURL: fileURL)
         await postIndexDidChange(vaultURL: vaultURL)
+        await SemanticIndexCoordinator.shared.scheduleRefresh(vaultURL: vaultURL)
         return stats
     }
 
@@ -36,6 +38,7 @@ actor SearchIndexController {
     func remove(vaultURL: URL, fileURL: URL) async throws -> SearchIndexStats {
         let stats = try await coordinator.remove(vaultURL: vaultURL, fileURL: fileURL)
         await postIndexDidChange(vaultURL: vaultURL)
+        await SemanticIndexCoordinator.shared.scheduleRefresh(vaultURL: vaultURL)
         return stats
     }
 
@@ -45,6 +48,7 @@ actor SearchIndexController {
         Task { [coordinator] in
             await coordinator.scheduleRefresh(vaultURL: vaultURL, fileURL: fileURL) { changedVaultURL in
                 await Self.postIndexDidChange(vaultURL: changedVaultURL)
+                await SemanticIndexCoordinator.shared.scheduleRefresh(vaultURL: changedVaultURL)
             }
         }
     }
@@ -55,6 +59,7 @@ actor SearchIndexController {
     func drainPendingQueue(vaultURL: URL) async {
         await coordinator.drainPendingQueue(vaultURL: vaultURL)
         await postIndexDidChange(vaultURL: vaultURL)
+        await SemanticIndexCoordinator.shared.scheduleRefresh(vaultURL: vaultURL)
     }
 
     /// Nuke the on-disk SQLite store + pending queue, then re-scan the vault
@@ -64,6 +69,9 @@ actor SearchIndexController {
     func rebuildIndex(vaultURL: URL) async throws -> SearchIndexRefreshResult {
         let result = try await coordinator.rebuildIndex(vaultURL: vaultURL)
         await postIndexDidChange(vaultURL: vaultURL)
+        // The semantic store survives an FTS rebuild (separate sqlite file);
+        // chunk hashes make this sweep cheap when content didn't change.
+        await SemanticIndexCoordinator.shared.scheduleRefresh(vaultURL: vaultURL)
         return result
     }
 

@@ -319,6 +319,7 @@ private struct ToolStepView: View {
 
     private var glyph: String {
         switch step.name {
+        case "search": return "sparkle.magnifyingglass"
         case "grep": return "magnifyingglass"
         case "read": return "doc"
         case "list": return "folder"
@@ -337,7 +338,8 @@ private struct ToolStepView: View {
 
     private var stepAction: String {
         switch step.name {
-        case "grep": return "Searched"
+        case "search": return "Searched"
+        case "grep": return "Matched"
         case "read": return step.isRunning ? "Reading" : "Read"
         case "list": return "Listed"
         default: return step.name.capitalized
@@ -346,14 +348,24 @@ private struct ToolStepView: View {
     private var stepTarget: String {
         let arg = (try? JSONSerialization.jsonObject(with: Data(step.arguments.utf8))) as? [String: Any]
         switch step.name {
+        case "search":
+            var target = ""
+            if let q = arg?["query"] as? String, !q.isEmpty { target = "‘\(q)’" }
+            var filters: [String] = []
+            if let d = arg?["created_after"] as? String { filters.append("created ≥ \(d)") }
+            if let d = arg?["created_before"] as? String { filters.append("created ≤ \(d)") }
+            if let d = arg?["updated_after"] as? String { filters.append("updated ≥ \(d)") }
+            if let d = arg?["updated_before"] as? String { filters.append("updated ≤ \(d)") }
+            if !filters.isEmpty { target += " · " + filters.joined(separator: ", ") }
+            return target
         case "grep": if let q = arg?["query"] as? String, !q.isEmpty { return "‘\(q)’" }; return ""
         case "read": if let p = arg?["path"] as? String { return NotoChatPath.title(p) }; return ""
         case "list": if let p = arg?["path"] as? String, !p.isEmpty { return p }; return "the vault"
         default: return ""
         }
     }
-    private var stepMeta: String {   // grep count only, e.g. " · 4 matches in 4 notes"
-        guard step.name == "grep", let s = step.summary, !s.isEmpty else { return "" }
+    private var stepMeta: String {   // result count, e.g. " · 4 matches in 4 notes"
+        guard step.name == "grep" || step.name == "search", let s = step.summary, !s.isEmpty else { return "" }
         return " · " + s
     }
 

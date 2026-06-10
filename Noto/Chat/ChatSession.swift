@@ -75,9 +75,19 @@ final class ChatSession: ObservableObject {
         static func humanize(name: String, arguments: String) -> String {
             let arg = (try? JSONSerialization.jsonObject(with: Data(arguments.utf8))) as? [String: Any]
             switch name {
+            case "search":
+                var title = "Searched"
+                if let q = arg?["query"] as? String, !q.isEmpty { title += " ‘\(q)’" }
+                var filters: [String] = []
+                if let d = arg?["created_after"] as? String { filters.append("created ≥ \(d)") }
+                if let d = arg?["created_before"] as? String { filters.append("created ≤ \(d)") }
+                if let d = arg?["updated_after"] as? String { filters.append("updated ≥ \(d)") }
+                if let d = arg?["updated_before"] as? String { filters.append("updated ≤ \(d)") }
+                if !filters.isEmpty { title += " · " + filters.joined(separator: ", ") }
+                return title
             case "grep":
-                if let q = arg?["query"] as? String, !q.isEmpty { return "Searched ‘\(q)’" }
-                return "Searched the vault"
+                if let q = arg?["query"] as? String, !q.isEmpty { return "Matched ‘\(q)’" }
+                return "Matched in the vault"
             case "read":
                 if let p = arg?["path"] as? String { return "Read \(NotoChatPath.title(p))" }
                 return "Read a note"
@@ -119,7 +129,10 @@ final class ChatSession: ObservableObject {
             title: "Noto"
         ))
         self.vaultURL = vaultURL
-        self.agent = ChatAgent(client: client, tools: VaultTools(root: vaultURL))
+        self.agent = ChatAgent(client: client, tools: VaultTools(
+            root: vaultURL,
+            searchProvider: HybridChatSearchProvider(vaultURL: vaultURL)
+        ))
     }
 
     /// Start a fresh conversation (••• → New chat).

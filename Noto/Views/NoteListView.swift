@@ -2770,6 +2770,16 @@ struct NoteSearchSheet: View {
                 #if DEBUG
                 updateDebug(path: execution.path, execution.debugMessages)
                 #endif
+                isSearching = false
+                // Stage 2: semantic leg. Keyword results are already painted;
+                // this quietly refines the same blended list when it lands.
+                await runSemanticStage(
+                    query: requestQuery,
+                    scope: requestScope,
+                    rootURL: rootURL,
+                    keywordResults: execution.results,
+                    rootStore: rootStore
+                )
             case .failure:
                 results = []
                 #if os(macOS)
@@ -2779,9 +2789,59 @@ struct NoteSearchSheet: View {
                 #if DEBUG
                 updateDebug(path: "Unavailable", ["search task failed"])
                 #endif
+                isSearching = false
             }
-            isSearching = false
         }
+    }
+
+    /// Semantic leg of search-as-you-type: gated to content scope and queries
+    /// of three or more characters, debounced past the keyword leg, then
+    /// RRF-fused into the same result list. Cancels with the shared searchTask
+    /// on every keystroke.
+    private func runSemanticStage(
+        query: String,
+        scope: SearchScope,
+        rootURL: URL,
+        keywordResults: [SearchResult],
+        rootStore: MarkdownNoteStore
+    ) async {
+        guard scope == .titleAndContent, query.count >= 3 else { return }
+        // Stage-1 debounce (120ms) + this wait ≈ the ~250ms consensus debounce
+        // for embedding work while typing.
+        try? await Task.sleep(nanoseconds: 130_000_000)
+        guard !Task.isCancelled else { return }
+
+        let fused = await Task.detached(priority: .userInitiated) {
+            Self.semanticFusedResults(query: query, rootURL: rootURL, keywordResults: keywordResults)
+        }.value
+
+        guard !Task.isCancelled, let fused else { return }
+        let displayResults = SearchResultDisplayPolicy.hidingNoteMatchesCoveredBySections(fused)
+        results = displayResults.map { appResult(for: $0, rootStore: rootStore) }
+        #if os(macOS)
+        selectedResultIndex = results.isEmpty ? nil : 0
+        #endif
+        #if DEBUG
+        updateDebug(path: "SQLite + semantic", ["semantic results merged"])
+        #endif
+    }
+
+    /// Embed + scan + fuse, off the main actor. Returns nil when the semantic
+    /// leg has nothing to add (no model, empty index, no hits) so the caller
+    /// keeps the keyword-only list untouched.
+    nonisolated private static func semanticFusedResults(
+        query: String,
+        rootURL: URL,
+        keywordResults: [SearchResult]
+    ) -> [SearchResult]? {
+        let hits = SemanticSearch.hits(for: query, vaultURL: rootURL, limit: 50)
+        guard !hits.isEmpty else { return nil }
+        return HybridSearchFusion.fuse(
+            keyword: keywordResults,
+            semantic: hits,
+            vaultURL: rootURL,
+            limit: 100
+        )
     }
 
     private func loadRecentNotes() {
@@ -2937,7 +2997,7 @@ struct NoteSearchSheet: View {
         indexer: MarkdownSearchIndexer
     ) throws -> [SearchResult] {
         let engine = MarkdownSearchEngine(store: try indexer.openStore(), vaultURL: rootURL)
-        return try engine.search(query, scope: scope, limit: 60)
+        return try engine.search(query, scope: scope, limit: 150)
     }
 
     nonisolated private static func fallbackSearchNotes(

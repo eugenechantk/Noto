@@ -1,3 +1,4 @@
+import NotoSearch
 import SwiftUI
 import os.log
 
@@ -10,6 +11,10 @@ struct SettingsView: View {
     @State private var isTokenSheetPresented = false
     @State private var isRebuildingIndex = false
     @State private var indexRebuildMessage: String?
+    @State private var isRebuildingSemanticIndex = false
+    @State private var isResumingKeywordIndex = false
+    @State private var isResumingSemanticIndex = false
+    @ObservedObject private var indexStatus = SearchIndexStatusModel.shared
     @State private var openRouterKeyInput = ""
     @State private var openRouterKeySaved = OpenRouterKeyStore.hasKey
     @Environment(\.dismiss) private var dismiss
@@ -40,11 +45,34 @@ struct SettingsView: View {
             }
 
             Section {
+                HStack {
+                    Label("Keyword index", systemImage: "magnifyingglass")
+                    Spacer()
+                    Text(indexStatus.keywordSummary)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryText)
+                }
+                .accessibilityIdentifier("keyword_index_status")
+
+                Button {
+                    resumeKeywordIndexing()
+                } label: {
+                    HStack {
+                        Label("Resume indexing", systemImage: "play.circle")
+                        if isResumingKeywordIndex {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isResumingKeywordIndex || locationManager.vaultURL == nil)
+                .accessibilityIdentifier("resume_keyword_index_button")
+
                 Button {
                     rebuildSearchIndex()
                 } label: {
                     HStack {
-                        Label("Refresh search index", systemImage: "magnifyingglass.circle")
+                        Label("Rebuild index", systemImage: "arrow.clockwise")
                         if isRebuildingIndex {
                             Spacer()
                             ProgressView()
@@ -53,6 +81,44 @@ struct SettingsView: View {
                 }
                 .disabled(isRebuildingIndex || locationManager.vaultURL == nil)
                 .accessibilityIdentifier("refresh_search_index_button")
+
+                HStack {
+                    Label("Semantic index", systemImage: "brain")
+                    Spacer()
+                    Text(indexStatus.semanticSummary)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryText)
+                }
+                .accessibilityIdentifier("semantic_index_status")
+                .padding(.top, 6)
+
+                Button {
+                    resumeSemanticIndexing()
+                } label: {
+                    HStack {
+                        Label("Resume indexing", systemImage: "play.circle")
+                        if isResumingSemanticIndex {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isResumingSemanticIndex || locationManager.vaultURL == nil)
+                .accessibilityIdentifier("resume_semantic_index_button")
+
+                Button {
+                    rebuildSemanticIndex()
+                } label: {
+                    HStack {
+                        Label("Rebuild index", systemImage: "arrow.clockwise")
+                        if isRebuildingSemanticIndex {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isRebuildingSemanticIndex || locationManager.vaultURL == nil)
+                .accessibilityIdentifier("rebuild_semantic_index_button")
             } header: {
                 Text("Search")
             } footer: {
@@ -61,10 +127,18 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(AppTheme.secondaryText)
                 } else {
-                    Text("Deletes the local search database and re-indexes every note in the vault. Use this if mention or search results look stale.")
+                    Text("The semantic index builds in the background while the app is open and resumes automatically. Rebuild re-embeds everything from scratch — only needed if results look stale.")
                         .font(.caption)
                         .foregroundStyle(AppTheme.secondaryText)
                 }
+            }
+            .onAppear {
+                if let vaultURL = locationManager.vaultURL {
+                    indexStatus.start(vaultURL: vaultURL)
+                }
+            }
+            .onDisappear {
+                indexStatus.stop()
             }
 
             Section {
@@ -176,6 +250,52 @@ struct SettingsView: View {
                     isTokenSheetPresented = false
                 }
             )
+        }
+    }
+
+    /// Incremental keyword sweep — picks up missing/changed notes only. The
+    /// semantic sweep also chains off it via the controller hook.
+    private func resumeKeywordIndexing() {
+        guard let vaultURL = locationManager.vaultURL, !isResumingKeywordIndex else { return }
+        isResumingKeywordIndex = true
+        Task {
+            _ = try? await SearchIndexController.shared.refresh(vaultURL: vaultURL)
+            await MainActor.run {
+                isResumingKeywordIndex = false
+            }
+        }
+    }
+
+    /// Incremental semantic sweep — embeds only what's missing or changed.
+    private func resumeSemanticIndexing() {
+        guard let vaultURL = locationManager.vaultURL, !isResumingSemanticIndex else { return }
+        isResumingSemanticIndex = true
+        Task {
+            _ = try? await SemanticIndexCoordinator.shared.refresh(vaultURL: vaultURL)
+            await MainActor.run {
+                isResumingSemanticIndex = false
+            }
+        }
+    }
+
+    private func rebuildSemanticIndex() {
+        guard let vaultURL = locationManager.vaultURL, !isRebuildingSemanticIndex else { return }
+        isRebuildingSemanticIndex = true
+        indexRebuildMessage = "Re-embedding every note…"
+        Task {
+            do {
+                let result = try await SemanticIndexCoordinator.shared.rebuild(vaultURL: vaultURL)
+                await MainActor.run {
+                    isRebuildingSemanticIndex = false
+                    indexRebuildMessage = "Embedded \(result.stats.chunkCount) chunks from \(result.stats.noteCount) notes."
+                }
+            } catch {
+                logger.error("Semantic index rebuild failed: \(error.localizedDescription)")
+                await MainActor.run {
+                    isRebuildingSemanticIndex = false
+                    indexRebuildMessage = "Semantic rebuild stopped: \(String(describing: error).prefix(180)). Progress so far is saved — it resumes automatically while the app is open."
+                }
+            }
         }
     }
 

@@ -421,6 +421,10 @@ struct MainAppView: View {
             .foregroundStyle(AppTheme.primaryText)
             .tint(AppTheme.primaryText)
             .task {
+                // Wire the on-device embedding model into the semantic index
+                // before any search-index work so the sweeps it triggers can
+                // embed. Until configured, semantic ops are no-ops.
+                SemanticSearch.configureAtStartup()
                 // Replay anything queued before a previous quit/crash, then
                 // run the broader sweep. Drain first so files the sandbox
                 // enumerator can't see (recently-written iCloud files) still
