@@ -232,16 +232,63 @@ public struct ChatAgent: Sendable {
             guard let n = Int(t[t.index(after: t.startIndex)..<close]) else { continue }
             var path = String(t[t.index(after: after)...]).trimmingCharacters(in: .whitespaces)
             path = path.trimmingCharacters(in: CharacterSet(charactersIn: "`\"' "))
+            // Strip the definition line either way; only resolved paths become
+            // sources. Leaving a rejected `[n]: path` line in the answer would
+            // surface citation plumbing as prose.
+            dropped.insert(i)
             guard let resolved = resolvePath(path, seenPaths: seenPaths) else { continue }
             numbered[n] = resolved
-            dropped.insert(i)
         }
         let cleaned = lines.enumerated()
             .filter { !dropped.contains($0.offset) }
             .map(\.element).joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let sources = numbered.keys.sorted().compactMap { numbered[$0] }
-        return (cleaned, sources.isEmpty ? attached.union(read).sorted() : sources)
+
+        guard !numbered.isEmpty else {
+            return (cleaned, attached.union(read).sorted())
+        }
+
+        // The renderer opens sources[n-1] for inline [n], so the inline numbers
+        // must match the compacted source order. The model's reference numbers
+        // can be non-contiguous (skipped numbers, or definitions dropped by path
+        // validation above) — renumber the inline citations to 1..K and remove
+        // ones whose reference was dropped, instead of leaving dead or
+        // wrong-target links (bug 021).
+        let orderedNumbers = numbered.keys.sorted()
+        let renumbering = Dictionary(
+            uniqueKeysWithValues: orderedNumbers.enumerated().map { ($0.element, $0.offset + 1) }
+        )
+        let sources = orderedNumbers.compactMap { numbered[$0] }
+        return (renumberInlineCitations(in: cleaned, renumbering: renumbering), sources)
+    }
+
+    /// Rewrites inline `[n]` and grouped `[a, b]` citations through `renumbering`,
+    /// dropping numbers that have no mapping. Uses the same bracket pattern the
+    /// chat renderer linkifies; `[n](…)` links and `[n]:` definitions are untouched.
+    static func renumberInlineCitations(in text: String, renumbering: [Int: Int]) -> String {
+        guard !renumbering.allSatisfy({ $0.key == $0.value }) else { return text }
+        let pattern = #"\[(\d+(?:\s*,\s*\d+)*)\](?![(:])"#
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return text }
+        let ns = text as NSString
+        var out = ""
+        var last = 0
+        for m in re.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            let mapped = ns.substring(with: m.range(at: 1))
+                .split(separator: ",")
+                .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+                .compactMap { renumbering[$0] }
+            if mapped.isEmpty {
+                // The whole bracket pointed at dropped references — remove it,
+                // along with one preceding space so "text [9]." reads "text.".
+                if out.hasSuffix(" ") { out.removeLast() }
+            } else {
+                out += "[" + mapped.map(String.init).joined(separator: ", ") + "]"
+            }
+            last = m.range.location + m.range.length
+        }
+        out += ns.substring(from: last)
+        return out
     }
 
     private static func resolvePath(_ path: String, seenPaths: Set<String>) -> String? {

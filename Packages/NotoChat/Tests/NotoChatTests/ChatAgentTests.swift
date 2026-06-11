@@ -143,4 +143,52 @@ import Testing
         let result = try await agent.send("q")
         #expect(result.sources.isEmpty) // hallucinated citation rejected, nothing read
     }
+
+    // MARK: - Citation renumbering (bug 021: inline [n] must always map to sources[n-1])
+
+    @Test func nonContiguousCitationNumbersAreRenumbered() {
+        let (answer, sources) = ChatAgent.extractCitations(
+            from: "Alpha fact [1] and beta fact [3].\n\n[1]: A.md\n[3]: B.md",
+            seenPaths: ["A.md", "B.md"], attached: [], read: []
+        )
+        #expect(answer == "Alpha fact [1] and beta fact [2].")
+        #expect(sources == ["A.md", "B.md"])
+    }
+
+    @Test func droppedReferenceRemovesItsInlineCitation() {
+        // [2]'s path was never surfaced → its definition is rejected; the inline
+        // [2] must disappear instead of becoming a dead or wrong-target link.
+        let (answer, sources) = ChatAgent.extractCitations(
+            from: "One [1] two [2] three [3].\n\n[1]: A.md\n[2]: Ghost.md\n[3]: B.md",
+            seenPaths: ["A.md", "B.md"], attached: [], read: []
+        )
+        #expect(answer == "One [1] two three [2].")
+        #expect(sources == ["A.md", "B.md"])
+    }
+
+    @Test func groupedCitationsRenumberMemberWise() {
+        let (answer, sources) = ChatAgent.extractCitations(
+            from: "Both notes agree [1, 4].\n\n[1]: A.md\n[4]: B.md",
+            seenPaths: ["A.md", "B.md"], attached: [], read: []
+        )
+        #expect(answer == "Both notes agree [1, 2].")
+        #expect(sources == ["A.md", "B.md"])
+    }
+
+    @Test func contiguousCitationsPassThroughUnchanged() {
+        let (answer, sources) = ChatAgent.extractCitations(
+            from: "First [1], second [2], both [1, 2].\n\n[1]: A.md\n[2]: B.md",
+            seenPaths: ["A.md", "B.md"], attached: [], read: []
+        )
+        #expect(answer == "First [1], second [2], both [1, 2].")
+        #expect(sources == ["A.md", "B.md"])
+    }
+
+    @Test func renumberingLeavesMarkdownLinksAndDefinitionsAlone() {
+        let (answer, _) = ChatAgent.extractCitations(
+            from: "See [1](https://example.com/1) and cite [3].\n\n[3]: A.md",
+            seenPaths: ["A.md"], attached: [], read: []
+        )
+        #expect(answer == "See [1](https://example.com/1) and cite [1].")
+    }
 }
