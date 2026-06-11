@@ -143,4 +143,35 @@ import Testing
         let result = try await agent.send("q")
         #expect(result.sources.isEmpty) // hallucinated citation rejected, nothing read
     }
+
+    // MARK: - Composed-prompt unwrapping (bug 022: restored chats must show typed text)
+
+    @Test func strippedComposedUserContentRecoversTypedMessage() async throws {
+        let root = try vault()
+        defer { TempVault.remove(root) }
+        let client = ScriptedClient(rounds: [[.textDelta("ok"), .finished(reason: "stop")]])
+        let agent = ChatAgent(client: client, tools: VaultTools(root: root))
+
+        // The real composed prompt (attachment wrapper around the typed text)…
+        let result = try await agent.send("summarize this", mentioned: ["Note.md"])
+        let composed = try #require(result.messages.first { $0.role == .user }?.content)
+        #expect(composed.contains("The answer is 42."))   // attachment really embedded
+
+        // …unwraps back to exactly what was typed.
+        #expect(ChatAgent.strippedComposedUserContent(composed) == "summarize this")
+    }
+
+    @Test func strippedComposedUserContentHandlesDelimiterInsideAttachment() {
+        let composed = ChatAgent.attachmentContextPrefix + "\n\n"
+            + "# Attached Note\n\nIntro\n\n---\n\nMore attached prose."
+            + ChatAgent.attachmentContextDelimiter + "what did I write?"
+        #expect(ChatAgent.strippedComposedUserContent(composed) == "what did I write?")
+    }
+
+    @Test func strippedComposedUserContentPassesPlainTextThrough() {
+        #expect(ChatAgent.strippedComposedUserContent("just a question") == "just a question")
+        // Prefix without the delimiter (not wrapper-produced) stays untouched.
+        let odd = ChatAgent.attachmentContextPrefix + " sort of, but not really"
+        #expect(ChatAgent.strippedComposedUserContent(odd) == odd)
+    }
 }

@@ -183,13 +183,42 @@ final class ChatSession: ObservableObject {
         title = parsed.title
         allMentioned = parsed.mentioned
         lastSources = parsed.sources
-        history = parsed.turns.map { $0.role == .user ? .user($0.text) : .assistant($0.text) }
-        turns = parsed.turns.enumerated().map { idx, t in
-            ChatTurn(
+        // Transcripts saved before display-level persistence (bug 022) carry the
+        // composed prompt in user turns — unwrap it so restoration shows exactly
+        // what was typed. New transcripts pass through unchanged.
+        let displayTurns = parsed.turns.map { t in
+            (role: t.role,
+             text: t.role == .user ? ChatAgent.strippedComposedUserContent(t.text) : t.text,
+             sources: t.sources)
+        }
+        history = displayTurns.map { $0.role == .user ? .user($0.text) : .assistant($0.text) }
+        let lastIndex = displayTurns.count - 1
+        turns = displayTurns.enumerated().map { idx, t in
+            // Per-turn sources from the transcript; legacy files without
+            // per-turn reference lines fall back to the frontmatter sources
+            // for the final answer (the only mapping the old format saved).
+            let isFallback = t.sources.isEmpty
+            let turnSources = !isFallback
+                ? t.sources
+                : ((t.role == .assistant && idx == lastIndex) ? parsed.sources : [])
+            // Legacy fallback with a single source: every inline citation in
+            // the turn can only mean that one note — normalize the numbers so
+            // they're tappable instead of dead (e.g. a stray "[7]").
+            var text = t.text
+            if isFallback, t.role == .assistant, turnSources.count == 1 {
+                text = ChatAgent.normalizeAllCitations(in: text, to: 1)
+            }
+            return ChatTurn(
                 role: t.role == .user ? .user : .assistant,
-                blocks: [.text(id: UUID(), t.text)],
-                sources: (t.role == .assistant && idx == parsed.turns.count - 1) ? parsed.sources : []
+                blocks: [.text(id: UUID(), text)],
+                sources: turnSources
             )
+        }
+        // Continuing a restored chat should behave like a fresh chat with the
+        // same notes attached: re-seed the previously mentioned documents so
+        // the next send re-attaches their current content.
+        for m in parsed.mentioned where !pendingMentions.contains(m) {
+            pendingMentions.append(m)
         }
         phase = .idle
     }
@@ -260,6 +289,18 @@ final class ChatSession: ObservableObject {
             }
 
         case .finished(let result):
+            // Reconcile the streamed blocks with the finalized answer:
+            // extractCitations renumbered inline citations and stripped the
+            // `[n]: path` reference lines from result.answer, so the raw
+            // streamed text would mismatch turn.sources (dead/wrong citation
+            // taps) and leak reference lines into the saved transcript. Tool
+            // steps stay, stacked above the final text.
+            if !result.answer.isEmpty {
+                let toolBlocks = turns[i].blocks.filter {
+                    if case .tool = $0 { return true } else { return false }
+                }
+                turns[i].blocks = toolBlocks + [.text(id: UUID(), result.answer)]
+            }
             turns[i].sources = result.sources
             turns[i].hitRoundLimit = result.hitRoundLimit
             history = result.messages
@@ -280,9 +321,30 @@ final class ChatSession: ObservableObject {
             model: agent.model,
             mentioned: allMentioned,
             sources: lastSources,
-            turns: history.filter { $0.role == .user || $0.role == .assistant }
+            turns: Self.transcriptTurns(from: turns)
         )
         saveTranscript(transcript, toChatsDirectory: chatsDir)
+    }
+
+    /// The display-level conversation — what the user actually typed and what
+    /// Noto answered — for the saved transcript. NOT the composed LLM history,
+    /// whose user messages embed attached-note text and context plumbing that
+    /// must never resurface when the chat is restored (bug 022). Tool-step
+    /// blocks are dropped; empty turns (e.g. a failed send's placeholder) too.
+    /// Assistant turns keep their per-turn sources so citations survive.
+    nonisolated static func transcriptTurns(from turns: [ChatTurn]) -> [TranscriptTurn] {
+        turns.compactMap { turn in
+            let text = turn.blocks.compactMap { block -> String? in
+                if case .text(_, let s) = block { return s }
+                return nil
+            }
+            .joined(separator: "\n\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+            return turn.role == .user
+                ? .user(text)
+                : .assistant(text, sources: turn.sources)
+        }
     }
 
     private func firstUserText() -> String? {
@@ -300,17 +362,19 @@ final class ChatSession: ObservableObject {
         var title: String
         var mentioned: [String]
         var sources: [String]
-        var turns: [(role: ChatRole, text: String)]
+        /// Assistant turns carry their own sources (in inline-number order);
+        /// user turns have none.
+        var turns: [(role: ChatRole, text: String, sources: [String])]
     }
 
     /// Parse a saved `Chats/*.md` (frontmatter + `## You` / `## Noto` sections).
-    static func parse(_ text: String, fallbackTitle: String) -> ParsedTranscript {
+    nonisolated static func parse(_ text: String, fallbackTitle: String) -> ParsedTranscript {
         var id: UUID?
         var created: Date?
         var title = fallbackTitle
         var mentioned: [String] = []
         var sources: [String] = []
-        var turns: [(role: ChatRole, text: String)] = []
+        var turns: [(role: ChatRole, text: String, sources: [String])] = []
 
         let lines = text.components(separatedBy: "\n")
         var i = 0
@@ -336,17 +400,43 @@ final class ChatSession: ObservableObject {
         var role: ChatRole?
         var buffer: [String] = []
         func flush() {
-            if let r = role {
-                let content = buffer.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-                if !content.isEmpty { turns.append((r, content)) }
+            guard let r = role else { buffer = []; return }
+            // Pull this turn's `[n]: path` reference lines out of the body. The
+            // numbers map citations to notes; the text is renumbered to the
+            // compacted 1..K order so `sources[n-1]` is the note for inline [n]
+            // in every turn (legacy transcripts can have gaps or no refs).
+            var refs: [Int: String] = [:]
+            var bodyLines: [String] = []
+            for line in buffer {
+                let t = line.trimmingCharacters(in: .whitespaces)
+                if r == .assistant, t.hasPrefix("["), let close = t.firstIndex(of: "]"),
+                   close < t.endIndex, t.index(after: close) < t.endIndex,
+                   t[t.index(after: close)] == ":",
+                   let n = Int(t[t.index(after: t.startIndex)..<close]) {
+                    let path = String(t[t.index(close, offsetBy: 2)...]).trimmingCharacters(in: .whitespaces)
+                    if !path.isEmpty { refs[n] = path; continue }
+                }
+                bodyLines.append(line)
             }
+            var content = bodyLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            var turnSources: [String] = []
+            if !refs.isEmpty {
+                let ordered = refs.keys.sorted()
+                let renumbering = Dictionary(uniqueKeysWithValues: ordered.enumerated().map { ($0.element, $0.offset + 1) })
+                content = ChatAgent.renumberInlineCitations(in: content, renumbering: renumbering)
+                turnSources = ordered.compactMap { refs[$0] }
+            }
+            if !content.isEmpty { turns.append((r, content, turnSources)) }
             buffer = []
         }
         while i < lines.count {
             let t = lines[i].trimmingCharacters(in: .whitespaces)
             if t == "## You" { flush(); role = .user }
             else if t == "## Noto" { flush(); role = .assistant }
-            else if t.hasPrefix("# ") && !t.hasPrefix("## ") { title = String(t.dropFirst(2)) }
+            // Only the document's own H1 (before any turn section) is the title —
+            // an `# Heading` inside a turn (e.g. attached-note text in legacy
+            // transcripts) is content, not the chat title (bug 022).
+            else if role == nil, t.hasPrefix("# "), !t.hasPrefix("## ") { title = String(t.dropFirst(2)) }
             else if role != nil { buffer.append(lines[i]) }
             i += 1
         }

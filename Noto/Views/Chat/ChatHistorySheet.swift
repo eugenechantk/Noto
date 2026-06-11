@@ -1,3 +1,4 @@
+import NotoChat
 import SwiftUI
 
 /// The past-chats list (title · snippet · relative date), rendered INLINE inside
@@ -167,8 +168,20 @@ struct ChatHistorySheet: View {
         return fallback
     }
 
-    /// Snippet = first non-empty body line that isn't frontmatter/heading.
-    private static func snippet(from content: String) -> String {
+    /// Snippet = the first thing the user typed. Legacy transcripts carry the
+    /// composed prompt (attached-note text) in the user turn — unwrap it so the
+    /// preview never shows context plumbing (bug 022).
+    static func snippet(from content: String) -> String {
+        let parsed = ChatSession.parse(content, fallbackTitle: "")
+        if let firstUser = parsed.turns.first(where: { $0.role == .user }) {
+            let typed = ChatAgent.strippedComposedUserContent(firstUser.text)
+            if let line = typed.split(separator: "\n")
+                .map({ $0.trimmingCharacters(in: .whitespaces) })
+                .first(where: { !$0.isEmpty && !$0.hasPrefix("#") }) {
+                return String(line.prefix(80))
+            }
+        }
+        // No user turn (malformed file): fall back to the first body line.
         var inFrontmatter = false
         for raw in content.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = raw.trimmingCharacters(in: .whitespaces)

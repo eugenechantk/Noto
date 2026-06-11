@@ -28,6 +28,21 @@ import Testing
         #expect(!md.contains("## System"))
     }
 
+    @Test func rendersPerTurnReferenceLines() {
+        let transcript = ChatTranscript(
+            title: "Cited chat",
+            turns: [
+                .user("which notes mention pricing?"),
+                .assistant("Two notes [1, 2].", sources: ["A.md", "B.md"]),
+                .user("more?"),
+                .assistant("One more [1].", sources: ["C.md"]),
+            ]
+        )
+        let md = transcript.markdown()
+        #expect(md.contains("Two notes [1, 2].\n\n[1]: A.md\n[2]: B.md"))
+        #expect(md.contains("One more [1].\n\n[1]: C.md"))
+    }
+
     @Test func sanitizesFileName() {
         let t = ChatTranscript(title: "Q2/Q3: pricing?")
         #expect(t.fileName() == "Q2 Q3  pricing.md")
