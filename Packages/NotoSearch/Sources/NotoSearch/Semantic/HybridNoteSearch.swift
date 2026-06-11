@@ -12,6 +12,9 @@ public enum HybridNoteSearch {
         public var query: String
         public var scope: SearchScope
         public var dateFilter: SearchDateFilter
+        /// Restricts both legs to notes inside this vault folder (any depth).
+        /// Normalized via `SearchFolderFilter.normalizedPrefix`.
+        public var folderPrefix: String?
         public var keywordLimit: Int
         public var semanticLimit: Int
         public var limit: Int
@@ -20,6 +23,7 @@ public enum HybridNoteSearch {
             query: String,
             scope: SearchScope = .titleAndContent,
             dateFilter: SearchDateFilter = SearchDateFilter(),
+            folderPrefix: String? = nil,
             keywordLimit: Int = 150,
             semanticLimit: Int = 50,
             limit: Int = 100
@@ -27,6 +31,7 @@ public enum HybridNoteSearch {
             self.query = query
             self.scope = scope
             self.dateFilter = dateFilter
+            self.folderPrefix = folderPrefix
             self.keywordLimit = keywordLimit
             self.semanticLimit = semanticLimit
             self.limit = limit
@@ -48,7 +53,8 @@ public enum HybridNoteSearch {
             scope: request.scope,
             vaultURL: vaultURL,
             limit: request.keywordLimit,
-            dateFilter: request.dateFilter
+            dateFilter: request.dateFilter,
+            folderPrefix: request.folderPrefix
         )
         return fuseWithSemantic(
             keyword: keyword,
@@ -72,13 +78,17 @@ public enum HybridNoteSearch {
         guard request.scope == .titleAndContent else { return nil }
         let directory = indexDirectory ?? MarkdownSearchIndexer.defaultIndexDirectory(for: vaultURL)
 
-        let hits: [SemanticSearchHit]
+        var hits: [SemanticSearchHit]
         do {
             guard let vector = try embedQuery(request.query) else { return nil }
             hits = try SemanticSearcher(indexDirectory: directory)
                 .search(queryVector: vector, limit: request.semanticLimit)
         } catch {
             return nil
+        }
+
+        if let folder = SearchFolderFilter.normalizedPrefix(request.folderPrefix) {
+            hits = hits.filter { SearchFolderFilter.matches(relativePath: $0.relativePath, normalizedPrefix: folder) }
         }
 
         let filteredHits: [SemanticSearchHit]

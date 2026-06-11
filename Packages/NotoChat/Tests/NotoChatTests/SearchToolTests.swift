@@ -9,6 +9,8 @@ import Testing
 /// 4. testProviderFailureReturnsErrorText — tool errors degrade to text, never throw (SC12)
 /// 5. testOutputFormatAndSurfacedPaths — ranked output, dedup'd surfaced paths, hits capped at 8 (SC12)
 /// 6. testNoResultsMessageMentionsFilters — empty result guidance includes the active filter (SC12)
+/// 7. testFolderArgumentReachesProvider — `folder` arg lands on ChatSearchRequest.folder; blank folder → nil (feature: search-folder-filter SC4)
+/// 8. testFolderAppearsInOutputAndNoResultsMessage — formatted header and empty-result guidance name the folder (SC4)
 struct SearchToolTests {
     private final class RecordingProvider: ChatSearchProviding, @unchecked Sendable {
         var lastRequest: ChatSearchRequest?
@@ -118,5 +120,34 @@ struct SearchToolTests {
         let outcome = tools.run(searchCall(#"{"query": "nothing", "updated_after": "2026-06-05"}"#))
         #expect(outcome.output.contains("No results"))
         #expect(outcome.output.contains("updated_after 2026-06-05"))
+    }
+
+    @Test func testFolderArgumentReachesProvider() throws {
+        let provider = RecordingProvider()
+        let tools = try makeTools(provider: provider)
+
+        _ = tools.run(searchCall(#"{"query": "captures", "folder": "Captures"}"#))
+        #expect(try #require(provider.lastRequest).folder == "Captures")
+
+        _ = tools.run(searchCall(#"{"query": "captures", "folder": "   "}"#))
+        #expect(try #require(provider.lastRequest).folder == nil)
+
+        _ = tools.run(searchCall(#"{"query": "captures"}"#))
+        #expect(try #require(provider.lastRequest).folder == nil)
+    }
+
+    @Test func testFolderAppearsInOutputAndNoResultsMessage() throws {
+        let provider = RecordingProvider()
+        let tools = try makeTools(provider: provider)
+
+        let empty = tools.run(searchCall(#"{"query": "nothing", "folder": "Captures", "updated_after": "2026-06-05"}"#))
+        #expect(empty.output.contains("No results"))
+        #expect(empty.output.contains("folder Captures"))
+        #expect(empty.output.contains("updated_after 2026-06-05"))
+
+        provider.results = [result(path: "Captures/Hit.md", line: 4)]
+        let hit = tools.run(searchCall(#"{"query": "something", "folder": "Captures"}"#))
+        #expect(hit.output.contains("(folder Captures)"))
+        #expect(hit.output.contains("Captures/Hit.md:4"))
     }
 }

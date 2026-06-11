@@ -6,11 +6,15 @@ import Foundation
 public struct ChatSearchRequest: Sendable, Equatable {
     public let query: String
     public let filter: DateFilter
+    /// Restricts results to notes inside this vault folder (vault-relative,
+    /// any depth). Nil = whole vault.
+    public let folder: String?
     public let limit: Int
 
-    public init(query: String, filter: DateFilter = .init(), limit: Int = 12) {
+    public init(query: String, filter: DateFilter = .init(), folder: String? = nil, limit: Int = 12) {
         self.query = query
         self.filter = filter
+        self.folder = folder
         self.limit = limit
     }
 }
@@ -61,8 +65,10 @@ extension VaultTools {
             + "the query (including across languages). Returns the best snippets and documents, most "
             + "relevant first. Supports date filters on the note's created and last-updated timestamps; "
             + "pass ISO dates (YYYY-MM-DD) and compute cutoffs like 'last 5 days' from today's date. "
-            + "Prefer this over grep for finding notes about a topic; use grep only for exact "
-            + "strings/substrings or pure date-filtered listings.",
+            + "Also supports a folder filter to search only inside one vault folder (e.g. the user asks "
+            + "about 'my Captures' or 'the Projects folder') — use the list tool if you need to discover "
+            + "exact folder names first. Prefer this over grep for finding notes about a topic; use grep "
+            + "only for exact strings/substrings or pure date-filtered listings.",
         parameters: .object([
             "type": .string("object"),
             "properties": .object([
@@ -86,6 +92,10 @@ extension VaultTools {
                     "type": .string("string"),
                     "description": .string("Only notes last updated on/before this ISO date (YYYY-MM-DD).")
                 ]),
+                "folder": .object([
+                    "type": .string("string"),
+                    "description": .string("Only notes inside this vault folder, at any depth — a vault-relative folder path like \"Captures\" or \"Projects/Alpha\". Omit to search the whole vault.")
+                ]),
                 "limit": .object([
                     "type": .string("integer"),
                     "description": .string("Maximum results to return (default 12, max 30).")
@@ -107,11 +117,13 @@ extension VaultTools {
                          readPath: nil, summary: "search: bad args")
         }
         let filter = Self.parseDateFilter(args)
+        let folder = (args["folder"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedFolder = (folder?.isEmpty ?? true) ? nil : folder
         let limit = min(max(Self.intValue(args["limit"]) ?? 12, 1), 30)
 
         let results: [ChatSearchResult]
         do {
-            results = try provider.search(ChatSearchRequest(query: query, filter: filter, limit: limit))
+            results = try provider.search(ChatSearchRequest(query: query, filter: filter, folder: normalizedFolder, limit: limit))
         } catch {
             return .init(output: "Error: search failed (\(String(describing: error))). Try grep instead.",
                          readPath: nil, summary: "search: failed")
@@ -122,7 +134,7 @@ extension VaultTools {
         }
         let noteCount = files.count
         return .init(
-            output: Self.format(searchResults: results, query: query, filter: filter),
+            output: Self.format(searchResults: results, query: query, filter: filter, folder: normalizedFolder),
             readPath: nil,
             summary: "\(results.count) result\(results.count == 1 ? "" : "s") in \(noteCount) note\(noteCount == 1 ? "" : "s")",
             surfacedPaths: files,
@@ -130,18 +142,18 @@ extension VaultTools {
         )
     }
 
-    static func format(searchResults: [ChatSearchResult], query: String, filter: DateFilter) -> String {
-        var filterNote = ""
+    static func format(searchResults: [ChatSearchResult], query: String, filter: DateFilter, folder: String? = nil) -> String {
+        var parts: [String] = []
+        if let folder { parts.append("folder \(folder)") }
         if filter.isActive {
-            var parts: [String] = []
             if let d = filter.createdAfter { parts.append("created_after \(shortDate.string(from: d))") }
             if let d = filter.createdBefore { parts.append("created_before \(shortDate.string(from: d))") }
             if let d = filter.updatedAfter { parts.append("updated_after \(shortDate.string(from: d))") }
             if let d = filter.updatedBefore { parts.append("updated_before \(shortDate.string(from: d))") }
-            filterNote = " (" + parts.joined(separator: ", ") + ")"
         }
+        let filterNote = parts.isEmpty ? "" : " (" + parts.joined(separator: ", ") + ")"
         guard !searchResults.isEmpty else {
-            return "No results for \"\(query)\"\(filterNote). Try broader wording, removing date filters, or grep for exact strings."
+            return "No results for \"\(query)\"\(filterNote). Try broader wording, removing the folder/date filters, or grep for exact strings."
         }
         let lines = searchResults.enumerated().map { index, result -> String in
             let location = result.lineStart.map { "\(result.path):\($0)" } ?? result.path

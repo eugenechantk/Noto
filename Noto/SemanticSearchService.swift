@@ -108,6 +108,7 @@ struct HybridChatSearchProvider: ChatSearchProviding {
                     updatedAfter: request.filter.updatedAfter,
                     updatedBefore: request.filter.updatedBefore
                 ),
+                folderPrefix: request.folder,
                 limit: request.limit
             ),
             vaultURL: vaultURL,
