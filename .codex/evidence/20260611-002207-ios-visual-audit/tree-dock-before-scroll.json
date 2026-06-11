@@ -1,0 +1,129 @@
+{
+  "accessibility" : {
+    "element_count" : 6,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 566
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 1133,
+          "width" : 744,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 59
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 54,
+          "width" : 744,
+          "x" : 0,
+          "y" : 32
+        },
+        "id" : "_TtGC7SwiftUI32NavigationStackHosting",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 228,
+          "y" : 1079
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 206,
+          "y" : 1057
+        },
+        "id" : "today_button",
+        "label" : "Today",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 1079
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 220,
+          "x" : 262,
+          "y" : 1053
+        },
+        "id" : "search_button",
+        "label" : "Search",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 516,
+          "y" : 1079
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 494,
+          "y" : 1057
+        },
+        "id" : "new_root_note_button",
+        "label" : "New Note",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 566
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 1133,
+          "width" : 744,
+          "x" : 0,
+          "y" : 0
+        },
+        "id" : "note_editor",
+        "role" : "TextArea",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 1133,
+    "optimized" : false,
+    "path" : "\/var\/folders\/cd\/_rd32xx17dv8ltmf4ctm5wn40000gn\/T\/flowdeck-snapshot-0783248A-21DE-4790-BC25-C452D7E2746F.png",
+    "pixel_height" : 1133,
+    "pixel_width" : 744,
+    "point_height" : 1133,
+    "point_width" : 744,
+    "size_bytes" : 344905,
+    "unit" : "points",
+    "width" : 744
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "6BB283F6-7DCC-48AB-B004-7010A804383D"
+  },
+  "success" : true,
+  "timestamp" : "2026-06-10T16:22:50Z",
+  "type" : "ui_snapshot"
+}

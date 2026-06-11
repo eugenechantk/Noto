@@ -1,0 +1,283 @@
+{
+  "accessibility" : {
+    "element_count" : 15,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 289,
+          "y" : 86
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 267,
+          "y" : 64
+        },
+        "id" : "new_note_button",
+        "label" : "New Note",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 333,
+          "y" : 86
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 311,
+          "y" : 64
+        },
+        "id" : "sort_menu",
+        "label" : "Sort",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 377,
+          "y" : 86
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 355,
+          "y" : 64
+        },
+        "id" : "more_menu",
+        "label" : "More",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 59,
+          "y" : 135
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 39,
+          "width" : 79,
+          "x" : 20,
+          "y" : 116
+        },
+        "id" : "largeTitleHeader",
+        "label" : "Vault",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 70,
+          "y" : 166
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 15,
+          "width" : 101,
+          "x" : 20,
+          "y" : 158
+        },
+        "id" : "largeTitleHeader",
+        "label" : "3 folders · 1 note",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 38,
+          "y" : 806
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 16,
+          "y" : 784
+        },
+        "id" : "today_button",
+        "label" : "Today",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 171,
+          "y" : 806
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 198,
+          "x" : 72,
+          "y" : 780
+        },
+        "id" : "search_button",
+        "label" : "Search",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 304,
+          "y" : 806
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 282,
+          "y" : 784
+        },
+        "id" : "chat_button",
+        "label" : "Chat",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 364,
+          "y" : 806
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 342,
+          "y" : 784
+        },
+        "id" : "new_root_note_button",
+        "label" : "New Note",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 530
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 687,
+          "width" : 402,
+          "x" : 0,
+          "y" : 186
+        },
+        "id" : "note_list",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 222
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 70,
+          "width" : 402,
+          "x" : 0,
+          "y" : 187
+        },
+        "id" : "folder_attachments",
+        "label" : "attachments, Empty",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 293
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 71,
+          "width" : 402,
+          "x" : 0,
+          "y" : 258
+        },
+        "id" : "folder_Captures",
+        "label" : "Captures, 772 items",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 364
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 71,
+          "width" : 402,
+          "x" : 0,
+          "y" : 329
+        },
+        "id" : "folder_Daily Notes",
+        "label" : "Daily Notes, 2 items",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 435
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 71,
+          "width" : 402,
+          "x" : 0,
+          "y" : 400
+        },
+        "id" : "note_Image Test",
+        "label" : "Image Test, Edited 12m ago",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : "\/var\/folders\/cd\/_rd32xx17dv8ltmf4ctm5wn40000gn\/T\/flowdeck-snapshot-E7D7F09E-4ABB-49A7-B3E4-5AFCEED4A1FB.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 54981,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "5B578975-0CC8-4794-BDF6-46E7F42D8780"
+  },
+  "success" : true,
+  "timestamp" : "2026-06-10T16:01:30Z",
+  "type" : "ui_snapshot"
+}

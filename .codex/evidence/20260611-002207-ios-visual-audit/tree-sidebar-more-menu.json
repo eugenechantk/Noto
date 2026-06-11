@@ -1,0 +1,128 @@
+{
+  "accessibility" : {
+    "element_count" : 6,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 566
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 1133,
+          "width" : 744,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 393,
+          "y" : 613
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 1133,
+          "width" : 224,
+          "x" : 281,
+          "y" : 47
+        },
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 393,
+          "y" : 74
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 38,
+          "width" : 224,
+          "x" : 281,
+          "y" : 55
+        },
+        "id" : "sidebar_new_folder_button",
+        "label" : "New Folder",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 393,
+          "y" : 129
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 38,
+          "width" : 224,
+          "x" : 281,
+          "y" : 110
+        },
+        "id" : "sidebar_chat_button",
+        "label" : "AI Chat",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 393,
+          "y" : 167
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 38,
+          "width" : 224,
+          "x" : 281,
+          "y" : 148
+        },
+        "id" : "gearshape",
+        "label" : "Settings",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 566
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 1133,
+          "width" : 744,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Dismiss context menu",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 1133,
+    "optimized" : false,
+    "path" : "\/var\/folders\/cd\/_rd32xx17dv8ltmf4ctm5wn40000gn\/T\/flowdeck-snapshot-671D1D87-F545-4A72-8022-B096D9E28F64.png",
+    "pixel_height" : 1133,
+    "pixel_width" : 744,
+    "point_height" : 1133,
+    "point_width" : 744,
+    "size_bytes" : 234733,
+    "unit" : "points",
+    "width" : 744
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "6BB283F6-7DCC-48AB-B004-7010A804383D"
+  },
+  "success" : true,
+  "timestamp" : "2026-06-10T16:25:38Z",
+  "type" : "ui_snapshot"
+}

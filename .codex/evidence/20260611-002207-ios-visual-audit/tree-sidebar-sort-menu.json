@@ -1,0 +1,111 @@
+{
+  "accessibility" : {
+    "element_count" : 5,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 566
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 1133,
+          "width" : 744,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 349,
+          "y" : 613
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 1133,
+          "width" : 224,
+          "x" : 237,
+          "y" : 47
+        },
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 349,
+          "y" : 74
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 38,
+          "width" : 224,
+          "x" : 237,
+          "y" : 55
+        },
+        "id" : "clock",
+        "label" : "Recent",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 349,
+          "y" : 112
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 38,
+          "width" : 224,
+          "x" : 237,
+          "y" : 93
+        },
+        "id" : "textformat",
+        "label" : "Name",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 566
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 1133,
+          "width" : 744,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Dismiss context menu",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 1133,
+    "optimized" : false,
+    "path" : "\/var\/folders\/cd\/_rd32xx17dv8ltmf4ctm5wn40000gn\/T\/flowdeck-snapshot-B9F88D87-3D30-4CFC-B8C0-B29E01688B55.png",
+    "pixel_height" : 1133,
+    "pixel_width" : 744,
+    "point_height" : 1133,
+    "point_width" : 744,
+    "size_bytes" : 230719,
+    "unit" : "points",
+    "width" : 744
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "6BB283F6-7DCC-48AB-B004-7010A804383D"
+  },
+  "success" : true,
+  "timestamp" : "2026-06-10T16:25:03Z",
+  "type" : "ui_snapshot"
+}

@@ -1,0 +1,196 @@
+{
+  "accessibility" : {
+    "element_count" : 10,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 566
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 1133,
+          "width" : 744,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 215,
+          "y" : 69
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 193,
+          "y" : 47
+        },
+        "id" : "sidebar_new_note_button",
+        "label" : "New Note",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 259,
+          "y" : 69
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 237,
+          "y" : 47
+        },
+        "id" : "sidebar_sort_menu",
+        "label" : "Sort",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 303,
+          "y" : 69
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 281,
+          "y" : 47
+        },
+        "id" : "sidebar_more_button",
+        "label" : "More",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 53,
+          "y" : 102
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 29,
+          "width" : 54,
+          "x" : 26,
+          "y" : 88
+        },
+        "label" : "Noto",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 75,
+          "y" : 127
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 15,
+          "width" : 98,
+          "x" : 26,
+          "y" : 120
+        },
+        "label" : "2 folders · 1 note",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 170,
+          "y" : 634
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 977,
+          "width" : 320,
+          "x" : 10,
+          "y" : 145
+        },
+        "id" : "note_list",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 170,
+          "y" : 174
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 58,
+          "width" : 320,
+          "x" : 10,
+          "y" : 145
+        },
+        "id" : "folder_Captures",
+        "label" : "Captures, 772 items",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 170,
+          "y" : 233
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 58,
+          "width" : 320,
+          "x" : 10,
+          "y" : 204
+        },
+        "id" : "folder_Daily Notes",
+        "label" : "Daily Notes, 2 items",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 170,
+          "y" : 291
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 58,
+          "width" : 320,
+          "x" : 10,
+          "y" : 262
+        },
+        "id" : "note_Long Scroll Test",
+        "label" : "Long Scroll Test, Edited 9 minutes ago",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 1133,
+    "optimized" : false,
+    "path" : "\/var\/folders\/cd\/_rd32xx17dv8ltmf4ctm5wn40000gn\/T\/flowdeck-snapshot-A9AEBA0E-3BC3-46DF-B117-1CECF9B09874.png",
+    "pixel_height" : 1133,
+    "pixel_width" : 744,
+    "point_height" : 1133,
+    "point_width" : 744,
+    "size_bytes" : 225130,
+    "unit" : "points",
+    "width" : 744
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "6BB283F6-7DCC-48AB-B004-7010A804383D"
+  },
+  "success" : true,
+  "timestamp" : "2026-06-10T16:24:30Z",
+  "type" : "ui_snapshot"
+}

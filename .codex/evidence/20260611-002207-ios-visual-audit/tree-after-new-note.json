@@ -1,0 +1,1060 @@
+{
+  "accessibility" : {
+    "element_count" : 63,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 566
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 1133,
+          "width" : 744,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 52,
+          "y" : 69
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 52,
+          "x" : 26,
+          "y" : 47
+        },
+        "id" : "sidebar_back_button",
+        "label" : "Back",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 215,
+          "y" : 69
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 193,
+          "y" : 47
+        },
+        "id" : "sidebar_new_note_button",
+        "label" : "New Note",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 259,
+          "y" : 69
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 237,
+          "y" : 47
+        },
+        "id" : "sidebar_sort_menu",
+        "label" : "Sort",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 303,
+          "y" : 69
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 44,
+          "x" : 281,
+          "y" : 47
+        },
+        "id" : "sidebar_more_button",
+        "label" : "More",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 89,
+          "y" : 102
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 29,
+          "width" : 127,
+          "x" : 26,
+          "y" : 88
+        },
+        "label" : "Daily Notes",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 79,
+          "y" : 127
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 15,
+          "width" : 106,
+          "x" : 26,
+          "y" : 120
+        },
+        "label" : "0 folders · 3 notes",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 170,
+          "y" : 634
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 977,
+          "width" : 320,
+          "x" : 10,
+          "y" : 145
+        },
+        "id" : "note_list",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 170,
+          "y" : 174
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 58,
+          "width" : 320,
+          "x" : 10,
+          "y" : 145
+        },
+        "id" : "note_Untitled",
+        "label" : "Untitled, Edited 2 seconds ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 170,
+          "y" : 233
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 58,
+          "width" : 320,
+          "x" : 10,
+          "y" : 204
+        },
+        "id" : "note_2026-06-11",
+        "label" : "2026-06-11, Edited 27 minutes ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 170,
+          "y" : 291
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 58,
+          "width" : 320,
+          "x" : 10,
+          "y" : 262
+        },
+        "id" : "note_2026-06-10",
+        "label" : "2026-06-10, Edited 52 minutes ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 26,
+          "y" : 767
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 36,
+          "x" : 8,
+          "y" : 749
+        },
+        "id" : "toggle_todo_button",
+        "label" : "Toggle Todo",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 66,
+          "y" : 767
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 36,
+          "x" : 48,
+          "y" : 749
+        },
+        "id" : "indent_button",
+        "label" : "Indent",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 106,
+          "y" : 767
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 36,
+          "x" : 88,
+          "y" : 749
+        },
+        "id" : "outdent_button",
+        "label" : "Outdent",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 146,
+          "y" : 767
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 36,
+          "x" : 128,
+          "y" : 749
+        },
+        "id" : "toggle_strikethrough_button",
+        "label" : "Strikethrough",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 186,
+          "y" : 767
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 36,
+          "x" : 168,
+          "y" : 749
+        },
+        "id" : "toggle_hyperlink_button",
+        "label" : "Link",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 226,
+          "y" : 767
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 36,
+          "x" : 208,
+          "y" : 749
+        },
+        "id" : "insert_image_button",
+        "label" : "Insert Image",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 718,
+          "y" : 767
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 36,
+          "x" : 700,
+          "y" : 749
+        },
+        "id" : "hide_keyboard_button",
+        "label" : "Hide Keyboard",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 39,
+          "y" : 818
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 49,
+          "width" : 22,
+          "x" : 28,
+          "y" : 794
+        },
+        "id" : "assistantUndo",
+        "label" : "undo",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 85,
+          "y" : 818
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 49,
+          "width" : 22,
+          "x" : 74,
+          "y" : 794
+        },
+        "id" : "assistantRedo",
+        "label" : "Redo",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 131,
+          "y" : 818
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 49,
+          "width" : 22,
+          "x" : 120,
+          "y" : 794
+        },
+        "id" : "assistantPaste:forEvent:",
+        "label" : "Paste",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 225,
+          "y" : 823
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 49,
+          "width" : 146,
+          "x" : 152,
+          "y" : 799
+        },
+        "role" : "GenericElement",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 372,
+          "y" : 823
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 49,
+          "width" : 146,
+          "x" : 298,
+          "y" : 799
+        },
+        "role" : "GenericElement",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 518,
+          "y" : 823
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 49,
+          "width" : 146,
+          "x" : 445,
+          "y" : 799
+        },
+        "role" : "GenericElement",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 36,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 3,
+          "y" : 855
+        },
+        "label" : "q",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 102,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 69,
+          "y" : 855
+        },
+        "label" : "w",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 169,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 136,
+          "y" : 855
+        },
+        "label" : "e",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 235,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 202,
+          "y" : 855
+        },
+        "label" : "r",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 301,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 268,
+          "y" : 855
+        },
+        "label" : "t",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 368,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 335,
+          "y" : 855
+        },
+        "label" : "y",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 434,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 401,
+          "y" : 855
+        },
+        "label" : "u",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 501,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 468,
+          "y" : 855
+        },
+        "label" : "i",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 567,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 534,
+          "y" : 855
+        },
+        "label" : "o",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 634,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 601,
+          "y" : 855
+        },
+        "label" : "p",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 707,
+          "y" : 887
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 79,
+          "x" : 667,
+          "y" : 855
+        },
+        "id" : "delete",
+        "label" : "delete",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 62,
+          "y" : 951
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 29,
+          "y" : 919
+        },
+        "label" : "a",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 129,
+          "y" : 951
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 96,
+          "y" : 919
+        },
+        "label" : "s",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 195,
+          "y" : 951
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 162,
+          "y" : 919
+        },
+        "label" : "d",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 262,
+          "y" : 951
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 229,
+          "y" : 919
+        },
+        "label" : "f",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 328,
+          "y" : 951
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 295,
+          "y" : 919
+        },
+        "label" : "g",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 394,
+          "y" : 951
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 361,
+          "y" : 919
+        },
+        "label" : "h",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 461,
+          "y" : 951
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 428,
+          "y" : 919
+        },
+        "label" : "j",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 527,
+          "y" : 951
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 494,
+          "y" : 919
+        },
+        "label" : "k",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 594,
+          "y" : 951
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 561,
+          "y" : 919
+        },
+        "label" : "l",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 687,
+          "y" : 951
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 119,
+          "x" : 627,
+          "y" : 919
+        },
+        "id" : "Return",
+        "label" : "return",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 36,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 3,
+          "y" : 984
+        },
+        "id" : "shift",
+        "label" : "shift",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 102,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 69,
+          "y" : 984
+        },
+        "label" : "z",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 169,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 136,
+          "y" : 984
+        },
+        "label" : "x",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 235,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 202,
+          "y" : 984
+        },
+        "label" : "c",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 301,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 268,
+          "y" : 984
+        },
+        "label" : "v",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 368,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 335,
+          "y" : 984
+        },
+        "label" : "b",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 434,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 401,
+          "y" : 984
+        },
+        "label" : "n",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 501,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 468,
+          "y" : 984
+        },
+        "label" : "m",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 567,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 534,
+          "y" : 984
+        },
+        "label" : ",",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 634,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 66,
+          "x" : 601,
+          "y" : 984
+        },
+        "label" : ".",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 707,
+          "y" : 1016
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 79,
+          "x" : 667,
+          "y" : 984
+        },
+        "label" : "shift",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 37,
+          "y" : 1080
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 69,
+          "x" : 3,
+          "y" : 1048
+        },
+        "id" : "emoji",
+        "label" : "Next keyboard",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 106,
+          "y" : 1080
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 69,
+          "x" : 72,
+          "y" : 1048
+        },
+        "id" : "more",
+        "label" : "numbers",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 175,
+          "y" : 1080
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 69,
+          "x" : 141,
+          "y" : 1048
+        },
+        "id" : "dictation",
+        "label" : "Dictate",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 375,
+          "y" : 1080
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 330,
+          "x" : 210,
+          "y" : 1048
+        },
+        "label" : " ",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 375,
+          "y" : 1080
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 330,
+          "x" : 210,
+          "y" : 1048
+        },
+        "id" : "space",
+        "label" : " ",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 591,
+          "y" : 1080
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 103,
+          "x" : 540,
+          "y" : 1048
+        },
+        "id" : "more",
+        "label" : "numbers",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 695,
+          "y" : 1080
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 64,
+          "width" : 103,
+          "x" : 643,
+          "y" : 1048
+        },
+        "label" : "Hide keyboard",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 1133,
+    "optimized" : false,
+    "path" : "\/var\/folders\/cd\/_rd32xx17dv8ltmf4ctm5wn40000gn\/T\/flowdeck-snapshot-FAF6BDC8-C605-41BA-867C-3D9F2622B29B.png",
+    "pixel_height" : 1133,
+    "pixel_width" : 744,
+    "point_height" : 1133,
+    "point_width" : 744,
+    "size_bytes" : 112467,
+    "unit" : "points",
+    "width" : 744
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "6BB283F6-7DCC-48AB-B004-7010A804383D"
+  },
+  "success" : true,
+  "timestamp" : "2026-06-10T16:26:33Z",
+  "type" : "ui_snapshot"
+}
