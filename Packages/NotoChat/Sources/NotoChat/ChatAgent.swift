@@ -182,6 +182,41 @@ public struct ChatAgent: Sendable {
 
     // MARK: Helpers
 
+    /// Marker + delimiter wrapping attached-note context around the typed user
+    /// message. Shared with `strippedComposedUserContent` so transcripts saved
+    /// before display-level persistence (bug 022) can be unwrapped on load.
+    public static let attachmentContextPrefix = "The user attached these notes as context:"
+    public static let attachmentContextDelimiter = "\n\n---\n\n"
+
+    /// Rewrites every inline citation bracket in `text` to point at a single
+    /// number — used when a legacy turn has exactly one known source, so any
+    /// citation it contains can only mean that note.
+    public static func normalizeAllCitations(in text: String, to number: Int) -> String {
+        let pattern = #"\[(\d+(?:\s*,\s*\d+)*)\](?![(:])"#
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return text }
+        let ns = text as NSString
+        var out = ""
+        var last = 0
+        for m in re.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            out += "[\(number)]"
+            last = m.range.location + m.range.length
+        }
+        out += ns.substring(from: last)
+        return out
+    }
+
+    /// Recovers the typed user message from a composed prompt. Content not
+    /// produced by the attachment wrapper passes through unchanged.
+    public static func strippedComposedUserContent(_ content: String) -> String {
+        guard content.hasPrefix(attachmentContextPrefix),
+              let range = content.range(of: attachmentContextDelimiter, options: .backwards) else {
+            return content
+        }
+        let typed = String(content[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return typed.isEmpty ? content : typed
+    }
+
     private func buildInitialMessages(_ userMessage: String,
                                       mentioned: [String],
                                       history: [ChatMessage],
@@ -197,9 +232,9 @@ public struct ChatAgent: Sendable {
                 }
             }
             if !blocks.isEmpty {
-                userContent = "The user attached these notes as context:\n\n"
+                userContent = Self.attachmentContextPrefix + "\n\n"
                     + blocks.joined(separator: "\n\n")
-                    + "\n\n---\n\n" + userMessage
+                    + Self.attachmentContextDelimiter + userMessage
             }
         }
         let dateLine = "Today's date is \(Self.todayString()). Use it to resolve relative dates "
@@ -265,7 +300,7 @@ public struct ChatAgent: Sendable {
     /// Rewrites inline `[n]` and grouped `[a, b]` citations through `renumbering`,
     /// dropping numbers that have no mapping. Uses the same bracket pattern the
     /// chat renderer linkifies; `[n](…)` links and `[n]:` definitions are untouched.
-    static func renumberInlineCitations(in text: String, renumbering: [Int: Int]) -> String {
+    public static func renumberInlineCitations(in text: String, renumbering: [Int: Int]) -> String {
         guard !renumbering.allSatisfy({ $0.key == $0.value }) else { return text }
         let pattern = #"\[(\d+(?:\s*,\s*\d+)*)\](?![(:])"#
         guard let re = try? NSRegularExpression(pattern: pattern) else { return text }

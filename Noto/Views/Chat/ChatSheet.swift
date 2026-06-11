@@ -1,7 +1,10 @@
 import SwiftUI
+import os.log
 #if canImport(UIKit)
 import UIKit
 #endif
+
+let chatLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "ChatSheet")
 
 /// The AI chat surface, presented as a large-detent sheet over the file list
 /// or editor. Renders the conversation (user pill + note-native AI markdown
@@ -267,7 +270,7 @@ private struct AIReplyView: View {
             ForEach(turn.blocks) { block in
                 switch block {
                 case .text(_, let s):
-                    MarkdownText(s)
+                    MarkdownText(s, citationsTappable: !turn.sources.isEmpty)
                 case .tool(let step):
                     ToolStepView(step: step, onOpenNote: onOpenNote)
                 }
@@ -287,10 +290,13 @@ private struct AIReplyView: View {
             // Always consume noto-cite links so they never fall through to a system
             // URL open (which on macOS pops the default browser). Open the note when
             // the citation index is valid; otherwise no-op.
+            chatLogger.info("citation tap url=\(url.absoluteString, privacy: .public) sources=\(turn.sources.count)")
             guard url.scheme == "noto-cite" else { return .systemAction }
             if let n = Int(url.host ?? url.lastPathComponent),
                n >= 1, n <= turn.sources.count {
                 onOpenNote?(turn.sources[n - 1])
+            } else {
+                chatLogger.warning("citation tap unmapped url=\(url.absoluteString, privacy: .public)")
             }
             return .handled
         })
@@ -694,7 +700,15 @@ extension MarkdownVisualSpec.Font {
 /// AttributedString — using the editor's shared `MarkdownVisualSpec` type ramp.
 struct MarkdownText: View {
     let raw: String
-    init(_ raw: String) { self.raw = raw }
+    /// False for restored turns with no citation→note mapping (legacy
+    /// transcripts that never saved per-turn reference lines): their `[n]`
+    /// markers render as plain text instead of dead-looking tappable links.
+    let citationsTappable: Bool
+
+    init(_ raw: String, citationsTappable: Bool = true) {
+        self.raw = raw
+        self.citationsTappable = citationsTappable
+    }
 
     // Share the editor's markdown type ramp (MarkdownVisualSpec) so AI replies and
     // the note editor render headings/body/code at the same sizes and weights.
@@ -733,7 +747,7 @@ struct MarkdownText: View {
     }
 
     private func inline(_ s: String) -> Text {
-        let linked = Self.linkifyCitations(s)
+        let linked = citationsTappable ? Self.linkifyCitations(s) : s
         if let attr = try? AttributedString(markdown: linked,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
             return Text(attr)
@@ -756,7 +770,9 @@ struct MarkdownText: View {
             let nums = inner.split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
-            out += nums.map { "[\($0)](noto-cite://\($0))" }.joined(separator: ", ")
+            // Narrow no-break spaces inside the link widen the tappable run —
+            // a bare digit is a ~7pt target and taps regularly miss it.
+            out += nums.map { "[\u{202F}\($0)\u{202F}](noto-cite://\($0))" }.joined(separator: ", ")
             last = m.range.location + m.range.length
         }
         out += ns.substring(from: last)
