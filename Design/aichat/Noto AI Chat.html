@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Noto — AI Chat</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #f0eee9; overflow: hidden; }
+    body { -webkit-font-smoothing: antialiased; }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Shared component files (reused, not duplicated) -->
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="components/noto-shared.jsx"></script>
+  <script type="text/babel" src="components/noto-shared-2.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-1.jsx"></script>
+  <script type="text/babel" src="components/noto-toolbar.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-3.jsx"></script>
+  <script type="text/babel" src="components/noto-sheet.jsx"></script>
+  <script type="text/babel" src="components/noto-properties-hig.jsx"></script>
+  <script type="text/babel" src="components/noto-ai-chat.jsx"></script>
+
+  <script type="text/babel">
+    function App() {
+      return (
+        <DesignCanvas stateFile=".design-canvas.ai-chat-v2.state.json">
+
+          <DCSection id="ai-triggers" title="Triggers" subtitle="How the chat is launched. The dock's chat icon is the single entry point — from the file list it starts a new chat, and from a note's editor it opens a chat with that note pre-attached as context. Tapping it raises the conversation as a large-detent sheet over the dimmed presenter; swipe the grabber down to dismiss.">
+            <DCArtboard id="ai-chat-trigger-home" label="01 · Home — dock chat icon (new chat)" width={402} height={874}>
+              <NotoAIChat state="trigger-home" />
+            </DCArtboard>
+            <DCArtboard id="ai-chat-trigger-note" label="02 · Note — editor dock chat icon (note pre-attached)" width={402} height={874}>
+              <NotoAIChat state="trigger-note" />
+            </DCArtboard>
+            <DCPostIt top={210} left={950} width={210} rotate={-3}>Tap the dock chat icon → the conversation rises as a large-detent sheet. Grabber: swipe down to dismiss.</DCPostIt>
+          </DCSection>
+
+          <DCSection id="ai-new" title="New chat & mentions" subtitle="Starting a chat and attaching notes. The empty state is bare — a “Chat about notes” heading and the composer, nothing else. Selecting a note to mention shows it as a tag ABOVE the text field while composing; once the message is sent, the mentioned notes are listed BELOW the user's bubble. The ＋ button opens the context picker.">
+            <DCArtboard id="ai-chat-new" label="01 · New chat — empty (heading + composer)" width={402} height={874}>
+              <NotoAIChat state="new" />
+            </DCArtboard>
+            <DCArtboard id="ai-chat-compose" label="02 · Composing — note mention tag above field" width={402} height={874}>
+              <NotoAIChat state="compose" />
+            </DCArtboard>
+            <DCPostIt top={760} left={950} width={214} rotate={2}>Pending mention → tag ABOVE the field. Once sent → listed UNDER the bubble. ＋ opens the picker.</DCPostIt>
+          </DCSection>
+
+          <DCSection id="ai-context" title="Adding context" subtitle="The context picker — a HIG sheet with the circular ✕/✓ header. Browse the vault folder-by-folder, or search a flat list of notes across all levels. Every row shows its vault-path breadcrumb so deeply-nested notes stay identifiable. Multi-select with orange checks, then confirm with “Add to chat.”">
+            <DCArtboard id="ai-chat-attach-browse" label="01 · Browse — search field + folder drill-in" width={402} height={874}>
+              <NotoAIChat state="attach-browse" />
+            </DCArtboard>
+            <DCArtboard id="ai-chat-attach-search" label="02 · Search — flat results, nested note selected" width={402} height={874}>
+              <NotoAIChat state="attach-search" />
+            </DCArtboard>
+            <DCPostIt top={400} left={950} width={210} rotate={-2}>Every row shows its vault-path breadcrumb — deeply-nested notes stay identifiable.</DCPostIt>
+          </DCSection>
+
+          <DCSection id="ai-conversation" title="The conversation" subtitle="How replies read. AI replies render as note-native markdown (no chat bubbles) under a ✶ NOTO eyebrow; the user's turns are a light right-aligned pill with their mentioned notes listed faintly below. Claims carry faint citation superscripts that resolve to a quiet SOURCES group at the end of the reply.">
+            <DCArtboard id="ai-chat-convo" label="01 · Single-file — mention + AI citation" width={402} height={874}>
+              <NotoAIChat state="convo" />
+            </DCArtboard>
+            <DCArtboard id="ai-chat-convo-multi" label="02 · Multi-file — mentions + citations" width={402} height={874}>
+              <NotoAIChat state="convo-multi" />
+            </DCArtboard>
+            <DCPostIt top={470} left={950} width={208} rotate={3}>Claims carry a faint superscript¹ that resolves to the SOURCES group.</DCPostIt>
+          </DCSection>
+
+          <DCSection id="ai-tools" title="Generating & tool use" subtitle="Watching the agent work. A shimmer/thinking state precedes output; the engine's grep / read / list tools surface as collapsible steps INTERLEAVED through the response (at the top and mid-paragraph). Live: steps stream with checks on finished ones, a spinner on the active one, and typing dots at the edge. Done: steps sit inline where they happened — tap a step to expand its result.">
+            <DCArtboard id="ai-chat-thinking" label="01 · Thinking — eyebrow + dots + shimmer" width={402} height={874}>
+              <NotoAIChat state="thinking" />
+            </DCArtboard>
+            <DCArtboard id="ai-chat-tool-working" label="02 · Tool use — working (live agent loop)" width={402} height={874}>
+              <NotoAIChat state="tool-working" />
+            </DCArtboard>
+            <DCArtboard id="ai-chat-tool-done" label="03 · Tool use — done (inline trace + answer)" width={402} height={874}>
+              <NotoAIChat state="tool-done" />
+            </DCArtboard>
+            <DCPostIt top={500} left={1400} width={212} rotate={-2}>Tap a tool step → it expands to its result (grep matches especially).</DCPostIt>
+          </DCSection>
+
+          <DCSection id="ai-manage" title="Managing the chat" subtitle="The sheet's ••• menu: new chat, chat history, attach files, rename, delete. Chat history opens the list of past chats — saved as markdown notes in a Chats/ folder, so the history is effectively that folder — as its own sheet.">
+            <DCArtboard id="ai-chat-menu" label="01 · ••• menu (new · history · attach · rename · delete)" width={402} height={874}>
+              <NotoAIChat state="menu" />
+            </DCArtboard>
+            <DCArtboard id="ai-chat-history" label="02 · Chat history — past chats sheet" width={402} height={874}>
+              <NotoAIChat state="history" />
+            </DCArtboard>
+            <DCPostIt top={380} left={950} width={208} rotate={2}>Chats are saved as notes in Chats/ — Chat history lists them.</DCPostIt>
+          </DCSection>
+
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

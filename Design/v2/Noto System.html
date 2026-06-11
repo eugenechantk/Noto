@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Noto — System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #f0eee9; overflow: hidden; }
+    body { -webkit-font-smoothing: antialiased; }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="components/noto-shared.jsx"></script>
+  <script type="text/babel" src="components/noto-shared-2.jsx"></script>
+  <script type="text/babel" src="components/noto-screens.jsx"></script>
+  <script type="text/babel" src="components/noto-screens-2.jsx"></script>
+  <script type="text/babel" src="components/noto-screens-3.jsx"></script>
+  <script type="text/babel" src="components/noto-screens-4.jsx"></script>
+  <script type="text/babel" src="components/noto-meta-expanded.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-1.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-2.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v2.jsx"></script>
+  <script type="text/babel" src="components/noto-keyboard.jsx"></script>
+  <script type="text/babel" src="components/noto-frame.jsx"></script>
+  <script type="text/babel" src="components/noto-toolbar.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-1.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-2.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-3.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-3-toptabs.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-3-glass.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-3-tabs.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-3-split.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-3-split2.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-3-dock.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-3-search.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-4.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v3-5.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v4-1.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v4-2.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v5-1.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v5-2.jsx"></script>
+  <script type="text/babel" src="components/noto-explorations-v6-1.jsx"></script>
+  <script type="text/babel" src="components/noto-sheet.jsx"></script>
+  <script type="text/babel" src="components/noto-article-properties.jsx"></script>
+  <script type="text/babel" src="components/noto-article-properties-screen.jsx"></script>
+  <script type="text/babel" src="components/noto-notabs-screens.jsx"></script>
+  <script type="text/babel" src="components/noto-longdoc.jsx"></script>
+  <script type="text/babel" src="components/noto-properties-hig.jsx"></script>
+  <script type="text/babel" src="components/noto-minimal-editor.jsx"></script>
+  <script type="text/babel" src="components/noto-platforms.jsx"></script>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    function App() {
+      return (
+        <DesignCanvas stateFile=".design-canvas.system.state.json">
+          <DCSection id="sys-files" title="File view" subtitle="Vault file explorer — one level per page; tap a folder to drill in, back to the parent level">
+            <DCArtboard id="sys-files-root" label="01 · Vault (root)" width={402} height={874}>
+              <NoTabsNoteList folder="root" />
+            </DCArtboard>
+            <DCArtboard id="sys-files-captures" label="02 · Captures" width={402} height={874}>
+              <NoTabsNoteList folder="captures" />
+            </DCArtboard>
+            <DCArtboard id="sys-files-ai" label="03 · Captures › AI Products" width={402} height={874}>
+              <NoTabsNoteList folder="ai-products" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="sys-editor" title="Editor view" subtitle="Minimal chrome — back + more top bar, the system keyboard toolbar while writing, and the large title collapsing into the translucent bar on scroll. No bottom dock.">
+            <DCArtboard id="sys-editor-editing" label="01 · Editing — top bar + system toolbar" width={402} height={874}>
+              <NotoMinimalEditor state="editing" />
+            </DCArtboard>
+            <DCArtboard id="sys-editor-reading" label="02 · Reading — keyboard dismissed" width={402} height={874}>
+              <NotoMinimalEditor state="reading" />
+            </DCArtboard>
+            <DCArtboard id="sys-editor-scrolled" label="03 · Scrolled — title in translucent top bar" width={402} height={874}>
+              <NotoMinimalEditor state="scrolled" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="sys-search" title="Search view" subtitle="Global search across the workspace — empty state and results">
+            <DCArtboard id="sys-search-empty" label="01 · Search · empty" width={402} height={874}>
+              <Exp03ArticleV3Search state="empty" />
+            </DCArtboard>
+            <DCArtboard id="sys-search-results" label="02 · Search · results" width={402} height={874}>
+              <Exp03ArticleV3Search state="results" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="sys-properties" title="Properties interaction" subtitle="HIG bottom sheet over the dimmed editor — circular ✕/✓ header + grabber, inset-grouped list, medium + expanded detents, pull-down type menu (Text · Tags · Date & time), add a property, and swipe to delete.">, key entry (no shift), swipe-to-delete, and editing a long value">
+            <DCArtboard id="sys-props-sheet" label="01 · Properties · sheet · inset-grouped (medium)" width={402} height={874}>
+              <NotoMinimalEditor state="properties" />
+            </DCArtboard>
+            <DCArtboard id="sys-props-expanded" label="02 · Properties · sheet expanded · add property visible" width={402} height={874}>
+              <NotoMinimalEditor state="properties-expanded" />
+            </DCArtboard>
+            <DCArtboard id="sys-props-menu" label="03 · Properties · add · type menu" width={402} height={874}>
+              <NotoMinimalEditor state="properties-menu" />
+            </DCArtboard>
+            <DCArtboard id="sys-props-add" label="04 · Properties · add · key field" width={402} height={874}>
+              <NotoMinimalEditor state="properties-add" />
+            </DCArtboard>
+            <DCArtboard id="sys-props-delete" label="05 · Properties · swipe to delete" width={402} height={874}>
+              <NotoMinimalEditor state="properties-delete" />
+            </DCArtboard>
+            <DCArtboard id="sys-props-edit" label="06 · Properties · editing a long value" width={402} height={874}>
+              <NotoMinimalEditor state="properties-edit" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="sys-ipad" title="iPad" subtitle="Regular size class → NavigationSplitView: a persistent translucent file-system sidebar + editor detail. Properties as a centered form sheet, not a bottom sheet.">
+            <DCArtboard id="sys-ipad-reading" label="01 · Split · reading" width={1194} height={834}>
+              <NotoIPad state="reading" />
+            </DCArtboard>
+            <DCArtboard id="sys-ipad-editing" label="02 · Split · editing" width={1194} height={834}>
+              <NotoIPad state="editing" />
+            </DCArtboard>
+            <DCArtboard id="sys-ipad-properties" label="03 · Properties · form sheet" width={1194} height={834}>
+              <NotoIPad state="properties" />
+            </DCArtboard>
+            <DCArtboard id="sys-ipad-portrait-reading" label="04 · Portrait · reading" width={834} height={1194}>
+              <NotoIPad state="portrait-reading" />
+            </DCArtboard>
+            <DCArtboard id="sys-ipad-portrait-files" label="05 · Portrait · files (sidebar overlay)" width={834} height={1194}>
+              <NotoIPad state="portrait-files" />
+            </DCArtboard>
+            <DCArtboard id="sys-ipad-portrait-properties" label="06 · Portrait · properties" width={834} height={1194}>
+              <NotoIPad state="portrait-properties" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="sys-macos" title="macOS" subtitle="Resizable window with a source-list sidebar + editor. Properties live in a right-hand inspector panel — the desktop-native equivalent of the sheet, no modal.">
+            <DCArtboard id="sys-mac-reading" label="01 · Window · reading" width={1280} height={800}>
+              <NotoMac state="reading" />
+            </DCArtboard>
+            <DCArtboard id="sys-mac-editing" label="02 · Window · editing" width={1280} height={800}>
+              <NotoMac state="editing" />
+            </DCArtboard>
+            <DCArtboard id="sys-mac-inspector" label="03 · Window · properties inspector" width={1280} height={800}>
+              <NotoMac state="inspector" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="sys-macos-tabs" title="macOS · Tabs" subtitle="Multiple open notes as inline tabs in the toolbar — framed by dividers, the new-tab button pinned, and horizontal scroll once they overflow.">
+            <DCArtboard id="sys-mac-tabs-inline-many" label="Inline tabs · overflow → horizontal scroll" width={1280} height={800}>
+              <NotoMacTabs variant="inline" count={7} />
+            </DCArtboard>
+            <DCArtboard id="sys-mac-tabs-picker" label="New tab · file picker (open a note / new note)" width={1280} height={800}>
+              <NotoMacTabs variant="inline" count={3} picker />
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
