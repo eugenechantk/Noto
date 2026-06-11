@@ -16,6 +16,7 @@ struct NotoSidebarView: View {
     @State private var folderStack: [SidebarDirectoryPage] = []
     @State private var showNewFolderAlert = false
     @State private var newFolderName = ""
+    @State private var sort: FileSortKey = .recent
     #if os(macOS)
     @State private var targetedDropDirectoryURL: URL?
     @State private var draggedNoteURL: URL?
@@ -38,6 +39,7 @@ struct NotoSidebarView: View {
                 fileWatcher: fileWatcher,
                 selectedNote: selectedNote,
                 presentation: .sidebar,
+                sort: sort,
                 onOpenFolder: openFolder,
                 onOpenNote: openNote,
                 onDeleteItem: deleteItem,
@@ -52,6 +54,7 @@ struct NotoSidebarView: View {
                 fileWatcher: fileWatcher,
                 selectedNote: selectedNote,
                 presentation: .sidebar,
+                sort: sort,
                 onOpenFolder: openFolder,
                 onOpenNote: openNote,
                 onDeleteItem: deleteItem
@@ -99,8 +102,8 @@ struct NotoSidebarView: View {
     }
 
     /// v2 design (VaultSidebarContent): explorer nav row (accent `‹ parent` back ·
-    /// new-folder + ⋯ more) over a large folder title + "N folders · M notes" counts.
-    /// Shared across iPhone, iPad, and macOS.
+    /// new-note + sort + ⋯ more, matching the file view top bar) over a large folder
+    /// title + "N folders · M notes" counts. Shared across iPhone, iPad, and macOS.
     private var vaultSidebarHeader: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 0) {
@@ -116,6 +119,7 @@ struct NotoSidebarView: View {
                                 .lineLimit(1)
                         }
                         .foregroundStyle(NotoTheme.accent)
+                        .frame(minHeight: 44)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -125,32 +129,50 @@ struct NotoSidebarView: View {
 
                 Spacer(minLength: 0)
 
-                // iOS/iPadOS AND macOS: new-folder + more live in the content header,
-                // on the same nav row as the `‹ back` button (matching the iPad layout).
-                HStack(spacing: 20) {
+                // iOS/iPadOS AND macOS: same action trio as the file view top bar —
+                // new note · sort · more — on the nav row with the `‹ back` button.
+                // Each label gets a 44×44pt hit target (HIG minimum); the HStack is
+                // capped at the row's 22pt layout height so the header doesn't grow —
+                // the targets overflow invisibly and stay tappable (no .clipped()).
+                HStack(spacing: 0) {
                     Button {
-                        showNewFolderAlert = true
+                        onIntent(.createNote(in: currentStore))
                     } label: {
-                        Image(systemName: "folder.badge.plus")
-                            .font(.system(size: 17, weight: .regular))
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 18, weight: .regular))
                             .foregroundStyle(NotoTheme.head)
+                            .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityIdentifier("sidebar_new_folder_button")
-                    .accessibilityLabel("New Folder")
+                    .accessibilityIdentifier("sidebar_new_note_button")
+                    .accessibilityLabel("New Note")
 
                     Menu {
-                        Button {
-                            onIntent(.createNote(in: currentStore))
-                        } label: {
-                            Label("New Note", systemImage: "doc.badge.plus")
+                        Picker("Sort", selection: $sort) {
+                            Label("Recent", systemImage: "clock").tag(FileSortKey.recent)
+                            Label("Name", systemImage: "textformat").tag(FileSortKey.name)
                         }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease")
+                            .font(.system(size: 17, weight: .regular))
+                            .foregroundStyle(NotoTheme.head)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .menuIndicator(.hidden)
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .accessibilityIdentifier("sidebar_sort_menu")
+                    .accessibilityLabel("Sort")
+
+                    Menu {
                         Button {
                             showNewFolderAlert = true
                         } label: {
                             Label("New Folder", systemImage: "folder.badge.plus")
                         }
+                        .accessibilityIdentifier("sidebar_new_folder_button")
                         Divider()
                         Button {
                             onIntent(.openChat)
@@ -165,9 +187,9 @@ struct NotoSidebarView: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.system(size: 18, weight: .regular))
                             .foregroundStyle(NotoTheme.head)
-                            .frame(width: 22, height: 22)
+                            .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
                     .menuIndicator(.hidden)
@@ -177,8 +199,13 @@ struct NotoSidebarView: View {
                     .accessibilityLabel("More")
                 }
             }
-            .frame(minHeight: 22)
-            .padding(.horizontal, 16)
+            // Fixed 22pt layout height: the 44pt hit targets overflow invisibly
+            // above/below so the header keeps its original size.
+            .frame(height: 22)
+            .padding(.leading, 16)
+            // 5pt instead of 16: the 44pt frame centers the glyph, keeping the
+            // trailing glyph ~16pt from the edge as before.
+            .padding(.trailing, 5)
             .padding(.top, 10)
             .padding(.bottom, 2)
 
