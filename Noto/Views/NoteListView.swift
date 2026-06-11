@@ -294,6 +294,7 @@ struct VaultWorkspaceView: View {
     #if os(iOS)
     @State private var splitNoteStackNavigation = NoteStackNavigationState()
     @State private var isSyncingSplitSelectionFromNativeStack = false
+    @State private var splitDockHiddenByScroll = false
     #endif
     #if os(macOS)
     @State private var hostingWindow: NSWindow?
@@ -318,6 +319,7 @@ struct VaultWorkspaceView: View {
                     handleWorkspaceIntent(.createNote(in: store))
                 },
                 onNativeStackChanged: syncSplitSelectionFromNativeStack,
+                dockHiddenByScroll: splitDockHiddenByScroll,
                 sidebar: { searchText, onToggleSidebar in
                     NotoSidebarView(
                         rootStore: store,
@@ -362,6 +364,7 @@ struct VaultWorkspaceView: View {
             }
             .onChange(of: selectedNote?.fileURL) { _, newURL in
                 persistLastOpenedNoteURL(newURL)
+                setSplitDockHidden(false)
             }
             .onAppear {
                 guard !hasRestoredSelection else { return }
@@ -846,8 +849,20 @@ struct VaultWorkspaceView: View {
             onNavigateForward: navigateSplitHistoryForward,
             leadingChromeControls: splitEditorLeadingControls(onToggleSidebar: onToggleSidebar),
             externallyDeletingNoteID: $externallyDeletingNoteID,
-            chromeMode: splitEditorChromeMode
+            chromeMode: splitEditorChromeMode,
+            onDockScrollHiddenChange: setSplitDockHidden
         )
+    }
+
+    /// iPad split-view dock: mirror the editor's scroll-driven hide/show with the
+    /// same animation curves the iPhone-compact dock uses. No-op on macOS.
+    private func setSplitDockHidden(_ hidden: Bool) {
+        #if os(iOS)
+        guard hidden != splitDockHiddenByScroll else { return }
+        withAnimation(hidden ? .easeOut(duration: 0.12) : .easeOut(duration: 0.2)) {
+            splitDockHiddenByScroll = hidden
+        }
+        #endif
     }
 
     private var splitEditorChromeMode: EditorChromeMode {

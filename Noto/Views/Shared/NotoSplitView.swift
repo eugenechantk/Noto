@@ -14,6 +14,9 @@ struct NotoSplitView<SidebarContent: View, DetailContent: View, IOSDetailRoot: V
     var onNativeStackChanged: (() -> Void)? = nil
     var onToggleSidebarCommand: (() -> Void)? = nil
     var onShowSearchCommand: (() -> Void)? = nil
+    /// Driven by the detail editor's scroll (hide on scroll down, reveal on scroll
+    /// up) — same behavior as the iPhone-compact editor dock.
+    var dockHiddenByScroll: Bool = false
     @ViewBuilder var sidebar: (_ searchText: Binding<String>, _ onToggleSidebar: @escaping () -> Void) -> SidebarContent
     @ViewBuilder var detail: (_ onToggleSidebar: @escaping () -> Void) -> DetailContent
     @ViewBuilder var iosDetailRoot: (_ onToggleSidebar: @escaping () -> Void) -> IOSDetailRoot
@@ -126,7 +129,8 @@ struct NotoSplitView<SidebarContent: View, DetailContent: View, IOSDetailRoot: V
                 onOpenTodayNote: onOpenTodayNote,
                 onSearch: { isSearchPresented.toggle() },
                 onCreateRootNote: onCreateRootNote,
-                isSidebarVisible: isSidebarVisible
+                isSidebarVisible: isSidebarVisible,
+                hiddenByScroll: dockHiddenByScroll
             )
         }
         .navigationSplitViewStyle(.prominentDetail)

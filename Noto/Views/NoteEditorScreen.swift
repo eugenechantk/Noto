@@ -22,6 +22,9 @@ struct NoteEditorScreen: View {
     var onNavigateForward: (() -> Void)? = nil
     var leadingChromeControls: EditorLeadingChromeControls = .none
     var chromeMode: EditorChromeMode
+    /// Scroll-driven dock visibility for docks owned by an ancestor (the iPad split
+    /// view). The iPhone-compact editor shows its own dock and uses local state.
+    var onDockScrollHiddenChange: ((Bool) -> Void)? = nil
     private var externallyDeletingNoteID: Binding<UUID?>?
 
     @State private var session: NoteEditorSession
@@ -75,7 +78,8 @@ struct NoteEditorScreen: View {
         onNavigateForward: (() -> Void)? = nil,
         leadingChromeControls: EditorLeadingChromeControls = .none,
         externallyDeletingNoteID: Binding<UUID?>? = nil,
-        chromeMode: EditorChromeMode = .platformDefault
+        chromeMode: EditorChromeMode = .platformDefault,
+        onDockScrollHiddenChange: ((Bool) -> Void)? = nil
     ) {
         self.store = store
         self.note = note
@@ -95,6 +99,7 @@ struct NoteEditorScreen: View {
         self.leadingChromeControls = leadingChromeControls
         self.externallyDeletingNoteID = externallyDeletingNoteID
         self.chromeMode = chromeMode
+        self.onDockScrollHiddenChange = onDockScrollHiddenChange
         _session = State(initialValue: NoteEditorSession(store: store, note: note, isNew: isNew))
     }
 
@@ -435,6 +440,7 @@ struct NoteEditorScreen: View {
         withAnimation(hidden ? .easeOut(duration: 0.12) : .easeOut(duration: 0.2)) {
             dockHiddenByScroll = hidden
         }
+        onDockScrollHiddenChange?(hidden)
     }
     #endif
 
