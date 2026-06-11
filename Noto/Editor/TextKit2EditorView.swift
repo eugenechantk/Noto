@@ -663,15 +663,26 @@ enum MarkdownVisualSpec {
         var isMonospaced = false
     }
 
-    static let bodyFont = Font(pointSize: 17, weight: .regular)
-    static let h1Font = Font(pointSize: 28, weight: .bold)
-    static let h2Font = Font(pointSize: 22, weight: .bold)
-    static let h3Font = Font(pointSize: 18, weight: .semibold)
-    static let codeFont = Font(pointSize: 16, weight: .regular, isMonospaced: true)
+    // The base metrics are the iOS/iPadOS values (17pt body). macOS uses a smaller
+    // base body size, and every other font and spacing metric scales by the same
+    // body-size ratio so the whole type ramp stays proportional.
+    #if os(macOS)
+    static let baseBodyPointSize: CGFloat = 16
+    #else
+    static let baseBodyPointSize: CGFloat = 17
+    #endif
+    private static let platformScale: CGFloat = baseBodyPointSize / 17
+
+    static let bodyFont = Font(pointSize: baseBodyPointSize, weight: .regular)
+    static let h1Font = Font(pointSize: 28 * platformScale, weight: .bold)
+    static let h2Font = Font(pointSize: 22 * platformScale, weight: .bold)
+    static let h3Font = Font(pointSize: 18 * platformScale, weight: .semibold)
+    static let codeFont = Font(pointSize: 16 * platformScale, weight: .regular, isMonospaced: true)
 
     // Trailing spacing for legibility, shared by the editor and the AI chat renderer.
-    static let paragraphSpacing: CGFloat = 14  // after a body paragraph
-    static let listItemSpacing: CGFloat = 8    // after a list item (bullet/ordered/todo)
+    static let paragraphSpacing: CGFloat = 12 * platformScale  // after a body paragraph
+    static let listItemSpacing: CGFloat = 8 * platformScale    // after a list item (bullet/ordered/todo)
+    static let lineSpacing: CGFloat = 4 * platformScale        // between wrapped lines within a paragraph
 
     // Legacy list indent values kept for inactive block-editor compatibility.
     static let listBaseIndent: CGFloat = 12
@@ -799,7 +810,7 @@ enum MarkdownParagraphStyler {
 
     static func paragraphStyle(for kind: MarkdownBlockKind, text: String = "") -> NSParagraphStyle {
         let paraStyle = NSMutableParagraphStyle()
-        paraStyle.lineSpacing = 4
+        paraStyle.lineSpacing = MarkdownVisualSpec.lineSpacing
 
         switch kind {
         case .heading(let level):
@@ -865,7 +876,7 @@ enum MarkdownParagraphStyler {
             paraStyle.paragraphSpacing = 0
 
         case .paragraph:
-            paraStyle.paragraphSpacingBefore = paragraphUsesListSpacingWhileTyping(text) ? 4 : 6
+            paraStyle.paragraphSpacingBefore = paragraphUsesListSpacingWhileTyping(text) ? 4 : 0
             paraStyle.paragraphSpacing = MarkdownVisualSpec.paragraphSpacing
         }
 
