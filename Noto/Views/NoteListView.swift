@@ -1610,16 +1610,22 @@ struct FolderContentView: View {
                             .lineLimit(1)
                     }
                     .foregroundStyle(NotoTheme.accent)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .accessibilityIdentifier("back_button")
             }
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 18) {
+            // 44×44pt hit targets (HIG minimum) around each ~18pt glyph; spacing 0
+            // because the oversized frames already provide the visual gap.
+            HStack(spacing: 0) {
                 Button(action: createNote) {
                     Image(systemName: "square.and.pencil")
                         .font(.system(size: 18, weight: .regular))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityIdentifier("new_note_button")
                 .accessibilityLabel("New Note")
@@ -1632,6 +1638,8 @@ struct FolderContentView: View {
                 } label: {
                     Image(systemName: "line.3.horizontal.decrease")
                         .font(.system(size: 17, weight: .regular))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityIdentifier("sort_menu")
                 .accessibilityLabel("Sort")
@@ -1655,6 +1663,8 @@ struct FolderContentView: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 18, weight: .regular))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityIdentifier("more_menu")
                 .accessibilityLabel("More")
@@ -1662,7 +1672,10 @@ struct FolderContentView: View {
             .foregroundStyle(NotoTheme.head)
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 16)
+        .padding(.leading, 16)
+        // 3pt instead of 16: the 44pt frame centers the ~18pt glyph, so the trailing
+        // glyph stays ~16pt from the edge as before.
+        .padding(.trailing, 3)
         .frame(height: 48)
         .background(NotoTheme.background)
     }
