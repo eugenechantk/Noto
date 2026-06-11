@@ -328,6 +328,48 @@ struct TextKit2MarkdownLayoutTests {
         #expect(kind == .paragraph)
     }
 
+    @Test("No-label image links with spaces in the path are detected and resolve")
+    func noLabelImageLinksWithSpacesInPathAreDetected() throws {
+        let vaultRoot = URL(fileURLWithPath: "/tmp/Noto Vault")
+        let text = "![](attachments/Pasted image 20260610.png)"
+        let kind = MarkdownBlockKind.detect(from: text, vaultRootURL: vaultRoot)
+
+        guard case .imageLink(let imageLink) = kind else {
+            Issue.record("Expected image-link block kind")
+            return
+        }
+
+        #expect(imageLink.altText.isEmpty)
+        let url = try #require(imageLink.url)
+        #expect(url.path == "/tmp/Noto Vault/attachments/Pasted image 20260610.png")
+    }
+
+    @Test("No-label image links with a bare filename are detected")
+    func noLabelImageLinksWithBareFilenameAreDetected() {
+        let text = "![](xyz.png)"
+        let kind = MarkdownBlockKind.detect(from: text)
+
+        guard case .imageLink(let imageLink) = kind else {
+            Issue.record("Expected image-link block kind")
+            return
+        }
+
+        #expect(imageLink.urlString == "xyz.png")
+    }
+
+    @Test("Markdown title after the image URL is stripped from the parsed URL")
+    func markdownTitleAfterImageURLIsStripped() {
+        let text = #"![](attachments/diagram final.png "Architecture diagram")"#
+        let kind = MarkdownBlockKind.detect(from: text)
+
+        guard case .imageLink(let imageLink) = kind else {
+            Issue.record("Expected image-link block kind")
+            return
+        }
+
+        #expect(imageLink.urlString == "attachments/diagram final.png")
+    }
+
     @Test("Image links reserve placeholder vertical preview space until dimensions are cached")
     func imageLinksReserveVerticalPreviewSpace() {
         let text = "![](https://example.com/chart.png)"

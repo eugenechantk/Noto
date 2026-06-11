@@ -157,8 +157,15 @@ struct MarkdownImageLink: Equatable {
 }
 
 enum MarkdownImageLinkParser {
+    // URL part is `[^)]+` (not `[^)\s]+`): local attachment paths routinely contain
+    // spaces (e.g. `![](attachments/Pasted image 20260610.png)`) and must still
+    // parse as image links.
     private static let linkRegex = try! NSRegularExpression(
-        pattern: #"^\s*(!)?\[([^\]]*)\]\(([^)\s]+)\)\s*$"#
+        pattern: #"^\s*(!)?\[([^\]]*)\]\(([^)]+)\)\s*$"#
+    )
+    /// Optional markdown link title after the URL: `(url "title")` / `(url 'title')`.
+    private static let titleSuffixRegex = try! NSRegularExpression(
+        pattern: #"\s+("[^"]*"|'[^']*')\s*$"#
     )
     private static let imageURLExtensions = [
         ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".heic", ".heif", ".tiff", ".bmp",
@@ -174,8 +181,10 @@ enum MarkdownImageLinkParser {
            match.numberOfRanges >= 4 {
             let hasImagePrefix = match.range(at: 1).location != NSNotFound
             let altText = nsText.substring(with: match.range(at: 2))
-            let urlString = nsText.substring(with: match.range(at: 3))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let urlString = strippingTitle(
+                from: nsText.substring(with: match.range(at: 3))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            )
             if !urlString.isEmpty {
                 let isEmptyImageLink = altText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     && looksLikeImageURL(urlString)
@@ -253,11 +262,22 @@ enum MarkdownImageLinkParser {
         let altText = String(text[altStart..<altEndIdx])
 
         let urlStart = text.index(after: afterAlt)
-        let urlString = String(text[urlStart..<urlEndIdx])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let urlString = strippingTitle(
+            from: String(text[urlStart..<urlEndIdx])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        )
         guard !urlString.isEmpty else { return nil }
 
         return (altText, urlString)
+    }
+
+    private static func strippingTitle(from urlString: String) -> String {
+        let nsText = urlString as NSString
+        let fullRange = NSRange(location: 0, length: nsText.length)
+        guard let match = titleSuffixRegex.firstMatch(in: urlString, range: fullRange) else {
+            return urlString
+        }
+        return nsText.substring(to: match.range.location)
     }
 
     static func looksLikeImageURL(_ urlString: String) -> Bool {
@@ -5035,6 +5055,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             self.loadingImageURLs.remove(url)
             if image != nil {
                 self.scheduleImageLayoutInvalidation()
+            } else {
+                logger.warning("Image load failed url=\(url.absoluteString, privacy: .public) isFileURL=\(url.isFileURL) exists=\(url.isFileURL && FileManager.default.fileExists(atPath: url.path))")
             }
         }
     }
@@ -5070,7 +5092,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         var activeLocations: Set<Int> = []
 
         for block in blocks {
-            guard case .imageLink(let imageLink) = block.kind,
+            guard let imageLink = imageLink(in: block),
                   !block.isCollapsedXMLTagContent,
                   let rect = imageOverlayRect(for: block),
                   rect.intersects(visibleRect) else {
@@ -5159,7 +5181,10 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     private func imageLink(in block: MarkdownRenderableBlock) -> MarkdownImageLink? {
         if case .imageLink(let link) = block.kind {
-            return link
+            // Renderable blocks are detected without a vault root (the analyzer is
+            // static), so vault-relative paths must be resolved here before the
+            // overlay can look the image up in the loader cache.
+            return link.resolving(relativeTo: vaultRootURL)
         }
         return nil
     }
@@ -7517,6 +7542,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             self.loadingImageURLs.remove(url)
             if image != nil {
                 self.scheduleImageLayoutInvalidation()
+            } else {
+                logger.warning("Image load failed url=\(url.absoluteString, privacy: .public) isFileURL=\(url.isFileURL) exists=\(url.isFileURL && FileManager.default.fileExists(atPath: url.path))")
             }
         }
     }
