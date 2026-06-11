@@ -50,12 +50,62 @@ public struct MarkdownSearchIndexer: Sendable {
         }
     }
 
+    /// Re-scans the vault and replaces the index. Evicted iCloud files (not
+    /// downloaded locally) get a download kick and a bounded wait; whatever is
+    /// still unavailable afterwards keeps its existing index rows and is
+    /// counted in `skippedUnavailable` — it re-indexes via the file watcher /
+    /// foreground refresh once the download lands (bug 020).
     @discardableResult
-    public func rebuild() throws -> SearchIndexRefreshResult {
-        let documents = try scanDocuments()
+    public func rebuild(
+        downloadWaitDeadline: TimeInterval = 60,
+        downloadPollInterval: TimeInterval = 2
+    ) throws -> SearchIndexRefreshResult {
+        let files = try markdownFiles(in: vaultURL)
+        var available = files.filter(\.isAvailableForIndexing)
+        var unavailable = files.filter { !$0.isAvailableForIndexing }
+
+        if !unavailable.isEmpty {
+            for file in unavailable {
+                Self.startDownloadingIfNeeded(file.url)
+            }
+            // Notes are small markdown files — most downloads land within
+            // seconds when there is network and free space. Poll briefly and
+            // index what arrives; leave the rest to the incremental paths.
+            let deadline = Date().addingTimeInterval(downloadWaitDeadline)
+            while !unavailable.isEmpty, Date() < deadline {
+                Thread.sleep(forTimeInterval: downloadPollInterval)
+                let landed = unavailable.filter { Self.isAvailableForIndexingNow($0.url) }
+                guard !landed.isEmpty else { continue }
+                unavailable.removeAll { file in landed.contains { $0.relativePath == file.relativePath } }
+                // Re-snapshot: size and dates change when the content lands.
+                available.append(contentsOf: landed.map { Self.freshSnapshot(for: $0.url, relativePath: $0.relativePath) })
+            }
+        }
+
+        let documents = available.compactMap { file -> SearchIndexedDocument? in
+            do {
+                return try SearchIndexedDocument(
+                    document: extractor.extract(fileURL: file.url),
+                    fileModifiedAt: file.modifiedAt,
+                    fileSize: file.fileSize,
+                    fileCreatedAt: file.createdAt
+                )
+            } catch {
+                return nil
+            }
+        }
         let store = try openStore()
-        let stats = try store.rebuild(documents: documents)
-        return SearchIndexRefreshResult(scanned: documents.count, upserted: documents.count, deleted: 0, stats: stats)
+        let stats = try store.rebuild(
+            documents: documents,
+            retainingRelativePaths: Set(unavailable.map(\.relativePath))
+        )
+        return SearchIndexRefreshResult(
+            scanned: files.count,
+            upserted: documents.count,
+            deleted: 0,
+            skippedUnavailable: unavailable.count,
+            stats: stats
+        )
     }
 
     @discardableResult
@@ -212,6 +262,27 @@ public struct MarkdownSearchIndexer: Sendable {
             // Non-ubiquitous and provider-backed files can reject this. Indexing
             // should keep going and pick the file up on a later refresh.
         }
+    }
+
+    private static func isAvailableForIndexingNow(_ url: URL) -> Bool {
+        let values = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+        return values?.ubiquitousItemDownloadingStatus.map { $0 == .current } ?? true
+    }
+
+    private static func freshSnapshot(for url: URL, relativePath: String) -> MarkdownFileSnapshot {
+        let values = try? url.resourceValues(forKeys: [
+            .contentModificationDateKey,
+            .creationDateKey,
+            .fileSizeKey,
+        ])
+        return MarkdownFileSnapshot(
+            url: url,
+            relativePath: relativePath,
+            modifiedAt: values?.contentModificationDate ?? .distantPast,
+            createdAt: values?.creationDate,
+            fileSize: values?.fileSize ?? 0,
+            isAvailableForIndexing: true
+        )
     }
 
     private func isInVault(_ url: URL) -> Bool {

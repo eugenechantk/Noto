@@ -101,16 +101,42 @@ public struct SearchIndexedDocument: Sendable, Equatable {
     }
 }
 
+/// Folder scoping for search: normalizes user-supplied folder names and
+/// matches vault-relative paths against them. Shared by the keyword leg
+/// (SQL LIKE) and the semantic leg (post-filter) so both agree.
+public enum SearchFolderFilter {
+    /// Trims whitespace and surrounding slashes: " /Captures/ " → "Captures".
+    /// Returns nil for empty input (= no filter).
+    public static func normalizedPrefix(_ folder: String?) -> String? {
+        guard let folder else { return nil }
+        let trimmed = folder
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// True when `relativePath` lives inside the folder (any depth). Matching
+    /// is case-insensitive and segment-safe: "Cap" does not match "Captures/x.md".
+    public static func matches(relativePath: String, normalizedPrefix: String) -> Bool {
+        relativePath.lowercased().hasPrefix(normalizedPrefix.lowercased() + "/")
+    }
+}
+
 public struct SearchIndexRefreshResult: Sendable, Equatable {
     public let scanned: Int
     public let upserted: Int
     public let deleted: Int
+    /// Files that exist in the vault but whose content is not downloaded
+    /// locally (evicted iCloud files). They keep their existing index rows
+    /// and are re-indexed automatically once their download completes.
+    public let skippedUnavailable: Int
     public let stats: SearchIndexStats
 
-    public init(scanned: Int, upserted: Int, deleted: Int, stats: SearchIndexStats) {
+    public init(scanned: Int, upserted: Int, deleted: Int, skippedUnavailable: Int = 0, stats: SearchIndexStats) {
         self.scanned = scanned
         self.upserted = upserted
         self.deleted = deleted
+        self.skippedUnavailable = skippedUnavailable
         self.stats = stats
     }
 }

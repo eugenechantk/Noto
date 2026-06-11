@@ -99,12 +99,25 @@ public final class SearchIndexStore {
         try setMetadata("schema_version", value: "1")
     }
 
-    public func rebuild(documents: [SearchIndexedDocument]) throws -> SearchIndexStats {
+    /// Replaces the index with `documents`. Rows whose relative path is in
+    /// `retainingRelativePaths` survive untouched — used for files that exist
+    /// in the vault but are not locally downloaded (evicted iCloud files), so
+    /// a rebuild doesn't drop notes it can't currently read (bug 020).
+    public func rebuild(
+        documents: [SearchIndexedDocument],
+        retainingRelativePaths: Set<String> = []
+    ) throws -> SearchIndexStats {
         try transaction {
-            try execute("DELETE FROM note_fts;")
-            try execute("DELETE FROM section_fts;")
-            try execute("DELETE FROM sections;")
-            try execute("DELETE FROM notes;")
+            if retainingRelativePaths.isEmpty {
+                try execute("DELETE FROM note_fts;")
+                try execute("DELETE FROM section_fts;")
+                try execute("DELETE FROM sections;")
+                try execute("DELETE FROM notes;")
+            } else {
+                for row in try noteCatalog() where !retainingRelativePaths.contains(row.relativePath) {
+                    try deleteNote(noteID: row.noteID, withinTransaction: true)
+                }
+            }
             for entry in documents {
                 try upsert(entry.document, fileModifiedAt: entry.fileModifiedAt, fileSize: entry.fileSize, fileCreatedAt: entry.fileCreatedAt, withinTransaction: true)
             }
@@ -186,7 +199,7 @@ public final class SearchIndexStore {
         )
     }
 
-    public func search(query: String, scope: SearchScope = .titleAndContent, vaultURL: URL, limit: Int = 50, dateFilter: SearchDateFilter = SearchDateFilter()) throws -> [SearchResult] {
+    public func search(query: String, scope: SearchScope = .titleAndContent, vaultURL: URL, limit: Int = 50, dateFilter: SearchDateFilter = SearchDateFilter(), folderPrefix: String? = nil) throws -> [SearchResult] {
         let ftsQuery = switch scope {
         case .title:
             MarkdownSearchEngine.titleOnlyFTSQuery(for: query)
@@ -198,9 +211,9 @@ public final class SearchIndexStore {
         var results: [(result: SearchResult, rank: Double)] = []
         let terms = MarkdownSearchEngine.boostTerms(for: query)
         let candidateLimit = max(limit * 4, limit)
-        try searchNotes(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, results: &results)
+        try searchNotes(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, folderPrefix: folderPrefix, results: &results)
         if scope == .titleAndContent {
-            try searchSections(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, results: &results)
+            try searchSections(ftsQuery: ftsQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, folderPrefix: folderPrefix, results: &results)
         }
 
         // Recall fallback (bug 019): the default AND semantics hide notes that
@@ -213,9 +226,9 @@ public final class SearchIndexStore {
            let orQuery = MarkdownSearchEngine.orFTSQuery(for: query) {
             var seenResultIDs = Set(results.map(\.result.id))
             var orResults: [(result: SearchResult, rank: Double)] = []
-            try searchNotes(ftsQuery: orQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, results: &orResults)
+            try searchNotes(ftsQuery: orQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, folderPrefix: folderPrefix, results: &orResults)
             if scope == .titleAndContent {
-                try searchSections(ftsQuery: orQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, results: &orResults)
+                try searchSections(ftsQuery: orQuery, rawQuery: query, terms: terms, vaultURL: vaultURL, limit: candidateLimit, dateFilter: dateFilter, folderPrefix: folderPrefix, results: &orResults)
             }
             for entry in orResults where seenResultIDs.insert(entry.result.id).inserted {
                 results.append(entry)
@@ -303,9 +316,11 @@ public final class SearchIndexStore {
         vaultURL: URL,
         limit: Int,
         dateFilter: SearchDateFilter = SearchDateFilter(),
+        folderPrefix: String? = nil,
         results: inout [(result: SearchResult, rank: Double)]
     ) throws {
         let (dateSQL, dateValues) = Self.dateFilterClause(dateFilter, prefix: "n")
+        let (folderSQL, folderValues) = Self.folderFilterClause(folderPrefix, prefix: "n")
         try query(
             """
             SELECT n.note_id, n.relative_path, n.title, n.folder_path, n.file_modified_at,
@@ -314,11 +329,11 @@ public final class SearchIndexStore {
                    n.created_at
             FROM note_fts
             JOIN notes n ON n.note_id = note_fts.note_id
-            WHERE note_fts MATCH ?\(dateSQL)
+            WHERE note_fts MATCH ?\(dateSQL)\(folderSQL)
             ORDER BY rank
             LIMIT ?;
             """,
-            [.text(ftsQuery)] + dateValues + [.int(limit)]
+            [.text(ftsQuery)] + dateValues + folderValues + [.int(limit)]
         ) { stmt in
             guard let noteIDText = textColumn(stmt, 0), let noteID = UUID(uuidString: noteIDText),
                   let relativePath = textColumn(stmt, 1),
@@ -361,9 +376,11 @@ public final class SearchIndexStore {
         vaultURL: URL,
         limit: Int,
         dateFilter: SearchDateFilter = SearchDateFilter(),
+        folderPrefix: String? = nil,
         results: inout [(result: SearchResult, rank: Double)]
     ) throws {
         let (dateSQL, dateValues) = Self.dateFilterClause(dateFilter, prefix: "n")
+        let (folderSQL, folderValues) = Self.folderFilterClause(folderPrefix, prefix: "n")
         try query(
             """
             SELECT s.section_id, s.note_id, s.heading, s.level, s.line_start, n.relative_path, n.title, n.folder_path, n.file_modified_at,
@@ -373,11 +390,11 @@ public final class SearchIndexStore {
             FROM section_fts
             JOIN sections s ON s.section_id = section_fts.section_id
             JOIN notes n ON n.note_id = s.note_id
-            WHERE section_fts MATCH ?\(dateSQL)
+            WHERE section_fts MATCH ?\(dateSQL)\(folderSQL)
             ORDER BY rank
             LIMIT ?;
             """,
-            [.text(ftsQuery)] + dateValues + [.int(limit)]
+            [.text(ftsQuery)] + dateValues + folderValues + [.int(limit)]
         ) { stmt in
             guard let sectionIDText = textColumn(stmt, 0), let sectionID = UUID(uuidString: sectionIDText),
                   let noteIDText = textColumn(stmt, 1), let noteID = UUID(uuidString: noteIDText),
@@ -420,6 +437,17 @@ public final class SearchIndexStore {
 
     /// WHERE-clause fragment + bind values for a date filter. ISO 8601 strings
     /// (same formatter everywhere) compare correctly as text.
+    /// Restricts results to notes inside a vault folder (any depth). LIKE is
+    /// ASCII case-insensitive in SQLite, matching `SearchFolderFilter.matches`.
+    private static func folderFilterClause(_ folderPrefix: String?, prefix: String) -> (sql: String, values: [SQLiteValue]) {
+        guard let normalized = SearchFolderFilter.normalizedPrefix(folderPrefix) else { return ("", []) }
+        let escaped = normalized
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "%", with: "\\%")
+            .replacingOccurrences(of: "_", with: "\\_")
+        return (" AND \(prefix).relative_path LIKE ? ESCAPE '\\'", [.text(escaped + "/%")])
+    }
+
     private static func dateFilterClause(_ filter: SearchDateFilter, prefix: String) -> (sql: String, values: [SQLiteValue]) {
         var clauses: [String] = []
         var values: [SQLiteValue] = []

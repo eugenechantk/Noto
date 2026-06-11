@@ -39,8 +39,16 @@ public struct SearchIndexCoordinatorClient: Sendable {
         },
         rebuildIndex: { vaultURL in
             let indexer = MarkdownSearchIndexer(vaultURL: vaultURL)
-            try indexer.openStore().destroy()
-            return try indexer.rebuild()
+            do {
+                // Rebuild in place so rows for evicted (not-downloaded) iCloud
+                // files survive — destroying the store first would drop them
+                // (bug 020).
+                return try indexer.rebuild()
+            } catch {
+                // Recovery hatch for a corrupt store: nuke and start over.
+                try indexer.openStore().destroy()
+                return try indexer.rebuild()
+            }
         }
     )
 }

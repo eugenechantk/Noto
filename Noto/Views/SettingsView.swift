@@ -308,7 +308,11 @@ struct SettingsView: View {
                 let result = try await SearchIndexController.shared.rebuildIndex(vaultURL: vaultURL)
                 await MainActor.run {
                     isRebuildingIndex = false
-                    indexRebuildMessage = "Indexed \(result.upserted) notes."
+                    if result.skippedUnavailable > 0 {
+                        indexRebuildMessage = "Indexed \(result.upserted) notes. \(result.skippedUnavailable) more are still downloading from iCloud — they keep their existing index entries and re-index automatically once downloaded."
+                    } else {
+                        indexRebuildMessage = "Indexed \(result.upserted) notes."
+                    }
                 }
             } catch {
                 logger.error("Search index rebuild failed: \(error.localizedDescription)")
