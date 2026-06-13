@@ -701,7 +701,11 @@ enum MarkdownVisualSpec {
 
     // Trailing spacing for legibility, shared by the editor and the AI chat renderer.
     static let paragraphSpacing: CGFloat = 12 * platformScale  // after a body paragraph
-    static let listItemSpacing: CGFloat = 8 * platformScale    // after a list item (bullet/ordered/todo)
+    static let listItemSpacing: CGFloat = 10 * platformScale   // after a list item (bullet/ordered/todo)
+    // Negative leading space pulls each list item up toward the block above it, so the
+    // first item hugs its preceding paragraph and items sit tighter together. Net gaps:
+    // paragraph→item = paragraphSpacing + listItemSpacingBefore; item→item = listItemSpacing + listItemSpacingBefore.
+    static let listItemSpacingBefore: CGFloat = -4 * platformScale
     static let lineSpacing: CGFloat = 4 * platformScale        // between wrapped lines within a paragraph
 
     // Legacy list indent values kept for inactive block-editor compatibility.
@@ -845,7 +849,7 @@ enum MarkdownParagraphStyler {
             let trailingSpaceCompensation = todoTrailingSpaceWidthCompensation(for: kind, text: text)
             paraStyle.firstLineHeadIndent = indentPt + contentIndent - hiddenPrefixWidth - trailingSpaceCompensation
             paraStyle.headIndent = indentPt + contentIndent
-            paraStyle.paragraphSpacingBefore = 4
+            paraStyle.paragraphSpacingBefore = MarkdownVisualSpec.listItemSpacingBefore
             paraStyle.paragraphSpacing = MarkdownVisualSpec.listItemSpacing
 
         case .bullet(let indent):
@@ -853,7 +857,7 @@ enum MarkdownParagraphStyler {
             let contentIndent = listContentIndent(for: kind, text: text)
             paraStyle.firstLineHeadIndent = indentPt
             paraStyle.headIndent = indentPt + contentIndent
-            paraStyle.paragraphSpacingBefore = 4
+            paraStyle.paragraphSpacingBefore = MarkdownVisualSpec.listItemSpacingBefore
             paraStyle.paragraphSpacing = MarkdownVisualSpec.listItemSpacing
 
         case .orderedList(_, let indent):
@@ -861,7 +865,7 @@ enum MarkdownParagraphStyler {
             let contentIndent = listContentIndent(for: kind, text: text)
             paraStyle.firstLineHeadIndent = indentPt
             paraStyle.headIndent = indentPt + contentIndent
-            paraStyle.paragraphSpacingBefore = 4
+            paraStyle.paragraphSpacingBefore = MarkdownVisualSpec.listItemSpacingBefore
             paraStyle.paragraphSpacing = MarkdownVisualSpec.listItemSpacing
 
         case .frontmatter:
@@ -896,7 +900,7 @@ enum MarkdownParagraphStyler {
             paraStyle.paragraphSpacing = 0
 
         case .paragraph:
-            paraStyle.paragraphSpacingBefore = paragraphUsesListSpacingWhileTyping(text) ? 4 : 0
+            paraStyle.paragraphSpacingBefore = paragraphUsesListSpacingWhileTyping(text) ? MarkdownVisualSpec.listItemSpacingBefore : 0
             paraStyle.paragraphSpacing = MarkdownVisualSpec.paragraphSpacing
         }
 
@@ -2165,6 +2169,13 @@ private enum FrontmatterEditingTarget: Equatable {
 #if os(iOS)
 
 private final class EditorAccessoryView: UIView {
+    // Same tint as the toolbar bar (#1A1C22). Painting the keyboard-region backdrop
+    // containers with it (rather than leaving them clear) fills the gaps the keyboard
+    // doesn't cover — its rounded top corners — so the dark window no longer shows there.
+    // Because these are superviews of the accessory (and ancestors of the keyboard
+    // plane), the tint can only ever appear *behind* the keys, never over them.
+    static let chromeTint = UIColor(hex: 0x1A1C22)
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         isOpaque = false
@@ -2188,10 +2199,19 @@ private final class EditorAccessoryView: UIView {
     }
 
     private func clearAccessoryChrome() {
+        // Only the keyboard-region containers should be tinted; full-screen containers
+        // higher in the chain must stay clear or the tint would cover the whole screen.
+        let screenHeight = window?.bounds.height ?? UIScreen.main.bounds.height
+        let keyboardRegionMaxHeight = screenHeight * 0.7
+
         var view = superview
         while let currentView = view, currentView !== window {
             currentView.isOpaque = false
-            currentView.backgroundColor = .clear
+            if currentView.bounds.height > 0, currentView.bounds.height <= keyboardRegionMaxHeight {
+                currentView.backgroundColor = EditorAccessoryView.chromeTint
+            } else {
+                currentView.backgroundColor = .clear
+            }
             view = currentView.superview
         }
     }
