@@ -839,8 +839,9 @@ enum MarkdownParagraphStyler {
         switch kind {
         case .heading(let level):
             let spacing: CGFloat = level == 1 ? 16 : level == 2 ? 12 : 8
+            let afterSpacing: CGFloat = level == 1 ? 12 : level == 2 ? 10 : 8
             paraStyle.paragraphSpacingBefore = spacing
-            paraStyle.paragraphSpacing = spacing * 0.4
+            paraStyle.paragraphSpacing = afterSpacing
 
         case .todo(_, let indent):
             let indentPt = sourceIndentWidth(for: kind, text: text, indentLevel: indent)
