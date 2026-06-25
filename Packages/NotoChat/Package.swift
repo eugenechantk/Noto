@@ -8,13 +8,14 @@ let package = Package(
         .library(name: "NotoChat", targets: ["NotoChat"]),
     ],
     dependencies: [
-        // Internal package only — no external/third-party dependencies.
+        // Internal packages only — no external/third-party dependencies.
         .package(path: "../NotoVault"),
+        .package(path: "../NotoEdit"),
     ],
     targets: [
         .target(
             name: "NotoChat",
-            dependencies: ["NotoVault"]
+            dependencies: ["NotoVault", "NotoEdit"]
         ),
         .testTarget(
             name: "NotoChatTests",

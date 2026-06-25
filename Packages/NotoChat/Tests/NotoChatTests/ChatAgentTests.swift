@@ -65,6 +65,7 @@ import Testing
             switch event {
             case .toolCallStarted(let name, _): if name == "read" { sawToolStart = true }
             case .toolCallFinished(let name, _, _): if name == "read" { sawToolFinish = true }
+            case .editProposal: break
             case .textDelta(let d): text += d
             case .finished: break
             }

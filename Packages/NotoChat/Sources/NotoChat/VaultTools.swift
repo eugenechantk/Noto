@@ -61,6 +61,8 @@ public struct ToolRunResult: Sendable, Equatable {
     public var surfacedPaths: [String] = []
     /// Per-match (note, snippet) for grep — drives the expanded tool-trace "note › snippet" rows.
     public var hits: [GrepHit] = []
+    /// Set by `propose_edits` — the edit-suggestion blocks surfaced to the UI (never written here).
+    public var editProposal: EditProposal?
 }
 
 // MARK: - VaultTools
@@ -70,7 +72,7 @@ public struct ToolRunResult: Sendable, Equatable {
 /// uses a fast direct scan for throughput.
 public struct VaultTools: Sendable {
     public let root: URL
-    private let fs: any VaultFileSystem
+    let fs: any VaultFileSystem
     let searchProvider: (any ChatSearchProviding)?
 
     public init(
@@ -91,9 +93,10 @@ public struct VaultTools: Sendable {
     /// Tools advertised to the model for this session. `search` appears only
     /// when the app injected a hybrid search provider.
     public var toolDefinitions: [ToolDefinition] {
-        searchProvider == nil
+        let base: [ToolDefinition] = searchProvider == nil
             ? [Self.grepDefinition, Self.readDefinition, Self.listDefinition]
             : [Self.searchDefinition, Self.grepDefinition, Self.readDefinition, Self.listDefinition]
+        return base + [Self.proposeEditsDefinition]
     }
 
     static let grepDefinition = ToolDefinition(function: .init(

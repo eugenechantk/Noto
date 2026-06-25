@@ -6,6 +6,9 @@ public enum AgentEvent: Sendable, Equatable {
     /// `hits` carries per-match (note, snippet) for grep so the tool-trace UI can show which
     /// document and snippet matched (empty for read/list).
     case toolCallFinished(name: String, summary: String, hits: [GrepHit])
+    /// The model proposed edits via `propose_edits` — surfaced as edit-suggestion
+    /// cards (one per block) rather than a tool-step row. Nothing is written.
+    case editProposal(EditProposal)
     case textDelta(String)
     case finished(AgentResult)
 }
@@ -44,6 +47,16 @@ You have tools:
   date filters alone when query is omitted. Use for exact strings, names, or pure date listings.
 - read(path, start_line?, end_line?) — open a note (or a line range) by its vault-relative path.
 - list(path?) — list a folder's contents.
+- propose_edits(path?, edits[], summary?) — propose changes to a note for the user to review. Each
+  edit is an addition, edit, or deletion anchored on an EXACT, UNIQUE quote copied verbatim from the
+  note. Edits are NOT applied — the user accepts or dismisses each one, so never say you changed,
+  saved, or updated the note; say you've SUGGESTED the edits. If the tool reports an edit as
+  not-found or ambiguous, re-quote with more surrounding text and call propose_edits again for it.
+  Use this only when the user asks you to change/rewrite/add to/clean up a note. `path` defaults to
+  the note in context; pass it explicitly to edit a different note. To ADD a new line or list item,
+  use an addition whose content STARTS with a newline (e.g. position "after" the previous line with
+  content "\\n- Eggs") — never an `edit` that repeats the anchor text just to append after it, which
+  would jam two items onto one line.
 
 Workflow:
 1. Routing rule: ANY question about a topic goes to `search` — even when it is time-scoped ("what
@@ -155,7 +168,19 @@ public struct ChatAgent: Sendable {
                         messages.append(ChatMessage(role: .assistant,
                                                     content: text.isEmpty ? nil : text,
                                                     toolCalls: toolCalls))
+                        // Default edit target = the single attached note (if exactly one).
+                        let defaultEditPath = mentioned.count == 1 ? mentioned.first : nil
                         for call in toolCalls {
+                            if call.function.name == "propose_edits" {
+                                // Surfaced as edit cards, not a tool-step row.
+                                let result = tools.proposeEdits(arguments: call.function.arguments,
+                                                                defaultPath: defaultEditPath)
+                                messages.append(.toolResult(result.output, callID: call.id, name: call.function.name))
+                                if let proposal = result.editProposal {
+                                    continuation.yield(.editProposal(proposal))
+                                }
+                                continue
+                            }
                             continuation.yield(.toolCallStarted(name: call.function.name,
                                                                 arguments: call.function.arguments))
                             let result = tools.run(call)

@@ -51,13 +51,16 @@ struct SearchToolTests {
     @Test func testSearchAdvertisedOnlyWithProvider() throws {
         let without = try makeTools(provider: nil)
         #expect(!without.toolDefinitions.contains { $0.function.name == "search" })
-        #expect(without.toolDefinitions.count == 3)
+        // grep, read, list, propose_edits
+        #expect(without.toolDefinitions.count == 4)
 
         let with = try makeTools(provider: RecordingProvider())
         let names = with.toolDefinitions.map(\.function.name)
         #expect(names.first == "search")
         #expect(names.contains("grep"))
-        #expect(names.count == 4)
+        #expect(names.contains("propose_edits"))
+        // search, grep, read, list, propose_edits
+        #expect(names.count == 5)
     }
 
     @Test func testDispatchParsesQueryDatesAndLimit() throws {

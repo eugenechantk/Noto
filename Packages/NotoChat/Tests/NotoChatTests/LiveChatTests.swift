@@ -44,6 +44,8 @@ import Testing
                 print("  → tool: \(name)(\(args))")
             case .toolCallFinished(let name, let summary, _):
                 print("  ✓ \(name): \(summary)")
+            case .editProposal(let p):
+                print("  ✎ proposed \(p.blocks.count) edit(s) to \(p.path)")
             case .textDelta(let delta):
                 streamed += delta
             case .finished(let result):
@@ -77,6 +79,7 @@ import Testing
             switch event {
             case .toolCallStarted(let name, let args): print("  → \(name)(\(args))")
             case .toolCallFinished(let name, let summary, _): print("  ✓ \(name): \(summary)")
+            case .editProposal(let p): print("  ✎ proposed \(p.blocks.count) edit(s) to \(p.path)")
             case .textDelta: break
             case .finished(let r): result = r
             }
