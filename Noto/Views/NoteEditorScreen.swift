@@ -419,6 +419,8 @@ struct NoteEditorScreen: View {
         // Reuse the existing session so the conversation persists across dismiss/reopen.
         chatStore.ensure(apiKey: apiKey, vaultURL: store.vaultRootURL, seedMention: noteVaultRelativePath)
         // Auto-attach the active document — also for an already-open session.
+        // Accepted edits write the file and publish an in-process sync snapshot,
+        // so this editor (and any other) updates live without a special bridge.
         if let path = noteVaultRelativePath { chatStore.session?.attachMention(path) }
         showChat = true
     }

@@ -173,7 +173,7 @@ struct ChatSheet: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
                     ForEach(session.turns) { turn in
-                        ChatTurnView(turn: turn, onOpenNote: openNote).id(turn.id)
+                        ChatTurnView(turn: turn, session: session, onOpenNote: openNote).id(turn.id)
                     }
                     if session.phase == .thinking {
                         ThinkingIndicator()
@@ -222,11 +222,12 @@ struct ChatSheet: View {
 
 private struct ChatTurnView: View {
     let turn: ChatSession.ChatTurn
+    @ObservedObject var session: ChatSession
     var onOpenNote: ((String) -> Void)?
     var body: some View {
         switch turn.role {
         case .user: UserMessageView(turn: turn)
-        case .assistant: AIReplyView(turn: turn, onOpenNote: onOpenNote)
+        case .assistant: AIReplyView(turn: turn, session: session, onOpenNote: onOpenNote)
         }
     }
 }
@@ -262,6 +263,7 @@ private struct UserMessageView: View {
 
 private struct AIReplyView: View {
     let turn: ChatSession.ChatTurn
+    @ObservedObject var session: ChatSession
     var onOpenNote: ((String) -> Void)?
 
     var body: some View {
@@ -273,6 +275,13 @@ private struct AIReplyView: View {
                     MarkdownText(s, citationsTappable: !turn.sources.isEmpty)
                 case .tool(let step):
                     ToolStepView(step: step, onOpenNote: onOpenNote)
+                case .editBlock(let state):
+                    EditBlockView(
+                        state: state,
+                        onAccept: { session.acceptEdit(blockID: state.id) },
+                        onDismiss: { session.dismissEdit(blockID: state.id) },
+                        onExpand: { up in session.expandEdit(blockID: state.id, up: up) }
+                    )
                 }
             }
             if !turn.sources.isEmpty {

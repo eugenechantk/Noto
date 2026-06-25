@@ -46,17 +46,37 @@ final class ChatSession: ObservableObject {
         enum Role { case user, assistant }
     }
 
-    /// A block within an assistant turn — text and tool steps interleave.
+    /// A block within an assistant turn — text, tool steps, and edit suggestions interleave.
     enum Block: Identifiable, Equatable {
         case text(id: UUID, String)
         case tool(ToolStep)
+        case editBlock(EditBlockState)   // one per edit spot (Suggested Edits card)
 
         var id: UUID {
             switch self {
             case .text(let id, _): return id
             case .tool(let step): return step.id
+            case .editBlock(let state): return state.id
             }
         }
+    }
+
+    /// One edit-suggestion card (one contiguous spot in a note). Carries the
+    /// resolved block (with its source proposals, for independent re-resolution
+    /// on accept/expand) and its display/terminal status.
+    struct EditBlockState: Identifiable, Equatable {
+        let id = UUID()
+        var targetPath: String       // vault-relative note the edit changes
+        var title: String            // note title for the "Suggested Edits ・ file" header
+        var breadcrumb: String?      // folder breadcrumb when nested
+        var locationHint: String?    // nearest heading within the note
+        var block: EditBlock         // NotoEdit block (immutable; .sources for re-resolution)
+        var preview: DiffPreview     // current preview (replaced when expanded)
+        var beforeRadius: Int        // context lines shown above (grows on expand-up)
+        var afterRadius: Int         // context lines shown below (grows on expand-down)
+        var status: Status
+
+        enum Status: Equatable { case proposed, applied, dismissed, stale }
     }
 
     /// A single tool invocation rendered as a collapsible step
@@ -291,6 +311,23 @@ final class ChatSession: ObservableObject {
                 turns[i].blocks[idx] = .tool(step)
             }
 
+        case .editProposal(let proposal):
+            phase = .streaming
+            // One card per spot; multiple spots stack as multiple cards.
+            for b in proposal.blocks {
+                turns[i].blocks.append(.editBlock(EditBlockState(
+                    targetPath: proposal.path,
+                    title: proposal.title,
+                    breadcrumb: proposal.breadcrumb,
+                    locationHint: b.locationHint,
+                    block: b,
+                    preview: b.preview,
+                    beforeRadius: EditApplier.defaultContextRadius,
+                    afterRadius: EditApplier.defaultContextRadius,
+                    status: .proposed
+                )))
+            }
+
         case .textDelta(let chunk):
             phase = .streaming
             // Append to the trailing text block, or start a new one (so tool
@@ -309,10 +346,12 @@ final class ChatSession: ObservableObject {
             // taps) and leak reference lines into the saved transcript. Tool
             // steps stay, stacked above the final text.
             if !result.answer.isEmpty {
-                let toolBlocks = turns[i].blocks.filter {
-                    if case .tool = $0 { return true } else { return false }
+                // Keep the non-text blocks (tool steps + edit cards) in order,
+                // and replace the streamed text with the finalized answer below them.
+                let keptBlocks = turns[i].blocks.filter {
+                    if case .text = $0 { return false } else { return true }
                 }
-                turns[i].blocks = toolBlocks + [.text(id: UUID(), result.answer)]
+                turns[i].blocks = keptBlocks + [.text(id: UUID(), result.answer)]
             }
             turns[i].sources = result.sources
             turns[i].hitRoundLimit = result.hitRoundLimit
@@ -455,6 +494,135 @@ final class ChatSession: ObservableObject {
         }
         flush()
         return ParsedTranscript(id: id, created: created, title: title, mentioned: mentioned, sources: sources, turns: turns)
+    }
+
+    #if DEBUG
+    /// Test/preview seam: append an assistant turn carrying an edit proposal,
+    /// reducing it through the normal event path (no live AI needed).
+    func _seedEditProposalForTesting(_ proposal: EditProposal) {
+        turns.append(ChatTurn(role: .assistant, blocks: []))
+        apply(.editProposal(proposal), toAssistantAt: turns.count - 1)
+    }
+
+    /// Test seam: the first edit card's id and current status, if any.
+    func _firstEditBlock() -> (id: UUID, status: EditBlockState.Status)? {
+        for turn in turns {
+            for block in turn.blocks {
+                if case .editBlock(let s) = block { return (s.id, s.status) }
+            }
+        }
+        return nil
+    }
+    #endif
+
+    // MARK: Edit suggestions — accept / dismiss / expand
+
+    /// Accept one edit card: re-resolve its source proposals against the note's
+    /// CURRENT body (it may have changed since the suggestion), apply, and persist
+    /// — through the open editor when it's the active note, else via file IO.
+    /// Each card is independent; a stale anchor marks just that card `.stale`.
+    func acceptEdit(blockID: UUID) {
+        guard let loc = locateEditBlock(blockID), case .editBlock(var state) = turns[loc.turn].blocks[loc.block] else { return }
+        guard state.status == .proposed else { return }
+        guard let full = currentFullContent(for: state.targetPath) else {
+            setEditStatus(blockID, .stale); return
+        }
+        let (prefix, body) = Self.splitFrontmatter(full)
+        let (blocks, _) = EditApplier.plan(state.block.sources, in: body)
+        guard !blocks.isEmpty, let newBody = try? EditApplier.apply(blocks, to: body) else {
+            setEditStatus(blockID, .stale); return
+        }
+        let newFull = prefix + newBody
+        guard writeFullContent(newFull, for: state.targetPath) else {
+            setEditStatus(blockID, .stale); return
+        }
+        state.status = .applied
+        turns[loc.turn].blocks[loc.block] = .editBlock(state)
+        persist()
+    }
+
+    /// Dismiss one edit card (no change to the note).
+    func dismissEdit(blockID: UUID) {
+        setEditStatus(blockID, .dismissed)
+        persist()
+    }
+
+    /// Reveal more context lines above (`up`) or below an edit card's hunk.
+    func expandEdit(blockID: UUID, up: Bool, by amount: Int = 5) {
+        guard let loc = locateEditBlock(blockID), case .editBlock(var state) = turns[loc.turn].blocks[loc.block] else { return }
+        guard let full = currentFullContent(for: state.targetPath) else { return }
+        let (_, body) = Self.splitFrontmatter(full)
+        if up { state.beforeRadius += amount } else { state.afterRadius += amount }
+        // Re-resolve this block's sources to a fresh block, then re-render its
+        // preview with the larger radius (anchors may have shifted; bail if gone).
+        let (blocks, _) = EditApplier.plan(state.block.sources, in: body)
+        guard let fresh = blocks.first else { return }
+        state.preview = EditApplier.preview(for: fresh, in: body,
+                                            contextBefore: state.beforeRadius, contextAfter: state.afterRadius)
+        turns[loc.turn].blocks[loc.block] = .editBlock(state)
+    }
+
+    private func setEditStatus(_ blockID: UUID, _ status: EditBlockState.Status) {
+        guard let loc = locateEditBlock(blockID), case .editBlock(var state) = turns[loc.turn].blocks[loc.block] else { return }
+        state.status = status
+        turns[loc.turn].blocks[loc.block] = .editBlock(state)
+    }
+
+    private func locateEditBlock(_ blockID: UUID) -> (turn: Int, block: Int)? {
+        for (ti, turn) in turns.enumerated() {
+            if let bi = turn.blocks.firstIndex(where: { $0.id == blockID }) { return (ti, bi) }
+        }
+        return nil
+    }
+
+    /// Full markdown of a note, read from disk — the file is the source of truth
+    /// for programmatic edits.
+    private func currentFullContent(for path: String) -> String? {
+        guard let url = noteURL(for: path) else { return nil }
+        return fs.readString(from: url) ?? (try? String(contentsOf: url, encoding: .utf8))
+    }
+
+    /// Persist new full markdown to a note via FILE IO, stamping `modified` at the
+    /// write (the timestamp is a property of the write, not of any editor). Then
+    /// publish an in-process sync snapshot so a note open in the editor updates
+    /// live (its session adopts the change through `handleRemoteSnapshot`).
+    private func writeFullContent(_ content: String, for path: String) -> Bool {
+        guard let url = noteURL(for: path) else { return false }
+        let stamped = NoteFrontmatter.stampingModified(content, to: Date())
+        guard fs.writeString(stamped, to: url) else { return false }
+        if let id = NoteFrontmatter.id(of: stamped) {
+            NoteSyncCenter.publish(NoteSyncSnapshot(
+                noteID: id, fileURL: url, text: stamped,
+                sourceEditorID: editApplySourceID, savedAt: Date()))
+        }
+        return true
+    }
+
+    /// Stable non-editor source id for sync snapshots from accepted AI edits, so
+    /// editor sessions never mistake them for their own saves.
+    private let editApplySourceID = UUID()
+
+    private func noteURL(for path: String) -> URL? {
+        var rel = path
+        while rel.hasPrefix("/") { rel.removeFirst() }
+        guard !rel.isEmpty else { return nil }
+        let url = vaultURL.appendingPathComponent(rel).standardizedFileURL
+        let base = vaultURL.standardizedFileURL.path
+        guard url.path == base || url.path.hasPrefix(base + "/") else { return nil }
+        return url
+    }
+
+    /// Split full markdown into (frontmatter prefix incl. closing `---\n`, body).
+    static func splitFrontmatter(_ content: String) -> (prefix: String, body: String) {
+        guard content.hasPrefix("---") else { return ("", content) }
+        let lines = content.components(separatedBy: "\n")
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---",
+              let close = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" }) else {
+            return ("", content)
+        }
+        let prefix = lines[0...close].joined(separator: "\n") + "\n"
+        let body = lines[(close + 1)...].joined(separator: "\n")
+        return (prefix, body)
     }
 
     // MARK: Helpers
