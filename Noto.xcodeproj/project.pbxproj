@@ -51,6 +51,16 @@
 		5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		58A1D0018A1D001000000010 /* Exceptions for "Noto" folder in "Noto" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5DF5FAFD2F0EC372008EDC76 /* Noto */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5DE568F52F80191200EC8657 /* NotoMacOSUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -64,6 +74,9 @@
 		};
 		5DF5FB002F0EC372008EDC76 /* Noto */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				58A1D0018A1D001000000010 /* Exceptions for "Noto" folder in "Noto" target */,
+			);
 			path = Noto;
 			sourceTree = "<group>";
 		};
@@ -618,6 +631,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Noto/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Noto;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
@@ -662,6 +676,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Noto/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Noto;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;

@@ -199,6 +199,7 @@ private struct NotoCommands: Commands {
 struct NotoApp: App {
     @State private var locationManager = VaultLocationManager()
     @State private var readwiseSyncController = ReadwiseSyncController()
+    @StateObject private var deepLinkRouter = NotoDeepLinkRouter()
     #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     #endif
@@ -261,6 +262,7 @@ struct NotoApp: App {
                     vaultURL: vaultURL,
                     locationManager: locationManager,
                     readwiseSyncController: readwiseSyncController,
+                    deepLinkRouter: deepLinkRouter,
                     initialDocumentLink: initialDocumentLink
                 )
                 #if os(macOS)
@@ -274,6 +276,9 @@ struct NotoApp: App {
             }
         }
         .environment(\.colorScheme, .dark)
+        .onOpenURL { url in
+            deepLinkRouter.open(url)
+        }
     }
 
     #if os(iOS)
@@ -374,6 +379,7 @@ struct MainAppView: View {
     let vaultURL: URL
     var locationManager: VaultLocationManager
     @ObservedObject var readwiseSyncController: ReadwiseSyncController
+    @ObservedObject var deepLinkRouter: NotoDeepLinkRouter
     var initialDocumentLink: String?
     @State private var store: MarkdownNoteStore
     @State private var fileWatcher = VaultFileWatcher()
@@ -388,11 +394,13 @@ struct MainAppView: View {
         vaultURL: URL,
         locationManager: VaultLocationManager,
         readwiseSyncController: ReadwiseSyncController,
+        deepLinkRouter: NotoDeepLinkRouter,
         initialDocumentLink: String? = nil
     ) {
         self.vaultURL = vaultURL
         self.locationManager = locationManager
         self.readwiseSyncController = readwiseSyncController
+        self.deepLinkRouter = deepLinkRouter
         self.initialDocumentLink = initialDocumentLink
         _store = State(wrappedValue: MarkdownNoteStore(
             vaultURL: vaultURL,
@@ -407,6 +415,7 @@ struct MainAppView: View {
             locationManager: locationManager,
             fileWatcher: fileWatcher,
             readwiseSyncController: readwiseSyncController,
+            deepLinkRouter: deepLinkRouter,
             initialDocumentLink: initialDocumentLink
         )
             .environmentObject(chatStore)

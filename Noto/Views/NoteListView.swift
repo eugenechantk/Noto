@@ -272,6 +272,7 @@ struct VaultWorkspaceView: View {
     var locationManager: VaultLocationManager?
     var fileWatcher: VaultFileWatcher?
     @ObservedObject var readwiseSyncController: ReadwiseSyncController
+    @ObservedObject var deepLinkRouter: NotoDeepLinkRouter
     var initialDocumentLink: String?
 
     #if os(iOS)
@@ -367,9 +368,10 @@ struct VaultWorkspaceView: View {
                 setSplitDockHidden(false)
             }
             .onAppear {
-                guard !hasRestoredSelection else { return }
-                hasRestoredSelection = true
-                openInitialDocumentLinkOrRestore()
+                restoreInitialSelectionIfNeeded()
+            }
+            .onChange(of: deepLinkRouter.pendingDocumentPath) { _, _ in
+                openPendingDocumentLinkIfNeeded()
             }
         } else {
             NavigationStack(path: $path) {
@@ -488,6 +490,12 @@ struct VaultWorkspaceView: View {
             .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openChat)) { _ in
                 toggleChat()
             }
+            .onAppear {
+                restoreInitialSelectionIfNeeded()
+            }
+            .onChange(of: deepLinkRouter.pendingDocumentPath) { _, _ in
+                openPendingDocumentLinkIfNeeded()
+            }
         }
         #elseif os(macOS)
             NotoSplitView(
@@ -577,9 +585,10 @@ struct VaultWorkspaceView: View {
             persistLastOpenedNoteURL(newURL)
         }
         .onAppear {
-            guard !hasRestoredSelection else { return }
-            hasRestoredSelection = true
-            openInitialDocumentLinkOrRestore()
+            restoreInitialSelectionIfNeeded()
+        }
+        .onChange(of: deepLinkRouter.pendingDocumentPath) { _, _ in
+            openPendingDocumentLinkIfNeeded()
         }
         #endif
     }
@@ -1091,7 +1100,31 @@ struct VaultWorkspaceView: View {
             return
         }
 
+        if openPendingDocumentLinkIfNeeded() {
+            return
+        }
+
         restoreOrOpenToday()
+    }
+
+    private func restoreInitialSelectionIfNeeded() {
+        guard !hasRestoredSelection else {
+            openPendingDocumentLinkIfNeeded()
+            return
+        }
+        hasRestoredSelection = true
+        openInitialDocumentLinkOrRestore()
+    }
+
+    @discardableResult
+    private func openPendingDocumentLinkIfNeeded() -> Bool {
+        guard let relativePath = deepLinkRouter.consumePendingDocumentPath(),
+              let resolved = store.note(atVaultRelativePath: relativePath) else {
+            return false
+        }
+
+        openNoteFromWorkspace(resolved.note, in: resolved.store, isNew: false)
+        return true
     }
 
     private func restoredNote(for fileURL: URL) -> MarkdownNote {
