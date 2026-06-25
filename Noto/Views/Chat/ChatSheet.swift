@@ -31,6 +31,9 @@ struct ChatSheet: View {
     private var vaultURL: URL { session.vaultURL }
 
     var body: some View {
+        // The GeometryReader ignores the keyboard so its height is the full
+        // screen; the composer input caps at half of it (≈ half the screen).
+        GeometryReader { geo in
         ZStack {
             NotoChatTokens.bg.ignoresSafeArea()
             VStack(spacing: 0) {
@@ -57,6 +60,7 @@ struct ChatSheet: View {
                     mentioned: $session.pendingMentions,
                     isBusy: session.phase == .thinking || session.phase == .streaming,
                     vaultURL: vaultURL,
+                    maxInputHeight: max(160, geo.size.height * 0.5),
                     onSend: send,
                     onAttach: { showAddContext = true }
                 )
@@ -90,6 +94,8 @@ struct ChatSheet: View {
             Button("Rename") { session.rename(to: renameText) }
             Button("Cancel", role: .cancel) {}
         }
+        }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     // MARK: Header (grabber + title + •••)
@@ -189,9 +195,12 @@ struct ChatSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
             }
-            // Dragging the conversation dismisses the keyboard. (No tap gesture here —
-            // it would swallow citation-link taps; the empty state handles tap-dismiss.)
-            .scrollDismissesKeyboard(.interactively)
+            // Any scroll drag dismisses the keyboard (in either direction — scrolling up
+            // to read history dismisses too, not only dragging down toward the keyboard).
+            .scrollDismissesKeyboard(.immediately)
+            // Tapping the conversation also dismisses. A *simultaneous* tap gesture fires
+            // alongside citation-link taps rather than swallowing them, so links still work.
+            .simultaneousGesture(TapGesture().onEnded { Self.dismissKeyboard() })
             .onChange(of: session.turns.count) { _, _ in
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
@@ -507,11 +516,15 @@ private struct ComposerHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
+
+
 private struct ComposerView: View {
     @Binding var draft: String
     @Binding var mentioned: [String]
     let isBusy: Bool
     let vaultURL: URL
+    /// Max height the text input grows to before it scrolls (≈ half the sheet).
+    let maxInputHeight: CGFloat
     let onSend: () -> Void
     let onAttach: () -> Void
 
@@ -580,34 +593,46 @@ private struct ComposerView: View {
                     }
                 }
             }
-            HStack(spacing: 10) {
-                Button(action: onAttach) {
-                    Image(systemName: "plus").font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(NotoChatTokens.ink).frame(width: 28, height: 28)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("composer.attach")
-
+            VStack(alignment: .leading, spacing: 8) {
+                // Text input on top — grows with the prompt and, once it reaches
+                // ~half the sheet, caps there and scrolls internally (native
+                // TextField behavior), so long prompts stay fully editable while
+                // the +/send row below stays pinned. The line cap is derived from
+                // half the sheet height (≈22pt/line).
                 TextField("Ask anything…", text: $draft, axis: .vertical)
                     .textFieldStyle(.plain)
                     .foregroundStyle(NotoChatTokens.ink)
-                    .lineLimit(1...5)
+                    .font(.body)
+                    .lineLimit(1...max(3, Int(maxInputHeight / 22)))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("composer.field")
 
-                Button(action: onSend) {
-                    Image(systemName: "arrow.up").font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.white).frame(width: 32, height: 32)
-                        .background(NotoChatTokens.accent, in: Circle())
-                        .contentShape(Circle())
+                // Second row: attach (+) on the left, send on the right.
+                HStack(spacing: 10) {
+                    Button(action: onAttach) {
+                        Image(systemName: "plus").font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(NotoChatTokens.ink).frame(width: 28, height: 28)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("composer.attach")
+
+                    Spacer(minLength: 0)
+
+                    Button(action: onSend) {
+                        Image(systemName: "arrow.up").font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.white).frame(width: 32, height: 32)
+                            .background(NotoChatTokens.accent, in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isBusy)
+                    .opacity(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isBusy ? 0.4 : 1)
+                    .accessibilityIdentifier("composer.send")
                 }
-                .buttonStyle(.plain)
-                .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isBusy)
-                .opacity(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isBusy ? 0.4 : 1)
-                .accessibilityIdentifier("composer.send")
             }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(NotoChatTokens.pill, in: Capsule())
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(NotoChatTokens.pill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
         .accessibilityIdentifier("composer")
