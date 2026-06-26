@@ -31,8 +31,9 @@ struct ChatSheet: View {
     private var vaultURL: URL { session.vaultURL }
 
     var body: some View {
-        // The GeometryReader ignores the keyboard so its height is the full
-        // screen; the composer input caps at half of it (≈ half the screen).
+        // GeometryReader height shrinks when the keyboard is visible (respects
+        // safe area); maxInputHeight is derived from the remaining space, which
+        // is fine — the composer caps a bit shorter while the keyboard is up.
         GeometryReader { geo in
         ZStack {
             NotoChatTokens.bg.ignoresSafeArea()
@@ -95,7 +96,6 @@ struct ChatSheet: View {
             Button("Cancel", role: .cancel) {}
         }
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     // MARK: Header (grabber + title + •••)
