@@ -17,6 +17,7 @@ struct SettingsView: View {
     @ObservedObject private var indexStatus = SearchIndexStatusModel.shared
     @State private var openRouterKeyInput = ""
     @State private var openRouterKeySaved = OpenRouterKeyStore.hasKey
+    @State private var openRouterBaseURLInput = OpenRouterBaseURLStore.load() ?? ""
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -168,6 +169,41 @@ struct SettingsView: View {
                 Text(openRouterKeySaved
                      ? "An OpenRouter API key is stored in your Keychain. Chat is enabled."
                      : "Add your OpenRouter API key to chat with your notes. Stored only in your device Keychain.")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryText)
+            }
+
+            Section {
+                #if os(iOS)
+                TextField("https://openrouter.ai/api/v1", text: $openRouterBaseURLInput)
+                    .textContentType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .accessibilityIdentifier("settings.openRouterBaseURL")
+                #else
+                TextField("https://openrouter.ai/api/v1", text: $openRouterBaseURLInput)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("settings.openRouterBaseURL")
+                #endif
+                HStack {
+                    Button("Save base URL") {
+                        OpenRouterBaseURLStore.save(openRouterBaseURLInput)
+                        openRouterBaseURLInput = OpenRouterBaseURLStore.load() ?? ""
+                    }
+                    .accessibilityIdentifier("settings.saveOpenRouterBaseURL")
+                    if OpenRouterBaseURLStore.hasOverride {
+                        Spacer()
+                        Button("Reset", role: .destructive) {
+                            OpenRouterBaseURLStore.clear()
+                            openRouterBaseURLInput = ""
+                        }
+                    }
+                }
+            } header: {
+                Text("Advanced")
+            } footer: {
+                Text("Optional. Route AI chat through a proxy that fronts OpenRouter — useful if your network or region blocks openrouter.ai and chat only works on a VPN. Leave blank to use OpenRouter directly.")
                     .font(.caption)
                     .foregroundStyle(AppTheme.secondaryText)
             }

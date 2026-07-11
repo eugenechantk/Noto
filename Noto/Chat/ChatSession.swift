@@ -145,6 +145,7 @@ final class ChatSession: ObservableObject {
     init(apiKey: String, vaultURL: URL) {
         let client = OpenRouterClient(configuration: .init(
             apiKey: apiKey,
+            baseURL: OpenRouterBaseURLStore.resolved(),
             referer: "https://noto.app",
             title: "Noto"
         ))
@@ -630,11 +631,34 @@ final class ChatSession: ObservableObject {
     private static func friendly(_ error: Error) -> String {
         if let llm = error as? LLMError {
             switch llm {
-            case .missingAPIKey: return "Add your OpenRouter API key in Settings to chat."
-            default: return "Something went wrong. Please try again."
+            case .missingAPIKey:
+                return "Add your OpenRouter API key in Settings to chat."
+            case let .http(status, body):
+                // 403 with no/HTML body from a region-blocked edge (e.g. Cloudflare
+                // refusing Hong Kong-origin requests) is the most common "needs VPN" case.
+                if status == 403 {
+                    return "OpenRouter refused the request (HTTP 403). This usually means your network/region is blocked at OpenRouter's edge. Try a VPN, or set a custom OpenRouter base URL (proxy) in Settings.\n\n\(Self.snippet(body))"
+                }
+                return "OpenRouter returned HTTP \(status).\n\n\(Self.snippet(body))"
+            case .emptyResponse:
+                return "OpenRouter returned an empty response. Please try again."
+            case let .decoding(detail):
+                return "Couldn't read OpenRouter's response. \(Self.snippet(detail))"
             }
         }
-        return "Something went wrong. Please try again."
+        // URLError (no route, timeout, DNS) — typical when the carrier's path to
+        // openrouter.ai is blocked and only a VPN gets through.
+        if let url = error as? URLError {
+            return "Network error reaching OpenRouter (\(url.code.rawValue): \(url.localizedDescription)). If this only works on a VPN, your network is blocking openrouter.ai."
+        }
+        return "Something went wrong: \(error.localizedDescription)"
+    }
+
+    /// Trim a response/error body to a readable one-liner for the chat error bubble.
+    private static func snippet(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        return trimmed.count > 300 ? String(trimmed.prefix(300)) + "…" : trimmed
     }
 }
 
