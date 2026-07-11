@@ -42,7 +42,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		58A1D0018A1D001000000005 /* Config/ReadwiseSecrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/ReadwiseSecrets.xcconfig; sourceTree = "<group>"; };
+		58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/ReadwiseSecrets.xcconfig; sourceTree = "<group>"; };
 		5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = file; path = Noto.xctestplan; sourceTree = "<group>"; };
 		5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = NotoIcon.icon; sourceTree = "<group>"; };
 		5DE568F42F80191200EC8657 /* NotoMacOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoMacOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -64,11 +64,15 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5DE568F52F80191200EC8657 /* NotoMacOSUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = NotoMacOSUITests;
 			sourceTree = "<group>";
 		};
 		5DE569042F80191F00EC8657 /* NotoiOSUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = NotoiOSUITests;
 			sourceTree = "<group>";
 		};
@@ -82,6 +86,8 @@
 		};
 		5DF5FB112F0EC373008EDC76 /* NotoTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = NotoTests;
 			sourceTree = "<group>";
 		};
@@ -129,7 +135,7 @@
 		5DF5FAF52F0EC372008EDC76 = {
 			isa = PBXGroup;
 			children = (
-				58A1D0018A1D001000000005 /* Config/ReadwiseSecrets.xcconfig */,
+				58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */,
 				5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */,
 				5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */,
 				5DF5FB002F0EC372008EDC76 /* Noto */,
@@ -171,8 +177,6 @@
 				5DE568F52F80191200EC8657 /* NotoMacOSUITests */,
 			);
 			name = NotoMacOSUITests;
-			packageProductDependencies = (
-			);
 			productName = NotoMacOSUITests;
 			productReference = 5DE568F42F80191200EC8657 /* NotoMacOSUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -194,8 +198,6 @@
 				5DE569042F80191F00EC8657 /* NotoiOSUITests */,
 			);
 			name = NotoiOSUITests;
-			packageProductDependencies = (
-			);
 			productName = NotoiOSUITests;
 			productReference = 5DE569032F80191F00EC8657 /* NotoiOSUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -207,7 +209,7 @@
 				5DF5FAFA2F0EC372008EDC76 /* Sources */,
 				5DF5FAFB2F0EC372008EDC76 /* Frameworks */,
 				5DF5FAFC2F0EC372008EDC76 /* Resources */,
-				58A1D0018A1D001000000006 /* Generate Readwise Secrets */,
+				58A1D0018A1D001000000006 /* Generate Secrets */,
 			);
 			buildRules = (
 			);
@@ -290,11 +292,11 @@
 			mainGroup = 5DF5FAF52F0EC372008EDC76;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				AABB000B000000000000000B /* XCLocalSwiftPackageReference "Packages/NotoVault" */,
-				5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "Packages/NotoReadwiseSync" */,
-				DD2E424822EC2E30DB9B7950 /* XCLocalSwiftPackageReference "Packages/NotoSearch" */,
-				58A1D0018A1D00100000000A /* XCLocalSwiftPackageReference "Packages/NotoChat" */,
-				58A1D0018A1D00100000000D /* XCLocalSwiftPackageReference "Packages/NotoEmbedding" */,
+				AABB000B000000000000000B /* XCLocalSwiftPackageReference "NotoVault" */,
+				5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "NotoReadwiseSync" */,
+				DD2E424822EC2E30DB9B7950 /* XCLocalSwiftPackageReference "NotoSearch" */,
+				58A1D0018A1D00100000000A /* XCLocalSwiftPackageReference "NotoChat" */,
+				58A1D0018A1D00100000000D /* XCLocalSwiftPackageReference "NotoEmbedding" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DF5FAFF2F0EC372008EDC76 /* Products */;
@@ -342,7 +344,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		58A1D0018A1D001000000006 /* Generate Readwise Secrets */ = {
+		58A1D0018A1D001000000006 /* Generate Secrets */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -620,12 +622,13 @@
 		};
 		5DF5FB232F0EC373008EDC76 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 58A1D0018A1D001000000005 /* Config/ReadwiseSecrets.xcconfig */;
+			baseConfigurationReference = 58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = NotoIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Noto/Noto.entitlements;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 202606110016;
 				DEVELOPMENT_TEAM = 39GJBP8V5A;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -653,6 +656,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.Noto;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.eugenechan.Noto";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
@@ -665,12 +669,13 @@
 		};
 		5DF5FB242F0EC373008EDC76 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 58A1D0018A1D001000000005 /* Config/ReadwiseSecrets.xcconfig */;
+			baseConfigurationReference = 58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = NotoIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Noto/Noto.entitlements;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 202606110016;
 				DEVELOPMENT_TEAM = 39GJBP8V5A;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -698,6 +703,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.Noto;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.eugenechan.Noto";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
@@ -805,25 +811,25 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "Packages/NotoReadwiseSync" */ = {
+		5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "NotoReadwiseSync" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoReadwiseSync;
 		};
-		AABB000B000000000000000B /* XCLocalSwiftPackageReference "Packages/NotoVault" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/NotoVault;
-		};
-		DD2E424822EC2E30DB9B7950 /* XCLocalSwiftPackageReference "Packages/NotoSearch" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/NotoSearch;
-		};
-		58A1D0018A1D00100000000A /* XCLocalSwiftPackageReference "Packages/NotoChat" */ = {
+		58A1D0018A1D00100000000A /* XCLocalSwiftPackageReference "NotoChat" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoChat;
 		};
-		58A1D0018A1D00100000000D /* XCLocalSwiftPackageReference "Packages/NotoEmbedding" */ = {
+		58A1D0018A1D00100000000D /* XCLocalSwiftPackageReference "NotoEmbedding" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoEmbedding;
+		};
+		AABB000B000000000000000B /* XCLocalSwiftPackageReference "NotoVault" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoVault;
+		};
+		DD2E424822EC2E30DB9B7950 /* XCLocalSwiftPackageReference "NotoSearch" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoSearch;
 		};
 /* End XCLocalSwiftPackageReference section */
 

@@ -19,7 +19,8 @@ DerivedData/
 Secrets.swift
 Config/LocalSecrets.xcconfig
 fastlane/*.p8
-fastlane/.env*
+# fastlane/.env is committed non-secret per-app config; secrets live in .env.default/.env.local
+fastlane/.env.*
 fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/

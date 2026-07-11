@@ -23,13 +23,21 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 Verify the App Store Connect app record exists
 
+### ios create_app_record
+
+```sh
+[bundle exec] fastlane ios create_app_record
+```
+
+Register the App ID and create the App Store Connect app record (headless, API-key only)
+
 ### ios bootstrap_match
 
 ```sh
 [bundle exec] fastlane ios bootstrap_match
 ```
 
-Create or refresh App Store signing assets in the match repository
+Create or refresh App Store signing assets in the shared match repo (run once per app)
 
 ### ios deploy_testflight
 
@@ -38,6 +46,14 @@ Create or refresh App Store signing assets in the match repository
 ```
 
 Build a signed Release archive and upload it to TestFlight
+
+### ios beta
+
+```sh
+[bundle exec] fastlane ios beta
+```
+
+Alias for deploy_testflight
 
 ----
 

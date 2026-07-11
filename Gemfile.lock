@@ -234,10 +234,8 @@ PLATFORMS
   x86_64-darwin
 
 DEPENDENCIES
-  fastlane (~> 2.228)
-
-RUBY VERSION
-   ruby 3.2.7p253
+  fastlane
+  xcodeproj
 
 BUNDLED WITH
    2.4.19
