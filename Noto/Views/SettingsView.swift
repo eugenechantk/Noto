@@ -1,4 +1,5 @@
 import NotoSearch
+import NotoTags
 import SwiftUI
 import os.log
 
@@ -18,7 +19,9 @@ struct SettingsView: View {
     @State private var openRouterKeyInput = ""
     @State private var openRouterKeySaved = OpenRouterKeyStore.hasKey
     @State private var openRouterBaseURLInput = OpenRouterBaseURLStore.load() ?? ""
+    @State private var editingTag: TagDefinition?
     @Environment(\.dismiss) private var dismiss
+    @Environment(TagController.self) private var tagController: TagController?
 
     var body: some View {
         List {
@@ -43,6 +46,44 @@ struct SettingsView: View {
                 Text("Storage")
             } footer: {
                 Text("Changing your vault returns you to the welcome screen where you can create or open a different vault.")
+            }
+
+            if let tagController {
+                Section {
+                    let definitions = tagController.registry.allDefinitions()
+                    if definitions.isEmpty {
+                        Text("No tags yet — add tags to a note to see them here.")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.secondaryText)
+                    } else {
+                        ForEach(definitions) { definition in
+                            Button {
+                                editingTag = definition
+                            } label: {
+                                HStack {
+                                    Label("#\(definition.name.rawValue)", systemImage: "tag")
+                                        .foregroundStyle(AppTheme.primaryText)
+                                    Spacer()
+                                    Text("\(tagController.count(for: definition.name)) notes")
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.secondaryText)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.secondaryText)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("tag_row_\(definition.name.rawValue)")
+                        }
+                    }
+                } header: {
+                    Text("Tags")
+                }
+                .accessibilityIdentifier("settings_tags_section")
+                .sheet(item: $editingTag) { definition in
+                    TagDetailSheet(tagDefinition: definition, tagController: tagController)
+                }
             }
 
             Section {

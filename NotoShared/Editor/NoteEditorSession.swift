@@ -1,4 +1,5 @@
 import Foundation
+import NotoVault
 import os.log
 
 private let sessionLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "NoteEditorSession")
@@ -55,10 +56,12 @@ final class NoteEditorSession {
     /// for the incoming note (or marks it unloaded if no cache hit).
     func switchTo(note newNote: MarkdownNote, store newStore: MarkdownNoteStore, isNew newIsNew: Bool) {
         guard newNote.id != note.id else {
+            DebugTrace.record("session switchTo same-id id=\(note.id) file=\(newNote.fileURL.lastPathComponent) oldFile=\(note.fileURL.lastPathComponent)")
             store = newStore
             isNew = newIsNew
             return
         }
+        DebugTrace.record("session switchTo new-id old=\(note.id) new=\(newNote.id) file=\(newNote.fileURL.lastPathComponent)")
         persistFinalSnapshotIfNeeded(isExternallyDeleting: false)
         renameTask?.cancel()
         autosaveTask?.cancel()
@@ -72,11 +75,13 @@ final class NoteEditorSession {
         note = newNote
 
         if let cached = NoteContentCache.get(newNote.id) {
+            DebugTrace.record("session switchTo cache-hit id=\(newNote.id) \(DebugTrace.textSummary(cached))")
             content = cached
             latestEditorText = cached
             lastPersistedText = cached
             hasLoaded = true
         } else {
+            DebugTrace.record("session switchTo cache-miss id=\(newNote.id)")
             content = ""
             latestEditorText = ""
             lastPersistedText = ""
@@ -345,45 +350,56 @@ private extension NoteEditorSession {
         case needsDownload
     }
 
+    /// How long the "just try reading it" probe may block before we assume the file
+    /// still has to come down from iCloud. A materialized file reads in well under a
+    /// millisecond; a `dataless` one blocks in the kernel until the file provider
+    /// materializes it, which can take minutes or never finish.
+    static let probeReadTimeout: TimeInterval = 2
+
+    /// Per-attempt budget while polling for a file we asked iCloud to download. Each
+    /// poll must be bounded too — otherwise the very first one blocks past the overall
+    /// download deadline and the poll loop never gets to give up.
+    static let downloadPollReadTimeout: TimeInterval = 3
+
+    static let downloadDeadline: TimeInterval = 30
+
     static nonisolated func loadReadableContent(from fileURL: URL) async -> ContentLoadProbe {
-        let task = Task<ContentLoadProbe, Never>.detached(priority: .userInitiated) {
-            // In security-scoped iCloud folders, ubiquitous metadata can lag
-            // behind actual file availability. Prefer a real read first.
-            if let readableContent = CoordinatedFileManager.readString(from: fileURL) {
-                return ContentLoadProbe.readable(readableContent)
-            }
+        // In security-scoped iCloud folders, ubiquitous metadata can lag behind actual
+        // file availability, so prefer a real read over `isDownloaded` — but bound it,
+        // because on an evicted file that read never returns.
+        switch await BoundedFileRead.run(timeout: probeReadTimeout, work: {
+            CoordinatedFileManager.readString(from: fileURL)
+        }) {
+        case .value(let readableContent):
+            return .readable(readableContent)
+        case .timedOut:
+            // Blocked in the kernel — the file is not locally available whatever the
+            // metadata claims. Treat it as needing a download so the UI can say so.
+            return .needsDownload
+        case .failed:
             return CoordinatedFileManager.isDownloaded(at: fileURL)
-                ? ContentLoadProbe.unreadableCurrent
-                : ContentLoadProbe.needsDownload
-        }
-        return await withTaskCancellationHandler {
-            await task.value
-        } onCancel: {
-            task.cancel()
+                ? .unreadableCurrent
+                : .needsDownload
         }
     }
 
     static nonisolated func downloadReadableContent(from fileURL: URL) async -> String? {
-        let task = Task<String?, Never>.detached(priority: .userInitiated) {
-            CoordinatedFileManager.startDownloading(at: fileURL)
-            let deadline = Date().addingTimeInterval(30)
+        CoordinatedFileManager.startDownloading(at: fileURL)
+        let deadline = Date().addingTimeInterval(downloadDeadline)
 
-            while Date() <= deadline {
-                if Task.isCancelled { return nil }
+        while Date() <= deadline {
+            if Task.isCancelled { return nil }
 
-                if let readableContent = CoordinatedFileManager.readString(from: fileURL) {
-                    return readableContent
-                }
-
-                try? await Task.sleep(for: .milliseconds(500))
+            if case .value(let readableContent) = await BoundedFileRead.run(
+                timeout: downloadPollReadTimeout,
+                work: { CoordinatedFileManager.readString(from: fileURL) }
+            ) {
+                return readableContent
             }
 
-            return nil
+            try? await Task.sleep(for: .milliseconds(500))
         }
-        return await withTaskCancellationHandler {
-            await task.value
-        } onCancel: {
-            task.cancel()
-        }
+
+        return nil
     }
 }

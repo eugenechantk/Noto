@@ -60,6 +60,41 @@ struct NotoDeepLinkTests {
         #expect(router.pendingDocumentPath == nil)
     }
 
+    @MainActor
+    @Test("Router accepts Universal Link URLs and routes them to the same document path")
+    func routerAcceptsUniversalLinkURLs() throws {
+        let router = NotoDeepLinkRouter()
+        let webURL = try #require(URL(string: "https://noto.eugenechantk.me/open#path=Captures%2FArticle.md"))
+
+        #expect(router.open(webURL))
+        #expect(router.pendingDocumentPath == "Captures/Article.md")
+    }
+
+    @MainActor
+    @Test("Router ignores look-alike hosts and unsafe Universal Link payloads")
+    func routerIgnoresForeignOrUnsafeUniversalLinks() throws {
+        let router = NotoDeepLinkRouter()
+        let rejected = [
+            "https://noto.eugenechantk.me.evil.com/open#path=Captures%2FA.md",
+            "https://eugenechantk.me/open#path=Captures%2FA.md",
+            "https://noto.eugenechantk.me/open#path=..%2FSecrets.md",
+            "https://noto.eugenechantk.me/",
+        ]
+
+        for raw in rejected {
+            let url = try #require(URL(string: raw))
+            #expect(!router.open(url), "Expected to reject \(raw)")
+            #expect(router.pendingDocumentPath == nil)
+        }
+    }
+
+    @Test("Universal Link host matches the applinks domain the app claims")
+    func universalLinkHostMatchesEntitlementDomain() {
+        // Pinned so a host rename cannot silently drift from Noto.entitlements'
+        // `applinks:` entry, which is what actually authorises the association.
+        #expect(NotoDeepLink.webHost == "noto.eugenechantk.me")
+    }
+
     @Test("App Info plist registers the noto URL scheme")
     func appInfoPlistRegistersNotoURLScheme() throws {
         let urlTypes = try #require(Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]])

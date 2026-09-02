@@ -239,6 +239,12 @@ struct NoteEditorScreen: View {
             }
         }
         .task(id: note.id) {
+            // This task can restart BEFORE .onChange(of: note) has switched the
+            // session (observed ordering on macOS). Switch here so the load
+            // decision always sees the incoming note; switchTo is a no-op when
+            // the session already matches.
+            DebugTrace.record("editor task fired noteID=\(note.id) sessionID=\(session.note.id) hasLoaded=\(session.hasLoaded)")
+            session.switchTo(note: note, store: store, isNew: isNew)
             guard !session.hasLoaded else { return }
             await session.loadNoteContent()
         }

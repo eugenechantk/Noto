@@ -156,6 +156,25 @@ struct MarkdownImageLink: Equatable {
     }
 }
 
+enum MarkdownBlockMarker {
+    private static let markers = ["> ", "- ", "* ", "+ "]
+    /// Nesting depth we bother to unwrap — `> - ![](url)` happens, deeper does not.
+    private static let maxDepth = 3
+
+    /// Drops leading blockquote/list markers. Returns nil when there was nothing to
+    /// drop, so callers can tell "unwrapped" apart from "already bare".
+    static func stripping(from text: String) -> String? {
+        var result = text
+        var depth = 0
+        while depth < maxDepth,
+              let marker = markers.first(where: { result.hasPrefix($0) }) {
+            result = String(result.dropFirst(marker.count))
+            depth += 1
+        }
+        return depth > 0 ? result : nil
+    }
+}
+
 enum MarkdownImageLinkParser {
     // URL part is `[^)]+` (not `[^)\s]+`): local attachment paths routinely contain
     // spaces (e.g. `![](attachments/Pasted image 20260610.png)`) and must still
@@ -194,28 +213,46 @@ enum MarkdownImageLinkParser {
             }
         }
 
-        // Fallback: any `[anything](url)` whose url looks like an image — handles
-        // nested patterns like `[![](thumb-url)](full-url)` where the outer link
-        // target is the rendered image. Require URL to actually construct as a
-        // schemed URL so unrenderable links fall back to text rather than
-        // showing as gray image-block placeholders.
-        if let (altText, urlString) = extractBalancedLinkParts(from: trimmed),
-           looksLikeImageURL(urlString),
-           URL(string: urlString)?.scheme != nil {
-            return MarkdownImageLink(urlString: urlString, altText: altText)
+        // Fallback: a balanced-bracket parse, which handles the two shapes the anchored
+        // regex above gives up on — nested brackets in the alt text
+        // (`[![](thumb-url)](full-url)`, where the outer link target is the rendered
+        // image) and nested parentheses in the URL
+        // (`![Badge](https://…/DMG_(Apple_Silicon)-000?style=…)`).
+        //
+        // An explicit `!` prefix is the author declaring "this is an image", so trust it
+        // exactly as the regex path does — badge and CDN URLs routinely carry no file
+        // extension. Without the prefix we still require an image-looking URL *and* a
+        // real scheme, so ordinary links fall back to text rather than showing as gray
+        // image-block placeholders.
+        if let parts = extractBalancedLinkParts(from: trimmed) {
+            if parts.isImage {
+                return MarkdownImageLink(urlString: parts.url, altText: parts.alt)
+            }
+            if looksLikeImageURL(parts.url), URL(string: parts.url)?.scheme != nil {
+                return MarkdownImageLink(urlString: parts.url, altText: parts.alt)
+            }
         }
 
         return nil
     }
 
-    /// Extracts `[alt](url)` parts allowing balanced brackets inside `alt`.
-    /// Returns nil if the entire trimmed text is not a single link expression.
-    private static func extractBalancedLinkParts(from text: String) -> (alt: String, url: String)? {
-        guard text.hasPrefix("[") else { return nil }
+    /// Extracts `[alt](url)` / `![alt](url)` parts allowing balanced brackets inside
+    /// `alt` and balanced parentheses inside `url`. Returns nil if the entire trimmed
+    /// text is not a single link expression.
+    private static func extractBalancedLinkParts(
+        from text: String
+    ) -> (alt: String, url: String, isImage: Bool)? {
+        var linkStart = text.startIndex
+        var isImage = false
+        if text.hasPrefix("!") {
+            isImage = true
+            linkStart = text.index(after: text.startIndex)
+        }
+        guard text[linkStart...].hasPrefix("[") else { return nil }
 
         var depth = 0
         var altEnd: String.Index?
-        var idx = text.startIndex
+        var idx = linkStart
         while idx < text.endIndex {
             switch text[idx] {
             case "[": depth += 1
@@ -258,7 +295,7 @@ enum MarkdownImageLinkParser {
             guard trailing.allSatisfy(\.isWhitespace) else { return nil }
         }
 
-        let altStart = text.index(after: text.startIndex)
+        let altStart = text.index(after: linkStart)
         let altText = String(text[altStart..<altEndIdx])
 
         let urlStart = text.index(after: afterAlt)
@@ -268,7 +305,7 @@ enum MarkdownImageLinkParser {
         )
         guard !urlString.isEmpty else { return nil }
 
-        return (altText, urlString)
+        return (altText, urlString, isImage)
     }
 
     private static func strippingTitle(from urlString: String) -> String {
@@ -440,6 +477,14 @@ enum MarkdownBlockKind: Equatable {
         let stripped = String(text.dropFirst(indentCount))
 
         if let imageLink = MarkdownImageLinkParser.parse(from: stripped) {
+            return .imageLink(imageLink.resolving(relativeTo: vaultRootURL))
+        }
+
+        // A lone image behind a blockquote or list marker (`> ![](url)`, `- ![](url)`)
+        // is still just an image — web clippings produce these constantly. Render the
+        // picture and drop the marker instead of falling through to raw markdown text.
+        if let markerStripped = MarkdownBlockMarker.stripping(from: stripped),
+           let imageLink = MarkdownImageLinkParser.parse(from: markerStripped) {
             return .imageLink(imageLink.resolving(relativeTo: vaultRootURL))
         }
 
@@ -1404,49 +1449,9 @@ final class TodoMarkerButton: UIControl {
 
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
-
-        context.saveGState()
-        defer { context.restoreGState() }
-
-        let symbolRect = TodoMarkerGeometry.symbolRect(in: markerRectInBounds)
-        let uncheckedColor = MarkdownTheme.todoUncheckedColor.cgColor
-        let checkedFillColor = MarkdownTheme.todoCheckedFillColor.cgColor
-        let checkmarkColor = MarkdownTheme.todoCheckmarkColor.cgColor
-
-        if isChecked {
-            context.setFillColor(checkedFillColor)
-            context.fillEllipse(
-                in: symbolRect.insetBy(
-                    dx: MarkdownVisualSpec.todoCheckedVisibleInset,
-                    dy: MarkdownVisualSpec.todoCheckedVisibleInset
-                )
-            )
-        } else {
-            context.setStrokeColor(uncheckedColor)
-            context.setLineWidth(MarkdownVisualSpec.todoOutlineWidth)
-            context.strokeEllipse(
-                in: symbolRect.insetBy(
-                    dx: MarkdownVisualSpec.todoOutlineWidth / 2,
-                    dy: MarkdownVisualSpec.todoOutlineWidth / 2
-                )
-            )
-            return
-        }
-
-        let checkmarkRect = symbolRect.insetBy(
-            dx: MarkdownVisualSpec.todoCheckedVisibleInset,
-            dy: MarkdownVisualSpec.todoCheckedVisibleInset
-        )
-        let checkPath = CGMutablePath()
-        checkPath.move(to: CGPoint(x: checkmarkRect.minX + checkmarkRect.width * 0.26, y: checkmarkRect.midY))
-        checkPath.addLine(to: CGPoint(x: checkmarkRect.minX + checkmarkRect.width * 0.43, y: checkmarkRect.maxY - checkmarkRect.height * 0.30))
-        checkPath.addLine(to: CGPoint(x: checkmarkRect.maxX - checkmarkRect.width * 0.22, y: checkmarkRect.minY + checkmarkRect.height * 0.30))
-        context.addPath(checkPath)
-        context.setLineCap(.round)
-        context.setLineJoin(.round)
-        context.setStrokeColor(checkmarkColor)
-        context.setLineWidth(MarkdownVisualSpec.todoCheckmarkWidth)
-        context.strokePath()
+        // Shared with macOS via TodoMarkerRenderer — the glyph is described in exactly one
+        // place, so a change to the circle or checkmark reaches both platforms.
+        TodoMarkerRenderer.draw(in: context, markerRect: markerRectInBounds, isChecked: isChecked)
     }
 }
 #endif
@@ -1474,9 +1479,100 @@ enum XMLCollapseControlGeometry {
 
 // MARK: - TodoLayoutFragment
 
+/// Paints a todo marker into a `CGContext`.
+///
+/// Deliberately platform-neutral: `CGContext` and `CGMutablePath` are identical on iOS and
+/// macOS, so the glyph is described exactly once and both platforms render from this source.
+/// It previously lived inside `TodoMarkerButton` (a `UIControl`, so `#if os(iOS)`), which is
+/// why macOS reserved space for the marker but never drew one.
+enum TodoMarkerRenderer {
+    /// Draws the circle (and checkmark when checked) inside `markerRect`.
+    ///
+    /// `markerRect` is the hit-target rect from `TodoMarkerGeometry.markerRect`; the visible
+    /// symbol is inset from it via `TodoMarkerGeometry.symbolRect`.
+    static func draw(in context: CGContext, markerRect: CGRect, isChecked: Bool) {
+        context.saveGState()
+        defer { context.restoreGState() }
+
+        let symbolRect = TodoMarkerGeometry.symbolRect(in: markerRect)
+
+        guard isChecked else {
+            context.setStrokeColor(MarkdownTheme.todoUncheckedColor.cgColor)
+            context.setLineWidth(MarkdownVisualSpec.todoOutlineWidth)
+            context.strokeEllipse(
+                in: symbolRect.insetBy(
+                    dx: MarkdownVisualSpec.todoOutlineWidth / 2,
+                    dy: MarkdownVisualSpec.todoOutlineWidth / 2
+                )
+            )
+            return
+        }
+
+        let filledRect = symbolRect.insetBy(
+            dx: MarkdownVisualSpec.todoCheckedVisibleInset,
+            dy: MarkdownVisualSpec.todoCheckedVisibleInset
+        )
+        context.setFillColor(MarkdownTheme.todoCheckedFillColor.cgColor)
+        context.fillEllipse(in: filledRect)
+
+        let checkPath = CGMutablePath()
+        checkPath.move(to: CGPoint(x: filledRect.minX + filledRect.width * 0.26, y: filledRect.midY))
+        checkPath.addLine(to: CGPoint(x: filledRect.minX + filledRect.width * 0.43, y: filledRect.maxY - filledRect.height * 0.30))
+        checkPath.addLine(to: CGPoint(x: filledRect.maxX - filledRect.width * 0.22, y: filledRect.minY + filledRect.height * 0.30))
+        context.addPath(checkPath)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        context.setStrokeColor(MarkdownTheme.todoCheckmarkColor.cgColor)
+        context.setLineWidth(MarkdownVisualSpec.todoCheckmarkWidth)
+        context.strokePath()
+    }
+}
+
 final class TodoLayoutFragment: NSTextLayoutFragment {
+    /// Checked state read from the backing paragraph, so the fragment can draw its own marker.
+    var isChecked: Bool {
+        guard let paragraph = textElement as? MarkdownParagraph,
+              case .todo(let checked, _) = paragraph.blockKind else {
+            return false
+        }
+        return checked
+    }
+
+    /// Marker rect in **fragment-local** coordinates.
+    ///
+    /// The draw origin already sits at the paragraph's text inset, so local x = 0 *is* the
+    /// content leading edge — passing `todoTextStartOffset` here would count the indent twice
+    /// and park the circle on top of the first character.
+    ///
+    /// Anchored to the **first** line fragment rather than the fragment's midpoint, so a todo
+    /// that wraps keeps its marker beside the first line instead of drifting to the vertical
+    /// centre of the block.
+    var localMarkerRect: CGRect {
+        let lineMidY = textLineFragments.first?.typographicBounds.midY
+            ?? (layoutFragmentFrame.height / 2)
+        return TodoMarkerGeometry.markerRect(contentLeadingX: 0, lineMidY: lineMidY)
+    }
+
+    /// TextKit clips a fragment's drawing to this rect. The marker extends left of the text
+    /// origin, so without widening it the circle is computed correctly and then clipped away —
+    /// which is precisely how this looked like "no marker at all" on macOS.
+    override var renderingSurfaceBounds: CGRect {
+        super.renderingSurfaceBounds.union(localMarkerRect)
+    }
+
     override func draw(at point: CGPoint, in context: CGContext) {
         super.draw(at: point, in: context)
+
+        #if os(macOS)
+        // iOS draws the marker through `TodoMarkerButton`, which doubles as the tap target for
+        // toggling. macOS has no such overlay, so the fragment paints the marker itself —
+        // same geometry, same renderer, so the two platforms cannot drift apart visually.
+        TodoMarkerRenderer.draw(
+            in: context,
+            markerRect: localMarkerRect.offsetBy(dx: point.x, dy: point.y),
+            isChecked: isChecked
+        )
+        #endif
     }
 
     static func markerRect(
@@ -2177,6 +2273,14 @@ private final class EditorAccessoryView: UIView {
     // plane), the tint can only ever appear *behind* the keys, never over them.
     static let chromeTint = UIColor(hex: 0x1A1C22)
 
+    /// Docked style tints the keyboard-region backdrop (above). The floating pill
+    /// instead needs every host container CLEAR, or the pill sits on a visible
+    /// rectangular backdrop instead of floating.
+    var paintsKeyboardChrome = true
+    /// When set, reported as the accessory's intrinsic height (the floating pill
+    /// needs extra room for its bottom gap). nil keeps the historical 56.
+    var overrideIntrinsicHeight: CGFloat?
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         isOpaque = false
@@ -2186,7 +2290,7 @@ private final class EditorAccessoryView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var intrinsicContentSize: CGSize {
-        CGSize(width: UIView.noIntrinsicMetric, height: 56)
+        CGSize(width: UIView.noIntrinsicMetric, height: overrideIntrinsicHeight ?? 56)
     }
 
     override func didMoveToSuperview() {
@@ -2208,7 +2312,7 @@ private final class EditorAccessoryView: UIView {
         var view = superview
         while let currentView = view, currentView !== window {
             currentView.isOpaque = false
-            if currentView.bounds.height > 0, currentView.bounds.height <= keyboardRegionMaxHeight {
+            if paintsKeyboardChrome, currentView.bounds.height > 0, currentView.bounds.height <= keyboardRegionMaxHeight {
                 currentView.backgroundColor = EditorAccessoryView.chromeTint
             } else {
                 currentView.backgroundColor = .clear
@@ -2791,6 +2895,14 @@ private final class FrontmatterBlockView: UIView {
     }
 }
 
+/// How the keyboard accessory toolbar renders.
+/// `.docked` — Noto's v2 full-width #1A1C22 bar (default, unchanged).
+/// `.floating` — iOS 26 Liquid Glass pill floating above the keyboard (Noto 2).
+enum EditorKeyboardToolbarStyle {
+    case docked
+    case floating
+}
+
 struct TextKit2EditorView: UIViewControllerRepresentable {
     @Binding var text: String
     var documentID: String = ""
@@ -2808,6 +2920,23 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     var scrollRestorationID: String?
     var initialContentOffsetY: CGFloat?
     var onContentOffsetYChange: ((CGFloat) -> Void)?
+    var keyboardToolbarStyle: EditorKeyboardToolbarStyle = .docked
+    /// Paints the editor surface a custom color (e.g. a card) instead of
+    /// `NotoTheme.uiBackground`. iOS only; nil keeps the default.
+    var backgroundColorOverride: UIColor?
+    /// Disables scroll bounce so that when the content fits, vertical pans pass
+    /// through to enclosing SwiftUI gestures (the capture card's swipe-up).
+    var disablesScrollBounce = false
+    /// Overrides the document's top/bottom text insets (iOS). Unlike outer
+    /// padding, scrolled text still renders through this zone — pair with a
+    /// gradient mask for edge fades (the capture card).
+    var topTextInsetOverride: CGFloat?
+    var bottomTextInsetOverride: CGFloat?
+    /// Editor-managed placeholder shown while the document is empty. Toggled
+    /// synchronously in textViewDidChange — no SwiftUI mirror to fall out of
+    /// sync with (the capture card had typed text overlaying an overlay-based
+    /// placeholder when the debounced mirror missed a beat).
+    var placeholder: String?
 
     func makeCoordinator() -> TextKit2EditorCoordinator {
         TextKit2EditorCoordinator(text: $text, onTextChange: onTextChange, autoFocus: autoFocus)
@@ -2816,6 +2945,12 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> TextKit2EditorViewController {
         let vc = TextKit2EditorViewController()
         vc.coordinator = context.coordinator
+        vc.keyboardToolbarStyle = keyboardToolbarStyle
+        vc.backgroundColorOverride = backgroundColorOverride
+        vc.disablesScrollBounce = disablesScrollBounce
+        vc.topTextInsetOverride = topTextInsetOverride
+        vc.bottomTextInsetOverride = bottomTextInsetOverride
+        vc.placeholder = placeholder
         vc.vaultRootURL = vaultRootURL
         vc.onImportImageData = onImportImageData
         vc.pageMentionProvider = pageMentionProvider
@@ -2882,6 +3017,18 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     static let keyboardToolbarReadingGap: CGFloat = 24
 
     var coordinator: TextKit2EditorCoordinator?
+    /// Set before viewDidLoad (the accessory is built once there).
+    var keyboardToolbarStyle: EditorKeyboardToolbarStyle = .docked
+    /// Set before viewDidLoad. See TextKit2EditorView.backgroundColorOverride.
+    var backgroundColorOverride: UIColor?
+    /// Set before viewDidLoad. See TextKit2EditorView.disablesScrollBounce.
+    var disablesScrollBounce = false
+    /// Set before viewDidLoad. See TextKit2EditorView.topTextInsetOverride.
+    var topTextInsetOverride: CGFloat?
+    var bottomTextInsetOverride: CGFloat?
+    /// Set before viewDidLoad. See TextKit2EditorView.placeholder.
+    var placeholder: String?
+    private var placeholderLabel: UILabel?
     var vaultRootURL: URL? {
         didSet {
             markdownDelegate.vaultRootURL = vaultRootURL
@@ -2958,7 +3105,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = NotoTheme.uiBackground
+        view.backgroundColor = backgroundColorOverride ?? NotoTheme.uiBackground
 
         // UITextView uses TextKit 2 by default on iOS 16+.
         // We hook into its existing stack via delegates.
@@ -2978,18 +3125,20 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
         textView.font = MarkdownTheme.bodyFont
         textView.textColor = MarkdownTheme.bodyColor
-        textView.backgroundColor = NotoTheme.uiBackground
+        textView.backgroundColor = backgroundColorOverride ?? NotoTheme.uiBackground
         textView.tintColor = NotoTheme.uiAccent
         textView.textContainerInset = UIEdgeInsets(
-            top: editorTopTextInset,
+            top: topTextInsetOverride ?? editorTopTextInset,
             left: minimumHorizontalTextInset,
-            bottom: verticalTextInset,
+            bottom: bottomTextInsetOverride ?? verticalTextInset,
             right: minimumHorizontalTextInset
         )
         textView.smartDashesType = .no
         textView.keyboardDismissMode = .interactive
-        textView.alwaysBounceVertical = true
+        textView.alwaysBounceVertical = !disablesScrollBounce
+        textView.bounces = !disablesScrollBounce
         textView.inputAccessoryView = makeInputAccessoryView()
+        installPlaceholderIfNeeded()
         textView.accessibilityIdentifier = "note_editor"
         textView.delegate = self
         textView.linkTextAttributes = [
@@ -3137,6 +3286,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func applyText(_ markdown: String, preservingVisiblePosition: Bool = false) {
+        defer { refreshPlaceholderVisibility() }
         pendingEditorPublishTask?.cancel()
         pendingEditorPublishTask = nil
         let contentOffsetToRestore = preservingVisiblePosition ? textView.contentOffset : nil
@@ -3209,19 +3359,58 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func makeInputAccessoryView() -> UIView {
-        // v2 design (`NotoToolbarArticle`): full-width bar (#1A1C22) with a top
-        // hairline, a horizontally-scrolling rail of formatting icons, and a
-        // pinned "Done" (keyboard-dismiss) on the trailing edge behind a vertical
-        // hairline divider so it stays visible regardless of rail content.
-        let barHeight: CGFloat = 52
+        // Two styles share the same rail/done content:
+        // .docked — v2 design (`NotoToolbarArticle`): full-width bar (#1A1C22) with a
+        //   top hairline; the accessory chrome behind the keyboard is tinted to match.
+        // .floating — iOS 26 Liquid Glass: a rounded pill floating above the keyboard,
+        //   with all host chrome cleared so only the pill's glass is visible.
+        let floating = keyboardToolbarStyle == .floating
+        let barHeight: CGFloat = floating ? 60 : 52
         let toolbar = EditorAccessoryView(frame: CGRect(x: 0, y: 0, width: 0, height: barHeight))
-        toolbar.backgroundColor = UIColor(hex: 0x1A1C22)
+        toolbar.paintsKeyboardChrome = !floating
+        // Keep the docked bar's historical 56pt intrinsic height; only the floating
+        // pill declares its own (pill 44 + top 4 + bottom gap 12).
+        toolbar.overrideIntrinsicHeight = floating ? barHeight : nil
+        toolbar.backgroundColor = floating ? .clear : UIColor(hex: 0x1A1C22)
         toolbar.accessibilityIdentifier = "note_editor_toolbar"
 
-        let topHairline = UIView()
-        topHairline.translatesAutoresizingMaskIntoConstraints = false
-        topHairline.backgroundColor = UIColor.white.withAlphaComponent(0.10)
-        toolbar.addSubview(topHairline)
+        // The view the rail + pinned controls live in: the bar itself when docked,
+        // the glass pill's content view when floating.
+        let host: UIView
+        if floating {
+            let pill: UIVisualEffectView
+            if #available(iOS 26.0, *) {
+                let glass = UIGlassEffect()
+                glass.isInteractive = true
+                pill = UIVisualEffectView(effect: glass)
+            } else {
+                pill = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+            }
+            pill.translatesAutoresizingMaskIntoConstraints = false
+            pill.layer.cornerRadius = 22
+            pill.layer.cornerCurve = .continuous
+            pill.clipsToBounds = true
+            toolbar.addSubview(pill)
+            NSLayoutConstraint.activate([
+                pill.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor, constant: 12),
+                pill.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -12),
+                pill.topAnchor.constraint(equalTo: toolbar.topAnchor, constant: 4),
+                pill.heightAnchor.constraint(equalToConstant: 44),
+            ])
+            host = pill.contentView
+        } else {
+            let topHairline = UIView()
+            topHairline.translatesAutoresizingMaskIntoConstraints = false
+            topHairline.backgroundColor = UIColor.white.withAlphaComponent(0.10)
+            toolbar.addSubview(topHairline)
+            NSLayoutConstraint.activate([
+                topHairline.topAnchor.constraint(equalTo: toolbar.topAnchor),
+                topHairline.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
+                topHairline.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
+                topHairline.heightAnchor.constraint(equalToConstant: 0.5),
+            ])
+            host = toolbar
+        }
 
         let rail = UIScrollView()
         rail.translatesAutoresizingMaskIntoConstraints = false
@@ -3289,18 +3478,13 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         )
         pinned.addSubview(doneButton)
 
-        toolbar.addSubview(rail)
-        toolbar.addSubview(pinned)
+        host.addSubview(rail)
+        host.addSubview(pinned)
 
         NSLayoutConstraint.activate([
-            topHairline.topAnchor.constraint(equalTo: toolbar.topAnchor),
-            topHairline.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
-            topHairline.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
-            topHairline.heightAnchor.constraint(equalToConstant: 0.5),
-
-            rail.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
-            rail.topAnchor.constraint(equalTo: topHairline.bottomAnchor),
-            rail.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor),
+            rail.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: floating ? 4 : 0),
+            rail.topAnchor.constraint(equalTo: host.topAnchor, constant: floating ? 0 : 0.5),
+            rail.bottomAnchor.constraint(equalTo: host.bottomAnchor),
             rail.trailingAnchor.constraint(equalTo: pinned.leadingAnchor),
 
             railStack.leadingAnchor.constraint(equalTo: rail.contentLayoutGuide.leadingAnchor, constant: 8),
@@ -3309,9 +3493,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             railStack.bottomAnchor.constraint(equalTo: rail.contentLayoutGuide.bottomAnchor),
             railStack.heightAnchor.constraint(equalTo: rail.frameLayoutGuide.heightAnchor),
 
-            pinned.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
-            pinned.topAnchor.constraint(equalTo: topHairline.bottomAnchor),
-            pinned.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor),
+            pinned.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: floating ? -4 : 0),
+            pinned.topAnchor.constraint(equalTo: host.topAnchor, constant: floating ? 0 : 0.5),
+            pinned.bottomAnchor.constraint(equalTo: host.bottomAnchor),
 
             divider.leadingAnchor.constraint(equalTo: pinned.leadingAnchor),
             divider.topAnchor.constraint(equalTo: pinned.topAnchor, constant: 9),
@@ -4173,7 +4357,31 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         return false
     }
 
+    private func installPlaceholderIfNeeded() {
+        guard let placeholder, placeholderLabel == nil else { return }
+        let label = UILabel()
+        label.text = placeholder
+        label.font = MarkdownTheme.bodyFont
+        label.textColor = AppTheme.uiMutedText
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.isUserInteractionEnabled = false
+        label.accessibilityIdentifier = "capturePlaceholder"
+        textView.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: textView.topAnchor, constant: (topTextInsetOverride ?? 0)),
+            label.leadingAnchor.constraint(equalTo: textView.leadingAnchor, constant: minimumHorizontalTextInset + 5),
+        ])
+        placeholderLabel = label
+        refreshPlaceholderVisibility()
+    }
+
+    /// Synchronous with every text mutation — never lags the keyboard.
+    private func refreshPlaceholderVisibility() {
+        placeholderLabel?.isHidden = !(textView.text ?? "").isEmpty
+    }
+
     func textViewDidChange(_ textView: UITextView) {
+        refreshPlaceholderVisibility()
         let textStorageString = textView.textStorage.mutableString
         updateFrontmatterMetadata(for: textStorageString as String)
         _ = syncReadableWidthInsets()
@@ -4425,9 +4633,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             constrainsToReadableWidth: constrainsToReadableWidth
         )
         let targetTextContainerInset = UIEdgeInsets(
-            top: editorTopTextInset,
+            top: topTextInsetOverride ?? editorTopTextInset,
             left: horizontalTextInset,
-            bottom: verticalTextInset,
+            bottom: bottomTextInsetOverride ?? verticalTextInset,
             right: horizontalTextInset
         )
 
@@ -5989,18 +6197,25 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
         // while the text view is first responder, which the guard below would
         // otherwise block.
         if context.coordinator.lastDocumentID != documentID {
+            DebugTrace.record("mac updateVC doc-change doc=\(documentID.suffix(6)) \(DebugTrace.textSummary(text))")
             context.coordinator.lastDocumentID = documentID
             if vc.textView.string != text {
                 vc.loadText(text)
             }
             return
         }
-        guard !context.coordinator.isUpdatingText else { return }
+        guard !context.coordinator.isUpdatingText else {
+            DebugTrace.record("mac updateVC skip isUpdatingText doc=\(documentID.suffix(6))")
+            return
+        }
         guard text != context.coordinator.lastPublishedText else { return }
         let isFirstResponder = vc.textView.window?.firstResponder === vc.textView
         let currentText = vc.textView.string
         if currentText != text, !isFirstResponder || currentText.isEmpty {
+            DebugTrace.record("mac updateVC loadText doc=\(documentID.suffix(6)) fr=\(isFirstResponder) \(DebugTrace.textSummary(text))")
             vc.loadText(text)
+        } else if currentText != text {
+            DebugTrace.record("mac updateVC BLOCKED first-responder doc=\(documentID.suffix(6)) cur=\(DebugTrace.textSummary(currentText)) new=\(DebugTrace.textSummary(text))")
         }
     }
 }

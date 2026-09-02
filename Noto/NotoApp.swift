@@ -235,12 +235,22 @@ struct NotoApp: App {
         .windowToolbarStyle(.unified)
 
         Settings {
-            SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
-                .frame(minWidth: 400, minHeight: 200)
-                .environment(\.colorScheme, .dark)
-                .background(AppTheme.background)
-                .foregroundStyle(AppTheme.primaryText)
-                .tint(AppTheme.primaryText)
+            Group {
+                if let vaultURL = locationManager.vaultURL {
+                    SettingsWithTagController(
+                        locationManager: locationManager,
+                        readwiseSyncController: readwiseSyncController,
+                        vaultURL: vaultURL
+                    )
+                } else {
+                    SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
+                }
+            }
+            .frame(minWidth: 400, minHeight: 200)
+            .environment(\.colorScheme, .dark)
+            .background(AppTheme.background)
+            .foregroundStyle(AppTheme.primaryText)
+            .tint(AppTheme.primaryText)
         }
         #else
         WindowGroup(id: "main") {
@@ -279,6 +289,13 @@ struct NotoApp: App {
         .onOpenURL { url in
             deepLinkRouter.open(url)
         }
+        // Universal Links arrive as a browsing user activity rather than through onOpenURL on
+        // every launch path, so both entry points feed the same router. open(_:) validates and
+        // is idempotent, so a URL delivered twice routes once.
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            guard let url = activity.webpageURL else { return }
+            deepLinkRouter.open(url)
+        }
     }
 
     #if os(iOS)
@@ -293,6 +310,29 @@ struct NotoApp: App {
         UINavigationBar.appearance().compactAppearance = appearance
     }
     #endif
+}
+
+private struct SettingsWithTagController: View {
+    let locationManager: VaultLocationManager
+    let readwiseSyncController: ReadwiseSyncController
+    let vaultURL: URL
+    @State private var tagController: TagController
+
+    init(locationManager: VaultLocationManager, readwiseSyncController: ReadwiseSyncController, vaultURL: URL) {
+        self.locationManager = locationManager
+        self.readwiseSyncController = readwiseSyncController
+        self.vaultURL = vaultURL
+        _tagController = State(wrappedValue: TagController(vaultURL: vaultURL))
+    }
+
+    var body: some View {
+        SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
+            .environment(tagController)
+            .task {
+                tagController.load()
+                tagController.rebuildMembership()
+            }
+    }
 }
 
 @MainActor
@@ -382,6 +422,7 @@ struct MainAppView: View {
     @ObservedObject var deepLinkRouter: NotoDeepLinkRouter
     var initialDocumentLink: String?
     @State private var store: MarkdownNoteStore
+    @State private var tagController: TagController
     @State private var fileWatcher = VaultFileWatcher()
     @State private var dailyNotePrewarmer = DailyNotePrewarmer()
     // One AI-chat session shared across the whole workspace (list + pushed editor),
@@ -407,6 +448,7 @@ struct MainAppView: View {
             autoload: false,
             directoryLoader: VaultDirectoryLoader(noteMetadataStrategy: .fileOnly)
         ))
+        _tagController = State(wrappedValue: TagController(vaultURL: vaultURL))
     }
 
     var body: some View {
@@ -419,6 +461,7 @@ struct MainAppView: View {
             initialDocumentLink: initialDocumentLink
         )
             .environmentObject(chatStore)
+            .environment(tagController)
             // macOS: the window root extends full-height under the (material-hidden) toolbar,
             // so it must use the editor body color (#0E1116) — not the darker app bg (#0A0A0A)
             // — for the top bar to read as the same tint as the editor.
@@ -440,6 +483,8 @@ struct MainAppView: View {
                 // index via their direct path.
                 await SearchIndexController.shared.drainPendingQueue(vaultURL: vaultURL)
                 store.loadItemsInBackground()
+                tagController.load()
+                tagController.rebuildMembership()
                 dailyNotePrewarmer.start(vaultURL: vaultURL)
                 readwiseSyncController.refreshSavedTokenState()
                 readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
@@ -463,6 +508,7 @@ struct MainAppView: View {
             }
             .onChange(of: fileWatcher.changeCount) { _, _ in
                 store.loadItemsInBackground()
+                tagController.rebuildMembership()
                 let changedURL = fileWatcher.lastChangedFileURL
                 Task {
                     if let changedURL {

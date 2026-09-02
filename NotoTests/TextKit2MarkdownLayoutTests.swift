@@ -212,6 +212,39 @@ struct TextKit2MarkdownLayoutTests {
         #expect(url.query?.contains("Folder/Project%20Brief.md") == true)
     }
 
+    @Test("Wiki links style the path as an actionable document link")
+    func wikiLinksStylePathAsDocumentLink() throws {
+        let text = "[[media/page-name]]"
+        let attributed = MarkdownParagraphStyler.style(text: text, kind: .paragraph)
+        let url = try #require(attributed.attribute(.link, at: 3, effectiveRange: nil) as? URL)
+        let underline = try #require(attributed.attribute(.underlineStyle, at: 3, effectiveRange: nil) as? Int)
+        let syntaxColor = try #require(attributed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        let syntaxFont = try #require(attributed.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)
+        let lightTrait = UITraitCollection(userInterfaceStyle: .light)
+
+        #expect(url.scheme == "noto-document")
+        #expect(url.query?.contains("media/page-name.md") == true)
+        #expect(underline == NSUnderlineStyle.single.rawValue)
+        #expect(syntaxColor.resolvedColor(with: lightTrait) == UIColor.clear.resolvedColor(with: lightTrait))
+        #expect(abs(syntaxFont.pointSize - MarkdownVisualSpec.hyperlinkSyntaxVisualWidth) < 0.5)
+    }
+
+    @Test("Revealed wiki links show raw markdown without a link attribute")
+    func revealedWikiLinksShowRawMarkdown() throws {
+        let text = "[[media/page-name]]"
+        let attributed = MarkdownParagraphStyler.style(
+            text: text,
+            kind: .paragraph,
+            revealedHyperlinkRanges: [NSRange(location: 0, length: (text as NSString).length)]
+        )
+        let syntaxColor = try #require(attributed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        let pathLink = attributed.attribute(.link, at: 3, effectiveRange: nil)
+        let lightTrait = UITraitCollection(userInterfaceStyle: .light)
+
+        #expect(syntaxColor.resolvedColor(with: lightTrait) == AppTheme.uiMutedText.resolvedColor(with: lightTrait))
+        #expect(pathLink == nil)
+    }
+
     @Test("Markdown strikethrough styles per-line command output")
     func markdownStrikethroughStylesPerLineCommandOutput() throws {
         let attributed = MarkdownParagraphStyler.style(text: "~~Alpha~~", kind: .paragraph)
@@ -368,6 +401,105 @@ struct TextKit2MarkdownLayoutTests {
         }
 
         #expect(imageLink.urlString == "attachments/diagram final.png")
+    }
+
+    @Test("Image URLs with nested parentheses are detected")
+    func imageURLsWithNestedParenthesesAreDetected() {
+        // The anchored regex stops the URL at the first `)`, leaving trailing text and
+        // failing the `$` anchor — the balanced fallback has to carry these.
+        let text = "![Download](https://img.shields.io/badge/macOS-DMG_(Apple_Silicon)-000?style=flat)"
+        let kind = MarkdownBlockKind.detect(from: text)
+
+        guard case .imageLink(let imageLink) = kind else {
+            Issue.record("Expected image-link block kind")
+            return
+        }
+
+        #expect(imageLink.urlString == "https://img.shields.io/badge/macOS-DMG_(Apple_Silicon)-000?style=flat")
+        #expect(imageLink.altText == "Download")
+    }
+
+    @Test("Explicit ! prefix is trusted for URLs with no image file extension")
+    func explicitImagePrefixIsTrustedWithoutFileExtension() {
+        // Badge and CDN endpoints serve images from extension-less paths.
+        let text = "![Stars](https://img.shields.io/github/stars/owner/repo)"
+        let kind = MarkdownBlockKind.detect(from: text)
+
+        guard case .imageLink(let imageLink) = kind else {
+            Issue.record("Expected image-link block kind")
+            return
+        }
+
+        #expect(imageLink.urlString == "https://img.shields.io/github/stars/owner/repo")
+    }
+
+    @Test("Extension-less links without a ! prefix stay regular paragraphs")
+    func extensionlessLinksWithoutImagePrefixStayParagraphs() {
+        // Guards the loosened `!` rule from swallowing ordinary links.
+        let text = "[Read the docs](https://example.com/docs)"
+        let kind = MarkdownBlockKind.detect(from: text)
+
+        #expect(kind == .paragraph)
+    }
+
+    @Test("Images behind a blockquote marker are detected")
+    func imagesBehindBlockquoteMarkerAreDetected() {
+        let text = "> ![](https://pbs.twimg.com/media/example.png)"
+        let kind = MarkdownBlockKind.detect(from: text)
+
+        guard case .imageLink(let imageLink) = kind else {
+            Issue.record("Expected image-link block kind")
+            return
+        }
+
+        #expect(imageLink.urlString == "https://pbs.twimg.com/media/example.png")
+    }
+
+    @Test("Images behind a list marker are detected and resolve against the vault root")
+    func imagesBehindListMarkerAreDetected() throws {
+        let vaultRoot = URL(fileURLWithPath: "/tmp/Noto Vault")
+        let text = "- ![Diagram](.attachments/diagram.png)"
+        let kind = MarkdownBlockKind.detect(from: text, vaultRootURL: vaultRoot)
+
+        guard case .imageLink(let imageLink) = kind else {
+            Issue.record("Expected image-link block kind")
+            return
+        }
+
+        let url = try #require(imageLink.url)
+        #expect(url.path == "/tmp/Noto Vault/.attachments/diagram.png")
+    }
+
+    @Test("Nested blockquote-plus-list markers still yield an image")
+    func nestedBlockMarkersStillYieldAnImage() {
+        let text = "> - ![](https://example.com/nested.png)"
+        let kind = MarkdownBlockKind.detect(from: text)
+
+        guard case .imageLink = kind else {
+            Issue.record("Expected image-link block kind")
+            return
+        }
+    }
+
+    @Test("Todo markers are not mistaken for images by the marker-stripping path")
+    func todoMarkersSurviveMarkerStripping() {
+        // `- [ ] ` starts with a list marker and a bracket — it must stay a todo.
+        #expect(MarkdownBlockKind.detect(from: "- [ ] Buy milk") == .todo(checked: false, indent: 0))
+        #expect(MarkdownBlockKind.detect(from: "- [x] Done") == .todo(checked: true, indent: 0))
+    }
+
+    @Test("Ordinary bullets with links stay bullets")
+    func bulletsWithOrdinaryLinksStayBullets() {
+        // Marker stripping runs only for image detection; this must not become an image.
+        let text = "- [Clicked](https://apps.apple.com/us/app/clicked/id6761549035)"
+        let kind = MarkdownBlockKind.detect(from: text)
+
+        #expect(kind == .bullet(indent: 0))
+    }
+
+    @Test("Dividers are unaffected by marker stripping")
+    func dividersAreUnaffectedByMarkerStripping() {
+        #expect(MarkdownBlockKind.detect(from: "---") == .divider)
     }
 
     @Test("Image links reserve placeholder vertical preview space until dimensions are cached")
@@ -727,6 +859,29 @@ struct TextKit2MarkdownLayoutMacTests {
         #expect(revealedColor == AppTheme.nsPrimaryText)
     }
 
+    @Test("Web-clipping image shapes are detected and hide their backing markdown")
+    func webClippingImageShapesAreDetectedAndHidden() throws {
+        // The three shapes that dominate the `Captures/` clippings on macOS:
+        // a marker prefix, a nested-paren URL, and an extension-less badge URL.
+        let cases = [
+            "> ![](https://pbs.twimg.com/media/example.png)",
+            "- ![Diagram](https://example.com/diagram.png)",
+            "![Download](https://img.shields.io/badge/macOS-DMG_(Apple_Silicon)-000?style=flat)",
+            "![Stars](https://img.shields.io/github/stars/owner/repo)",
+        ]
+
+        for text in cases {
+            let kind = MarkdownBlockKind.detect(from: text)
+            guard case .imageLink = kind else {
+                Issue.record("Expected image-link block kind for \(text)")
+                continue
+            }
+            let attributed = MarkdownParagraphStyler.style(text: text, kind: kind)
+            let color = try #require(attributed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+            #expect(color == NSColor.clear, "Backing markdown should be hidden for \(text)")
+        }
+    }
+
     @Test("Empty todo prefix keeps trailing space at body size for insertion point height")
     func emptyTodoPrefixKeepsTrailingSpaceAtBodySizeForInsertionPointHeight() throws {
         let text = "- [ ] "
@@ -768,6 +923,37 @@ struct TextKit2MarkdownLayoutMacTests {
 
         #expect(url.scheme == "noto-document")
         #expect(url.query?.contains("Folder/Project%20Brief.md") == true)
+    }
+
+    @Test("Wiki links style the path as an actionable document link")
+    func wikiLinksStylePathAsDocumentLink() throws {
+        let text = "[[media/page-name]]"
+        let attributed = MarkdownParagraphStyler.style(text: text, kind: .paragraph)
+        let url = try #require(attributed.attribute(.link, at: 3, effectiveRange: nil) as? URL)
+        let underline = try #require(attributed.attribute(.underlineStyle, at: 3, effectiveRange: nil) as? Int)
+        let syntaxColor = try #require(attributed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+        let syntaxFont = try #require(attributed.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+
+        #expect(url.scheme == "noto-document")
+        #expect(url.query?.contains("media/page-name.md") == true)
+        #expect(underline == NSUnderlineStyle.single.rawValue)
+        #expect(syntaxColor == NSColor.clear)
+        #expect(abs(syntaxFont.pointSize - MarkdownVisualSpec.hyperlinkSyntaxVisualWidth) < 0.5)
+    }
+
+    @Test("Revealed wiki links show raw markdown without a link attribute")
+    func revealedWikiLinksShowRawMarkdown() throws {
+        let text = "[[media/page-name]]"
+        let attributed = MarkdownParagraphStyler.style(
+            text: text,
+            kind: .paragraph,
+            revealedHyperlinkRanges: [NSRange(location: 0, length: (text as NSString).length)]
+        )
+        let syntaxColor = try #require(attributed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+        let pathLink = attributed.attribute(.link, at: 3, effectiveRange: nil)
+
+        #expect(syntaxColor == AppTheme.nsMutedText)
+        #expect(pathLink == nil)
     }
 
     @Test("Markdown strikethrough styles per-line command output")

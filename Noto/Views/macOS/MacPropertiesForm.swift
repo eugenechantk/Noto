@@ -1,6 +1,7 @@
 #if os(macOS)
 import SwiftUI
 import NotoVault
+import NotoTags
 
 /// macOS-native Properties view, presented in a sheet by `NoteEditorScreen`. Unlike the
 /// iOS `PropertiesSheet` (an inset-grouped list with a modal graphical date picker — both
@@ -14,6 +15,7 @@ struct MacPropertiesForm: View {
     var onMoveFolder: (() -> Void)?
 
     @Environment(\.openURL) private var openURL
+    @Environment(TagController.self) private var tagController
 
     /// Pending text/url/tags edits, keyed by field key. Committed on submit or on close.
     @State private var drafts: [String: String] = [:]
@@ -230,7 +232,9 @@ struct MacPropertiesForm: View {
         let kind = NotePropertyClassifier.kind(key: key, value: fields.first { $0.key == key }?.value ?? "")
         if kind == .tags {
             let members = draft.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-            updateField(key, NotePropertyClassifier.serializeTags(members))
+            let previous = NotePropertyClassifier.parseTags(fields.first { $0.key == key }?.value ?? "")
+                .compactMap(TagName.init)
+            tagController.commitTags(members, previous: previous, frontmatterKey: key, session: session)
         } else {
             updateField(key, draft)
         }

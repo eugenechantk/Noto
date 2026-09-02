@@ -7,17 +7,40 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		260C4638209FCE498F36DC11 /* Noto2QuickCaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258D1BBCE132EE72D17CAB8E /* Noto2QuickCaptureIntent.swift */; };
 		58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */; };
 		58A1D0018A1D001000000002 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */; };
 		58A1D0018A1D001000000007 /* NotoSearch in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000008 /* NotoSearch */; };
 		58A1D0018A1D00100000000C /* NotoChat in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D00100000000B /* NotoChat */; };
 		58A1D0018A1D00100000000F /* NotoEmbedding in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D00100000000E /* NotoEmbedding */; };
 		5DB7BFB72F97BDEB0018E268 /* NotoIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */; };
+		5DF600000000000000000001 /* NotoTags in Frameworks */ = {isa = PBXBuildFile; productRef = 5DF600000000000000000002 /* NotoTags */; };
 		5DFAED8F2F5F135300F3DACD /* NotoVault in Frameworks */ = {isa = PBXBuildFile; productRef = CCDD000B000000000000000B /* NotoVault */; };
 		5DFAED902F5F135300F3DACD /* NotoVault in Frameworks */ = {isa = PBXBuildFile; productRef = EEFF000B000000000000000B /* NotoVault */; };
+		6835FFFD57E2EF429C10E5E9 /* Noto2QuickCaptureControl.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 58FDAF8F6C5503B565EF0598 /* Noto2QuickCaptureControl.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		89D532451D69C02D77D417C3 /* Noto2QuickCaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258D1BBCE132EE72D17CAB8E /* Noto2QuickCaptureIntent.swift */; };
+		A20000000000000000000030 /* NotoVault in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000020 /* NotoVault */; };
+		A20000000000000000000031 /* NotoTags in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000021 /* NotoTags */; };
+		A20000000000000000000032 /* NotoSearch in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000022 /* NotoSearch */; };
+		A20000000000000000000033 /* NotoChat in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000023 /* NotoChat */; };
+		A20000000000000000000034 /* NotoEmbedding in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000024 /* NotoEmbedding */; };
+		A20000000000000000000035 /* NotoDigest in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000025 /* NotoDigest */; };
+		A20000000000000000000051 /* NotoVault in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000050 /* NotoVault */; };
+		A20000000000000000000053 /* NotoSearch in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000052 /* NotoSearch */; };
+		A20000000000000000000055 /* NotoDigest in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000054 /* NotoDigest */; };
+		A20000000000000000000061 /* Noto2Icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000060 /* Noto2Icon.icon */; };
+		A2EBC6BDFFF520AC5DEEA865 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8CA0549E2D705A888D3673E4 /* Foundation.framework */; };
+		E35366682A4BD0316C8999B4 /* Noto2QuickCaptureControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C668640928AB37E2CA8673D /* Noto2QuickCaptureControl.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		40FD7D19E9BCC6B12BA6FBDE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5DF5FAF62F0EC372008EDC76 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C1B9129E154C7B9E50745334;
+			remoteInfo = Noto2QuickCaptureControl;
+		};
 		5DE568FA2F80191200EC8657 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5DF5FAF62F0EC372008EDC76 /* Project object */;
@@ -39,16 +62,45 @@
 			remoteGlobalIDString = 5DF5FAFD2F0EC372008EDC76;
 			remoteInfo = Noto;
 		};
+		A20000000000000000000048 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5DF5FAF62F0EC372008EDC76 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A20000000000000000000010;
+			remoteInfo = Noto2;
+		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		176A451EBDFC68CE7BE160BC /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				6835FFFD57E2EF429C10E5E9 /* Noto2QuickCaptureControl.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		258D1BBCE132EE72D17CAB8E /* Noto2QuickCaptureIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Noto2QuickCaptureIntent.swift; sourceTree = "<group>"; };
 		58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/ReadwiseSecrets.xcconfig; sourceTree = "<group>"; };
+		58FDAF8F6C5503B565EF0598 /* Noto2QuickCaptureControl.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; name = Noto2QuickCaptureControl.appex; path = Noto2QuickCaptureControl.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = file; path = Noto.xctestplan; sourceTree = "<group>"; };
 		5DB7BFB62F97BDEB0018E268 /* NotoIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = NotoIcon.icon; sourceTree = "<group>"; };
 		5DE568F42F80191200EC8657 /* NotoMacOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoMacOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5DE569032F80191F00EC8657 /* NotoiOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoiOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5DF5FAFE2F0EC372008EDC76 /* Noto.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Noto.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8CA0549E2D705A888D3673E4 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		9C668640928AB37E2CA8673D /* Noto2QuickCaptureControl.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Noto2QuickCaptureControl.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* Noto2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Noto2.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000041 /* Noto2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Noto2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000060 /* Noto2Icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Noto2Icon.icon; sourceTree = "<group>"; };
+		B5AF7FCAC9852FC23752A68C /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -58,6 +110,13 @@
 				Info.plist,
 			);
 			target = 5DF5FAFD2F0EC372008EDC76 /* Noto */;
+		};
+		A2BE2E8DCB8203A8692101A3 /* Exceptions for "Noto2" folder in "Noto2" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A20000000000000000000010 /* Noto2 */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -91,6 +150,28 @@
 			path = NotoTests;
 			sourceTree = "<group>";
 		};
+		A20000000000000000000001 /* NotoShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = NotoShared;
+			sourceTree = "<group>";
+		};
+		A20000000000000000000002 /* Noto2 */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A2BE2E8DCB8203A8692101A3 /* Exceptions for "Noto2" folder in "Noto2" target */,
+			);
+			path = Noto2;
+			sourceTree = "<group>";
+		};
+		A20000000000000000000003 /* Noto2Tests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = Noto2Tests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,6 +194,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5DFAED8F2F5F135300F3DACD /* NotoVault in Frameworks */,
+				5DF600000000000000000001 /* NotoTags in Frameworks */,
 				58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */,
 				58A1D0018A1D001000000007 /* NotoSearch in Frameworks */,
 				58A1D0018A1D00100000000C /* NotoChat in Frameworks */,
@@ -129,9 +211,50 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A20000000000000000000013 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A20000000000000000000030 /* NotoVault in Frameworks */,
+				A20000000000000000000031 /* NotoTags in Frameworks */,
+				A20000000000000000000032 /* NotoSearch in Frameworks */,
+				A20000000000000000000033 /* NotoChat in Frameworks */,
+				A20000000000000000000034 /* NotoEmbedding in Frameworks */,
+				A20000000000000000000035 /* NotoDigest in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A20000000000000000000043 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A20000000000000000000051 /* NotoVault in Frameworks */,
+				A20000000000000000000053 /* NotoSearch in Frameworks */,
+				A20000000000000000000055 /* NotoDigest in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF0AFB1F8965E901168F3E82 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A2EBC6BDFFF520AC5DEEA865 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1EFEFF571B44D62715EDA022 /* Noto2QuickCaptureControl */ = {
+			isa = PBXGroup;
+			children = (
+				9C668640928AB37E2CA8673D /* Noto2QuickCaptureControl.swift */,
+				B5AF7FCAC9852FC23752A68C /* Info.plist */,
+			);
+			name = Noto2QuickCaptureControl;
+			path = Noto2QuickCaptureControl;
+			sourceTree = "<group>";
+		};
 		5DF5FAF52F0EC372008EDC76 = {
 			isa = PBXGroup;
 			children = (
@@ -140,9 +263,16 @@
 				5DAABABF2F801A9600CC5A52 /* Noto.xctestplan */,
 				5DF5FB002F0EC372008EDC76 /* Noto */,
 				5DF5FB112F0EC373008EDC76 /* NotoTests */,
+				A20000000000000000000001 /* NotoShared */,
+				A20000000000000000000002 /* Noto2 */,
+				A20000000000000000000003 /* Noto2Tests */,
+				A20000000000000000000060 /* Noto2Icon.icon */,
 				5DE568F52F80191200EC8657 /* NotoMacOSUITests */,
 				5DE569042F80191F00EC8657 /* NotoiOSUITests */,
 				5DF5FAFF2F0EC372008EDC76 /* Products */,
+				CFD6BB4D748C0DEBB9F47CEE /* Noto2ControlShared */,
+				1EFEFF571B44D62715EDA022 /* Noto2QuickCaptureControl */,
+				6FDE297D4F15815607A57C36 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -151,10 +281,38 @@
 			children = (
 				5DF5FAFE2F0EC372008EDC76 /* Noto.app */,
 				5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */,
+				A20000000000000000000011 /* Noto2.app */,
+				A20000000000000000000041 /* Noto2Tests.xctest */,
 				5DE568F42F80191200EC8657 /* NotoMacOSUITests.xctest */,
 				5DE569032F80191F00EC8657 /* NotoiOSUITests.xctest */,
+				58FDAF8F6C5503B565EF0598 /* Noto2QuickCaptureControl.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		6FDE297D4F15815607A57C36 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A0BE70BE891D402149883EF3 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A0BE70BE891D402149883EF3 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				8CA0549E2D705A888D3673E4 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		CFD6BB4D748C0DEBB9F47CEE /* Noto2ControlShared */ = {
+			isa = PBXGroup;
+			children = (
+				258D1BBCE132EE72D17CAB8E /* Noto2QuickCaptureIntent.swift */,
+			);
+			name = Noto2ControlShared;
+			path = Noto2ControlShared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -217,10 +375,12 @@
 			);
 			fileSystemSynchronizedGroups = (
 				5DF5FB002F0EC372008EDC76 /* Noto */,
+				A20000000000000000000001 /* NotoShared */,
 			);
 			name = Noto;
 			packageProductDependencies = (
 				CCDD000B000000000000000B /* NotoVault */,
+				5DF600000000000000000002 /* NotoTags */,
 				58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */,
 				58A1D0018A1D001000000008 /* NotoSearch */,
 				58A1D0018A1D00100000000B /* NotoChat */,
@@ -255,6 +415,81 @@
 			productReference = 5DF5FB0E2F0EC373008EDC76 /* NotoTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		A20000000000000000000010 /* Noto2 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A20000000000000000000016 /* Build configuration list for PBXNativeTarget "Noto2" */;
+			buildPhases = (
+				A20000000000000000000012 /* Sources */,
+				A20000000000000000000013 /* Frameworks */,
+				A20000000000000000000014 /* Resources */,
+				A20000000000000000000015 /* Generate Secrets */,
+				176A451EBDFC68CE7BE160BC /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A641B88D4A0EC8D3CC76A49A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A20000000000000000000001 /* NotoShared */,
+				A20000000000000000000002 /* Noto2 */,
+			);
+			name = Noto2;
+			packageProductDependencies = (
+				A20000000000000000000020 /* NotoVault */,
+				A20000000000000000000021 /* NotoTags */,
+				A20000000000000000000022 /* NotoSearch */,
+				A20000000000000000000023 /* NotoChat */,
+				A20000000000000000000024 /* NotoEmbedding */,
+				A20000000000000000000025 /* NotoDigest */,
+			);
+			productName = Noto2;
+			productReference = A20000000000000000000011 /* Noto2.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A20000000000000000000040 /* Noto2Tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A20000000000000000000045 /* Build configuration list for PBXNativeTarget "Noto2Tests" */;
+			buildPhases = (
+				A20000000000000000000042 /* Sources */,
+				A20000000000000000000043 /* Frameworks */,
+				A20000000000000000000044 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A20000000000000000000049 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A20000000000000000000003 /* Noto2Tests */,
+			);
+			name = Noto2Tests;
+			packageProductDependencies = (
+				A20000000000000000000050 /* NotoVault */,
+				A20000000000000000000052 /* NotoSearch */,
+				A20000000000000000000054 /* NotoDigest */,
+			);
+			productName = Noto2Tests;
+			productReference = A20000000000000000000041 /* Noto2Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C1B9129E154C7B9E50745334 /* Noto2QuickCaptureControl */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 843B3F746821390712E4C374 /* Build configuration list for PBXNativeTarget "Noto2QuickCaptureControl" */;
+			buildPhases = (
+				F634224E22F4FCD422FA68D4 /* Sources */,
+				EF0AFB1F8965E901168F3E82 /* Frameworks */,
+				0EE7FFB302D3EF233FEC92E1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Noto2QuickCaptureControl;
+			productName = Noto2QuickCaptureControl;
+			productReference = 58FDAF8F6C5503B565EF0598 /* Noto2QuickCaptureControl.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -280,6 +515,13 @@
 						CreatedOnToolsVersion = 16.4;
 						TestTargetID = 5DF5FAFD2F0EC372008EDC76;
 					};
+					A20000000000000000000010 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					A20000000000000000000040 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = A20000000000000000000010;
+					};
 				};
 			};
 			buildConfigurationList = 5DF5FAF92F0EC372008EDC76 /* Build configuration list for PBXProject "Noto" */;
@@ -293,10 +535,12 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AABB000B000000000000000B /* XCLocalSwiftPackageReference "NotoVault" */,
+				5DF600000000000000000003 /* XCLocalSwiftPackageReference "NotoTags" */,
 				5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "NotoReadwiseSync" */,
 				DD2E424822EC2E30DB9B7950 /* XCLocalSwiftPackageReference "NotoSearch" */,
 				58A1D0018A1D00100000000A /* XCLocalSwiftPackageReference "NotoChat" */,
 				58A1D0018A1D00100000000D /* XCLocalSwiftPackageReference "NotoEmbedding" */,
+				A20000000000000000000070 /* XCLocalSwiftPackageReference "NotoDigest" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DF5FAFF2F0EC372008EDC76 /* Products */;
@@ -307,11 +551,21 @@
 				5DF5FB0D2F0EC373008EDC76 /* NotoTests */,
 				5DE568F32F80191200EC8657 /* NotoMacOSUITests */,
 				5DE569022F80191F00EC8657 /* NotoiOSUITests */,
+				A20000000000000000000010 /* Noto2 */,
+				A20000000000000000000040 /* Noto2Tests */,
+				C1B9129E154C7B9E50745334 /* Noto2QuickCaptureControl */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		0EE7FFB302D3EF233FEC92E1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5DE568F22F80191200EC8657 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -341,10 +595,46 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A20000000000000000000014 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A20000000000000000000061 /* Noto2Icon.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A20000000000000000000044 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		58A1D0018A1D001000000006 /* Generate Secrets */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Generate Secrets";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ReadwiseDefaultToken.txt",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/OpenRouterDefaultKey.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nwrite_secret() {\n  OUT=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/$1\"\n  rm -f \"$OUT\"\n  if [ -n \"$2\" ]; then\n    mkdir -p \"$(dirname \"$OUT\")\"\n    /usr/bin/printf \"%s\" \"$2\" > \"$OUT\"\n  fi\n}\nwrite_secret ReadwiseDefaultToken.txt \"${NOTO_READWISE_TOKEN:-}\"\nwrite_secret OpenRouterDefaultKey.txt \"${NOTO_OPENROUTER_KEY:-}\"\n";
+		};
+		A20000000000000000000015 /* Generate Secrets */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -396,6 +686,30 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A20000000000000000000012 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				260C4638209FCE498F36DC11 /* Noto2QuickCaptureIntent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A20000000000000000000042 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F634224E22F4FCD422FA68D4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E35366682A4BD0316C8999B4 /* Noto2QuickCaptureControl.swift in Sources */,
+				89D532451D69C02D77D417C3 /* Noto2QuickCaptureIntent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -414,9 +728,85 @@
 			target = 5DF5FAFD2F0EC372008EDC76 /* Noto */;
 			targetProxy = 5DF5FB0F2F0EC373008EDC76 /* PBXContainerItemProxy */;
 		};
+		A20000000000000000000049 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A20000000000000000000010 /* Noto2 */;
+			targetProxy = A20000000000000000000048 /* PBXContainerItemProxy */;
+		};
+		A641B88D4A0EC8D3CC76A49A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Noto2QuickCaptureControl;
+			target = C1B9129E154C7B9E50745334 /* Noto2QuickCaptureControl */;
+			targetProxy = 40FD7D19E9BCC6B12BA6FBDE /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		0557F309D735C952E8C8B190 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Noto2QuickCaptureControl/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Noto Quick Capture";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.Noto2.QuickCaptureControl;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.eugenechan.Noto2.QuickCaptureControl";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		1B4390EE89B576DCA1F98522 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Noto2QuickCaptureControl/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Noto Quick Capture";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.Noto2.QuickCaptureControl;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.eugenechan.Noto2.QuickCaptureControl";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		5DE568FD2F80191200EC8657 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -760,6 +1150,124 @@
 			};
 			name = Release;
 		};
+		A20000000000000000000017 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = Noto2Icon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Noto2/Noto2.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Noto2/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Noto 2";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				MARKETING_VERSION = 0.1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.Noto2;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.eugenechan.Noto2";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A20000000000000000000018 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = Noto2Icon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Noto2/Noto2.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Noto2/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Noto 2";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				MARKETING_VERSION = 0.1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.Noto2;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.eugenechan.Noto2";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A20000000000000000000046 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.Noto2Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Noto2.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Noto2";
+			};
+			name = Debug;
+		};
+		A20000000000000000000047 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.Noto2Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Noto2.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Noto2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -808,6 +1316,33 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		843B3F746821390712E4C374 /* Build configuration list for PBXNativeTarget "Noto2QuickCaptureControl" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1B4390EE89B576DCA1F98522 /* Release */,
+				0557F309D735C952E8C8B190 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A20000000000000000000016 /* Build configuration list for PBXNativeTarget "Noto2" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A20000000000000000000017 /* Debug */,
+				A20000000000000000000018 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A20000000000000000000045 /* Build configuration list for PBXNativeTarget "Noto2Tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A20000000000000000000046 /* Debug */,
+				A20000000000000000000047 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -822,6 +1357,14 @@
 		58A1D0018A1D00100000000D /* XCLocalSwiftPackageReference "NotoEmbedding" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoEmbedding;
+		};
+		5DF600000000000000000003 /* XCLocalSwiftPackageReference "NotoTags" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoTags;
+		};
+		A20000000000000000000070 /* XCLocalSwiftPackageReference "NotoDigest" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoDigest;
 		};
 		AABB000B000000000000000B /* XCLocalSwiftPackageReference "NotoVault" */ = {
 			isa = XCLocalSwiftPackageReference;
@@ -853,6 +1396,46 @@
 		58A1D0018A1D00100000000E /* NotoEmbedding */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoEmbedding;
+		};
+		5DF600000000000000000002 /* NotoTags */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoTags;
+		};
+		A20000000000000000000020 /* NotoVault */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoVault;
+		};
+		A20000000000000000000021 /* NotoTags */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoTags;
+		};
+		A20000000000000000000022 /* NotoSearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoSearch;
+		};
+		A20000000000000000000023 /* NotoChat */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoChat;
+		};
+		A20000000000000000000024 /* NotoEmbedding */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoEmbedding;
+		};
+		A20000000000000000000025 /* NotoDigest */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoDigest;
+		};
+		A20000000000000000000050 /* NotoVault */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoVault;
+		};
+		A20000000000000000000052 /* NotoSearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoSearch;
+		};
+		A20000000000000000000054 /* NotoDigest */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoDigest;
 		};
 		CCDD000B000000000000000B /* NotoVault */ = {
 			isa = XCSwiftPackageProductDependency;

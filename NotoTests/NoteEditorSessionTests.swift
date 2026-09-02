@@ -143,6 +143,63 @@ struct NoteEditorSessionTests {
         #expect(session.note.title == "Loaded Title")
     }
 
+    @Test("Editor task ordering: switch-then-load shows incoming note even when the load task runs before onChange")
+    @MainActor
+    func switchThenLoadShowsIncomingNoteRegardlessOfCallbackOrder() async {
+        // Regression for bug 024: on macOS, NoteEditorScreen's `.task(id:)`
+        // restarts BEFORE `.onChange(of: note)` performs `switchTo`. The task
+        // must therefore switch the session itself before deciding whether to
+        // load, otherwise it sees the outgoing note's `hasLoaded == true`,
+        // skips the load, and the subsequent switchTo leaves a blank editor.
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        var noteA = store.createNote()
+        noteA = store.saveContent(MarkdownNote.makeFrontmatter(id: noteA.id) + "# Note A\nAlpha", for: noteA).note
+        var noteB = store.createNote()
+        let contentB = MarkdownNote.makeFrontmatter(id: noteB.id) + "# Note B\nBravo"
+        noteB = store.saveContent(contentB, for: noteB).note
+
+        let session = NoteEditorSession(store: store, note: noteA)
+        await session.loadNoteContent()
+        #expect(session.hasLoaded)
+
+        // Mirror the fixed `.task(id:)` body, which runs while the session
+        // still holds note A with hasLoaded == true.
+        session.switchTo(note: noteB, store: store, isNew: false)
+        if !session.hasLoaded {
+            await session.loadNoteContent()
+        }
+
+        #expect(session.note.id == noteB.id)
+        #expect(session.hasLoaded)
+        #expect(session.content == contentB)
+    }
+
+    @Test("Switching to the same note id preserves loaded content")
+    @MainActor
+    func switchToSameNoteIDPreservesLoadedContent() async {
+        // The fixed `.task(id:)` calls switchTo unconditionally on first
+        // appear; a same-id switch must not clear the already-loaded content.
+        let vault = makeTempVault()
+        defer { cleanupVault(vault) }
+        let store = MarkdownNoteStore(vaultURL: vault)
+
+        var note = store.createNote()
+        let content = MarkdownNote.makeFrontmatter(id: note.id) + "# Same\nBody"
+        note = store.saveContent(content, for: note).note
+
+        let session = NoteEditorSession(store: store, note: note)
+        await session.loadNoteContent()
+        #expect(session.hasLoaded)
+
+        session.switchTo(note: note, store: store, isNew: false)
+
+        #expect(session.hasLoaded)
+        #expect(session.content == content)
+    }
+
     @Test("Load note content marks unreadable current files as failed")
     @MainActor
     func loadNoteContentMarksUnreadableCurrentFileAsFailed() async {

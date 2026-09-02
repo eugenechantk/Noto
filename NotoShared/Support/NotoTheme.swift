@@ -56,6 +56,7 @@ enum NotoTheme {
     static let uiBackground = UIColor(red: 0x0E / 255.0, green: 0x11 / 255.0, blue: 0x16 / 255.0, alpha: 1)
     static let uiInk        = UIColor(red: 0xEC / 255.0, green: 0xEC / 255.0, blue: 0xEE / 255.0, alpha: 1)
     static let uiAccent     = UIColor(red: 0xFF / 255.0, green: 0x6A / 255.0, blue: 0x2E / 255.0, alpha: 1)
+    static let uiCard       = UIColor(red: 0x1C / 255.0, green: 0x20 / 255.0, blue: 0x27 / 255.0, alpha: 1)
     #elseif os(macOS)
     static let nsBackground = NSColor(red: 0x0E / 255.0, green: 0x11 / 255.0, blue: 0x16 / 255.0, alpha: 1)
     static let nsInk        = NSColor(red: 0xEC / 255.0, green: 0xEC / 255.0, blue: 0xEE / 255.0, alpha: 1)

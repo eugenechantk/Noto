@@ -18,6 +18,9 @@ struct EditorContentView: View {
     var scrollRestorationID: String?
     var initialContentOffsetY: CGFloat?
     var onContentOffsetYChange: ((CGFloat) -> Void)?
+    /// Keyboard accessory style for the wrapped editor (iOS). Noto keeps the
+    /// docked bar; Noto 2 opts into the floating glass pill.
+    var keyboardToolbarStyle: EditorKeyboardToolbarStyle = .docked
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #if os(iOS)
@@ -27,11 +30,16 @@ struct EditorContentView: View {
     var body: some View {
         Group {
             if session.downloadFailed {
-                ContentUnavailableView(
-                    "Download Failed",
-                    systemImage: "exclamationmark.icloud",
-                    description: Text("Could not download this note from iCloud. Check your connection and try again.")
-                )
+                ContentUnavailableView {
+                    Label("Note Not Available", systemImage: "exclamationmark.icloud")
+                } description: {
+                    Text("This note hasn't finished downloading from iCloud. Check your connection, or make sure iCloud Drive has finished syncing.")
+                } actions: {
+                    Button("Try Again") {
+                        Task { await session.loadNoteContent() }
+                    }
+                    .accessibilityIdentifier("editor_retry_load_button")
+                }
             } else if session.isDownloading {
                 downloadingView
             } else {
@@ -151,7 +159,8 @@ struct EditorContentView: View {
             onCloseFind: closeFind,
             scrollRestorationID: scrollRestorationID,
             initialContentOffsetY: initialContentOffsetY,
-            onContentOffsetYChange: onContentOffsetYChange
+            onContentOffsetYChange: onContentOffsetYChange,
+            keyboardToolbarStyle: keyboardToolbarStyle
         )
         #elseif os(macOS)
         TextKit2EditorView(
@@ -248,23 +257,30 @@ private struct DelayedLoadingPlaceholder: View {
     @State private var isVisible = false
 
     var body: some View {
-        Group {
-            if isVisible && !session.hasLoaded {
-                VStack(spacing: 12) {
-                    ProgressView()
-                    Text("Loading note...")
-                        .font(.subheadline)
-                        .foregroundStyle(AppTheme.secondaryText)
+        // The base must be a real (if invisible) view, not conditional-empty content:
+        // SwiftUI skips `.task` on a view that resolves to nothing, so hanging the
+        // delay task off `Group { if isVisible { … } }` — which starts empty — meant
+        // `isVisible` never flipped and the placeholder could never appear. The user
+        // got a blank editor pane instead of any loading feedback.
+        Color.clear
+            .overlay {
+                if isVisible && !session.hasLoaded {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        Text("Loading note...")
+                            .font(.subheadline)
+                            .foregroundStyle(AppTheme.secondaryText)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppTheme.background)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppTheme.background)
             }
-        }
-        .task {
-            guard !session.hasLoaded else { return }
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled, !session.hasLoaded else { return }
-            isVisible = true
-        }
+            .allowsHitTesting(isVisible && !session.hasLoaded)
+            .task {
+                guard !session.hasLoaded else { return }
+                try? await Task.sleep(for: .milliseconds(300))
+                guard !Task.isCancelled, !session.hasLoaded else { return }
+                isVisible = true
+            }
     }
 }

@@ -129,36 +129,72 @@ struct NotoSidebarView: View {
 
                 Spacer(minLength: 0)
 
-                // iOS/iPadOS AND macOS: same action trio as the file view top bar —
-                // new note · sort · more — on the nav row with the `‹ back` button.
-                // Each label gets a 44×44pt hit target (HIG minimum); the HStack is
-                // capped at the row's 22pt layout height so the header doesn't grow —
-                // the targets overflow invisibly and stay tappable (no .clipped()).
+                // iOS/iPadOS AND macOS: the same action set as the file view top bar —
+                // (today ·) new note · sort · more — on the nav row with the `‹ back`
+                // button. Every glyph renders at `SidebarHeaderMetrics.iconPointSize`
+                // inside an identical square hit target so the icons read as one set
+                // and each is equally clickable; the HStack is capped at the row's 22pt
+                // layout height so the header doesn't grow — the targets overflow
+                // invisibly and stay tappable (no .clipped()).
                 HStack(spacing: 0) {
+                    #if os(macOS)
+                    // Today's note. macOS only: iOS/iPadOS already reach today from the
+                    // editor dock's calendar capsule, so a second entry point would just
+                    // crowd the row. Plain `calendar` — the dock's day-of-month badge is
+                    // illegible over the glyph's own dot grid at this row's icon size.
+                    Button {
+                        onIntent(.openToday)
+                    } label: {
+                        sidebarHeaderHitTarget {
+                            sidebarHeaderGlyph("calendar")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .help("Today's Note")
+                    .accessibilityIdentifier("sidebar_today_button")
+                    .accessibilityLabel("Today")
+                    #endif
+
                     Button {
                         onIntent(.createNote(in: currentStore))
                     } label: {
-                        Image(systemName: "square.and.pencil")
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundStyle(NotoTheme.head)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
+                        sidebarHeaderHitTarget {
+                            sidebarHeaderGlyph("square.and.pencil")
+                        }
                     }
                     .buttonStyle(.plain)
+                    .help("New Note")
                     .accessibilityIdentifier("sidebar_new_note_button")
                     .accessibilityLabel("New Note")
 
+                    #if os(macOS)
+                    SidebarHeaderMenuButton(
+                        systemImage: "line.3.horizontal.decrease",
+                        iconPointSize: SidebarHeaderMetrics.iconPointSize,
+                        hitTarget: SidebarHeaderMetrics.hitTarget,
+                        help: "Sort",
+                        accessibilityID: "sidebar_sort_menu",
+                        items: sortMenuItems
+                    )
+
+                    SidebarHeaderMenuButton(
+                        systemImage: "ellipsis",
+                        iconPointSize: SidebarHeaderMetrics.iconPointSize,
+                        hitTarget: SidebarHeaderMetrics.hitTarget,
+                        help: "More",
+                        accessibilityID: "sidebar_more_button",
+                        items: moreMenuItems
+                    )
+                    #else
                     Menu {
                         Picker("Sort", selection: $sort) {
                             Label("Recent", systemImage: "clock").tag(FileSortKey.recent)
                             Label("Name", systemImage: "textformat").tag(FileSortKey.name)
                         }
                     } label: {
-                        Image(systemName: "line.3.horizontal.decrease")
-                            .font(.system(size: 17, weight: .regular))
-                            .foregroundStyle(NotoTheme.head)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
+                        sidebarHeaderHitTarget {
+                            sidebarHeaderGlyph("line.3.horizontal.decrease")
+                        }
                     }
                     .menuIndicator(.hidden)
                     .menuStyle(.borderlessButton)
@@ -186,24 +222,23 @@ struct NotoSidebarView: View {
                             Label("Settings", systemImage: "gearshape")
                         }
                     } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundStyle(NotoTheme.head)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
+                        sidebarHeaderHitTarget {
+                            sidebarHeaderGlyph("ellipsis")
+                        }
                     }
                     .menuIndicator(.hidden)
                     .menuStyle(.borderlessButton)
                     .fixedSize()
                     .accessibilityIdentifier("sidebar_more_button")
                     .accessibilityLabel("More")
+                    #endif
                 }
             }
-            // Fixed 22pt layout height: the 44pt hit targets overflow invisibly
+            // Fixed 22pt layout height: the hit targets overflow invisibly
             // above/below so the header keeps its original size.
             .frame(height: 22)
             .padding(.leading, 16)
-            // 5pt instead of 16: the 44pt frame centers the glyph, keeping the
+            // 5pt instead of 16: the square hit target centers the glyph, keeping the
             // trailing glyph ~16pt from the edge as before.
             .padding(.trailing, 5)
             .padding(.top, 10)
@@ -229,6 +264,52 @@ struct NotoSidebarView: View {
         .notoSidebarHeaderTopInset()
         .notoSidebarHeaderBackground()
     }
+
+    /// One glyph size + one square hit target for every action in the sidebar header
+    /// row, so the icons read as a single set instead of drifting per-button.
+    private enum SidebarHeaderMetrics {
+        /// SF Symbols are optically balanced against each other at a shared point
+        /// size — matching the size is what makes the glyphs look the same size.
+        static let iconPointSize: CGFloat = 17
+        #if os(macOS)
+        /// Pointer target. 36 keeps four actions comfortably inside the 260pt
+        /// minimum sidebar width alongside the `‹ parent` back button.
+        static let hitTarget: CGFloat = 36
+        #else
+        /// HIG minimum touch target.
+        static let hitTarget: CGFloat = 44
+        #endif
+    }
+
+    private func sidebarHeaderGlyph(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: SidebarHeaderMetrics.iconPointSize, weight: .regular))
+            .foregroundStyle(NotoTheme.head)
+    }
+
+    private func sidebarHeaderHitTarget<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .frame(width: SidebarHeaderMetrics.hitTarget, height: SidebarHeaderMetrics.hitTarget)
+            .contentShape(Rectangle())
+    }
+
+    #if os(macOS)
+    private func sortMenuItems() -> [SidebarHeaderMenuItem] {
+        [
+            .action(title: "Recent", systemImage: "clock", isOn: sort == .recent) { sort = .recent },
+            .action(title: "Name", systemImage: "textformat", isOn: sort == .name) { sort = .name }
+        ]
+    }
+
+    private func moreMenuItems() -> [SidebarHeaderMenuItem] {
+        [
+            .action(title: "New Folder", systemImage: "folder.badge.plus") { showNewFolderAlert = true },
+            .separator,
+            .action(title: "AI Chat", systemImage: "bubble.left") { onIntent(.openChat) },
+            .action(title: "Settings", systemImage: "gearshape") { onIntent(.openSettings) }
+        ]
+    }
+    #endif
 
     private var parentTitle: String {
         if folderStack.count >= 2 {

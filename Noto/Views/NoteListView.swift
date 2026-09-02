@@ -2,6 +2,7 @@ import SwiftUI
 import os.log
 import NotoSearch
 import NotoVault
+import NotoTags
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
@@ -2119,9 +2120,11 @@ struct NoteSearchSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isSearchFocused: Bool
+    @Environment(TagController.self) private var tagController
     @State private var query = ""
     @State private var scope: SearchScope = .titleAndContent
     @State private var results: [NoteSearchResult] = []
+    @State private var tagResults: [NoteSearchResult] = []
     @State private var recentNotes: [NoteSearchResult] = []
     @State private var isPreparingIndex = false
     @State private var isSearching = false
@@ -2138,6 +2141,29 @@ struct NoteSearchSheet: View {
     #endif
 
     private var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var isTagMode: Bool { trimmedQuery.hasPrefix("#") }
+    private var tagFragment: String { TagName.normalize(String(trimmedQuery.dropFirst())) }
+    private var tagSuggestions: [TagName] {
+        guard isTagMode else { return [] }
+        return Array(tagController.suggestions(matching: tagFragment).prefix(10))
+    }
+    private var resolvedTag: TagName? {
+        guard isTagMode, let normalized = TagName(tagFragment) else { return nil }
+        return tagController.allTagNames().contains(normalized) ? normalized : nil
+    }
+    private var resolvedTagResults: [NoteSearchResult] {
+        resolvedTag == nil ? [] : tagResults
+    }
+    private var activeSearchResults: [NoteSearchResult] {
+        if isTagMode {
+            return resolvedTagResults
+        }
+        return trimmedQuery.isEmpty ? recentNotes : results
+    }
+    private var searchSectionTitle: String? {
+        guard let tag = resolvedTag else { return nil }
+        return "Tagged #\(tag.rawValue)"
+    }
 
     var body: some View {
         #if os(macOS)
@@ -2153,10 +2179,12 @@ struct NoteSearchSheet: View {
                 await prepareIndex()
             }
             .onChange(of: query) { _, _ in
-                scheduleSearch()
+                resolveQueryState()
             }
             .onChange(of: scope) { _, _ in
-                scheduleSearch()
+                if !isTagMode {
+                    scheduleSearch()
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .notoSearchIndexDidChange)) { notification in
                 handleSearchIndexDidChange(notification)
@@ -2192,7 +2220,7 @@ struct NoteSearchSheet: View {
 
     private var iosSearchView: some View {
         let showingRecent = trimmedQuery.isEmpty
-        let displayResults = showingRecent ? recentNotes : results
+        let displayResults = activeSearchResults
         return Group {
             if didFail {
                 ContentUnavailableView(
@@ -2210,11 +2238,18 @@ struct NoteSearchSheet: View {
     }
 
     @ViewBuilder
-    private func iosResultsScroll(showingRecent: Bool, displayResults: [NoteSearchResult]) -> some View {
+    private func iosResultsScroll(
+        showingRecent: Bool,
+        displayResults: [NoteSearchResult]
+    ) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 Color.clear.frame(height: 8)
-                iosSectionTitle(showingRecent ? "Last edited" : "Search results")
+                if let sectionTitle = searchSectionTitle {
+                    iosSectionTitle(sectionTitle)
+                } else {
+                    iosSectionTitle(showingRecent ? "Last edited" : "Search results")
+                }
                 ForEach(Array(displayResults.enumerated()), id: \.element.id) { index, result in
                     Button {
                         onSelect(result)
@@ -2244,7 +2279,7 @@ struct NoteSearchSheet: View {
                     message: "Checking this vault for new, edited, moved, or deleted notes.",
                     accessibilityIdentifier: "note_search_indexing_indicator"
                 )
-            } else if isSearching && results.isEmpty && !showingRecent {
+            } else if !isTagMode && isSearching && results.isEmpty && !showingRecent {
                 searchProgressIndicator(
                     title: "Searching notes",
                     message: "Looking through the search index.",
@@ -2276,11 +2311,15 @@ struct NoteSearchSheet: View {
     @ViewBuilder
     private func iosBottomControls(showingRecent: Bool) -> some View {
         VStack(spacing: 0) {
-            if !showingRecent {
+            if isTagMode {
+                tagSuggestionStrip
+            } else if !showingRecent {
                 iosSegmentedControl
                     .padding(.horizontal, 12)
                     .padding(.top, 4)
                     .padding(.bottom, 8)
+            } else {
+                EmptyView()
             }
             iosSearchDock
         }
@@ -2366,7 +2405,48 @@ struct NoteSearchSheet: View {
     }
     #endif
 
+    // Shared across iOS and macOS: the `#`-tag suggestion strip shown above the
+    // search dock. `TagChip` resolves per-platform (the iOS chip from the
+    // Properties view; the macOS shim below).
+    @ViewBuilder
+    private var tagSuggestionStrip: some View {
+        if isTagMode {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    ForEach(Array(tagSuggestions.enumerated()), id: \.offset) { index, tag in
+                        Button {
+                            query = "#\(tag.rawValue)"
+                        } label: {
+                            TagChip(text: "#\(tag.rawValue) (\(tagController.count(for: tag)))")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("tag_search_suggestion_\(index)")
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 6)
+            .accessibilityIdentifier("tag_search_suggestions")
+        }
+    }
+
     #if os(macOS)
+    private struct TagChip: View {
+        let text: String
+
+        var body: some View {
+            Text(text)
+                .font(.system(size: 13.5))
+                .foregroundStyle(AppTheme.primaryText)
+                .lineLimit(1)
+                .padding(.horizontal, 9)
+                .frame(height: 24)
+                .background(AppTheme.primaryText.opacity(0.12), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+    }
+
     private var macOSSearchPanel: some View {
         VStack(spacing: 0) {
             macOSTopBar
@@ -2401,10 +2481,12 @@ struct NoteSearchSheet: View {
             await prepareIndex()
         }
         .onChange(of: query) { _, _ in
-            scheduleSearch()
+            resolveQueryState()
         }
         .onChange(of: scope) { _, _ in
-            scheduleSearch()
+            if !isTagMode {
+                scheduleSearch()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .notoSearchIndexDidChange)) { notification in
             handleSearchIndexDidChange(notification)
@@ -2438,6 +2520,9 @@ struct NoteSearchSheet: View {
 
     private var macOSSearchControls: some View {
         VStack(spacing: 10) {
+            if isTagMode {
+                tagSuggestionStrip
+            }
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(AppTheme.secondaryText)
@@ -2469,8 +2554,9 @@ struct NoteSearchSheet: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(AppTheme.primaryText.opacity(0.10), lineWidth: 0.5)
             }
-
-            searchScopePicker
+            if !isTagMode {
+                searchScopePicker
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -2539,14 +2625,28 @@ struct NoteSearchSheet: View {
             #endif
 
             let showingRecent = trimmedQuery.isEmpty
-            let displayResults = showingRecent ? recentNotes : results
+            let displayResults = activeSearchResults
 
             ScrollViewReader { proxy in
                 Group {
                 #if os(macOS)
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        if showingRecent && !recentNotes.isEmpty {
+                        if isTagMode {
+                            if let sectionTitle = searchSectionTitle {
+                                HStack {
+                                    Text(sectionTitle)
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(AppTheme.secondaryText)
+                                        .textCase(.uppercase)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.top, 10)
+                                .padding(.bottom, 4)
+                            }
+                        } else if showingRecent && !recentNotes.isEmpty {
                             HStack {
                                 Text("Last edited")
                                     .font(.caption)
@@ -2644,7 +2744,23 @@ struct NoteSearchSheet: View {
                             message: "Checking this vault for new, edited, moved, or deleted notes.",
                             accessibilityIdentifier: "note_search_indexing_indicator"
                         )
-                    } else if isSearching && results.isEmpty && !showingRecent {
+                    } else if isTagMode {
+                        if isSearching && tagResults.isEmpty && !showingRecent {
+                            searchProgressIndicator(
+                                title: "Searching tags",
+                                message: "Looking up notes for this tag.",
+                                accessibilityIdentifier: "note_search_loading_indicator"
+                            )
+                        } else if displayResults.isEmpty {
+                            ContentUnavailableView(
+                                emptyTitle,
+                                systemImage: "number",
+                                description: Text(emptyDescription)
+                            )
+                            .allowsHitTesting(false)
+                            .accessibilityIdentifier("note_search_empty_state")
+                        }
+                    } else if !isTagMode && isSearching && results.isEmpty && !showingRecent {
                         searchProgressIndicator(
                             title: "Searching notes",
                             message: "Looking through the search index.",
@@ -2661,7 +2777,6 @@ struct NoteSearchSheet: View {
                     }
                 }
             }
-
         }
     }
 
@@ -2703,10 +2818,16 @@ struct NoteSearchSheet: View {
     }
 
     private var emptyTitle: String {
-        trimmedQuery.isEmpty ? "Search Notes" : "No Matching Notes"
+        if isTagMode && resolvedTag == nil && !trimmedQuery.isEmpty {
+            return "Pick a tag"
+        }
+        return trimmedQuery.isEmpty ? "Search Notes" : "No Matching Notes"
     }
 
     private var emptyDescription: String {
+        if isTagMode && resolvedTag == nil && !trimmedQuery.isEmpty {
+            return "Use a tag from the suggestions to see tagged notes."
+        }
         if trimmedQuery.isEmpty {
             return scope == .title
                 ? "Type a note title to search this vault."
@@ -2786,6 +2907,7 @@ struct NoteSearchSheet: View {
     private func scheduleSearch() {
         searchTask?.cancel()
         guard !didFail else { return }
+        if isTagMode { return }
         guard !trimmedQuery.isEmpty else {
             results = []
             isSearching = false
@@ -2852,6 +2974,89 @@ struct NoteSearchSheet: View {
                 #endif
                 isSearching = false
             }
+        }
+    }
+
+    private func resolveQueryState() {
+        searchTask?.cancel()
+        tagResults = []
+        if isTagMode {
+            resolveTagResults()
+            return
+        }
+        scheduleSearch()
+    }
+
+    private func resolveTagResults() {
+        isSearching = false
+        guard isTagMode, let tag = resolvedTag else {
+            #if os(macOS)
+            selectedResultIndex = nil
+            #endif
+            return
+        }
+
+        let notePaths = tagController.notes(withTag: tag)
+        guard !notePaths.isEmpty else {
+            #if os(macOS)
+            selectedResultIndex = nil
+            #endif
+            return
+        }
+
+        let rootURL = rootStore.vaultRootURL
+        let directoryLoader = rootStore.directoryLoader
+        isSearching = true
+
+        Task {
+            let resolved = await Task.detached(priority: .userInitiated) {
+                let repository = NoteRepository(directoryURL: rootURL, vaultRootURL: rootURL)
+                return notePaths.compactMap { relativePath -> NoteSearchResult? in
+                    let fileURL = rootURL.appendingPathComponent(relativePath).standardizedFileURL
+                    let record = repository.note(atVaultRelativePath: relativePath)
+
+                    let note: MarkdownNote
+                    if let record {
+                        note = MarkdownNote(record: record)
+                    } else {
+                        let fallbackModified: Date = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+                            ?? .init()
+                            note = MarkdownNote(
+                                id: VaultDirectoryLoader.stableID(for: fileURL),
+                                fileURL: fileURL,
+                                title: fileURL.deletingPathExtension().lastPathComponent,
+                                modifiedDate: fallbackModified
+                            )
+                    }
+
+                    let parentRelative = (relativePath as NSString).deletingLastPathComponent
+                    let breadcrumb = parentRelative == "." ? "" : parentRelative
+                    let store = MarkdownNoteStore(
+                        directoryURL: fileURL.deletingLastPathComponent(),
+                        vaultRootURL: rootURL,
+                        autoload: false,
+                        directoryLoader: directoryLoader
+                    )
+                    return NoteSearchResult(
+                        id: "tag-\(note.id.uuidString)",
+                        note: note,
+                        store: store,
+                        relativePath: relativePath,
+                        title: note.title,
+                        breadcrumb: breadcrumb,
+                        snippet: "",
+                        kind: .note
+                    )
+                }
+            }.value
+
+            guard !Task.isCancelled else { return }
+            tagResults = resolved
+                .sorted { $0.note.modifiedDate > $1.note.modifiedDate }
+            #if os(macOS)
+            selectedResultIndex = tagResults.isEmpty ? nil : 0
+            #endif
+            isSearching = false
         }
     }
 
@@ -3014,7 +3219,11 @@ struct NoteSearchSheet: View {
         #if DEBUG
         updateDebug(path: debugPath, ["index changed for current vault"])
         #endif
-        scheduleSearch()
+        if isTagMode {
+            resolveQueryState()
+        } else {
+            scheduleSearch()
+        }
         loadRecentNotes()
     }
 
@@ -3175,7 +3384,7 @@ struct NoteSearchSheet: View {
 
     #if os(macOS)
     private func moveSelection(_ direction: SearchResultSelectionDirection) {
-        let displayResults = trimmedQuery.isEmpty ? recentNotes : results
+        let displayResults = activeSearchResults
         guard !displayResults.isEmpty else { return }
         let currentIndex = selectedResultIndex ?? -1
         switch direction {
@@ -3187,7 +3396,7 @@ struct NoteSearchSheet: View {
     }
 
     private func openSelectedResult() {
-        let displayResults = trimmedQuery.isEmpty ? recentNotes : results
+        let displayResults = activeSearchResults
         guard let selectedResultIndex, displayResults.indices.contains(selectedResultIndex) else { return }
         onSelect(displayResults[selectedResultIndex])
         closeSearch()

@@ -10,6 +10,7 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 final class VaultLocationManager {
     var vaultURL: URL?
     var isVaultConfigured: Bool = false
+    private(set) var hasDeferredExternalVaultResolution = false
 
     private static let bookmarkKey = "vaultBookmarkData"
     private static let isLocalKey = "vaultIsLocal"
@@ -19,7 +20,7 @@ final class VaultLocationManager {
     private static let forceDirectVaultPathArgument = "-notoDirectVaultPath"
     private static let resetStateArgument = "-notoResetState"
 
-    init() {
+    init(resolveExternalVaultOnInit: Bool = true) {
         if Self.shouldResetStateFromLaunchArguments {
             resetStateForUITesting()
         }
@@ -31,7 +32,47 @@ final class VaultLocationManager {
             setLocalVault()
             return
         }
+        if !resolveExternalVaultOnInit,
+           UserDefaults.standard.data(forKey: Self.bookmarkKey) != nil {
+            // Noto 2 can show its durable capture draft before it needs to
+            // touch the vault. Bookmark resolution and its write probe can be
+            // slow on a cold iCloud/file-provider launch, so do that after the
+            // first frame instead of blocking App initialization.
+            hasDeferredExternalVaultResolution = true
+            return
+        }
         resolveVault()
+    }
+
+    func resolveDeferredExternalVault() async {
+        guard hasDeferredExternalVaultResolution else { return }
+        guard let bookmarkData = UserDefaults.standard.data(forKey: Self.bookmarkKey) else {
+            hasDeferredExternalVaultResolution = false
+            resolveVault()
+            return
+        }
+
+        let isDirect = UserDefaults.standard.bool(forKey: Self.isDirectKey)
+        let resolution = await Task.detached(priority: .userInitiated) {
+            Self.resolveExternalVault(bookmarkData: bookmarkData, isDirect: isDirect)
+        }.value
+
+        hasDeferredExternalVaultResolution = false
+        switch resolution {
+        case .success(let resolvedURL, let refreshedBookmark):
+            if let refreshedBookmark {
+                UserDefaults.standard.set(refreshedBookmark, forKey: Self.bookmarkKey)
+            }
+            vaultURL = resolvedURL
+            isVaultConfigured = true
+            logger.info("Resolved deferred vault bookmark at \(resolvedURL.path)")
+            DebugTrace.record("vault deferred bookmark target=\(resolvedURL.path) isDirect=\(isDirect)")
+        case .failure(let message):
+            logger.error("Deferred vault resolution failed: \(message, privacy: .public)")
+            DebugTrace.record("vault deferred bookmark failed \(message)")
+            clearSavedExternalVaultState()
+            isVaultConfigured = false
+        }
     }
 
     // MARK: - Resolve saved vault
@@ -125,6 +166,7 @@ final class VaultLocationManager {
     /// Set vault to a user-picked parent folder (iCloud, external provider, etc.).
     /// Creates a `Noto/` directory inside the chosen folder.
     func setVault(toParent parentURL: URL) {
+        hasDeferredExternalVaultResolution = false
         _ = parentURL.startAccessingSecurityScopedResource()
         let notoURL = parentURL.appendingPathComponent("Noto")
         ensureDirectoryExists(notoURL)
@@ -150,6 +192,7 @@ final class VaultLocationManager {
     /// Set vault directly to the chosen folder (no `/Noto` subfolder).
     /// Use this when pointing at an existing folder of markdown files.
     func setVault(directURL url: URL) {
+        hasDeferredExternalVaultResolution = false
         _ = url.startAccessingSecurityScopedResource()
 
         guard validateWriteAccess(to: url) else {
@@ -172,6 +215,7 @@ final class VaultLocationManager {
 
     /// Set vault to local app sandbox Documents/Noto.
     func setLocalVault() {
+        hasDeferredExternalVaultResolution = false
         let localURL = Self.localVaultURL()
         ensureDirectoryExists(localURL)
         UserDefaults.standard.set(true, forKey: Self.isLocalKey)
@@ -186,6 +230,7 @@ final class VaultLocationManager {
 
     /// Resets vault configuration, returning the user to the setup screen.
     func resetVault() {
+        hasDeferredExternalVaultResolution = false
         vaultURL = nil
         isVaultConfigured = false
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
@@ -271,6 +316,7 @@ final class VaultLocationManager {
     }
 
     private func clearSavedExternalVaultState() {
+        hasDeferredExternalVaultResolution = false
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
         UserDefaults.standard.removeObject(forKey: Self.isDirectKey)
         UserDefaults.standard.removeObject(forKey: Self.directPathKey)
@@ -289,6 +335,70 @@ final class VaultLocationManager {
             DebugTrace.record("vault writable denied \(url.path) error=\(String(describing: error))")
             try? FileManager.default.removeItem(at: probeURL)
             return false
+        }
+    }
+
+    private enum DeferredExternalResolution: Sendable {
+        case success(resolvedURL: URL, refreshedBookmark: Data?)
+        case failure(String)
+    }
+
+    nonisolated private static func resolveExternalVault(
+        bookmarkData: Data,
+        isDirect: Bool
+    ) -> DeferredExternalResolution {
+        do {
+            var isStale = false
+            #if os(macOS)
+            let resolveOptions: URL.BookmarkResolutionOptions = [.withSecurityScope]
+            #else
+            let resolveOptions: URL.BookmarkResolutionOptions = []
+            #endif
+            let accessURL = try URL(
+                resolvingBookmarkData: bookmarkData,
+                options: resolveOptions,
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )
+
+            guard accessURL.startAccessingSecurityScopedResource() else {
+                return .failure("security-scoped access denied")
+            }
+
+            let resolvedURL = isDirect ? accessURL : accessURL.appendingPathComponent("Noto")
+            let fileManager = FileManager.default
+            if !fileManager.fileExists(atPath: resolvedURL.path) {
+                try fileManager.createDirectory(at: resolvedURL, withIntermediateDirectories: true)
+            }
+
+            let probeURL = resolvedURL.appendingPathComponent(".noto-write-probe-\(UUID().uuidString)")
+            do {
+                try Data("probe".utf8).write(to: probeURL, options: .atomic)
+                try? fileManager.removeItem(at: probeURL)
+            } catch {
+                try? fileManager.removeItem(at: probeURL)
+                accessURL.stopAccessingSecurityScopedResource()
+                return .failure("vault is not writable: \(error.localizedDescription)")
+            }
+
+            let refreshedBookmark: Data?
+            if isStale {
+                #if os(macOS)
+                let bookmarkOptions: URL.BookmarkCreationOptions = [.withSecurityScope]
+                #else
+                let bookmarkOptions: URL.BookmarkCreationOptions = []
+                #endif
+                refreshedBookmark = try? accessURL.bookmarkData(
+                    options: bookmarkOptions,
+                    includingResourceValuesForKeys: nil,
+                    relativeTo: nil
+                )
+            } else {
+                refreshedBookmark = nil
+            }
+            return .success(resolvedURL: resolvedURL, refreshedBookmark: refreshedBookmark)
+        } catch {
+            return .failure(error.localizedDescription)
         }
     }
 

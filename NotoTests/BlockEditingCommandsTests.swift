@@ -462,6 +462,113 @@ struct BlockEditingCommandsTests {
         #expect(target == .vaultDocument(relativePath: "Folder/Project Brief.md"))
     }
 
+    @Test("Wiki link parses as a match with vault document target and .md appended")
+    func wikiLinkParsesWithMdAppended() throws {
+        let text = "See [[media/page-name]] for details"
+        let matches = HyperlinkMarkdown.matches(in: text)
+
+        let match = try #require(matches.first)
+        #expect(matches.count == 1)
+        #expect(match.kind == .wiki)
+        #expect(match.fullRange == NSRange(location: 4, length: 19))
+        #expect(match.titleRange == NSRange(location: 6, length: 15))
+        #expect(match.title == "media/page-name")
+        #expect(match.target == .vaultDocument(relativePath: "media/page-name.md"))
+    }
+
+    @Test("Wiki link keeps an explicit .md extension without doubling it")
+    func wikiLinkKeepsExplicitMdExtension() {
+        let target = HyperlinkMarkdown.target(at: 3, in: "[[media/page.md]]")
+
+        #expect(target == .vaultDocument(relativePath: "media/page.md"))
+    }
+
+    @Test("Wiki link syntax ranges cover the double brackets only")
+    func wikiLinkSyntaxRangesCoverBrackets() throws {
+        let match = try #require(HyperlinkMarkdown.matches(in: "[[note]]").first)
+
+        #expect(match.syntaxRanges == [
+            NSRange(location: 0, length: 2),
+            NSRange(location: 6, length: 2),
+        ])
+    }
+
+    @Test("Markdown link syntax ranges are unchanged by the wiki kind")
+    func markdownLinkSyntaxRangesUnchanged() throws {
+        let match = try #require(HyperlinkMarkdown.matches(in: "[a](b.md)").first)
+
+        #expect(match.kind == .markdown)
+        #expect(match.syntaxRanges == [
+            NSRange(location: 0, length: 1),
+            NSRange(location: 2, length: 2),
+            NSRange(location: 4, length: 4),
+            NSRange(location: 8, length: 1),
+        ])
+    }
+
+    @Test("Invalid wiki paths do not produce matches")
+    func invalidWikiPathsDoNotMatch() {
+        #expect(HyperlinkMarkdown.matches(in: "[[]]").isEmpty)
+        #expect(HyperlinkMarkdown.matches(in: "[[   ]]").isEmpty)
+        #expect(HyperlinkMarkdown.matches(in: "[[/absolute/path]]").isEmpty)
+        #expect(HyperlinkMarkdown.matches(in: "[[../escape]]").isEmpty)
+        #expect(HyperlinkMarkdown.matches(in: "[[a|alias]]").isEmpty)
+        #expect(HyperlinkMarkdown.matches(in: "[[unclosed").isEmpty)
+        #expect(HyperlinkMarkdown.matches(in: "[single](x").isEmpty)
+    }
+
+    @Test("Wiki and markdown links coexist on one line with correct ordering")
+    func wikiAndMarkdownLinksCoexist() throws {
+        let text = "[[first/note]] then [Second](second.md) then [[third]]"
+        let matches = HyperlinkMarkdown.matches(in: text)
+
+        #expect(matches.count == 3)
+        #expect(matches.map(\.kind) == [.wiki, .markdown, .wiki])
+        let first = try #require(matches.first)
+        #expect(first.fullRange.location == 0)
+        #expect(matches[1].fullRange.location > NSMaxRange(first.fullRange))
+        #expect(matches[2].fullRange.location > NSMaxRange(matches[1].fullRange))
+    }
+
+    @Test("Adjacent wiki links parse as separate matches")
+    func adjacentWikiLinksParseSeparately() {
+        let matches = HyperlinkMarkdown.matches(in: "[[a]][[b]]")
+
+        #expect(matches.count == 2)
+        #expect(matches.map(\.title) == ["a", "b"])
+    }
+
+    @Test("Tap location inside a wiki link resolves its target")
+    func tapInsideWikiLinkResolvesTarget() {
+        let target = HyperlinkMarkdown.target(at: 8, in: "Go [[media/page-name]]")
+
+        #expect(target == .vaultDocument(relativePath: "media/page-name.md"))
+    }
+
+    @Test("Hyperlink toggle unwraps a wiki link to its plain path")
+    func hyperlinkToggleUnwrapsWikiLink() {
+        let result = BlockEditingCommands.toggledHyperlink(
+            in: "See [[media/page-name]] now",
+            selection: NSRange(location: 8, length: 0)
+        )
+
+        #expect(result == TextSelectionTransform(
+            text: "See media/page-name now",
+            selection: NSRange(location: 4, length: 15)
+        ))
+    }
+
+    @Test("Wiki link attribute URL round-trips through the noto-document scheme")
+    func wikiLinkAttributeURLRoundTrips() throws {
+        let match = try #require(HyperlinkMarkdown.matches(in: "[[media/page-name]]").first)
+        let url = try #require(match.url)
+
+        #expect(url.scheme == "noto-document")
+        let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        let path = components.queryItems?.first { $0.name == "path" }?.value
+        #expect(path == "media/page-name.md")
+    }
+
     @Test("Page mention detects active query after at-prefix")
     func pageMentionDetectsActiveQuery() {
         let result = PageMentionMarkdown.activeQuery(

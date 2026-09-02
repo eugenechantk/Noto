@@ -21,6 +21,7 @@ final class VaultController {
 
     init(
         vaultURL: URL,
+        autoloadRoot: Bool = true,
         directoryLoader: VaultDirectoryLoader = VaultDirectoryLoader()
     ) {
         self.vaultURL = vaultURL
@@ -37,7 +38,9 @@ final class VaultController {
             autoload: false,
             directoryLoader: directoryLoader
         )
-        self.rootStore.loadItemsInBackground()
+        if autoloadRoot {
+            self.rootStore.loadItemsInBackground()
+        }
     }
 
     func loadRoot() {

@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import NotoVault
+import NotoTags
 
 /// v2 Properties sheet (`NotoPropertyList` / `noto-properties-hig.jsx`) presented over the
 /// editor on iPhone/iPad. macOS uses its own native grouped `Form` (`MacPropertiesForm`).
@@ -22,6 +23,7 @@ struct PropertiesSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(TagController.self) private var tagController
 
     // inline editing — one field at a time. `editingTagIndex` non-nil means a tag member.
     @State private var editingKey: String?
@@ -256,7 +258,7 @@ struct PropertiesSheet: View {
             HStack(spacing: 7) {
                 ForEach(Array(tags.enumerated()), id: \.offset) { index, tag in
                     if editingKey == field.key, editingTagIndex == index {
-                        inlineTagField
+                        inlineTagFieldWithSuggestions
                     } else {
                         Button {
                             beginTagEdit(key: field.key, index: index, tags: tags)
@@ -279,7 +281,7 @@ struct PropertiesSheet: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("add_tag_button")
                 } else {
-                    inlineTagField
+                    inlineTagFieldWithSuggestions
                 }
             }
         }
@@ -292,7 +294,7 @@ struct PropertiesSheet: View {
     /// Inline chip-sized editor for a single tag member.
     private var inlineTagField: some View {
         TextField("tag", text: $draft)
-            .focused($fieldFocused)
+        .focused($fieldFocused)
             .propertiesNoAutocap()
             .autocorrectionDisabled()
             .submitLabel(.done)
@@ -310,6 +312,42 @@ struct PropertiesSheet: View {
             }
             .onAppear { fieldFocused = true }
             .accessibilityIdentifier("property_inline_tag_field")
+    }
+
+    @ViewBuilder
+    private var inlineTagFieldWithSuggestions: some View {
+        inlineTagField
+            .overlay(alignment: .bottomLeading) {
+                if !visibleTagSuggestions.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(visibleTagSuggestions.enumerated()), id: \.offset) { index, tag in
+                            Button {
+                                draft = tag.rawValue
+                                commitInlineEdit()
+                            } label: {
+                                TagChip(text: tag.rawValue)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("tag_suggestion_\(index)")
+                        }
+                    }
+                    .frame(maxWidth: 180)
+                    .padding(6)
+                    .background(NotoTheme.card, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 1)
+                    .accessibilityIdentifier("tag_suggestion_list")
+                    .offset(y: 28)
+                }
+            }
+    }
+
+    private var visibleTagSuggestions: [TagName] {
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard editingTagIndex != nil, !trimmed.isEmpty else {
+            return []
+        }
+
+        return Array(tagController.suggestions(matching: trimmed).prefix(6))
     }
 
     private var addPropertyRow: some View {
@@ -360,6 +398,8 @@ struct PropertiesSheet: View {
     private func commitInlineEdit() {
         guard let key = editingKey else { return }
         if let idx = editingTagIndex {
+            let previous = NotePropertyClassifier.parseTags(fields.first { $0.key == key }?.value ?? "")
+                .compactMap(TagName.init)
             var members = editingTagMembers
             let trimmed = draft.trimmingCharacters(in: .whitespaces)
             if idx < members.count {
@@ -367,7 +407,7 @@ struct PropertiesSheet: View {
             } else if !trimmed.isEmpty {
                 members.append(trimmed)
             }
-            updateField(key, NotePropertyClassifier.serializeTags(members))
+            tagController.commitTags(members, previous: previous, frontmatterKey: key, session: session)
         } else {
             updateField(key, draft)
         }
