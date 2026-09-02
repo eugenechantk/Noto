@@ -1,0 +1,41 @@
+===== /Users/eugenechan/Library/Developer/CoreSimulator/Devices/6A3AB13E-6A15-46C7-97BC-531A2602EE84/data/Containers/Data/Application/902F1F4A-1222-4AC0-ADDC-2C0143AF0E0D/Documents/Noto/inbox/2026-08-15-aaaa1111.md
+---
+id: 11111111-1111-4111-8111-111111111111
+created: 2026-08-15T09:00:00Z
+updated: 2026-08-15T09:00:00Z
+type: note
+status: inbox
+snoozed_until: 2026-12-01T12:00:00Z
+---
+
+SNOOZED CAPTURE should not appear in the digest.
+===== /Users/eugenechan/Library/Developer/CoreSimulator/Devices/6A3AB13E-6A15-46C7-97BC-531A2602EE84/data/Containers/Data/Application/902F1F4A-1222-4AC0-ADDC-2C0143AF0E0D/Documents/Noto/inbox/2026-08-20-bbbb2222.md
+---
+id: 22222222-2222-4222-8222-222222222222
+created: 2026-08-20T10:15:00Z
+updated: 2026-08-20T10:15:00Z
+type: note
+status: inbox
+---
+
+OLDEST capture: call the dentist about the crown refit.
+===== /Users/eugenechan/Library/Developer/CoreSimulator/Devices/6A3AB13E-6A15-46C7-97BC-531A2602EE84/data/Containers/Data/Application/902F1F4A-1222-4AC0-ADDC-2C0143AF0E0D/Documents/Noto/inbox/2026-08-25-cccc3333.md
+---
+id: 33333333-3333-4333-8333-333333333333
+created: 2026-08-25T14:30:00Z
+updated: 2026-08-25T14:30:00Z
+type: note
+status: inbox
+---
+
+MIDDLE capture: draft the Q4 roadmap one-pager.
+===== /Users/eugenechan/Library/Developer/CoreSimulator/Devices/6A3AB13E-6A15-46C7-97BC-531A2602EE84/data/Containers/Data/Application/902F1F4A-1222-4AC0-ADDC-2C0143AF0E0D/Documents/Noto/inbox/2026-08-30-dddd4444.md
+---
+id: 44444444-4444-4444-8444-444444444444
+created: 2026-08-30T08:45:00Z
+updated: 2026-08-30T08:45:00Z
+type: note
+status: inbox
+---
+
+NEWEST capture: buy tickets for the November trip.

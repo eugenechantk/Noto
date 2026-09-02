@@ -1,0 +1,534 @@
+[16:05:17]: [33mWARNING: Support for your Ruby version (3.2.7) is going away. fastlane will soon require Ruby 3.3.0 or newer.[0m
+[16:05:18]: [32m------------------------------[0m
+[16:05:18]: [32m--- Step: default_platform ---[0m
+[16:05:18]: [32m------------------------------[0m
+[16:05:18]: [32mDriving the lane 'ios deploy_testflight' 🚀[0m
+[16:05:18]: [32m-------------------[0m
+[16:05:18]: [32m--- Step: is_ci ---[0m
+[16:05:18]: [32m-------------------[0m
+[16:05:18]: [32m---------------------------------------[0m
+[16:05:18]: [32m--- Step: app_store_connect_api_key ---[0m
+[16:05:18]: [32m---------------------------------------[0m
+[16:05:18]: [32m---------------------------------------[0m
+[16:05:18]: [32m--- Step: app_store_connect_api_key ---[0m
+[16:05:18]: [32m---------------------------------------[0m
+[16:05:20]: [32m--------------------------------[0m
+[16:05:20]: [32m--- Step: get_version_number ---[0m
+[16:05:20]: [32m--------------------------------[0m
+[16:05:21]: [32mVersion train OK: 0.1.0 >= highest existing train 0.1.0.[0m
+[16:05:21]: [32m---------------------------------------[0m
+[16:05:21]: [32m--- Step: app_store_connect_api_key ---[0m
+[16:05:21]: [32m---------------------------------------[0m
+[16:05:21]: [32m-------------------[0m
+[16:05:21]: [32m--- Step: match ---[0m
+[16:05:21]: [32m-------------------[0m
+[16:05:21]: [32mSuccessfully loaded '/Users/eugenechan/dev/personal/Noto/fastlane/Matchfile' 📄[0m
+
++-------------------------------------------------------+
+|      Detected Values from './fastlane/Matchfile'      |
++----------------+--------------------------------------+
+| storage_mode   | git                                  |
+| git_url        | https://github.com/eugenechantk/mat  |
+|                | ch.git                               |
+| git_branch     | main                                 |
+| type           | appstore                             |
+| readonly       | true                                 |
+| app_identifier | com.eugenechan.Noto2                 |
+| team_id        | 39GJBP8V5A                           |
++----------------+--------------------------------------+
+
+
++-----------------------------------------------------------------------------+
+|                          [32mSummary for match 2.234.0[0m                          |
++--------------------------------------+--------------------------------------+
+| type                                 | appstore                             |
+| readonly                             | true                                 |
+| app_identifier                       | ["com.eugenechan.Noto2",             |
+|                                      | "com.eugenechan.Noto2.QuickCaptureC  |
+|                                      | ontrol"]                             |
+| git_url                              | https://github.com/eugenechantk/mat  |
+|                                      | ch.git                               |
+| git_branch                           | main                                 |
+| team_id                              | 39GJBP8V5A                           |
+| api_key                              | ********                             |
+| generate_apple_certs                 | true                                 |
+| skip_provisioning_profiles           | false                                |
+| storage_mode                         | git                                  |
+| shallow_clone                        | false                                |
+| clone_branch_directly                | false                                |
+| git_basic_authorization              | ********                             |
+| skip_google_cloud_account_confirmat  | false                                |
+| ion                                  |                                      |
+| s3_skip_encryption                   | false                                |
+| gitlab_host                          | https://gitlab.com                   |
+| keychain_name                        | login.keychain                       |
+| force                                | false                                |
+| force_for_new_devices                | false                                |
+| include_mac_in_profiles              | false                                |
+| include_all_certificates             | false                                |
+| force_for_new_certificates           | false                                |
+| skip_confirmation                    | false                                |
+| safe_remove_certs                    | false                                |
+| skip_docs                            | false                                |
+| platform                             | ios                                  |
+| derive_catalyst_app_identifier       | false                                |
+| fail_on_name_taken                   | false                                |
+| skip_certificate_matching            | false                                |
+| skip_set_partition_list              | false                                |
+| force_legacy_encryption              | false                                |
+| verbose                              | false                                |
++--------------------------------------+--------------------------------------+
+
+[16:05:21]: Cloning remote git repo...
+[16:05:21]: If cloning the repo takes too long, you can use the `clone_branch_directly` option in match.
+[16:05:22]: Checking out branch main...
+[16:05:23]: [32m🔓  Successfully decrypted certificates repo[0m
+[16:05:23]: Installing certificate...
+
++--------------------------------------------------------------------------+
+|                          [32mInstalled Certificate[0m                           |
++-------------------+------------------------------------------------------+
+| User ID           | 39GJBP8V5A                                           |
+| Common Name       | Apple Distribution: Tsz Kiu Eugene Chan (39GJBP8V5A) |
+| Organisation Unit | 39GJBP8V5A                                           |
+| Organisation      | Tsz Kiu Eugene Chan                                  |
+| Country           | US                                                   |
+| Start Datetime    | 2026-05-16 15:17:49 UTC                              |
+| End Datetime      | 2027-05-16 15:17:48 UTC                              |
++-------------------+------------------------------------------------------+
+
+[16:05:23]: Installing provisioning profile...
+[16:05:23]: Installing provisioning profile...
+
++-----------------------------------------------------------------------+
+|                    [32mInstalled Provisioning Profile[0m                     |
++---------------------+------------------------+------------------------+
+| Parameter           | Environment Variable   | Value                  |
++---------------------+------------------------+------------------------+
+| App Identifier      |                        | com.eugenechan.Noto2   |
+| Type                |                        | appstore               |
+| Platform            |                        | ios                    |
+| Profile UUID        | sigh_com.eugenechan.N  | c3cf2b95-b3d8-43e7-b4  |
+|                     | oto2_appstore          | 8f-87c6edd2d1c1        |
+| Profile Name        | sigh_com.eugenechan.N  | match AppStore         |
+|                     | oto2_appstore_profile  | com.eugenechan.Noto2   |
+|                     | -name                  |                        |
+| Profile Path        | sigh_com.eugenechan.N  | /Users/eugenechan/Lib  |
+|                     | oto2_appstore_profile  | rary/Developer/Xcode/  |
+|                     | -path                  | UserData/Provisioning  |
+|                     |                        | Profiles/c3cf2b95-b3d  |
+|                     |                        | 8-43e7-b48f-87c6edd2d  |
+|                     |                        | 1c1.mobileprovision    |
+| Development Team ID | sigh_com.eugenechan.N  | 39GJBP8V5A             |
+|                     | oto2_appstore_team-id  |                        |
+| Certificate Name    | sigh_com.eugenechan.N  | Apple Distribution:    |
+|                     | oto2_appstore_certifi  | Tsz Kiu Eugene Chan    |
+|                     | cate-name              | (39GJBP8V5A)           |
++---------------------+------------------------+------------------------+
+
+
++-----------------------------------------------------------------------+
+|                    [32mInstalled Provisioning Profile[0m                     |
++---------------------+------------------------+------------------------+
+| Parameter           | Environment Variable   | Value                  |
++---------------------+------------------------+------------------------+
+| App Identifier      |                        | com.eugenechan.Noto2.  |
+|                     |                        | QuickCaptureControl    |
+| Type                |                        | appstore               |
+| Platform            |                        | ios                    |
+| Profile UUID        | sigh_com.eugenechan.N  | e25ad1de-8035-46ca-b5  |
+|                     | oto2.QuickCaptureCont  | fa-712844214f6a        |
+|                     | rol_appstore           |                        |
+| Profile Name        | sigh_com.eugenechan.N  | match AppStore         |
+|                     | oto2.QuickCaptureCont  | com.eugenechan.Noto2.  |
+|                     | rol_appstore_profile-  | QuickCaptureControl    |
+|                     | name                   |                        |
+| Profile Path        | sigh_com.eugenechan.N  | /Users/eugenechan/Lib  |
+|                     | oto2.QuickCaptureCont  | rary/Developer/Xcode/  |
+|                     | rol_appstore_profile-  | UserData/Provisioning  |
+|                     | path                   | Profiles/e25ad1de-803  |
+|                     |                        | 5-46ca-b5fa-712844214  |
+|                     |                        | f6a.mobileprovision    |
+| Development Team ID | sigh_com.eugenechan.N  | 39GJBP8V5A             |
+|                     | oto2.QuickCaptureCont  |                        |
+|                     | rol_appstore_team-id   |                        |
+| Certificate Name    | sigh_com.eugenechan.N  | Apple Distribution:    |
+|                     | oto2.QuickCaptureCont  | Tsz Kiu Eugene Chan    |
+|                     | rol_appstore_certific  | (39GJBP8V5A)           |
+|                     | ate-name               |                        |
++---------------------+------------------------+------------------------+
+
+[16:05:24]: [32m[32mAll required keys, certificates and provisioning profiles are installed 🙌[0m
+[16:05:24]: Setting Provisioning Profile type to 'app-store'
+[16:05:24]: [32m------------------------------------------[0m
+[16:05:24]: [32m--- Step: update_code_signing_settings ---[0m
+[16:05:24]: [32m------------------------------------------[0m
+
++-------------------------------------------------------------+
+|              [32mSummary for code signing settings[0m              |
++-----------------------+-------------------------------------+
+| use_automatic_signing | false                               |
+| path                  | Noto.xcodeproj                      |
+| targets               | ["Noto2"]                           |
+| team_id               | 39GJBP8V5A                          |
+| code_sign_identity    | Apple Distribution                  |
+| profile_name          | match AppStore com.eugenechan.Noto2 |
++-----------------------+-------------------------------------+
+
+[16:05:24]: Updating the Automatic Codesigning flag to disabled for the given project '/Users/eugenechan/dev/personal/Noto/Noto.xcodeproj/project.pbxproj'
+[16:05:24]: [33mSkipping Noto not selected (Noto2)[0m
+[16:05:24]: [33mSkipping NotoTests not selected (Noto2)[0m
+[16:05:24]: [33mSkipping NotoMacOSUITests not selected (Noto2)[0m
+[16:05:24]: [33mSkipping NotoiOSUITests not selected (Noto2)[0m
+[16:05:24]: [33mSet Team id to: 39GJBP8V5A for target: Noto2 for build configuration: Debug[0m
+[16:05:24]: [33mSet Code Sign identity to: Apple Distribution for target: Noto2 for build configuration: Debug[0m
+[16:05:24]: [33mSet Provisioning Profile name to: match AppStore com.eugenechan.Noto2 for target: Noto2 for build configuration: Debug[0m
+[16:05:24]: [33mSet Team id to: 39GJBP8V5A for target: Noto2 for build configuration: Release[0m
+[16:05:24]: [33mSet Code Sign identity to: Apple Distribution for target: Noto2 for build configuration: Release[0m
+[16:05:24]: [33mSet Provisioning Profile name to: match AppStore com.eugenechan.Noto2 for target: Noto2 for build configuration: Release[0m
+[16:05:24]: [33mSkipping Noto2Tests not selected (Noto2)[0m
+[16:05:24]: [33mSkipping Noto2QuickCaptureControl not selected (Noto2)[0m
+[16:05:24]: [32mSuccessfully updated project settings to use Code Sign Style = 'Manual'[0m
+[16:05:24]: [32mModified Targets:[0m
+[16:05:24]: [32m	 * Noto2[0m
+[16:05:24]: [32mModified Build Configurations:[0m
+[16:05:24]: [32m	 * Debug[0m
+[16:05:24]: [32m	 * Release[0m
+[16:05:24]: [32m------------------------------------------[0m
+[16:05:24]: [32m--- Step: update_code_signing_settings ---[0m
+[16:05:24]: [32m------------------------------------------[0m
+
++--------------------------------------------------------------+
+|              [32mSummary for code signing settings[0m               |
++-----------------------+--------------------------------------+
+| use_automatic_signing | false                                |
+| path                  | Noto.xcodeproj                       |
+| targets               | ["Noto2QuickCaptureControl"]         |
+| team_id               | 39GJBP8V5A                           |
+| code_sign_identity    | Apple Distribution                   |
+| profile_name          | match AppStore                       |
+|                       | com.eugenechan.Noto2.QuickCaptureCo  |
+|                       | ntrol                                |
++-----------------------+--------------------------------------+
+
+[16:05:24]: Updating the Automatic Codesigning flag to disabled for the given project '/Users/eugenechan/dev/personal/Noto/Noto.xcodeproj/project.pbxproj'
+[16:05:24]: [33mSkipping Noto not selected (Noto2QuickCaptureControl)[0m
+[16:05:24]: [33mSkipping NotoTests not selected (Noto2QuickCaptureControl)[0m
+[16:05:24]: [33mSkipping NotoMacOSUITests not selected (Noto2QuickCaptureControl)[0m
+[16:05:24]: [33mSkipping NotoiOSUITests not selected (Noto2QuickCaptureControl)[0m
+[16:05:24]: [33mSkipping Noto2 not selected (Noto2QuickCaptureControl)[0m
+[16:05:24]: [33mSkipping Noto2Tests not selected (Noto2QuickCaptureControl)[0m
+[16:05:24]: [33mSet Team id to: 39GJBP8V5A for target: Noto2QuickCaptureControl for build configuration: Release[0m
+[16:05:24]: [33mSet Code Sign identity to: Apple Distribution for target: Noto2QuickCaptureControl for build configuration: Release[0m
+[16:05:24]: [33mSet Provisioning Profile name to: match AppStore com.eugenechan.Noto2.QuickCaptureControl for target: Noto2QuickCaptureControl for build configuration: Release[0m
+[16:05:24]: [33mSet Team id to: 39GJBP8V5A for target: Noto2QuickCaptureControl for build configuration: Debug[0m
+[16:05:24]: [33mSet Code Sign identity to: Apple Distribution for target: Noto2QuickCaptureControl for build configuration: Debug[0m
+[16:05:24]: [33mSet Provisioning Profile name to: match AppStore com.eugenechan.Noto2.QuickCaptureControl for target: Noto2QuickCaptureControl for build configuration: Debug[0m
+[16:05:24]: [32mSuccessfully updated project settings to use Code Sign Style = 'Manual'[0m
+[16:05:24]: [32mModified Targets:[0m
+[16:05:24]: [32m	 * Noto2QuickCaptureControl[0m
+[16:05:24]: [32mModified Build Configurations:[0m
+[16:05:24]: [32m	 * Release[0m
+[16:05:24]: [32m	 * Debug[0m
+[16:05:24]: [32m-----------------------[0m
+[16:05:24]: [32m--- Step: build_app ---[0m
+[16:05:24]: [32m-----------------------[0m
+[16:05:24]: [33mResolving Swift Package Manager dependencies...[0m
+[16:05:24]: [36m$ xcodebuild -resolvePackageDependencies -scheme Noto2 -project Noto.xcodeproj -configuration Release -destination generic/platform\=iOS[0m
+[16:05:25]: ▸ [35mCommand line invocation:[0m
+[16:05:25]: ▸ [35m    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -resolvePackageDependencies -scheme Noto2 -project Noto.xcodeproj -configuration Release -destination generic/platform=iOS[0m
+[16:05:25]: ▸ [35mResolve Package Graph[0m
+[16:05:31]: ▸ [35mResolved source packages:[0m
+[16:05:31]: ▸ [35m  NotoReadwiseSync: /Users/eugenechan/dev/personal/Noto/Packages/NotoReadwiseSync @ local[0m
+[16:05:31]: ▸ [35m  NotoVault: /Users/eugenechan/dev/personal/Noto/Packages/NotoVault @ local[0m
+[16:05:31]: ▸ [35m  NotoChat: /Users/eugenechan/dev/personal/Noto/Packages/NotoChat @ local[0m
+[16:05:31]: ▸ [35m  NotoEdit: /Users/eugenechan/dev/personal/Noto/Packages/NotoEdit @ local[0m
+[16:05:31]: ▸ [35m  NotoEmbedding: /Users/eugenechan/dev/personal/Noto/Packages/NotoEmbedding @ local[0m
+[16:05:31]: ▸ [35m  NotoTags: /Users/eugenechan/dev/personal/Noto/Packages/NotoTags @ local[0m
+[16:05:31]: ▸ [35m  NotoSearch: /Users/eugenechan/dev/personal/Noto/Packages/NotoSearch @ local[0m
+[16:05:31]: ▸ [35mresolved source packages: NotoReadwiseSync, NotoVault, NotoChat, NotoEdit, NotoEmbedding, NotoTags, NotoSearch[0m
+[16:05:31]: [36m$ xcodebuild -showBuildSettings -scheme Noto2 -project Noto.xcodeproj -configuration Release -destination generic/platform\=iOS 2>&1[0m
+[16:05:32]: Detected provisioning profile mapping: {:"com.eugenechan.Noto2"=>"match AppStore com.eugenechan.Noto2", :"com.eugenechan.Noto2.QuickCaptureControl"=>"match AppStore com.eugenechan.Noto2.QuickCaptureControl"}
+
++-----------------------------------------------------------------------------+
+|                           [32mSummary for gym 2.234.0[0m                           |
++--------------------------------------+--------------------------------------+
+| project                              | Noto.xcodeproj                       |
+| scheme                               | Noto2                                |
+| configuration                        | Release                              |
+| destination                          | generic/platform=iOS                 |
+| clean                                | true                                 |
+| export_method                        | app-store                            |
+| output_directory                     | build/fastlane                       |
+| output_name                          | Noto2                                |
+| xcargs                               | CURRENT_PROJECT_VERSION=20260901160  |
+|                                      | 5                                    |
+| export_options.signingStyle          | manual                               |
+| export_options.provisioningProfiles  | match AppStore com.eugenechan.Noto2  |
+| .com.eugenechan.Noto2                |                                      |
+| export_options.provisioningProfiles  | match AppStore                       |
+| .com.eugenechan.Noto2.QuickCaptureC  | com.eugenechan.Noto2.QuickCaptureCo  |
+| ontrol                               | ntrol                                |
+| silent                               | false                                |
+| skip_package_ipa                     | false                                |
+| skip_package_pkg                     | false                                |
+| build_path                           | /Users/eugenechan/Library/Developer  |
+|                                      | /Xcode/Archives/2026-09-01           |
+| result_bundle                        | false                                |
+| buildlog_path                        | ~/Library/Logs/gym                   |
+| xcodebuild_formatter                 | xcpretty                             |
+| build_timing_summary                 | false                                |
+| skip_profile_detection               | false                                |
+| xcodebuild_command                   | xcodebuild                           |
+| skip_package_dependencies_resolutio  | false                                |
+| n                                    |                                      |
+| disable_package_automatic_updates    | false                                |
+| skip_package_repository_fetches      | false                                |
+| use_system_scm                       | false                                |
+| generate_appstore_info               | false                                |
+| xcode_path                           | /Applications/Xcode.app              |
++--------------------------------------+--------------------------------------+
+
+[16:05:32]: [36m$ set -o pipefail && xcodebuild -scheme Noto2 -project Noto.xcodeproj -configuration Release -destination 'generic/platform=iOS' -archivePath /Users/eugenechan/Library/Developer/Xcode/Archives/2026-09-01/Noto2\ 2026-09-01\ 16.05.32.xcarchive CURRENT_PROJECT_VERSION=202609011605 clean archive | tee /Users/eugenechan/Library/Logs/gym/Noto2-Noto2.log | xcpretty[0m
+[16:05:33]: [35m[33m▸[0m [39;1mClean[0m Succeeded[0m
+[16:05:36]: [35m[33m▸[0m [39;1mCopying[0m /Users/eugenechan/Library/Developer/Xcode/DerivedData/Noto-avkhatqcdtvymufbhyrxtlkrfeqb/Build/Intermediates.noindex/ArchiveIntermediates/Noto2/IntermediateBuildFilesPath/UninstalledProducts/iphoneos/NotoEmbedding_NotoEmbedding.bundle/tokenizer_config.json[0m
+[16:05:36]: [35m[33m▸[0m [39;1mCopying[0m /Users/eugenechan/Library/Developer/Xcode/DerivedData/Noto-avkhatqcdtvymufbhyrxtlkrfeqb/Build/Intermediates.noindex/ArchiveIntermediates/Noto2/IntermediateBuildFilesPath/UninstalledProducts/iphoneos/NotoEmbedding_NotoEmbedding.bundle/tokenizer.json[0m
+[16:05:36]: [35m[33m▸[0m [39;1mProcessing[0m Info.plist[0m
+[16:05:36]: [35m[33m▸[0m [39;1mProcessing[0m empty-NotoEmbedding_NotoEmbedding.plist[0m
+[16:05:36]: [35m[33m▸[0m [39;1mTouching[0m NotoEmbedding_NotoEmbedding.bundle (in target 'NotoEmbedding_NotoEmbedding' from project 'NotoEmbedding')[0m
+[16:05:44]: [35m[33m▸[0m [39;1mLinking[0m NotoTags.o[0m
+[16:05:44]: [35m[33m▸[0m [39;1mLinking[0m NotoEdit.o[0m
+[16:05:44]: [35m[33m▸[0m [39;1mLinking[0m Noto2QuickCaptureControl[0m
+[16:05:44]: [35m[33m▸[0m [39;1mGenerating 'Noto2QuickCaptureControl.appex.dSYM'[0m
+[16:05:44]: [35m[33m▸[0m [39;1mTouching[0m Noto2QuickCaptureControl.appex (in target 'Noto2QuickCaptureControl' from project 'Noto')[0m
+[16:05:44]: [35m[33m▸[0m [39;1mLinking[0m NotoVault.o[0m
+[16:06:12]: [35m[33m▸[0m [39;1mLinking[0m NotoEmbedding.o[0m
+[16:06:12]: [35m[33m▸[0m [39;1mLinking[0m NotoSearch.o[0m
+[16:06:12]: [35m[33m▸[0m [39;1mLinking[0m NotoChat.o[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/NoteEditorSession.swift:388:50: [33mmain actor-isolated static property 'downloadDeadline' cannot be accessed from outside of the actor; this is an error in the Swift 6 language mode[0m
+[16:06:26]: ▸ [35m        let deadline = Date().addingTimeInterval(downloadDeadline)[0m
+[16:06:26]: ▸ [35m[36m                       ~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:1864:68: [33m'main' was deprecated in iOS 26.0: Use a UIScreen instance found through context instead (i.e, view.window.windowScene.screen), or for properties like UIScreen.scale with trait equivalents, use a traitCollection found through context.[0m
+[16:06:26]: ▸ [35m        let renderScale = image.scale > 0 ? image.scale : UIScreen.main.scale[0m
+[16:06:26]: ▸ [35m[36m                                                                   ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:2309:62: [33m'main' was deprecated in iOS 26.0: Use a UIScreen instance found through context instead (i.e, view.window.windowScene.screen), or for properties like UIScreen.scale with trait equivalents, use a traitCollection found through context.[0m
+[16:06:26]: ▸ [35m        let screenHeight = window?.bounds.height ?? UIScreen.main.bounds.height[0m
+[16:06:26]: ▸ [35m[36m                                                             ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:2571:21: [33m'done' was deprecated in iOS 26.0: renamed to 'UIBarButtonItem.Style.prominent'[0m
+[16:06:26]: ▸ [35m            style: .done,[0m
+[16:06:26]: ▸ [35m[36m                    ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3196:13: [33m'init(input:modifierFlags:action:discoverabilityTitle:)' was deprecated in iOS 13.0[0m
+[16:06:26]: ▸ [35m            UIKeyCommand([0m
+[16:06:26]: ▸ [35m[36m                    ^~~~[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3202:13: [33m'init(input:modifierFlags:action:discoverabilityTitle:)' was deprecated in iOS 13.0[0m
+[16:06:26]: ▸ [35m            UIKeyCommand([0m
+[16:06:26]: ▸ [35m[36m            ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3208:13: [33m'init(input:modifierFlags:action:discoverabilityTitle:)' was deprecated in iOS 13.0[0m
+[16:06:26]: ▸ [35m            UIKeyCommand([0m
+[16:06:26]: ▸ [35m[36m            ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3214:13: [33m'init(input:modifierFlags:action:discoverabilityTitle:)' was deprecated in iOS 13.0[0m
+[16:06:26]: ▸ [35m            UIKeyCommand([0m
+[16:06:26]: ▸ [35m[36m            ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3220:13: [33m'init(input:modifierFlags:action:discoverabilityTitle:)' was deprecated in iOS 13.0[0m
+[16:06:26]: ▸ [35m            UIKeyCommand([0m
+[16:06:26]: ▸ [35m[36m            ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3226:13: [33m'init(input:modifierFlags:action:discoverabilityTitle:)' was deprecated in iOS 13.0[0m
+[16:06:26]: ▸ [35m            UIKeyCommand([0m
+[16:06:26]: ▸ [35m[36m            ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3236:17: [33m'init(input:modifierFlags:action:discoverabilityTitle:)' was deprecated in iOS 13.0[0m
+[16:06:26]: ▸ [35m                UIKeyCommand([0m
+[16:06:26]: ▸ [35m[36m            ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3242:17: [33m'init(input:modifierFlags:action:discoverabilityTitle:)' was deprecated in iOS 13.0[0m
+[16:06:26]: ▸ [35m                UIKeyCommand([0m
+[16:06:26]: ▸ [35m[36m                ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3248:17: [33m'init(input:modifierFlags:action:discoverabilityTitle:)' was deprecated in iOS 13.0[0m
+[16:06:26]: ▸ [35m                UIKeyCommand([0m
+[16:06:26]: ▸ [35m[36m                ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3258:29: [33m'init(input:modifierFlags:action:discoverabilityTitle:)' was deprecated in iOS 13.0[0m
+[16:06:26]: ▸ [35m            commands.append(UIKeyCommand([0m
+[16:06:26]: ▸ [35m[36m                ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:3912:20: [33m'contentEdgeInsets' was deprecated in iOS 15.0: This property is ignored when using UIButtonConfiguration[0m
+[16:06:26]: ▸ [35m            button.contentEdgeInsets = UIEdgeInsets(top: 7, left: 12, bottom: 7, right: 12)[0m
+[16:06:26]: ▸ [35m[36m                            ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Editor/TextKit2EditorView.swift:5364:30: [33m'main' was deprecated in iOS 26.0: Use a UIScreen instance found through context instead (i.e, view.window.windowScene.screen), or for properties like UIScreen.scale with trait equivalents, use a traitCollection found through context.[0m
+[16:06:26]: ▸ [35m        let scale = UIScreen.main.scale[0m
+[16:06:26]: ▸ [35m[36m                   ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Search/SemanticSearchService.swift:59:44: [33mmain actor-isolated static property 'shared' can not be referenced from a Sendable closure; this is an error in the Swift 6 language mode[0m
+[16:06:26]: ▸ [35m                    SearchIndexStatusModel.shared.noteSemanticProgress()[0m
+[16:06:26]: ▸ [35m[36m                             ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/Noto2/Capture/CaptureScreen.swift:348:31: [33m'main' was deprecated in iOS 26.0: Use a UIScreen instance found through context instead (i.e, view.window.windowScene.screen), or for properties like UIScreen.scale with trait equivalents, use a traitCollection found through context.[0m
+[16:06:26]: ▸ [35m        let bounds = UIScreen.main.bounds[0m
+[16:06:26]: ▸ [35m[36m               ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/Noto2/Search/SearchModel.swift:158:31: [33mmain actor-isolated static property 'semanticMinScore' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode[0m
+[16:06:26]: ▸ [35m            semanticMinScore: semanticMinScore,[0m
+[16:06:26]: ▸ [35m[36m                              ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/Noto2/Search/SearchModel.swift:159:34: [33mmain actor-isolated static property 'semanticRelativeGap' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode[0m
+[16:06:26]: ▸ [35m            semanticRelativeGap: semanticRelativeGap,[0m
+[16:06:26]: ▸ [35m[36m               ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/Noto2/Search/SearchModel.swift:160:33: [33mmain actor-isolated static property 'semanticPeakMargin' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode[0m
+[16:06:26]: ▸ [35m            semanticPeakMargin: semanticPeakMargin[0m
+[16:06:26]: ▸ [35m[36m               ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/Noto2/RootTabView.swift:39:44: [33mmain actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode[0m
+[16:06:26]: ▸ [35m        launchRouter: Noto2LaunchRouter = .shared[0m
+[16:06:26]: ▸ [35m[36m               ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/Noto2/RootTabView.swift:120:21: [33mresult of 'try?' is unused[0m
+[16:06:26]: ▸ [35m                    try? await SearchIndexController.shared.refresh(vaultURL: vaultURL, fileURL: changedURL)[0m
+[16:06:26]: ▸ [35m[36m               ^[0m
+[16:06:26]: ▸ [35m[33m⚠️  [0m/Users/eugenechan/dev/personal/Noto/NotoShared/Views/EditorContentView.swift:75:35: [33m'main' was deprecated in iOS 26.0: Use a UIScreen instance found through context instead (i.e, view.window.windowScene.screen), or for properties like UIScreen.scale with trait equivalents, use a traitCollection found through context.[0m
+[16:06:26]: ▸ [35m            let screen = UIScreen.main.bounds[0m
+[16:06:26]: ▸ [35m[36m                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[16:06:26]: [35m[33m▸[0m [39;1mLinking[0m Noto2[0m
+[16:06:26]: [35m[33m▸[0m [39;1mRunning script[0m 'Generate Secrets'[0m
+[16:06:27]: [35m[33m▸[0m [39;1mProcessing[0m Info.plist[0m
+[16:06:27]: [35m[33m▸[0m [39;1mGenerating 'Noto2.app.dSYM'[0m
+[16:06:29]: [35m[33m▸[0m [39;1mTouching[0m Noto2.app (in target 'Noto2' from project 'Noto')[0m
+[16:06:29]: [35m[33m▸[0m [39;1mArchive[0m Succeeded[0m
+[16:06:29]: [33mGenerated plist file with the following values:[0m
+[16:06:29]: ▸ [35m-----------------------------------------[0m
+[16:06:29]: ▸ [35m{[0m
+[16:06:29]: ▸ [35m  "signingStyle": "manual",[0m
+[16:06:29]: ▸ [35m  "provisioningProfiles": {[0m
+[16:06:29]: ▸ [35m    "com.eugenechan.Noto2": "match AppStore com.eugenechan.Noto2",[0m
+[16:06:29]: ▸ [35m    "com.eugenechan.Noto2.QuickCaptureControl": "match AppStore com.eugenechan.Noto2.QuickCaptureControl"[0m
+[16:06:29]: ▸ [35m  },[0m
+[16:06:29]: ▸ [35m  "method": "app-store"[0m
+[16:06:29]: ▸ [35m}[0m
+[16:06:29]: ▸ [35m-----------------------------------------[0m
+[16:06:29]: [36m$ /usr/bin/xcrun /Users/eugenechan/.rbenv/versions/3.2.7/lib/ruby/gems/3.2.0/gems/fastlane-2.234.0/gym/lib/assets/wrap_xcodebuild/xcbuild-safe.sh -exportArchive -exportOptionsPlist '/var/folders/cd/_rd32xx17dv8ltmf4ctm5wn40000gn/T/gym_config20260901-14893-ejhyf0.plist' -archivePath /Users/eugenechan/Library/Developer/Xcode/Archives/2026-09-01/Noto2\ 2026-09-01\ 16.05.32.xcarchive -exportPath '/var/folders/cd/_rd32xx17dv8ltmf4ctm5wn40000gn/T/gym_output20260901-14893-g5qnm0' CURRENT_PROJECT_VERSION=202609011605 [0m
+[16:06:33]: Compressing 2 dSYM(s)
+[16:06:33]: [36m$ cd '/Users/eugenechan/Library/Developer/Xcode/Archives/2026-09-01/Noto2 2026-09-01 16.05.32.xcarchive/dSYMs' && zip -r '/Users/eugenechan/dev/personal/Noto/build/fastlane/Noto2.app.dSYM.zip' *.dSYM[0m
+[16:06:34]: ▸ [35mupdating: Noto2.app.dSYM/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2.app.dSYM/Contents/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2.app.dSYM/Contents/Resources/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2.app.dSYM/Contents/Resources/Relocations/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2.app.dSYM/Contents/Resources/Relocations/aarch64/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2.app.dSYM/Contents/Resources/Relocations/aarch64/Noto2.yml (deflated 86%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2.app.dSYM/Contents/Resources/DWARF/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2.app.dSYM/Contents/Resources/DWARF/Noto2 (deflated 68%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2.app.dSYM/Contents/Info.plist (deflated 51%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2QuickCaptureControl.appex.dSYM/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2QuickCaptureControl.appex.dSYM/Contents/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2QuickCaptureControl.appex.dSYM/Contents/Resources/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2QuickCaptureControl.appex.dSYM/Contents/Resources/Relocations/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2QuickCaptureControl.appex.dSYM/Contents/Resources/Relocations/aarch64/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2QuickCaptureControl.appex.dSYM/Contents/Resources/Relocations/aarch64/Noto2QuickCaptureControl.yml (deflated 34%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2QuickCaptureControl.appex.dSYM/Contents/Resources/DWARF/ (stored 0%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2QuickCaptureControl.appex.dSYM/Contents/Resources/DWARF/Noto2QuickCaptureControl (deflated 59%)[0m
+[16:06:34]: ▸ [35mupdating: Noto2QuickCaptureControl.appex.dSYM/Contents/Info.plist (deflated 51%)[0m
+
+[16:06:34]: [32mSuccessfully exported and compressed dSYM file[0m
+[16:06:34]: [32mSuccessfully exported and signed the ipa file:[0m
+[16:06:34]: /Users/eugenechan/dev/personal/Noto/build/fastlane/Noto2.ipa
+[16:06:34]: [32m----------------------------------[0m
+[16:06:34]: [32m--- Step: upload_to_testflight ---[0m
+[16:06:34]: [32m----------------------------------[0m
+[16:06:34]: Creating authorization token for App Store Connect API
+[16:06:34]: [32mReady to upload new build to TestFlight (App: 6804900143)...[0m
+[16:06:35]: Going to upload updated app to App Store Connect
+[16:06:35]: [32mThis might take a few minutes. Please don't interrupt the script.[0m
+[16:08:17]: [32m--------------------------------------------------------------------[0m
+[16:08:17]: [32mSuccessfully uploaded package to App Store Connect. It might take a few minutes until it's visible online.[0m
+[16:08:17]: [32m--------------------------------------------------------------------[0m
+[16:08:17]: [32mSuccessfully uploaded the new binary to App Store Connect[0m
+[16:08:17]: [33m`skip_waiting_for_build_processing` used and no `changelog` supplied - skipping waiting for build processing[0m
+
++---------------------------------------------+
+|              [32mfastlane summary[0m               |
++------+------------------------+-------------+
+| Step | Action                 | Time (in s) |
++------+------------------------+-------------+
+| 1    | default_platform       | 0           |
+| 2    | is_ci                  | 0           |
+| 3    | app_store_connect_api  | 0           |
+|      | _key                   |             |
+| 4    | app_store_connect_api  | 0           |
+|      | _key                   |             |
+| 5    | get_version_number     | 0           |
+| 6    | app_store_connect_api  | 0           |
+|      | _key                   |             |
+| 7    | match                  | 2           |
+| 8    | update_code_signing_s  | 0           |
+|      | ettings                |             |
+| 9    | update_code_signing_s  | 0           |
+|      | ettings                |             |
+| 10   | build_app              | 70          |
+| 11   | upload_to_testflight   | 102         |
++------+------------------------+-------------+
+
+[16:08:17]: [32mfastlane.tools finished successfully 🎉[0m
+
+#######################################################################
+# fastlane 2.238.0 is available. You are on 2.234.0.
+# You should use the latest version.
+# Please update using `bundle update fastlane`.
+#######################################################################
+
+[32m2.238.0 Improvements[0m
+* [ci] support releases with PRs that were deleted (or users) (#30105) via Connor Tumbleson (@iBotPeaches)
+* [pilot] Match groups by either name or id (#30104) via Alexander Chapliuk (@krin-san)
+* [update_project_team] add support for sdk conditionals (#30142) via Connor Tumbleson (@iBotPeaches)
+* harden: detected non-static command inside ` in... (#30148) via Anupam Mediratta (@anupamme)
+* [fastlane_core] Create a unique package directory for non-macOS uploads (#30144) via Victor Amorim dos Santos (@victoramsantos)
+* [gem] move to webrick 1.9.x (#30135) via Connor Tumbleson (@iBotPeaches)
+* [gem] upgrade 'terminal-table' to drop monkey patch (#30137) via Connor Tumbleson (@iBotPeaches)
+* [core] Fix video resolution parsing when audio track precedes video track (#30143) via Thomas Walther (@tcwalther)
+* [gym] Fix Mac Catalyst package type detection when catalyst_platform is not set (#29829) via Josh Holtz (@joshdholtz)
+* [deliver/pilot] change instruction on how to run iTMSTransporter (#21155) via Merlin Ran (@merlinran)
+* [gem] move to sinatra 4 (#30134) via Connor Tumbleson (@iBotPeaches)
+* [action][spm] add `--skip-update` (#21127) via Atsuto Yamashita (@att55)
+* Fix precheck copyright rule wording (#19500) via Andreas Ganske (@ChaosCoder)
+* docs: add detailed notation of what metrics collected (#30132) via Connor Tumbleson (@iBotPeaches)
+* Bump actions/labeler from 6 to 7 (#30133) via dependabot[bot] (@dependabot[bot])
+* [upload_symbols_to_crashlytics] Adds option to let the action fail when an upload fails (#29700) via Tobias Kreß (@Myrronth)
+* [deliver] add support for social media rating keys (#30128) via Connor Tumbleson (@iBotPeaches)
+* [core] Support for Ruby 4 (+ testing) (#29849) via Connor Tumbleson (@iBotPeaches)
+* [register_devices] Ignore blank lines and comment lines in devices_file (#30129) via David Cordero (@dcordero)
+* [core] detect installed Developer ID intermediate certificates by their common name (#30126) via Rinat Kutuev (@ReilganInt)
+* [core] move to xcodeproj 1.28.1 (from 1.27.0) (#30124) via Nuno de Carvalho (@nmcc24)
+* [core] normalize FastlaneSwiftRunner.xcodeproj plist quoting (#30125) via Nuno de Carvalho (@nmcc24)
+* [register_devices] Register devices normalization for UDIDs. (#29981) via Muhammet Ilendemli (@ilendemli)
+* [crashlytics] improve logging during error (#30077) via Connor Tumbleson (@iBotPeaches)
+* [setup_ci] Add option to opt out of setting the default keychain (#30121) via Eyüp Can Akman (@eyupcanakman)
+* [snapshot] Open the requested simulator for non-headless runs (#30119) via huven (@huven)
+* [core] improve operating_system detection (#30118) via Connor Tumbleson (@iBotPeaches)
+* [core] fix: upgrade yard to >= 0.9.42 (CVE-2026-41493) (#30117) via OrbisAI Security (@orbisai0security)
+* [core] move to Faraday 2 (#30089) via Connor Tumbleson (@iBotPeaches)
+* [docs] clarify platform resolution behavior (#22185) via Douglas Hill (@douglashill)
+* [core] fix crash when uploading large `.pkg` by using `Digest::MD5.file` instead of `Digest::MD5.hexdigest` (#21999) via reflexing (@reflexing)
+* [docs] fix a missing negation in `pilot` error message (#22331) via Gemma Barlow (@gemmakbarlow)
+* [notarize] Fix erroring out with `bundle_id` parameter being absent (#29736) via Timur Sharifianov (@Scvairy)
+* [metrics] move to GA4 and improve metrics (#30111) via Connor Tumbleson (@iBotPeaches)
+
+[32m2.237.0 Improvements[0m
+* [ci] drop CircleCI for GHA (#30108) via Connor Tumbleson (@iBotPeaches)
+* [fastlane_core] Restore altool -f flag, keep -assetFile only for iTMSTransporter (#30106) via Roman Gardukevich (@OdNairy)
+* [gym] handle xcpretty errors cleaner & promote xcbeautify (#30099) via Connor Tumbleson (@iBotPeaches)
+* [docs] Reflect specification changes regarding iPad Pro 12.9-inch screenshots in `deliver` (#30103) via 417-72KI (@417-72KI)
+* [core] Reduce duplication on output and noise during failure. (#30097) via Connor Tumbleson (@iBotPeaches)
+* Bump actions/checkout from 6 to 7 (#30100) via dependabot[bot] (@dependabot[bot])
+* [match] Restore renew expired certs (opt in) (#30096) via Roman Gardukevich (@OdNairy)
+* [match] fail fast for SSH authentication prompts in non-interactive shell (#30078) via Pratik Patil (@PratikPatil131)
+* [gem] move to faraday 1.10.6 (#30095) via Connor Tumbleson (@iBotPeaches)
+* [core] Skip repeating the output again when an sh command fails (#19545) via Peter Tutervai (@tutipeti)
+* [scan] Forward force_legacy_xcresulttool to trainer (#30092) via Eyüp Can Akman (@eyupcanakman)
+* [trainer] Fix output_remove_retry_attempts not stripping failures for skipped-on-retry tests (modern xcresult parser) (#30081) via Oliver Fox (@foxware00)
+* [scan] Handle array destination in xcodebuild_destination_parameter (#30069) via Ricardo Sawir (@sawirricardo)
+* [action][swiftlint] Fix path option for SwiftLint 0.48.0 and above (#30080) via Augusto Xavier (@augustocbx)
+* [ci] move more workflows from CircleCI -> GHA (#30090) via Connor Tumbleson (@iBotPeaches)
+* [core] remove upper bound on excon (#30085) via Connor Tumbleson (@iBotPeaches)
+* Bump actions/checkout from 6 to 7 (#30091) via dependabot[bot] (@dependabot[bot])
+* [spaceship] Fix appInfoLocalizations create/delete on the Tunes API (#30084) via Marcel Hoppe (@hoppsen)
+* [match] Fix keychain import path escaping (#30072) via Ricardo Sawir (@sawirricardo)
+* [precheck] Fix copyright year check to allow past years (#30076) via Augusto Xavier (@augustocbx)
+* [supply] Fix version_codes_to_retain causing promote-only flow to use… (#30073) via Pratik Patil (@PratikPatil131)
+* Bump rubygems/configure-rubygems-credentials from 2.0.0 to 2.1.0 (#30074) via dependabot[bot] (@dependabot[bot])
+* [fastlane_core] Fix deprecated Transporter -f flag, use -assetFile fo… (#30061) via Pratik Patil (@PratikPatil131)
+* [core] fix: update addressable to 2.9.0 min for CVE-2026-35611 (#30060) via OrbisAI Security (@orbisai0security)
+
+[32m2.236.1 Improvements[0m
+* Revert "[transporter] Decode Base64 key content for .p8 file generation in Al…" (#30066) via Connor Tumbleson (@iBotPeaches)
+
+[32mTo see all new releases, open https://github.com/fastlane/fastlane/releases[0m
+
+[32mPlease update using `bundle update fastlane`[0m
+[16:08:18]: [33mWARNING: Support for your Ruby version (3.2.7) is going away. fastlane will soon require Ruby 3.3.0 or newer.[0m

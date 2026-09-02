@@ -1,0 +1,108 @@
+{
+  "accessibility" : {
+    "element_count" : 5,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "id" : "PopoverDismissRegion",
+        "label" : "dismiss popup",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 670
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 20,
+          "width" : 180,
+          "x" : 111,
+          "y" : 660
+        },
+        "label" : "Discard this capture?",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 717
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 58,
+          "width" : 180,
+          "x" : 111,
+          "y" : 688
+        },
+        "label" : "The note is deleted from your vault. This can't be undone.",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 790
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 48,
+          "width" : 208,
+          "x" : 97,
+          "y" : 766
+        },
+        "label" : "Discard",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : false,
+    "height" : 874,
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "6A3AB13E-6A15-46C7-97BC-531A2602EE84"
+  },
+  "success" : true,
+  "timestamp" : "2026-09-01T13:12:58Z",
+  "type" : "ui_snapshot"
+}

@@ -1,0 +1,44 @@
+{
+  "observed_via": "FlowDeck live accessibility tree during Lock Screen widget gallery navigation",
+  "utc_observed_window": [
+    "2026-08-29T16:03:00Z",
+    "2026-08-29T16:05:07Z"
+  ],
+  "local_context": "Simulator lock screen displayed Sunday, August 30 around 12:03-12:05 AM HKT.",
+  "navigation": [
+    "Lock simulator",
+    "Long-press lock screen",
+    "Tap Customize",
+    "Tap Add Widget",
+    "Scroll until Noto 2",
+    "Open Noto 2 gallery entry"
+  ],
+  "gallery": {
+    "app_heading": "Noto 2",
+    "description": "Quick Capture, Open Noto directly to capture a thought.",
+    "instruction": "Tap or drag to add widget."
+  },
+  "widget_options": [
+    {
+      "label": "Noto 2, Quick Capture",
+      "family_inference": "accessoryCircular",
+      "frame_points": {
+        "x": 79.0547263681592,
+        "y": 611.547263681592,
+        "width": 69.13432835820895,
+        "height": 69.1343283582089
+      }
+    },
+    {
+      "label": "Noto 2, Quick Capture",
+      "family_inference": "accessoryRectangular",
+      "frame_points": {
+        "x": 167.39303482587064,
+        "y": 611.547263681592,
+        "width": 155.55223880597015,
+        "height": 69.1343283582089
+      }
+    }
+  ],
+  "note": "Apple's PosterBoard widget-gallery sheet was not consistently composited into FlowDeck screenshots during this step, so this artifact records the live tree values observed during the audit."
+}

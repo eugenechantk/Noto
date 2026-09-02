@@ -1,0 +1,113 @@
+Noto2QuickCaptureControl.swift
+import SwiftUI
+import WidgetKit
+
+@main
+struct Noto2QuickCaptureControlBundle: WidgetBundle {
+    var body: some Widget {
+        Noto2QuickCaptureControl()
+    }
+}
+
+struct Noto2QuickCaptureControl: ControlWidget {
+    static let kind = "com.eugenechan.Noto2.quickCapture"
+
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: Self.kind) {
+            ControlWidgetButton(action: Noto2QuickCaptureOpenIntent()) {
+                Label("Quick Capture", systemImage: "square.and.pencil")
+            }
+        }
+        .displayName("Quick Capture")
+        .description("Open Noto and capture a thought.")
+    }
+}
+
+Noto2QuickCaptureIntent.swift
+import AppIntents
+import Foundation
+import Observation
+
+enum Noto2Tab: String, Hashable, Sendable {
+    case capture, search, browse
+}
+
+enum Noto2LaunchRoute {
+    static let quickCaptureURL = URL(string: "noto2://capture")!
+
+    static func tab(for url: URL) -> Noto2Tab? {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme == "noto2",
+              components.host == "capture",
+              components.path.isEmpty,
+              components.user == nil,
+              components.password == nil,
+              components.port == nil,
+              components.query == nil,
+              components.fragment == nil else {
+            return nil
+        }
+        return .capture
+    }
+}
+
+@MainActor
+@Observable
+final class Noto2LaunchRouter {
+    static let shared = Noto2LaunchRouter()
+
+    private(set) var requestedTab: Noto2Tab?
+    private(set) var requestRevision = 0
+
+    func request(_ tab: Noto2Tab) {
+        requestedTab = tab
+        requestRevision &+= 1
+    }
+
+    @discardableResult
+    func handle(_ url: URL) -> Bool {
+        guard let tab = Noto2LaunchRoute.tab(for: url) else { return false }
+        request(tab)
+        return true
+    }
+}
+
+enum Noto2OpenDestination: String, AppEnum {
+    case quickCapture
+
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Noto Destination")
+    static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .quickCapture: "Quick Capture"
+    ]
+
+    var tab: Noto2Tab {
+        switch self {
+        case .quickCapture:
+            return .capture
+        }
+    }
+}
+
+struct Noto2QuickCaptureOpenIntent: OpenIntent {
+    static let title: LocalizedStringResource = "Open Quick Capture"
+    static let description = IntentDescription("Open Noto directly to Quick Capture.")
+
+    @Parameter(title: "Destination")
+    var target: Noto2OpenDestination
+
+    init() {
+        target = .quickCapture
+    }
+
+    init(target: Noto2OpenDestination) {
+        self.target = target
+    }
+
+    func perform() async throws -> some IntentResult {
+        let tab = target.tab
+        await MainActor.run {
+            Noto2LaunchRouter.shared.request(tab)
+        }
+        return .result()
+    }
+}

@@ -1,0 +1,238 @@
+{
+  "accessibility" : {
+    "element_count" : 13,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 105
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 54,
+          "width" : 402,
+          "x" : 0,
+          "y" : 78
+        },
+        "id" : "Create a note",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 177
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 66,
+          "width" : 370,
+          "x" : 16,
+          "y" : 144
+        },
+        "id" : "digestFileCapturePreview",
+        "label" : "MIDDLE capture: draft the Q4 roadmap one-pager.",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 237
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 31,
+          "width" : 370,
+          "x" : 16,
+          "y" : 222
+        },
+        "id" : "digestFileModePicker",
+        "role" : "TabGroup",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 569
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 608,
+          "width" : 402,
+          "x" : 0,
+          "y" : 265
+        },
+        "id" : "digestCreateForm",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 285
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 40,
+          "width" : 370,
+          "x" : 16,
+          "y" : 265
+        },
+        "label" : "Title",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 187,
+          "y" : 331
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 22,
+          "width" : 310,
+          "x" : 32,
+          "y" : 320
+        },
+        "id" : "digestCreateTitleField",
+        "role" : "TextField",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 360,
+          "y" : 331
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 17,
+          "width" : 17,
+          "x" : 351,
+          "y" : 323
+        },
+        "id" : "digestCreateTitleClearButton",
+        "label" : "Clear title",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 395
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 40,
+          "width" : 370,
+          "x" : 16,
+          "y" : 375
+        },
+        "label" : "Folder",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 441
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : 16,
+          "y" : 415
+        },
+        "id" : "digestCreateFolderPicker",
+        "label" : "Folder",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 505
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 40,
+          "width" : 370,
+          "x" : 16,
+          "y" : 485
+        },
+        "label" : "Body",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 559
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 68,
+          "width" : 370,
+          "x" : 16,
+          "y" : 525
+        },
+        "label" : "MIDDLE capture: draft the Q4 roadmap one-pager.",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 616
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 45,
+          "width" : 370,
+          "x" : 16,
+          "y" : 593
+        },
+        "label" : "Saved as MIDDLE capture： draft the Q4 roadmap one-pager..md in Vault root.",
+        "role" : "StaticText",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : false,
+    "height" : 874,
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "6A3AB13E-6A15-46C7-97BC-531A2602EE84"
+  },
+  "success" : true,
+  "timestamp" : "2026-09-01T13:13:34Z",
+  "type" : "ui_snapshot"
+}

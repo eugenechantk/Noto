@@ -1,0 +1,2 @@
+/Users/eugenechan/Library/Developer/FlowDeck/DerivedData/Noto-28a2c7716246/Build/Products/Debug-iphonesimulator/Noto2.app/PlugIns/Noto2QuickCaptureControl.appex
+/Users/eugenechan/Library/Developer/FlowDeck/DerivedData/Noto-28a2c7716246/Build/Products/Debug-iphonesimulator/Noto2.app/PlugIns/Noto2Tests.xctest

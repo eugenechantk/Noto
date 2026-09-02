@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["39GJBP8V5A.com.eugenechan.Noto"],
+        "components": [
+          {
+            "/": "/open",
+            "comment": "Open a vault-relative note in Noto"
+          },
+          {
+            "/": "/open/",
+            "comment": "Open a vault-relative note in Noto (trailing slash)"
+          }
+        ]
+      }
+    ]
+  }
+}

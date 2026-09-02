@@ -47,6 +47,22 @@ Create or refresh App Store signing assets in the shared match repo (run once pe
 
 Build a signed Release archive and upload it to TestFlight
 
+### ios verify_version_train
+
+```sh
+[bundle exec] fastlane ios verify_version_train
+```
+
+Check the project's MARKETING_VERSION against existing TestFlight version trains
+
+### ios verify_testflight_build
+
+```sh
+[bundle exec] fastlane ios verify_testflight_build
+```
+
+Definition-of-done for an uploaded build: ipa ground truth + VALID + right train + beta-testable
+
 ### ios beta
 
 ```sh

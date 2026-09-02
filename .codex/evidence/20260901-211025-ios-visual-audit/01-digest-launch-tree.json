@@ -1,0 +1,176 @@
+{
+  "accessibility" : {
+    "element_count" : 9,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 85
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 15,
+          "width" : 75,
+          "x" : 163,
+          "y" : 77
+        },
+        "id" : "digestRemainingCount",
+        "label" : "3 to process",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 110,
+          "y" : 193
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 15,
+          "width" : 148,
+          "x" : 36,
+          "y" : 185
+        },
+        "id" : "digestCardDate",
+        "label" : "Aug 20, 2026 at 6:15 PM",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 192,
+          "y" : 230
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 38,
+          "width" : 313,
+          "x" : 36,
+          "y" : 211
+        },
+        "label" : "OLDEST capture: call the dentist about the crown refit.",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 200,
+          "y" : 443
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 465,
+          "width" : 347,
+          "x" : 27,
+          "y" : 210
+        },
+        "id" : "digestBackCard",
+        "role" : "GenericElement",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 91,
+          "y" : 699
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 151,
+          "x" : 16,
+          "y" : 677
+        },
+        "id" : "digestAddToButton",
+        "label" : "Add to",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 252,
+          "y" : 699
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 151,
+          "x" : 177,
+          "y" : 677
+        },
+        "id" : "digestCreateButton",
+        "label" : "Create",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 362,
+          "y" : 699
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 44,
+          "width" : 48,
+          "x" : 338,
+          "y" : 677
+        },
+        "id" : "digestDiscardButton",
+        "label" : "Discard capture",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : false,
+    "height" : 874,
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "6A3AB13E-6A15-46C7-97BC-531A2602EE84"
+  },
+  "success" : true,
+  "timestamp" : "2026-09-01T13:10:55Z",
+  "type" : "ui_snapshot"
+}

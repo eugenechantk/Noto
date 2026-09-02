@@ -1,0 +1,12 @@
+# Apple refuses an AASA that is not served as JSON. Cloudflare Pages would otherwise
+# guess a type for this extensionless file.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600
+  X-Robots-Tag: noindex, nofollow
+
+# This host exists only to bounce links into the app. Keep it out of every index.
+/*
+  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff

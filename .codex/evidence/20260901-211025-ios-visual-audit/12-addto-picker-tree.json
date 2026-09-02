@@ -1,0 +1,227 @@
+{
+  "accessibility" : {
+    "element_count" : 12,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 135
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 114,
+          "width" : 402,
+          "x" : 0,
+          "y" : 78
+        },
+        "id" : "Add to a note",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 237
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 66,
+          "width" : 370,
+          "x" : 16,
+          "y" : 204
+        },
+        "id" : "digestFileCapturePreview",
+        "label" : "NEWEST capture: buy tickets for the November trip.",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 297
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 31,
+          "width" : 370,
+          "x" : 16,
+          "y" : 282
+        },
+        "id" : "digestFileModePicker",
+        "role" : "TabGroup",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 599
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 548,
+          "width" : 402,
+          "x" : 0,
+          "y" : 325
+        },
+        "id" : "digestNotePicker",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 358
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 67,
+          "width" : 402,
+          "x" : 0,
+          "y" : 325
+        },
+        "id" : "digestNotePickerRow",
+        "label" : "Long Scrolling Note, Long Scrolling Note.md",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 425
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 67,
+          "width" : 402,
+          "x" : 0,
+          "y" : 392
+        },
+        "id" : "digestNotePickerRow",
+        "label" : "Meeting Notes, Meeting Notes.md",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 492
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 66,
+          "width" : 402,
+          "x" : 0,
+          "y" : 459
+        },
+        "id" : "digestNotePickerRow",
+        "label" : "Project Plan, Project Plan.md",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 559
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 67,
+          "width" : 402,
+          "x" : 0,
+          "y" : 526
+        },
+        "id" : "digestNotePickerRow",
+        "label" : "Q4 Roadmap One Pager, Projects\/Q4 Roadmap One Pager.md",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 626
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 67,
+          "width" : 402,
+          "x" : 0,
+          "y" : 593
+        },
+        "id" : "digestNotePickerRow",
+        "label" : "Shopping List, Shopping List.md",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 693
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 67,
+          "width" : 402,
+          "x" : 0,
+          "y" : 660
+        },
+        "id" : "digestNotePickerRow",
+        "label" : "The $120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money, Captures\/The $120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money.md",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 760
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 67,
+          "width" : 402,
+          "x" : 0,
+          "y" : 727
+        },
+        "id" : "digestNotePickerRow",
+        "label" : "The State of Consumer AI - Usage, Captures\/The State of Consumer AI - Usage.md",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : false,
+    "height" : 874,
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "6A3AB13E-6A15-46C7-97BC-531A2602EE84"
+  },
+  "success" : true,
+  "timestamp" : "2026-09-01T13:15:01Z",
+  "type" : "ui_snapshot"
+}

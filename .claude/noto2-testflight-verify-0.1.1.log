@@ -1,0 +1,10 @@
+[13:55:13]: [33mWARNING: Support for your Ruby version (3.2.7) is going away. fastlane will soon require Ruby 3.3.0 or newer.[0m
+[13:55:14]: [32m------------------------------[0m
+[13:55:14]: [32m--- Step: default_platform ---[0m
+[13:55:14]: [32m------------------------------[0m
+[13:55:14]: [32mDriving the lane 'ios verify_testflight_build' 🚀[0m
+[13:55:14]: [32m---------------------------------------[0m
+[13:55:14]: [32m--- Step: app_store_connect_api_key ---[0m
+[13:55:14]: [32m---------------------------------------[0m
+[13:55:14]: [32mipa ground truth OK: CFBundleVersion=202609021352, v0.1.1[0m
+[13:55:16]: [1/20] build 202609021352: not visible yet

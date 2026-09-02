@@ -1,0 +1,738 @@
+<div id="noto-qc-prototype">
+  <style>
+    #noto-qc-prototype {
+      --qc-page: light-dark(#eeeae3, #141414);
+      --qc-ink: light-dark(#1d1c1a, #f1eee8);
+      --qc-muted: light-dark(#6f6b64, #8e8a84);
+      --qc-phone: #090909;
+      --qc-card: #20201f;
+      --qc-card-next: #292927;
+      --qc-line: rgba(255, 255, 255, 0.09);
+      --qc-orange: #ff7a31;
+      --qc-shadow: rgba(0, 0, 0, 0.42);
+      color-scheme: light dark;
+      box-sizing: border-box;
+      display: grid;
+      place-items: center;
+      width: 100%;
+      min-height: min(820px, 100vh);
+      padding: 24px 16px 30px;
+      overflow: hidden;
+      color: var(--qc-ink);
+      background:
+        radial-gradient(circle at 50% 14%, light-dark(rgba(255,255,255,.9), rgba(255,122,49,.05)), transparent 38%),
+        var(--qc-page);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    }
+
+    #noto-qc-prototype * { box-sizing: border-box; }
+
+    #noto-qc-prototype .qc-stage {
+      display: grid;
+      justify-items: center;
+      gap: 18px;
+      width: min(100%, 430px);
+    }
+
+    #noto-qc-prototype .qc-heading {
+      display: grid;
+      gap: 5px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    #noto-qc-prototype .qc-heading h2 {
+      margin: 0;
+      font: 650 clamp(18px, 4.8vw, 23px)/1.1 ui-sans-serif, -apple-system, sans-serif;
+      letter-spacing: -0.035em;
+    }
+
+    #noto-qc-prototype .qc-heading p {
+      margin: 0;
+      max-width: 340px;
+      color: var(--qc-muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    #noto-qc-prototype .qc-modes {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid light-dark(rgba(28,25,21,.08), rgba(255,255,255,.08));
+      border-radius: 999px;
+      background: light-dark(rgba(255,255,255,.64), rgba(255,255,255,.035));
+      box-shadow: 0 1px 0 light-dark(rgba(255,255,255,.7), rgba(255,255,255,.04)) inset;
+    }
+
+    #noto-qc-prototype .qc-mode {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 8px 11px;
+      color: var(--qc-muted);
+      background: transparent;
+      font: 600 11px/1 ui-sans-serif, -apple-system, sans-serif;
+      cursor: pointer;
+      transition: color .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+
+    #noto-qc-prototype .qc-mode[aria-pressed="true"] {
+      color: light-dark(#171614, #f6f2ec);
+      background: light-dark(#fff, #333230);
+      box-shadow: 0 1px 4px light-dark(rgba(40,32,20,.1), rgba(0,0,0,.25));
+    }
+
+    #noto-qc-prototype .qc-mode:focus-visible,
+    #noto-qc-prototype .qc-grab:focus-visible,
+    #noto-qc-prototype .qc-toolbar button:focus-visible {
+      outline: 2px solid var(--qc-orange);
+      outline-offset: 2px;
+    }
+
+    #noto-qc-prototype .qc-phone {
+      position: relative;
+      width: min(100%, 365px);
+      aspect-ratio: 365 / 720;
+      overflow: hidden;
+      border: 1px solid light-dark(rgba(0,0,0,.18), rgba(255,255,255,.12));
+      border-radius: clamp(34px, 10vw, 48px);
+      background: var(--qc-phone);
+      box-shadow:
+        0 34px 72px light-dark(rgba(51,39,25,.2), rgba(0,0,0,.48)),
+        0 0 0 5px light-dark(#cfcbc4, #2a2928);
+      isolation: isolate;
+    }
+
+    #noto-qc-prototype .qc-statusbar {
+      position: absolute;
+      inset: 0 0 auto;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 47px;
+      padding: 7px 24px 0;
+      color: #f4f1ec;
+      font-size: 11px;
+      font-weight: 650;
+      pointer-events: none;
+    }
+
+    #noto-qc-prototype .qc-island {
+      position: absolute;
+      top: 9px;
+      left: 50%;
+      width: 90px;
+      height: 24px;
+      border-radius: 999px;
+      background: #000;
+      transform: translateX(-50%);
+    }
+
+    #noto-qc-prototype .qc-signals {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    #noto-qc-prototype .qc-signal-bars {
+      display: flex;
+      align-items: end;
+      gap: 1.5px;
+      height: 9px;
+    }
+
+    #noto-qc-prototype .qc-signal-bars i {
+      display: block;
+      width: 2px;
+      border-radius: 2px;
+      background: #f4f1ec;
+    }
+
+    #noto-qc-prototype .qc-signal-bars i:nth-child(1) { height: 3px; }
+    #noto-qc-prototype .qc-signal-bars i:nth-child(2) { height: 5px; }
+    #noto-qc-prototype .qc-signal-bars i:nth-child(3) { height: 7px; }
+    #noto-qc-prototype .qc-signal-bars i:nth-child(4) { height: 9px; }
+
+    #noto-qc-prototype .qc-battery {
+      width: 18px;
+      height: 9px;
+      padding: 1.5px;
+      border: 1px solid rgba(255,255,255,.65);
+      border-radius: 3px;
+    }
+
+    #noto-qc-prototype .qc-battery::before {
+      content: "";
+      display: block;
+      width: 78%;
+      height: 100%;
+      border-radius: 1px;
+      background: #f4f1ec;
+    }
+
+    #noto-qc-prototype .qc-app-title {
+      position: absolute;
+      top: 52px;
+      left: 22px;
+      z-index: 5;
+      color: #817d77;
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    #noto-qc-prototype .qc-result {
+      position: absolute;
+      top: 49px;
+      right: 22px;
+      z-index: 12;
+      color: #bcb7af;
+      font-size: 10px;
+      font-weight: 550;
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    #noto-qc-prototype .qc-result.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #noto-qc-prototype .qc-deck {
+      position: absolute;
+      top: 82px;
+      right: 16px;
+      left: 16px;
+      z-index: 3;
+      height: 345px;
+      perspective: 900px;
+    }
+
+    #noto-qc-prototype .qc-underlay,
+    #noto-qc-prototype .qc-back,
+    #noto-qc-prototype .qc-front {
+      position: absolute;
+      inset: 0;
+      border-radius: 26px;
+    }
+
+    #noto-qc-prototype .qc-underlay {
+      background: #271d17;
+      opacity: 0;
+      transform: translateY(17px) scale(.965);
+      transition: opacity .18s ease, background .18s ease;
+    }
+
+    #noto-qc-prototype .qc-underlay span {
+      position: absolute;
+      right: 22px;
+      bottom: 19px;
+      color: #ffb183;
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: .12em;
+    }
+
+    #noto-qc-prototype .qc-back {
+      overflow: hidden;
+      border: 1px solid var(--qc-line);
+      background: var(--qc-card-next);
+      box-shadow: 0 18px 42px rgba(0,0,0,.18);
+      transform: translateY(18px) scale(.965) rotate(1.8deg);
+      transform-origin: 50% 90%;
+      transition: transform .24s cubic-bezier(.2,.82,.2,1), opacity .2s ease;
+    }
+
+    #noto-qc-prototype .qc-back::before {
+      content: "Next thought";
+      position: absolute;
+      top: 27px;
+      left: 25px;
+      color: #77736d;
+      font: 500 16px/1 ui-sans-serif, -apple-system, sans-serif;
+    }
+
+    #noto-qc-prototype[data-mode="pile"] .qc-back {
+      transform: translate(-3px, 16px) scale(.975) rotate(-2.1deg);
+      box-shadow: 7px 12px 0 #171716, 8px 13px 0 rgba(255,255,255,.07);
+    }
+
+    #noto-qc-prototype[data-mode="reveal"] .qc-back {
+      transform: translateY(9px) scale(.985);
+      border-color: rgba(255,122,49,.18);
+    }
+
+    #noto-qc-prototype[data-mode="reveal"] .qc-underlay { opacity: .82; }
+
+    #noto-qc-prototype .qc-front {
+      display: grid;
+      grid-template-rows: 46px 1fr 40px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.1);
+      background: var(--qc-card);
+      box-shadow: 0 18px 45px var(--qc-shadow);
+      touch-action: none;
+      transform: translate3d(0, 0, 0) rotate(0deg);
+      transform-origin: 50% 80%;
+      will-change: transform;
+    }
+
+    #noto-qc-prototype .qc-front.is-returning {
+      transition: transform .34s cubic-bezier(.2,.9,.25,1.15), opacity .24s ease;
+    }
+
+    #noto-qc-prototype .qc-front.is-committing {
+      transition: transform .32s cubic-bezier(.3,.02,.75,.3), opacity .25s ease;
+    }
+
+    #noto-qc-prototype .qc-front.is-resetting { transition: none; }
+
+    #noto-qc-prototype .qc-grab {
+      appearance: none;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      width: 100%;
+      padding: 0 16px;
+      border: 0;
+      border-bottom: 1px solid rgba(255,255,255,.055);
+      color: #77736e;
+      background: transparent;
+      font: 650 9px/1 ui-sans-serif, -apple-system, sans-serif;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #noto-qc-prototype .qc-grab:active { cursor: grabbing; }
+
+    #noto-qc-prototype .qc-grab::after {
+      content: "Flick to send";
+      justify-self: end;
+      color: #5d5a56;
+    }
+
+    #noto-qc-prototype .qc-rail {
+      width: 36px;
+      height: 4px;
+      border-radius: 99px;
+      background: #4d4b48;
+    }
+
+    #noto-qc-prototype .qc-editor {
+      width: 100%;
+      min-height: 0;
+      resize: none;
+      padding: 20px 22px 12px;
+      border: 0;
+      outline: 0;
+      color: #f3f0eb;
+      background: transparent;
+      caret-color: var(--qc-orange);
+      font: 430 18px/1.48 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+      letter-spacing: -.012em;
+    }
+
+    #noto-qc-prototype .qc-editor::placeholder { color: #74716c; }
+
+    #noto-qc-prototype .qc-card-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      color: #66635e;
+      font-size: 10px;
+    }
+
+    #noto-qc-prototype .qc-hint-file { color: #8f674f; }
+
+    #noto-qc-prototype .qc-stamp {
+      position: absolute;
+      top: 62px;
+      z-index: 4;
+      padding: 7px 10px 6px;
+      border: 2px solid currentColor;
+      border-radius: 7px;
+      font-size: 16px;
+      font-weight: 850;
+      letter-spacing: .09em;
+      line-height: 1;
+      opacity: 0;
+      pointer-events: none;
+      text-transform: uppercase;
+      transform: rotate(-9deg) scale(.8);
+      transition: opacity .06s linear;
+    }
+
+    #noto-qc-prototype .qc-stamp-file {
+      right: 22px;
+      color: var(--qc-orange);
+    }
+
+    #noto-qc-prototype .qc-stamp-discard {
+      left: 22px;
+      color: #aaa49c;
+      transform: rotate(9deg) scale(.8);
+    }
+
+    #noto-qc-prototype .qc-compose {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 7;
+      padding: 12px 10px 9px;
+      border-top: 1px solid rgba(255,255,255,.055);
+      background: linear-gradient(#171716, #101010);
+    }
+
+    #noto-qc-prototype .qc-toolbar {
+      display: flex;
+      justify-content: center;
+      gap: 3px;
+      width: max-content;
+      max-width: 100%;
+      margin: 0 auto 11px;
+      padding: 4px;
+      border: 1px solid rgba(255,255,255,.09);
+      border-radius: 14px;
+      background: rgba(50,49,47,.74);
+      box-shadow: 0 8px 20px rgba(0,0,0,.24), 0 1px 0 rgba(255,255,255,.07) inset;
+      backdrop-filter: blur(14px);
+    }
+
+    #noto-qc-prototype .qc-toolbar button {
+      appearance: none;
+      display: grid;
+      place-items: center;
+      width: 29px;
+      height: 27px;
+      padding: 0;
+      border: 0;
+      border-radius: 9px;
+      color: #c5c0b8;
+      background: transparent;
+      font: 650 13px/1 ui-sans-serif, -apple-system, sans-serif;
+      cursor: pointer;
+    }
+
+    #noto-qc-prototype .qc-toolbar button:hover { background: rgba(255,255,255,.07); }
+
+    #noto-qc-prototype .qc-keyboard {
+      display: grid;
+      gap: 6px;
+      user-select: none;
+    }
+
+    #noto-qc-prototype .qc-key-row {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 4px;
+    }
+
+    #noto-qc-prototype .qc-key-row:nth-child(2) { padding: 0 12px; }
+    #noto-qc-prototype .qc-key-row:nth-child(3) { grid-template-columns: 1.4fr repeat(7, 1fr) 1.4fr; }
+    #noto-qc-prototype .qc-key-row:nth-child(4) { grid-template-columns: 1fr 1fr 4.2fr 1fr 1.5fr; }
+
+    #noto-qc-prototype .qc-key {
+      display: grid;
+      place-items: center;
+      height: 32px;
+      border-radius: 5px;
+      color: #ece8e1;
+      background: #373735;
+      box-shadow: 0 1px 0 #050505;
+      font-size: 12px;
+    }
+
+    #noto-qc-prototype .qc-key.qc-special { background: #242423; }
+    #noto-qc-prototype .qc-key.qc-space { font-size: 9px; }
+    #noto-qc-prototype .qc-key.qc-return { color: #fff; background: #90512e; }
+
+    #noto-qc-prototype .qc-home {
+      width: 116px;
+      height: 4px;
+      margin: 9px auto 0;
+      border-radius: 99px;
+      background: #f2eee8;
+      opacity: .88;
+    }
+
+    #noto-qc-prototype .qc-caption {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      color: var(--qc-muted);
+      font-size: 11px;
+    }
+
+    #noto-qc-prototype .qc-caption span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #noto-qc-prototype .qc-caption i {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    #noto-qc-prototype .qc-caption .qc-orange { color: light-dark(#b24d14, #ff9a60); }
+
+    @media (max-width: 420px) {
+      #noto-qc-prototype {
+        min-height: auto;
+        padding: 17px 10px 24px;
+      }
+      #noto-qc-prototype .qc-stage { gap: 14px; }
+      #noto-qc-prototype .qc-phone {
+        width: min(100%, 342px);
+        border-radius: 38px;
+      }
+      #noto-qc-prototype .qc-mode { padding: 7px 9px; font-size: 10px; }
+      #noto-qc-prototype .qc-deck { top: 78px; height: 327px; }
+      #noto-qc-prototype .qc-editor { font-size: 17px; }
+      #noto-qc-prototype .qc-key { height: 29px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #noto-qc-prototype *, #noto-qc-prototype *::before, #noto-qc-prototype *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+
+  <section class="qc-stage" aria-labelledby="qc-title">
+    <header class="qc-heading">
+      <h2 id="qc-title">Quick capture, with a little physics</h2>
+      <p>Write immediately. Drag the card by its top edge: up or right files it; left discards it.</p>
+    </header>
+
+    <div class="qc-modes" role="group" aria-label="Card styling">
+      <button class="qc-mode" type="button" data-qc-mode="peek" aria-pressed="true">Peek + stamp</button>
+      <button class="qc-mode" type="button" data-qc-mode="pile" aria-pressed="false">Paper pile</button>
+      <button class="qc-mode" type="button" data-qc-mode="reveal" aria-pressed="false">Color reveal</button>
+    </div>
+
+    <div class="qc-phone" aria-label="Interactive Noto quick capture prototype">
+      <div class="qc-statusbar" aria-hidden="true">
+        <span>9:41</span>
+        <span class="qc-island"></span>
+        <span class="qc-signals">
+          <span class="qc-signal-bars"><i></i><i></i><i></i><i></i></span>
+          <span>5G</span>
+          <span class="qc-battery"></span>
+        </span>
+      </div>
+
+      <div class="qc-app-title">Noto · Quick capture</div>
+      <div class="qc-result" role="status" aria-live="polite"></div>
+
+      <div class="qc-deck">
+        <div class="qc-underlay" aria-hidden="true"><span>FILE TO INBOX</span></div>
+        <div class="qc-back" aria-hidden="true"></div>
+        <article class="qc-front">
+          <button class="qc-grab" type="button" aria-label="Drag card to file or discard">
+            <span aria-hidden="true"></span>
+            <span class="qc-rail" aria-hidden="true"></span>
+          </button>
+          <textarea class="qc-editor" spellcheck="false" aria-label="Quick capture note" placeholder="Jot something down…">A capture flow should feel faster than deciding where a thought belongs.</textarea>
+          <footer class="qc-card-foot">
+            <span>← discard</span>
+            <span class="qc-hint-file">file ↑ →</span>
+          </footer>
+          <div class="qc-stamp qc-stamp-file" aria-hidden="true">File</div>
+          <div class="qc-stamp qc-stamp-discard" aria-hidden="true">Discard</div>
+        </article>
+      </div>
+
+      <div class="qc-compose" aria-hidden="true">
+        <div class="qc-toolbar">
+          <button tabindex="-1" type="button">H</button>
+          <button tabindex="-1" type="button"><strong>B</strong></button>
+          <button tabindex="-1" type="button"><em>I</em></button>
+          <button tabindex="-1" type="button">☷</button>
+          <button tabindex="-1" type="button">☐</button>
+          <button tabindex="-1" type="button">↗</button>
+        </div>
+        <div class="qc-keyboard">
+          <div class="qc-key-row"><span class="qc-key">Q</span><span class="qc-key">W</span><span class="qc-key">E</span><span class="qc-key">R</span><span class="qc-key">T</span><span class="qc-key">Y</span><span class="qc-key">U</span><span class="qc-key">I</span><span class="qc-key">O</span><span class="qc-key">P</span></div>
+          <div class="qc-key-row"><span class="qc-key">A</span><span class="qc-key">S</span><span class="qc-key">D</span><span class="qc-key">F</span><span class="qc-key">G</span><span class="qc-key">H</span><span class="qc-key">J</span><span class="qc-key">K</span><span class="qc-key">L</span><span class="qc-key">’</span></div>
+          <div class="qc-key-row"><span class="qc-key qc-special">⇧</span><span class="qc-key">Z</span><span class="qc-key">X</span><span class="qc-key">C</span><span class="qc-key">V</span><span class="qc-key">B</span><span class="qc-key">N</span><span class="qc-key">M</span><span class="qc-key qc-special">⌫</span></div>
+          <div class="qc-key-row"><span class="qc-key qc-special">123</span><span class="qc-key qc-special">☺</span><span class="qc-key qc-space">space</span><span class="qc-key qc-special">◉</span><span class="qc-key qc-return">return</span></div>
+        </div>
+        <div class="qc-home"></div>
+      </div>
+    </div>
+
+    <div class="qc-caption" aria-hidden="true">
+      <span class="qc-orange"><i></i>file</span>
+      <span><i></i>discard</span>
+    </div>
+  </section>
+
+  <script>
+    (() => {
+      const root = document.getElementById('noto-qc-prototype');
+      const front = root.querySelector('.qc-front');
+      const grab = root.querySelector('.qc-grab');
+      const back = root.querySelector('.qc-back');
+      const underlay = root.querySelector('.qc-underlay');
+      const underlayLabel = underlay.querySelector('span');
+      const fileStamp = root.querySelector('.qc-stamp-file');
+      const discardStamp = root.querySelector('.qc-stamp-discard');
+      const result = root.querySelector('.qc-result');
+      const editor = root.querySelector('.qc-editor');
+      const modeButtons = [...root.querySelectorAll('.qc-mode')];
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let pointerId = null;
+      let startX = 0;
+      let startY = 0;
+      let dx = 0;
+      let dy = 0;
+      let resultTimer = null;
+
+      root.dataset.mode = 'peek';
+
+      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+      function updateDrag() {
+        const upward = Math.max(0, -dy);
+        const rightward = Math.max(0, dx);
+        const leftward = Math.max(0, -dx);
+        const fileDistance = Math.max(upward * 1.08, rightward);
+        const discardDistance = leftward;
+        const fileProgress = clamp((fileDistance - 22) / 92, 0, 1);
+        const discardProgress = clamp((discardDistance - 22) / 92, 0, 1);
+        const activeProgress = Math.max(fileProgress, discardProgress);
+        const softenedY = dy > 0 ? dy * .24 : dy;
+        const rotation = clamp(dx / 20, -8, 8);
+
+        front.style.transform = `translate3d(${dx}px, ${softenedY}px, 0) rotate(${rotation}deg)`;
+        fileStamp.style.opacity = fileProgress;
+        fileStamp.style.transform = `rotate(-9deg) scale(${.8 + fileProgress * .2})`;
+        discardStamp.style.opacity = discardProgress;
+        discardStamp.style.transform = `rotate(9deg) scale(${.8 + discardProgress * .2})`;
+        back.style.transform = `translateY(${18 - activeProgress * 18}px) scale(${.965 + activeProgress * .035}) rotate(${1.8 - activeProgress * 1.8}deg)`;
+
+        if (fileProgress > discardProgress) {
+          underlay.style.background = '#3a2116';
+          underlayLabel.textContent = upward >= rightward ? 'FILE TO INBOX ↑' : 'FILE TO INBOX →';
+          underlayLabel.style.color = '#ffb183';
+        } else {
+          underlay.style.background = '#242322';
+          underlayLabel.textContent = 'DISCARD ←';
+          underlayLabel.style.color = '#aaa49c';
+        }
+        underlay.style.opacity = String(root.dataset.mode === 'reveal' ? clamp(.82 + activeProgress * .18, 0, 1) : activeProgress * .72);
+      }
+
+      function beginDrag(event) {
+        if (pointerId !== null) return;
+        pointerId = event.pointerId;
+        startX = event.clientX;
+        startY = event.clientY;
+        dx = 0;
+        dy = 0;
+        front.classList.remove('is-returning', 'is-committing');
+        grab.setPointerCapture(pointerId);
+        event.preventDefault();
+      }
+
+      function moveDrag(event) {
+        if (event.pointerId !== pointerId) return;
+        dx = event.clientX - startX;
+        dy = event.clientY - startY;
+        updateDrag();
+      }
+
+      function releaseDrag(event) {
+        if (event.pointerId !== pointerId) return;
+        const upward = Math.max(0, -dy);
+        const fileDistance = Math.max(upward * 1.08, Math.max(0, dx));
+        const discardDistance = Math.max(0, -dx);
+        const action = discardDistance > 104 && discardDistance > fileDistance ? 'discard' : fileDistance > 104 ? 'file' : null;
+        pointerId = null;
+        if (action) commit(action);
+        else returnCard();
+      }
+
+      function returnCard() {
+        front.classList.add('is-returning');
+        front.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+        fileStamp.style.opacity = '0';
+        discardStamp.style.opacity = '0';
+        back.style.transform = '';
+        underlay.style.opacity = root.dataset.mode === 'reveal' ? '.82' : '0';
+      }
+
+      function commit(action) {
+        const isFile = action === 'file';
+        const exitX = isFile ? (dx > 60 ? 430 : dx * 1.4) : -430;
+        const exitY = isFile ? (dy < -55 ? -440 : dy - 90) : dy * .4;
+        front.classList.add('is-committing');
+        front.style.transform = `translate3d(${exitX}px, ${exitY}px, 0) rotate(${isFile ? 12 : -13}deg)`;
+        front.style.opacity = '0';
+        back.style.transform = 'translateY(0) scale(1) rotate(0deg)';
+        fileStamp.style.opacity = '0';
+        discardStamp.style.opacity = '0';
+        showResult(isFile ? 'Filed · inbox/today' : 'Discarded');
+
+        window.setTimeout(() => {
+          front.className = 'qc-front is-resetting';
+          front.style.transform = 'translate3d(0, 18px, 0) scale(.965)';
+          front.style.opacity = '0';
+          editor.value = '';
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              front.className = 'qc-front is-returning';
+              front.style.transform = 'translate3d(0, 0, 0) scale(1)';
+              front.style.opacity = '1';
+              back.style.transform = '';
+              underlay.style.opacity = root.dataset.mode === 'reveal' ? '.82' : '0';
+            });
+          });
+        }, reduceMotion ? 30 : 340);
+      }
+
+      function showResult(message) {
+        window.clearTimeout(resultTimer);
+        result.textContent = message;
+        result.classList.add('is-visible');
+        resultTimer = window.setTimeout(() => result.classList.remove('is-visible'), 1400);
+      }
+
+      grab.addEventListener('pointerdown', beginDrag);
+      grab.addEventListener('pointermove', moveDrag);
+      grab.addEventListener('pointerup', releaseDrag);
+      grab.addEventListener('pointercancel', releaseDrag);
+
+      grab.addEventListener('keydown', event => {
+        if (event.key === 'ArrowUp' || event.key === 'ArrowRight') {
+          event.preventDefault();
+          commit('file');
+        }
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          commit('discard');
+        }
+      });
+
+      modeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          root.dataset.mode = button.dataset.qcMode;
+          modeButtons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+          returnCard();
+        });
+      });
+    })();
+  </script>
+</div>

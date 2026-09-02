@@ -1,0 +1,500 @@
+<div id="noto-quick-capture-exploration">
+  <style>
+    #noto-quick-capture-exploration {
+      color-scheme: light dark;
+      --noto-shell: light-dark(#1b1b1d, #090a0d);
+      --noto-screen: light-dark(#f3f1ed, #0d0f13);
+      --noto-surface: light-dark(#ffffff, #1a1d22);
+      --noto-surface-2: light-dark(#e9e6df, #24272e);
+      --noto-text: light-dark(#171719, #f1f1f2);
+      --noto-secondary: light-dark(#6e6d72, #a5a8af);
+      --noto-muted: light-dark(#a1a0a5, #666a72);
+      --noto-line: light-dark(#d7d3cb, #30343c);
+      --noto-orange: #ff7a32;
+      --noto-orange-ink: #ffffff;
+      width: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      color: var(--noto-text);
+    }
+
+    #noto-quick-capture-exploration .qc-layout {
+      display: grid;
+      grid-template-columns: minmax(290px, 350px) minmax(250px, 1fr);
+      gap: 24px;
+      align-items: center;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    #noto-quick-capture-exploration .qc-phone {
+      width: min(100%, 330px);
+      height: 680px;
+      margin: 0 auto;
+      padding: 9px;
+      border-radius: 47px;
+      background: var(--noto-shell);
+      box-shadow: 0 20px 50px color-mix(in srgb, var(--noto-shell) 32%, transparent);
+    }
+
+    #noto-quick-capture-exploration .qc-screen {
+      position: relative;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 39px;
+      background: var(--noto-screen);
+      display: grid;
+      grid-template-rows: 42px minmax(0, 1fr) 252px;
+    }
+
+    #noto-quick-capture-exploration .qc-statusbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 22px 0;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    #noto-quick-capture-exploration .qc-island {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      width: 86px;
+      height: 24px;
+      transform: translateX(-50%);
+      border-radius: 20px;
+      background: #050506;
+    }
+
+    #noto-quick-capture-exploration .qc-stage {
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    #noto-quick-capture-exploration .qc-variant {
+      position: absolute;
+      inset: 0;
+      display: none;
+      padding: 8px 15px 12px;
+    }
+
+    #noto-quick-capture-exploration .qc-variant.is-active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    #noto-quick-capture-exploration .qc-topbar {
+      min-height: 43px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #noto-quick-capture-exploration .qc-top-label {
+      font-size: 12px;
+      color: var(--noto-secondary);
+    }
+
+    #noto-quick-capture-exploration .qc-circle {
+      width: 36px;
+      height: 36px;
+      border: 0;
+      border-radius: 50%;
+      background: var(--noto-surface-2);
+      color: var(--noto-text);
+      font: inherit;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    #noto-quick-capture-exploration .qc-circle.qc-confirm {
+      background: var(--noto-orange);
+      color: var(--noto-orange-ink);
+      font-weight: 500;
+    }
+
+    #noto-quick-capture-exploration textarea {
+      width: 100%;
+      min-height: 0;
+      flex: 1;
+      box-sizing: border-box;
+      resize: none;
+      border: 0;
+      outline: 0;
+      padding: 12px 4px;
+      background: transparent;
+      color: var(--noto-text);
+      font: 400 18px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    }
+
+    #noto-quick-capture-exploration textarea::placeholder {
+      color: var(--noto-muted);
+    }
+
+    #noto-quick-capture-exploration .qc-card-stack {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      margin-top: 4px;
+    }
+
+    #noto-quick-capture-exploration .qc-card-back {
+      position: absolute;
+      inset: 12px 10px -8px;
+      border-radius: 24px;
+      background: var(--noto-surface-2);
+      opacity: .62;
+    }
+
+    #noto-quick-capture-exploration .qc-card-front {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      border-radius: 24px;
+      background: var(--noto-surface);
+      border: 1px solid var(--noto-line);
+      overflow: hidden;
+    }
+
+    #noto-quick-capture-exploration .qc-card-front textarea {
+      padding: 20px 18px 8px;
+    }
+
+    #noto-quick-capture-exploration .qc-swipe-legend {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 18px 13px;
+      color: var(--noto-muted);
+      font-size: 11px;
+    }
+
+    #noto-quick-capture-exploration .qc-sheet-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding-top: 6px;
+      min-height: 0;
+    }
+
+    #noto-quick-capture-exploration .qc-sheet {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-radius: 26px 26px 18px 18px;
+      background: var(--noto-surface);
+      border: 1px solid var(--noto-line);
+      overflow: hidden;
+    }
+
+    #noto-quick-capture-exploration .qc-sheet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 12px 0;
+    }
+
+    #noto-quick-capture-exploration .qc-sheet-title {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    #noto-quick-capture-exploration .qc-sheet textarea {
+      padding: 14px 16px;
+    }
+
+    #noto-quick-capture-exploration .qc-thumb-dock {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 48px;
+      padding: 0 8px 0 15px;
+      border-radius: 24px;
+      background: var(--noto-surface);
+      border: 1px solid var(--noto-line);
+    }
+
+    #noto-quick-capture-exploration .qc-thumb-dock span {
+      color: var(--noto-secondary);
+      font-size: 12px;
+    }
+
+    #noto-quick-capture-exploration .qc-keyboard {
+      padding: 7px 6px 8px;
+      background: color-mix(in srgb, var(--noto-surface-2) 92%, var(--noto-screen));
+      border-top: 1px solid var(--noto-line);
+      display: grid;
+      grid-template-rows: 32px repeat(3, 41px) 45px 25px;
+      gap: 6px;
+    }
+
+    #noto-quick-capture-exploration .qc-suggestions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-items: center;
+      text-align: center;
+      color: var(--noto-secondary);
+      font-size: 12px;
+    }
+
+    #noto-quick-capture-exploration .qc-keys {
+      display: grid;
+      gap: 4px;
+    }
+
+    #noto-quick-capture-exploration .qc-keys.ten { grid-template-columns: repeat(10, 1fr); }
+    #noto-quick-capture-exploration .qc-keys.nine { grid-template-columns: repeat(9, 1fr); padding: 0 10px; }
+    #noto-quick-capture-exploration .qc-keys.seven { grid-template-columns: 1.25fr repeat(7, 1fr) 1.25fr; }
+    #noto-quick-capture-exploration .qc-keys.bottom { grid-template-columns: 1.35fr 4fr 1.35fr; }
+
+    #noto-quick-capture-exploration .qc-key {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: var(--noto-surface);
+      color: var(--noto-text);
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--noto-shell) 30%, transparent);
+      font-size: 13px;
+    }
+
+    #noto-quick-capture-exploration .qc-key.qc-mod {
+      background: color-mix(in srgb, var(--noto-secondary) 22%, var(--noto-surface));
+    }
+
+    #noto-quick-capture-exploration .qc-keyboard-footer {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 15px;
+      color: var(--noto-text);
+      font-size: 16px;
+    }
+
+    #noto-quick-capture-exploration .qc-side {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    #noto-quick-capture-exploration .qc-choices {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    #noto-quick-capture-exploration .qc-choices .btn {
+      justify-content: flex-start;
+      text-align: left;
+    }
+
+    #noto-quick-capture-exploration .qc-name {
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    #noto-quick-capture-exploration .qc-inspiration {
+      color: var(--muted-foreground);
+      font-size: 13px;
+    }
+
+    #noto-quick-capture-exploration .qc-facts {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 9px 14px;
+      margin: 0;
+      font-size: 14px;
+    }
+
+    #noto-quick-capture-exploration .qc-facts dt {
+      color: var(--muted-foreground);
+    }
+
+    #noto-quick-capture-exploration .qc-facts dd {
+      margin: 0;
+    }
+
+    #noto-quick-capture-exploration .qc-recommend {
+      display: inline-flex;
+      align-self: flex-start;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--noto-orange) 16%, transparent);
+      color: var(--noto-text);
+      font-size: 12px;
+    }
+
+    #noto-quick-capture-exploration .qc-filed {
+      position: absolute;
+      z-index: 5;
+      left: 50%;
+      top: 49px;
+      transform: translate(-50%, -8px);
+      opacity: 0;
+      pointer-events: none;
+      padding: 6px 10px;
+      border-radius: 14px;
+      background: var(--noto-surface-2);
+      color: var(--noto-text);
+      font-size: 11px;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    #noto-quick-capture-exploration .qc-filed.is-visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 620px) {
+      #noto-quick-capture-exploration .qc-layout {
+        grid-template-columns: 1fr;
+      }
+      #noto-quick-capture-exploration .qc-side {
+        max-width: 420px;
+        margin: 0 auto;
+      }
+    }
+  </style>
+
+  <div class="qc-layout">
+    <div class="qc-phone" aria-label="Interactive Noto Quick Capture mockup">
+      <div class="qc-screen">
+        <div class="qc-island" aria-hidden="true"></div>
+        <div class="qc-filed" aria-live="polite">Filed · inbox/today</div>
+        <div class="qc-statusbar"><span>9:41</span><span>●●● ᯤ ▰</span></div>
+        <div class="qc-stage">
+          <section class="qc-variant" data-variant="stack" aria-label="Swipe stack">
+            <div class="qc-topbar"><span></span><span class="qc-top-label">Quick Capture</span><span></span></div>
+            <div class="qc-card-stack">
+              <div class="qc-card-back"></div>
+              <div class="qc-card-front">
+                <textarea aria-label="Swipe stack note">Sketch a calmer first-run experience for the app.</textarea>
+                <div class="qc-swipe-legend"><span>← discard</span><span>file ↑ or →</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="qc-variant is-active" data-variant="canvas" aria-label="Blank canvas">
+            <div class="qc-topbar">
+              <button class="qc-circle" type="button" aria-label="Discard">×</button>
+              <span class="qc-top-label">Inbox</span>
+              <button class="qc-circle qc-confirm" type="button" aria-label="File note" data-file>✓</button>
+            </div>
+            <textarea aria-label="Blank canvas note">Sketch a calmer first-run experience for the app.</textarea>
+          </section>
+
+          <section class="qc-variant" data-variant="sheet" aria-label="Focused sheet">
+            <div class="qc-sheet-wrap">
+              <div class="qc-sheet">
+                <div class="qc-sheet-header">
+                  <button class="qc-circle" type="button" aria-label="Discard">×</button>
+                  <span class="qc-sheet-title">Quick note</span>
+                  <button class="qc-circle qc-confirm" type="button" aria-label="File note" data-file>✓</button>
+                </div>
+                <textarea aria-label="Focused sheet note">Sketch a calmer first-run experience for the app.</textarea>
+              </div>
+            </div>
+          </section>
+
+          <section class="qc-variant" data-variant="dock" aria-label="Thumb dock">
+            <div class="qc-topbar"><span></span><span class="qc-top-label">Quick Capture</span><span></span></div>
+            <textarea aria-label="Thumb dock note">Sketch a calmer first-run experience for the app.</textarea>
+            <div class="qc-thumb-dock">
+              <span>inbox · saved as markdown</span>
+              <button class="qc-circle qc-confirm" type="button" aria-label="File note" data-file>↑</button>
+            </div>
+          </section>
+        </div>
+
+        <div class="qc-keyboard" aria-hidden="true">
+          <div class="qc-suggestions"><span>I</span><span>The</span><span>I’m</span></div>
+          <div class="qc-keys ten"><span class="qc-key">Q</span><span class="qc-key">W</span><span class="qc-key">E</span><span class="qc-key">R</span><span class="qc-key">T</span><span class="qc-key">Y</span><span class="qc-key">U</span><span class="qc-key">I</span><span class="qc-key">O</span><span class="qc-key">P</span></div>
+          <div class="qc-keys nine"><span class="qc-key">A</span><span class="qc-key">S</span><span class="qc-key">D</span><span class="qc-key">F</span><span class="qc-key">G</span><span class="qc-key">H</span><span class="qc-key">J</span><span class="qc-key">K</span><span class="qc-key">L</span></div>
+          <div class="qc-keys seven"><span class="qc-key qc-mod">⇧</span><span class="qc-key">Z</span><span class="qc-key">X</span><span class="qc-key">C</span><span class="qc-key">V</span><span class="qc-key">B</span><span class="qc-key">N</span><span class="qc-key">M</span><span class="qc-key qc-mod">⌫</span></div>
+          <div class="qc-keys bottom"><span class="qc-key qc-mod">123</span><span class="qc-key">space</span><span class="qc-key qc-mod">return</span></div>
+          <div class="qc-keyboard-footer"><span>◎</span><span>⌨</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="qc-side">
+      <div class="viz-controls qc-choices" aria-label="Choose a capture direction">
+        <button class="btn" type="button" data-choice="stack" aria-pressed="false">Current stack</button>
+        <button class="btn btn-primary" type="button" data-choice="canvas" aria-pressed="true">Canvas + check</button>
+        <button class="btn" type="button" data-choice="sheet" aria-pressed="false">Focused sheet</button>
+        <button class="btn" type="button" data-choice="dock" aria-pressed="false">Thumb dock</button>
+      </div>
+
+      <div>
+        <div class="qc-name" data-detail="name">Canvas + check</div>
+        <div class="qc-inspiration" data-detail="inspiration">Apple Journal · Raycast · Beli</div>
+      </div>
+
+      <span class="qc-recommend" data-detail="badge">Recommended</span>
+
+      <dl class="qc-facts">
+        <dt>Start typing</dt><dd data-detail="start">Immediate</dd>
+        <dt>File</dt><dd data-detail="file">1 explicit tap; swipe can remain a shortcut</dd>
+        <dt>Best at</dt><dd data-detail="best">Short and medium notes</dd>
+        <dt>Tradeoff</dt><dd data-detail="tradeoff">Top action is less thumb-reachable</dd>
+      </dl>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('noto-quick-capture-exploration');
+      const details = {
+        stack: {
+          name: 'Current stack', inspiration: 'Current Noto · Slopes · Calm', badge: 'Baseline',
+          start: 'Immediate', file: 'Swipe up or right', best: 'Fast repeated capture after learning',
+          tradeoff: 'Hidden action competes with text scrolling'
+        },
+        canvas: {
+          name: 'Canvas + check', inspiration: 'Apple Journal · Raycast · Beli', badge: 'Recommended',
+          start: 'Immediate', file: '1 explicit tap; swipe can remain a shortcut', best: 'Short and medium notes',
+          tradeoff: 'Top action is less thumb-reachable'
+        },
+        sheet: {
+          name: 'Focused sheet', inspiration: 'Slopes · Calm', badge: 'Most contained',
+          start: 'Immediate', file: '1 explicit tap', best: 'Clear draft boundaries',
+          tradeoff: 'Least writing space above the keyboard'
+        },
+        dock: {
+          name: 'Thumb dock', inspiration: 'Raycast footer · messaging composers', badge: 'Fastest one-handed',
+          start: 'Immediate', file: '1 thumb-zone tap', best: 'Very short notes on the move',
+          tradeoff: 'Send control crowds the keyboard edge'
+        }
+      };
+
+      root.querySelectorAll('[data-choice]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const choice = button.dataset.choice;
+          root.querySelectorAll('[data-choice]').forEach((peer) => {
+            const active = peer === button;
+            peer.setAttribute('aria-pressed', String(active));
+            peer.classList.toggle('btn-primary', active);
+          });
+          root.querySelectorAll('.qc-variant').forEach((view) => {
+            view.classList.toggle('is-active', view.dataset.variant === choice);
+          });
+          Object.entries(details[choice]).forEach(([key, value]) => {
+            const node = root.querySelector(`[data-detail="${key}"]`);
+            if (node) node.textContent = value;
+          });
+        });
+      });
+
+      root.querySelectorAll('[data-file]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const filed = root.querySelector('.qc-filed');
+          filed.classList.add('is-visible');
+          window.setTimeout(() => filed.classList.remove('is-visible'), 1300);
+        });
+      });
+    })();
+  </script>
+</div>

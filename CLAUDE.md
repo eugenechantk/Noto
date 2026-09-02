@@ -46,7 +46,7 @@ When asked to fix a bug, or when something built doesn't work as expected, alway
 
 ### Editor code
 
-- The live iOS/iPadOS editor is `TextKit2EditorView`, not `BlockEditorView`. Confirm through `Noto/Views/NoteEditorScreen.swift` before editing editor behavior.
+- The live iOS/iPadOS editor is `TextKit2EditorView` (`NotoShared/Editor/TextKit2EditorView.swift`), not `BlockEditorView`. Confirm through `Noto/Views/NoteEditorScreen.swift` (Noto) or `Noto2/Browse/NoteScreen.swift` / `Noto2/Capture/CaptureScreen.swift` (Noto 2) before editing editor behavior; it is compiled into both apps.
 - For Noto iOS editor, markdown rendering, bullet/list indentation, or keyboard toolbar work, use the project skill at `.codex/skills/noto-ios-editor-validation/SKILL.md`.
 
 ### Simulator UI validation
@@ -83,25 +83,40 @@ modified: 2026-03-16T14:22:00Z
 
 The frontmatter UUID is the note's permanent identity. Filenames can change freely.
 
-### App Target (`Noto/`)
+### App Targets (`Noto/`, `Noto2/`) and the shared layer (`NotoShared/`)
 
-Thin UI shell — SwiftUI views + UIKit TextKit 2 bridge for the editor.
+Two apps build from this project: **Noto** (`Noto/`, multiplatform) and **Noto 2**
+(`Noto2/`, iOS-only, scheme `Noto2`, bundle `com.eugenechan.Noto2` — Capture/Search/Browse
+over the same vault). Everything app-level that both need lives in `NotoShared/`, a synced
+folder compiled into both targets. Thin UI shells — SwiftUI views + UIKit TextKit 2 bridge.
 
 ```
-Noto/
-  NotoApp.swift              # App entry: vault setup → main app flow
+NotoShared/                  # compiled into BOTH targets — must build for iOS-only and multiplatform
   Storage/
     VaultLocationManager     # Persists vault location via security-scoped bookmark
     MarkdownNoteStore        # Note CRUD: list, create, read, write, delete .md files
+    VaultController          # App-facing vault facade
+    CaptureFilingService     # inbox/<date>-<sha8>.md quick-capture filing
     NoteTemplate             # Templates for note creation (daily note prompts)
   Editor/
-    TextKit2EditorView       # UIKit UITextView (TextKit 2) wrapped for SwiftUI
+    TextKit2EditorView       # UIKit UITextView / AppKit NSTextView (TextKit 2) wrapped for SwiftUI
+    NoteEditorSession        # One note's load/edit/autosave/rename lifecycle
+  Search/                    # SearchIndexController, SemanticSearchService, status model
+  Support/                   # DebugTrace, AppTheme, NotoTheme, NoteSyncCenter
+  Chat/                      # OpenRouter key/base-URL stores
+  Views/                     # EditorContentView + editor chrome, VaultSetupView
+Noto/                        # Noto only
+  NotoApp.swift              # App entry: vault setup → main app flow
   Views/
     NoteListView             # Main list of notes with folder navigation
     NoteEditorScreen         # Full editor screen (wraps TextKit2EditorView)
-    VaultSetupView           # First-launch vault picker
     SettingsView             # App settings
+Noto2/                       # Noto 2 only: Noto2App, RootTabView, Capture/, Search/, Browse/, Settings/
 ```
+
+Rules: nothing in `NotoShared/` or `Noto2/` may reference `Noto/` types; new shared
+editor/storage code goes in `NotoShared/` (or a package), not `Noto/`. Noto 2 simulator
+seeding: `.maestro/seed-vault.sh <udid> --bundle-id com.eugenechan.Noto2`.
 
 ### Runtime rules — macOS
 
@@ -163,7 +178,7 @@ Default principle: make behavior as shared as possible across iOS, iPadOS, and m
 
 #### Note List and Sidebar
 
-- Shared responsibilities include vault/directory loading, item ordering, note title resolution, filename/title rules, date formatting inputs, persistence contracts, and any reusable row/sidebar state not tied to a platform widget. Implement these in `Packages/NotoVault` or `Noto/Views/Shared/` when UI-bound.
+- Shared responsibilities include vault/directory loading, item ordering, note title resolution, filename/title rules, date formatting inputs, persistence contracts, and any reusable row/sidebar state not tied to a platform widget. Implement these in `Packages/NotoVault`, `NotoShared/` (both apps), or `Noto/Views/Shared/` (Noto-only UI) when UI-bound.
 - `NoteListView` is the platform entry point and may branch for compact iOS navigation, regular iPad layouts, and macOS split-window behavior. Keep those branches thin: navigation shell, toolbar placement, selection binding, and platform presentation differences only.
 - `NotoSidebarView`, shared rows, loaders, and title/count helpers should remain cross-platform unless a concrete platform behavior requires a separate implementation.
 - iOS and iPadOS should share list/sidebar logic by default. Separate iPad behavior only for size-class/navigation presentation differences, not for data loading or note/folder semantics.
@@ -174,7 +189,7 @@ Default principle: make behavior as shared as possible across iOS, iPadOS, and m
 - Shared editor responsibilities include `NoteEditorSession`, load/save/autosave, title updates, note renaming, same-process sync, iCloud/readability handling, markdown parsing, markdown editing transforms, todo markdown behavior, word/character counting, and styling rules that can be expressed platform-neutrally.
 - `TextKit2EditorView.swift` has a shared upper layer for markdown block detection, frontmatter handling, visual specs, paragraph/inline styling, editing transforms coordination, and TextKit delegate behavior. Prefer adding new markdown/text semantics there first so iOS, iPadOS, and macOS benefit together.
 - The concrete TextKit stacks are platform-specific: iOS/iPadOS use `UITextView` and its TextKit 2 stack; macOS uses `NSTextView` with its own AppKit TextKit setup. Platform-specific code should stay limited to native view construction, keyboard/input behavior, selection quirks, accessory/toolbars, click/tap handling, and AppKit/UIKit delegate differences.
-- iOS/iPadOS-specific editor chrome lives in `Noto/Views/iOS/`; macOS-specific editor chrome lives in `Noto/Views/macOS/`; shared editor composition lives in `Noto/Views/Shared/`. Prefer moving common chrome concepts into shared abstractions before adding parallel platform implementations.
+- iOS/iPadOS-specific editor chrome lives in `Noto/Views/iOS/`; macOS-specific editor chrome lives in `Noto/Views/macOS/`; shared editor composition lives in `NotoShared/Views/` (both apps) and `Noto/Views/Shared/` (Noto-only). Prefer moving common chrome concepts into shared abstractions before adding parallel platform implementations.
 - The editor More actions menu is currently implemented separately for iOS/iPadOS and macOS. Do not assume changing one updates the other; either update both intentionally or explicitly keep the behavior platform-specific.
 - For new editor features (hyperlinks, lists, inline marks, counters, note links): put parsing, transforms, models, and styling intent in shared code first; add only the minimum iOS/iPadOS and macOS adapters needed for native interaction.
 - When replacing backing markdown/text with a visual element (e.g. rendering `- [ ] ` as a todo circle), keep the backing text and visual metrics aligned. The insertion boundary next to editable content must keep body-font metrics so caret, selection rects, hit testing, wrapping, and overlay placement remain stable on both `UITextView` and `NSTextView`. Add regression tests for the empty-content boundary, not only the populated case.
@@ -197,14 +212,20 @@ For app-level builds, tests, simulator management, UI automation, log capture, d
 
 ### Simulator Isolation
 
-Multiple Claude Code sessions may run concurrently. Each session MUST create and use its own dedicated simulator to avoid conflicts:
+Multiple Claude Code sessions may run concurrently. The `flowdeck-guard.sh` PreToolUse hook
+enforces one simulator per session: on your first `flowdeck run/test/ui` command it creates
+and boots `cc-<first 8 chars of session id>` and BLOCKS any command that targets another
+UDID (including one you created yourself) — so **do not create your own simulator**.
 
-1. **Create:** `flowdeck simulator create --name "Noto-Test-<short-id>" --device-type "iPhone 16 Pro" --runtime "iOS 26"`
-2. **Build/run to it:** `flowdeck run -S "Noto-Test-<short-id>"`
+1. Run any `flowdeck test/run/ui` command; read the UDID the guard prints.
+2. Pass that literal UDID as `-S "<UDID>"` on every subsequent flowdeck command (no shell
+   variables — the hook matches the raw command text).
 3. **Maestro against it:** `maestro --device <UDID> test .maestro/`
-4. **Clean up when done**
+4. Relaunch without reinstalling (keeps a seeded container): XcodeBuildMCP `simulator_launch_app`
+   — `flowdeck run` reinstalls and wipes the data container, and flowdeck has no launch verb.
+5. Seed: `.maestro/seed-vault.sh <UDID>` (Noto) or `… --bundle-id com.eugenechan.Noto2` (Noto 2).
 
-Never use the default/shared simulator for testing. Use the first 8 chars of `$CLAUDE_SESSION_ID` as `<short-id>`.
+Never use the default/shared simulator for testing.
 
 When the user asks to test on simulator without naming a narrower device, install and launch on both an iPhone simulator and an iPad simulator. Prefer an iPad mini simulator for iPad unless the user specifies otherwise.
 

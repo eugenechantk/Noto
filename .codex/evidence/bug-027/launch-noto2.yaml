@@ -1,0 +1,4 @@
+appId: com.eugenechan.Noto2
+---
+- launchApp:
+    appId: com.eugenechan.Noto2

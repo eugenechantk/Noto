@@ -46,9 +46,53 @@ Packages
   NotoVault: UI-free filesystem, note, folder, daily-note, attachment, path,
              title, sidebar tree, and word-count mechanics
   NotoSearch: UI-free markdown indexing, search, and refresh coordination
+  NotoDigest: UI-free inbox triage — reading inbox/, snooze filtering, and the
+              four filing actions (snooze, add-to, create, discard)
   NotoReadwiseSync: Readwise/Reader API client, sync engine, note rendering,
                     sync state, tests, and CLI
 ```
+
+### Two app targets, one shared layer (`NotoShared/`)
+
+Since 2026-08-23 the project builds two apps from the same code:
+
+| Target | Scheme | Bundle id | What it is |
+| --- | --- | --- | --- |
+| `Noto` | `Noto-iOS`, `Noto-macOS`, `Noto` | `com.eugenechan.Noto` | the full iOS/iPadOS/macOS app |
+| `Noto2` | `Noto2` | `com.eugenechan.Noto2` | a separate, iOS-only four-screen app — Capture (editor + send to `inbox/`), Digest (process `inbox/` to zero), Search (hybrid hits + streamed summary), Browse — over the same vault |
+| `Noto2QuickCaptureControl` | embedded by `Noto2` | `com.eugenechan.Noto2.QuickCaptureControl` | WidgetKit accessory widget for opening Noto 2 Quick Capture from the Lock Screen widget area; the existing target name is retained for bundle/signing stability |
+
+Both targets compile the `NotoShared/` synced folder, which holds everything that is
+app-level Swift but not specific to either app's chrome:
+
+```text
+NotoShared/
+  Editor/    TextKit2EditorView, NoteEditorSession, BlockEditingCommands, TodoMarkdown,
+             EditableFrontmatter, EditorFind, FrontmatterBlockLayout, NoteContentCache, Block
+  Storage/   VaultLocationManager, MarkdownNoteStore, VaultController, VaultFileWatcher,
+             CoordinatedFileManager, NoteTemplate, CaptureFilingService
+  Search/    SearchIndexController, SearchIndexStatusModel, SemanticSearchService
+  Support/   DebugTrace, AppTheme, NotoTheme, NoteSyncCenter
+  Chat/      OpenRouterKeyStore, OpenRouterBaseURLStore, ReadwiseSecretStore
+  Views/     EditorContentView, EditorFindBar, EditorBreadcrumbBar, EditorChromeMode,
+             EditorStatusOverlay, SheetCircleButton, VaultSetupView
+Noto2ControlShared/
+  Noto2QuickCaptureIntent     Strict capture URL route and launch router shared with the widget
+Noto2QuickCaptureControl/
+  Noto2QuickCaptureControl    WidgetKit accessory widget extension embedded by Noto 2
+```
+
+Rules that follow: a file in `NotoShared/` must compile for both targets (iOS-only Noto 2
+and multiplatform Noto), so platform code stays behind `#if os(...)`; anything under
+`Noto/` (NotoApp, NoteListView, NotoSidebarView, Settings, Chat UI, deep links, Readwise
+sync) is Noto-only and must not be referenced from `NotoShared/` or `Noto2/`; `Noto2/`
+holds only Noto 2's screens. `NotoTests` still `@testable import Noto` (the shared files
+compile into the Noto module); `Noto2Tests` imports `Noto2`. Simulator seeding for Noto 2:
+`.maestro/seed-vault.sh <udid> --bundle-id com.eugenechan.Noto2`. The long-term direction
+is to promote `NotoShared/Storage` (no UI) and `NotoShared/Editor` into packages
+(`NotoStorage`, `NotoEditorKit`); see `.claude/brainstorm/noto2-app-plan.md`.
+The launch-route file in `Noto2ControlShared/` is intentionally compiled into both
+Noto 2 and its widget extension; extension-only UI stays in `Noto2QuickCaptureControl/`.
 
 ### Ownership Rules
 
@@ -190,6 +234,38 @@ Search is split between app lifecycle and package mechanics.
 - `NotoSearch.SearchIndexCoordinator` owns package-level single-flight full refreshes, debounced file refreshes, remove/replace behavior, and follow-up work after overlapping refreshes.
 - `NoteSearchSheet` asks the search index for results and emits selected results back to `VaultWorkspaceView` as workspace navigation.
 
+### Inbox / Digest Lifecycle
+
+Noto 2's Capture tab writes `inbox/<YYYY-MM-DD>-<sha8>.md` (`CaptureFilingService`); the
+Digest tab is the other half of that loop — it works the folder down to zero.
+
+- `NotoDigest.DigestInbox` enumerates top-level `.md` files in `inbox/` and parses each into
+  a `DigestEntry`. It does not recurse — the inbox is flat by construction.
+- **`snoozed_until:` is the only key the digest adds.** `status:` stays `inbox` so gbrain's
+  cycle keeps typing the file as a note; only the digest honours the snooze. A missing or
+  unparseable stamp means *due*, never hidden — a typo in the vault must not be able to make
+  a capture invisible with no way to reach it from the app.
+- `NotoDigest.DigestFiling` owns the four actions. Add-to and Create write the destination
+  **first** and delete the inbox file only on success, so a failed write costs a retry and
+  never the thought. Both re-read the capture from disk at filing time rather than trusting
+  the loaded entry — the digest can sit on screen while iCloud syncs an edit from another
+  device.
+- Filed and discarded captures are **deleted**, not archived: the text now lives in the
+  destination note, and a second copy would double every search hit.
+- A capture whose body is an evicted iCloud stub is surfaced as `isAvailable == false` and
+  shown as downloading, rather than dropped from the queue (see the iCloud policy above).
+- `Noto2/Digest/DigestModel` is the app-side queue: it pops the card only when the action
+  succeeded, and tells `SearchIndexController` about both the written note and the removed
+  capture so Noto 2's own index stays in step.
+- **Discard is undoable, not confirmed.** `discard` returns the file's exact bytes and
+  `restore` writes them back; the model holds them for as long as the outcome banner is on
+  screen. A swipe that has already flown the card off should not then raise a modal.
+- Gesture geometry lives in `Noto2/Digest/DigestSwipe.swift`, not the view: `DigestSwipe`
+  (the four directions ↔ four actions) and `DigestSwipeResolver` (thresholds, dominant-axis
+  resolution, per-direction signal strength). Put new gesture rules there so they stay
+  testable — a threshold change that makes one action occasionally fire another is invisible
+  in a screenshot.
+
 ### Mention Menu Lifecycle
 
 The mention menu stays editor-scoped:
@@ -206,6 +282,56 @@ Readwise is split across the app target and package:
 - `ReadwiseSyncController` lives in the app target and owns token UI state, keychain access, automatic sync state, and Settings integration.
 - `Packages/NotoReadwiseSync/Sources/NotoReadwiseSyncCore` owns API models, the Readwise client, Reader/Readwise sync engines, source-note rendering, and sync state.
 - `Packages/NotoReadwiseSync/Sources/noto-readwise-sync` contains the CLI wrapper around the same core package.
+
+### Deep Link Lifecycle
+
+Noto notes are addressable by URL. There are two wire forms and both decode to the same
+vault-relative path:
+
+- `https://noto.eugenechantk.me/open#path=<encoded>` — **the canonical form.** A Universal Link:
+  `https`, so messengers autolink it, and it opens the app directly with no browser hop. This is
+  what everything should generate.
+- `noto://open?path=<encoded>` — the original custom scheme. Still parsed so old links keep working,
+  but nothing generates it any more. Most messengers refuse to autolink a non-`http` scheme, which
+  is why the https form exists.
+
+Ownership:
+
+- `Packages/NotoVault/Sources/NotoVault/NotoDeepLink.swift` owns the whole codec — building both
+  forms, parsing either, and validating the path. It is the single source of truth; do not hand-roll
+  or re-encode a Noto URL anywhere else.
+- Paths are rejected unless they are safe vault-relative markdown: no absolute paths, no `..`
+  traversal, no empty components, `.md` only. Parsing also pins scheme, host, and path, so a
+  look-alike host (`noto.eugenechantk.me.evil.com`) does not route.
+- `NotoDeepLinkRouter` (`Noto/Support/NotoDeepLink.swift`) is the single entry point in the app.
+  Both `.onOpenURL` and `.onContinueUserActivity(NSUserActivityTypeBrowsingWeb)` in `NotoApp` feed
+  it; it publishes `pendingDocumentPath`, which `VaultWorkspaceView` (defined in
+  `Noto/Views/NoteListView.swift`) consumes via `openPendingDocumentLinkIfNeeded()`. Add new URL
+  entry points by calling `router.open(_:)`, not by parsing.
+
+The payload rides in the **fragment**, not the query, because fragments are never sent to the
+origin — note titles stay out of edge access logs and out of the link-preview fetches messengers
+make. Parsing accepts the query form too, only as a fallback for clients that strip fragments.
+
+Supporting infrastructure:
+
+- `com.apple.developer.associated-domains` = `applinks:noto.eugenechantk.me` in `Noto/Noto.entitlements`.
+  It must stay in lockstep with `NotoDeepLink.webHost`; a test pins the constant.
+- `web/noto-links/` is the site behind that host — the `apple-app-site-association` file authorising
+  appID `39GJBP8V5A.com.eugenechan.Noto`, plus an "Open in Noto" fallback page. The fallback exists
+  because WhatsApp's in-app WKWebView does not honour Universal Links; a tap there fires `noto://`
+  from a user gesture. Deploy with
+  `npx wrangler pages deploy public --project-name noto-links --branch main` from that directory.
+- Producers of links outside this repo: `noto-agent` (`Packages/NotoAgentCLI`) returns `deepLink` on
+  mutation/search/read results, and the Readwise digest agent
+  (`~/dev/inbox/readwise-auto-digest-agent`, `src/notoLink.ts`) mirrors the codec in TypeScript. Any
+  consumer must treat a returned link as authoritative and never rebuild it.
+
+**Known gap:** simulator builds do not enforce capability entitlements, so Universal Links are
+verified on simulator but **not yet on physical devices**. The App ID needs the Associated Domains
+capability enabled in the developer portal and the match AppStore profile regenerated before the
+next device or TestFlight build; that build may otherwise fail to sign. See
+`.codex/feature/noto-universal-links.md`.
 
 ## Feature set (running)
 

@@ -1,0 +1,29 @@
+{
+  "observed_via": "FlowDeck lock-screen screenshot, widget tap command, and post-launch app screenshot/tree",
+  "precondition": {
+    "app_stopped_utc": "2026-08-29T16:07:49.108Z",
+    "bundle_id": "com.eugenechan.Noto2"
+  },
+  "lock_screen_surface": {
+    "local_display_time": "Sunday, August 30 12:07 AM HKT",
+    "artifact": "02-lock-screen-surface.jpg",
+    "observed_widgets": [
+      "Rectangular Quick Capture widget with compose symbol, truncated Quick Capture title, and New note subtitle",
+      "Circular Quick Capture widget with compose symbol"
+    ]
+  },
+  "activation": {
+    "command": "flowdeck ui simulator tap --point 114,710 --geometry points -S \"1922B139-ADDC-4A5E-9C85-FB43D75A2C2D\" --json",
+    "widget_tapped": "Rectangular Quick Capture widget on the Lock Screen"
+  },
+  "result": {
+    "local_display_time": "Sunday, August 30 12:08 AM HKT",
+    "artifact": "03-capture-opened.jpg",
+    "tree_observations": [
+      "TextArea present",
+      "Placeholder text: What's on your mind?",
+      "Hide Keyboard button visible"
+    ],
+    "conclusion": "Noto 2 cold-launched to Capture and the editor was focused with the software keyboard visible."
+  }
+}
