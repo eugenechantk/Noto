@@ -56,6 +56,10 @@ struct MarkdownSearchIndexerTests {
         #expect(result.deleted == 1)
         #expect(try engine.search("nebula").first?.title == "Body Only Match")
         #expect(try engine.search("retention loops").isEmpty)
+        // A local vault has nothing to wait on: every scanned file is indexable,
+        // so a non-zero count here would mean the sweep silently dropped notes
+        // (bug 030 — the symptom is "search finds nothing").
+        #expect(result.skippedUnavailable == 0)
     }
 
     @Test("Changed-file refresh removes stale paths after note move")

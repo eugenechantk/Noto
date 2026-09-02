@@ -114,6 +114,7 @@ public struct MarkdownSearchIndexer: Sendable {
         let store = try openStore()
         let catalog = Dictionary(uniqueKeysWithValues: try store.noteCatalog().map { ($0.relativePath, $0) })
         var upserted = 0
+        var skippedUnavailable = 0
 
         for file in files {
             if let entry = catalog[file.relativePath],
@@ -126,6 +127,7 @@ public struct MarkdownSearchIndexer: Sendable {
             }
             guard file.isAvailableForIndexing else {
                 Self.startDownloadingIfNeeded(file.url)
+                skippedUnavailable += 1
                 continue
             }
 
@@ -147,7 +149,13 @@ public struct MarkdownSearchIndexer: Sendable {
 
         let deleted = try store.deleteMissing(existingRelativePaths: Set(files.map(\.relativePath)))
         let stats = try store.stats()
-        return SearchIndexRefreshResult(scanned: files.count, upserted: upserted, deleted: deleted, stats: stats)
+        return SearchIndexRefreshResult(
+            scanned: files.count,
+            upserted: upserted,
+            deleted: deleted,
+            skippedUnavailable: skippedUnavailable,
+            stats: stats
+        )
     }
 
     @discardableResult

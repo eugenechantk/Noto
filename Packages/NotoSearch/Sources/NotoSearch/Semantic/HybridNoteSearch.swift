@@ -18,6 +18,19 @@ public enum HybridNoteSearch {
         public var keywordLimit: Int
         public var semanticLimit: Int
         public var limit: Int
+        /// Absolute cosine floor for semantic chunk hits. The default matches
+        /// `SemanticSearcher.search`'s historical floor.
+        public var semanticMinScore: Float
+        /// When set, semantic hits must also score within this distance of the
+        /// best semantic hit. Embedding models with a high similarity floor
+        /// (granite: unrelated text ≈ 0.70, related ≈ 0.80+) otherwise surface
+        /// every note in a small vault as a "meaning" match. `nil` disables.
+        public var semanticRelativeGap: Float?
+        /// When set, the semantic leg is used only if the best hit stands at least
+        /// this far above the median of the fetched hits. Gibberish queries score
+        /// flat (granite: top − median ≈ 0.04); real queries peak (≥ 0.11), so
+        /// this keeps "no results" reachable. `nil` disables. Needs ≥ 4 hits.
+        public var semanticPeakMargin: Float?
 
         public init(
             query: String,
@@ -26,7 +39,10 @@ public enum HybridNoteSearch {
             folderPrefix: String? = nil,
             keywordLimit: Int = 150,
             semanticLimit: Int = 50,
-            limit: Int = 100
+            limit: Int = 100,
+            semanticMinScore: Float = 0.2,
+            semanticRelativeGap: Float? = nil,
+            semanticPeakMargin: Float? = nil
         ) {
             self.query = query
             self.scope = scope
@@ -35,6 +51,9 @@ public enum HybridNoteSearch {
             self.keywordLimit = keywordLimit
             self.semanticLimit = semanticLimit
             self.limit = limit
+            self.semanticMinScore = semanticMinScore
+            self.semanticRelativeGap = semanticRelativeGap
+            self.semanticPeakMargin = semanticPeakMargin
         }
     }
 
@@ -67,6 +86,23 @@ public enum HybridNoteSearch {
 
     /// Fusion half, reusable by callers that already ran (and displayed) the
     /// keyword leg — the search sheet's two-stage flow. Returns `nil` when the
+    /// Keeps only hits within `gap` of the best hit's score (hits arrive sorted
+    /// by score descending). Pure; exposed for tests.
+    public static func applyRelativeGap(_ hits: [SemanticSearchHit], gap: Float?) -> [SemanticSearchHit] {
+        guard let gap, let best = hits.map(\.score).max() else { return hits }
+        let floor = best - gap
+        return hits.filter { $0.score >= floor }
+    }
+
+    /// True when the top score clears the median by at least `margin` (or when
+    /// the test is disabled / there are too few scores to judge). Pure; for tests.
+    public static func passesPeakTest(scores: [Float], margin: Float?) -> Bool {
+        guard let margin, scores.count >= 4 else { return true }
+        let sorted = scores.sorted(by: >)
+        let median = sorted[sorted.count / 2]
+        return sorted[0] - median >= margin
+    }
+
     /// semantic leg has nothing to add, so callers keep their keyword list.
     public static func fuseWithSemantic(
         keyword: [SearchResult],
@@ -81,11 +117,17 @@ public enum HybridNoteSearch {
         var hits: [SemanticSearchHit]
         do {
             guard let vector = try embedQuery(request.query) else { return nil }
+            // Fetch broadly when the peak test is on so the median reflects the
+            // corpus baseline, then apply the floor.
+            let fetchFloor = request.semanticPeakMargin == nil ? request.semanticMinScore : min(request.semanticMinScore, 0.2)
             hits = try SemanticSearcher(indexDirectory: directory)
-                .search(queryVector: vector, limit: request.semanticLimit)
+                .search(queryVector: vector, limit: request.semanticLimit, minScore: fetchFloor)
         } catch {
             return nil
         }
+        guard passesPeakTest(scores: hits.map(\.score), margin: request.semanticPeakMargin) else { return nil }
+        hits = hits.filter { $0.score >= request.semanticMinScore }
+        hits = applyRelativeGap(hits, gap: request.semanticRelativeGap)
 
         if let folder = SearchFolderFilter.normalizedPrefix(request.folderPrefix) {
             hits = hits.filter { SearchFolderFilter.matches(relativePath: $0.relativePath, normalizedPrefix: folder) }

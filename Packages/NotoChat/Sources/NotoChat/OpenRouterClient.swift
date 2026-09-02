@@ -112,7 +112,7 @@ public struct OpenRouterClient: LLMClienting {
     // Build the POST /chat/completions request.
     func makeURLRequest(_ request: ChatRequest, stream: Bool) throws -> URLRequest {
         guard !configuration.apiKey.isEmpty else { throw LLMError.missingAPIKey }
-        let url = configuration.baseURL.appendingPathComponent("chat/completions")
+        let url = Self.chatCompletionsURL(for: configuration.baseURL)
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
@@ -123,6 +123,15 @@ public struct OpenRouterClient: LLMClienting {
         let encoder = JSONEncoder()
         req.httpBody = try encoder.encode(ChatCompletionPayload(request, stream: stream))
         return req
+    }
+
+    /// Accept either an OpenAI-compatible API root (`…/api/v1`) or a complete
+    /// chat-completions endpoint. Proxy dashboards commonly present the latter;
+    /// blindly appending the path made those otherwise-valid overrides fail.
+    static func chatCompletionsURL(for baseURL: URL) -> URL {
+        let path = baseURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased()
+        guard !path.hasSuffix("chat/completions") else { return baseURL }
+        return baseURL.appendingPathComponent("chat/completions")
     }
 
     public func complete(_ request: ChatRequest) async throws -> ChatMessage {
@@ -146,7 +155,12 @@ public struct OpenRouterClient: LLMClienting {
                 do {
                     let urlRequest = try makeURLRequest(request, stream: true)
                     let (bytes, response) = try await configuration.session.bytes(for: urlRequest)
-                    try Self.validate(response, data: nil)
+                    if let http = response as? HTTPURLResponse,
+                       !(200...299).contains(http.statusCode) {
+                        var errorData = Data()
+                        for try await byte in bytes.prefix(4_096) { errorData.append(byte) }
+                        try Self.validate(response, data: errorData)
+                    }
                     var decoder = SSEStreamDecoder()
                     for try await line in bytes.lines {
                         for event in decoder.ingest(line) {

@@ -38,6 +38,23 @@ import Testing
         }
     }
 
+    @Test func customBaseURLAcceptsRootOrFullEndpoint() throws {
+        let root = OpenRouterClient(configuration: .init(
+            apiKey: "secret",
+            baseURL: URL(string: "https://relay.example.com/openai/v1")!
+        ))
+        let endpoint = OpenRouterClient(configuration: .init(
+            apiKey: "secret",
+            baseURL: URL(string: "https://relay.example.com/openai/v1/chat/completions")!
+        ))
+
+        let request = ChatRequest(messages: [.user("hi")])
+        #expect(try root.makeURLRequest(request, stream: true).url?.absoluteString
+            == "https://relay.example.com/openai/v1/chat/completions")
+        #expect(try endpoint.makeURLRequest(request, stream: true).url?.absoluteString
+            == "https://relay.example.com/openai/v1/chat/completions")
+    }
+
     @Test func completeParsesAssistantMessage() async throws {
         MockURLProtocol.statusCode = 200
         MockURLProtocol.responseData = try JSONSerialization.data(withJSONObject: [
@@ -70,13 +87,19 @@ import Testing
         #expect(collected == [.textDelta("Hi "), .textDelta("there"), .finished(reason: "stop")])
     }
 
-    @Test func streamSurfacesHTTPError() async throws {
+    @Test func streamSurfacesHTTPErrorBody() async throws {
         MockURLProtocol.statusCode = 401
         MockURLProtocol.responseData = Data("unauthorized".utf8)
         let c = client(session: MockURLProtocol.makeSession())
 
-        await #expect(throws: LLMError.self) {
+        do {
             for try await _ in c.stream(ChatRequest(messages: [.user("hi")])) {}
+            Issue.record("Expected an HTTP error")
+        } catch let LLMError.http(status, body) {
+            #expect(status == 401)
+            #expect(body == "unauthorized")
+        } catch {
+            Issue.record("Unexpected error: \(error)")
         }
     }
 }

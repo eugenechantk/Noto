@@ -212,3 +212,32 @@ struct HybridNoteSearchTests {
         #expect(!titles.contains("Weekend Plans"))   // semantic leg disabled
     }
 }
+
+/// Test case index
+/// 1. relativeGapKeepsHitsNearTheBest — hits more than `gap` below the top score are dropped; nil gap is a no-op
+/// 2. relativeGapOnEmptyIsEmpty — no hits → no hits
+struct HybridRelativeGapTests {
+    private func hit(_ score: Float) -> SemanticSearchHit {
+        SemanticSearchHit(chunkID: UUID(), noteID: UUID(), relativePath: "n.md", noteTitle: "n", heading: "", snippet: "", lineStart: 0, score: score)
+    }
+
+    @Test func relativeGapKeepsHitsNearTheBest() {
+        let hits = [hit(0.86), hit(0.82), hit(0.80), hit(0.72), hit(0.70)]
+        #expect(HybridNoteSearch.applyRelativeGap(hits, gap: 0.12).map(\.score) == [0.86, 0.82, 0.80])
+        #expect(HybridNoteSearch.applyRelativeGap(hits, gap: nil).count == 5)
+    }
+
+    @Test func relativeGapOnEmptyIsEmpty() {
+        #expect(HybridNoteSearch.applyRelativeGap([], gap: 0.1).isEmpty)
+    }
+
+    /// 3. peakTestSeparatesFlatFromPeaked — measured granite distributions: gibberish (top−median ≈ 0.04) fails, real queries (≥ 0.11) pass; nil margin or < 4 scores always pass
+    @Test func peakTestSeparatesFlatFromPeaked() {
+        let gibberish: [Float] = [0.780, 0.749, 0.740, 0.733, 0.730, 0.725, 0.716]
+        let granite: [Float] = [0.859, 0.816, 0.801, 0.724, 0.711, 0.706, 0.698]
+        #expect(HybridNoteSearch.passesPeakTest(scores: gibberish, margin: 0.07) == false)
+        #expect(HybridNoteSearch.passesPeakTest(scores: granite, margin: 0.07) == true)
+        #expect(HybridNoteSearch.passesPeakTest(scores: gibberish, margin: nil) == true)
+        #expect(HybridNoteSearch.passesPeakTest(scores: [0.78, 0.75, 0.74], margin: 0.07) == true)
+    }
+}
