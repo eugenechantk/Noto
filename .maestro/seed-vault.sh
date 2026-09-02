@@ -34,6 +34,7 @@ Options:
   --scale small|large    Generate the built-in seed vault. Default: small.
   --current-vault        Copy Eugene's current iCloud Noto vault into the simulator.
   --source-vault <path>  Copy an arbitrary local Noto vault into the simulator.
+  --bundle-id <id>       Seed a different app container (e.g. com.eugenechan.Noto2 for Noto 2).
   --help                 Show this help.
 USAGE
 }
@@ -47,6 +48,9 @@ UDID="${1:?Usage: $0 <simulator-udid> [--scale small|large]}"
 SCALE="small"
 MODE="generated"
 SOURCE_VAULT=""
+BUNDLE_ID_OVERRIDE=""
+INITIAL_TAB=""
+DRAFT_FILE=""
 CURRENT_VAULT="/Users/eugenechan/Library/Mobile Documents/com~apple~CloudDocs/Noto"
 
 shift
@@ -65,6 +69,18 @@ while [ "$#" -gt 0 ]; do
         --source-vault)
             SOURCE_VAULT="${2:?Error: --source-vault requires a path.}"
             MODE="source"
+            shift 2
+            ;;
+        --bundle-id)
+            BUNDLE_ID_OVERRIDE="${2:?Error: --bundle-id requires a bundle identifier.}"
+            shift 2
+            ;;
+        --initial-tab)
+            INITIAL_TAB="${2:?Error: --initial-tab requires capture|digest|search|browse.}"
+            shift 2
+            ;;
+        --draft-file)
+            DRAFT_FILE="${2:?Error: --draft-file requires a path to a text file.}"
             shift 2
             ;;
         --help|-h)
@@ -100,7 +116,10 @@ if [ "$MODE" = "source" ]; then
     fi
 fi
 
-BUNDLE_ID="com.eugenechan.Noto"
+BUNDLE_ID="${BUNDLE_ID_OVERRIDE:-com.eugenechan.Noto}"
+
+# Seeding a running app's container is racy - stop it first (no-op if not running).
+xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
 
 # Get the app's data container path
 DATA_DIR=$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" data 2>/dev/null || true)
@@ -410,4 +429,11 @@ esac
 
 # Set UserDefaults so the app uses local vault (skips setup screen)
 xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" vaultIsLocal -bool true
+if [ -n "$DRAFT_FILE" ]; then
+    xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" "noto2.capture.draft" -string "$(cat "$DRAFT_FILE")"
+fi
+xcrun simctl spawn "$UDID" defaults delete "$BUNDLE_ID" noto2.debug.initialTab >/dev/null 2>&1 || true
+if [ -n "$INITIAL_TAB" ]; then
+    xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" noto2.debug.initialTab -string "$INITIAL_TAB"
+fi
 xcrun simctl spawn "$UDID" defaults delete "$BUNDLE_ID" lastOpenedNoteURL >/dev/null 2>&1 || true
