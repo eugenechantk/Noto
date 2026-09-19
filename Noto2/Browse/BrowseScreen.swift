@@ -65,6 +65,12 @@ struct BrowseScreen: View {
             }
             .navigationDestination(for: BrowseDestination.self) { destination in
                 BrowseDestinationView(destination: destination, vaultController: vaultController, onOpen: { path.append($0) })
+                    // A pending note replaces the stack with `[note]`. When a
+                    // note is already pushed, that keeps the same stack position,
+                    // and without explicit identity SwiftUI reuses the existing
+                    // editor (whose session was built from the old note). Keying
+                    // by destination makes the new note get its own screen.
+                    .id(destination)
             }
         }
         // Both hooks are needed: `onAppear` covers the first hand-off, when the
