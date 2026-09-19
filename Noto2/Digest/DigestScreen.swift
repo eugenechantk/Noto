@@ -91,8 +91,7 @@ struct DigestScreen: View {
                         label: "Discard this capture"
                     )
                     .zIndex(1)
-                    Spacer(minLength: 4)
-                    actionRow
+                    Spacer(minLength: 12)
                 }
             }
             .padding(.horizontal, 16)
@@ -342,40 +341,6 @@ struct DigestScreen: View {
         case .create, .discard: return 0
         case nil: return min(10, max(-10, Double(drag.width) / 18))
         }
-    }
-
-    // MARK: - Actions row
-
-    /// The explicit path for the two actions that need more input anyway. Discard
-    /// and snooze are gesture-only — both are one-tap-irreversible-ish, and the
-    /// targets above and below already advertise them.
-    private var actionRow: some View {
-        HStack(spacing: 10) {
-            actionButton("Add to", systemImage: "text.append", id: "digestAddToButton") {
-                present(.addTo)
-            }
-            actionButton("Create", systemImage: "doc.badge.plus", id: "digestCreateButton") {
-                present(.create)
-            }
-        }
-        .disabled(!canAct)
-        .opacity(canAct ? 1 : 0.4)
-        .padding(.bottom, 4)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("digestActionRow")
-    }
-
-    private func actionButton(_ title: String, systemImage: String, id: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(NotoTheme.head)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(NotoTheme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(id)
     }
 
     // MARK: - Gesture

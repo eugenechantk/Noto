@@ -247,7 +247,7 @@ struct DigestFilingTests {
         vault.write("---\nid: t\n---\n# A\n", at: "A.md")
 
         let inbox = DigestInbox(vaultURL: vault.rootURL)
-        try filing(vault).discard(inbox.allEntries().first!)
+        try filing(vault).discard(inbox.allEntries().first { $0.body == "Junk" }!)
 
         #expect(!vault.exists("inbox/one.md"))
         #expect(vault.exists("inbox/two.md"))

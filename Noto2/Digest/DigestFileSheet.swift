@@ -2,13 +2,29 @@ import NotoDigest
 import NotoVault
 import SwiftUI
 
-/// Where a capture goes. Presented when the digest card is swiped right (or the
-/// Add to / Create buttons are tapped), pre-selected to the tapped mode.
+/// Where a capture goes. Presented by swiping the digest card right or up and
+/// pre-selected to the corresponding mode.
 enum DigestFileMode: String, Identifiable, CaseIterable {
     case addTo, create
 
     var id: String { rawValue }
     var label: String { self == .addTo ? "Add to" : "Create" }
+}
+
+enum DigestFileFocusTarget: Hashable {
+    case search, title
+}
+
+/// Testable initial input contract for the sheet. Create deliberately starts
+/// with no suggested title: naming the note is always an explicit user action.
+struct DigestFileInputState: Equatable {
+    var mode: DigestFileMode
+    var query = ""
+    var newTitle = ""
+
+    var focusTarget: DigestFileFocusTarget {
+        mode == .addTo ? .search : .title
+    }
 }
 
 /// The destination the user picked, handed back to `DigestScreen` to execute.
@@ -24,17 +40,33 @@ enum DigestDestination {
 struct DigestFileSheet: View {
     let vaultController: VaultController
     let capture: DigestEntry
-    @State var mode: DigestFileMode
     let onFile: (DigestDestination) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var query = ""
+    @State private var input: DigestFileInputState
+    @FocusState private var focusedInput: DigestFileFocusTarget?
+    @State private var allCandidates: [PageMentionDocument] = []
     @State private var matches: [PageMentionDocument] = []
-    @State private var newTitle = ""
     @State private var folders: [DigestFolderOption] = []
     @State private var selectedFolder: URL?
+    @State private var isLoadingDestinations = true
 
-    private var trimmedTitle: String { newTitle.trimmingCharacters(in: .whitespacesAndNewlines) }
+    init(
+        vaultController: VaultController,
+        capture: DigestEntry,
+        mode: DigestFileMode,
+        onFile: @escaping (DigestDestination) -> Void
+    ) {
+        self.vaultController = vaultController
+        self.capture = capture
+        self.onFile = onFile
+        _input = State(initialValue: DigestFileInputState(mode: mode))
+        _folders = State(initialValue: [
+            DigestFolderOption(url: vaultController.vaultURL.standardizedFileURL, label: "Vault root")
+        ])
+    }
+
+    private var trimmedTitle: String { input.newTitle.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var canCreate: Bool { DigestMarkdown.filename(forTitle: trimmedTitle) != nil }
     private var destinationFolder: URL { selectedFolder ?? vaultController.vaultURL }
 
@@ -42,7 +74,7 @@ struct DigestFileSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 capturePreview
-                Picker("Mode", selection: $mode) {
+                Picker("Mode", selection: $input.mode) {
                     ForEach(DigestFileMode.allCases) { mode in
                         Text(mode.label).tag(mode)
                     }
@@ -52,13 +84,13 @@ struct DigestFileSheet: View {
                 .padding(.bottom, 12)
                 .accessibilityIdentifier("digestFileModePicker")
 
-                switch mode {
+                switch input.mode {
                 case .addTo: addToList
                 case .create: createForm
                 }
             }
             .background(NotoTheme.background.ignoresSafeArea())
-            .navigationTitle(mode == .addTo ? "Add to a note" : "Create a note")
+            .navigationTitle(input.mode == .addTo ? "Add to a note" : "Create a note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -66,7 +98,7 @@ struct DigestFileSheet: View {
                         .accessibilityIdentifier("digestFileCloseButton")
                         .accessibilityLabel("Cancel")
                 }
-                if mode == .create {
+                if input.mode == .create {
                     ToolbarItem(placement: .topBarTrailing) {
                         SheetCircleButton(kind: .confirm) { confirmCreate() }
                             .disabled(!canCreate)
@@ -79,14 +111,19 @@ struct DigestFileSheet: View {
         }
         .presentationDetents([.large])
         .task {
-            refreshMatches()
-            folders = DigestFolderOption.load(vaultURL: vaultController.vaultURL)
-            // Seed the title from the capture's first line — most captures are
-            // already a serviceable title, and an empty field means retyping the
-            // thought you just read on the card.
-            if newTitle.isEmpty { newTitle = DigestFolderOption.suggestedTitle(from: capture) }
+            // Focus before awaiting the vault scan so typing is available as
+            // soon as the sheet is on screen, even for a large or iCloud vault.
+            await Task.yield()
+            focusedInput = input.focusTarget
+            await loadDestinations()
         }
-        .onChange(of: query) { _, _ in refreshMatches() }
+        .onChange(of: input.mode) { _, _ in
+            Task { @MainActor in
+                await Task.yield()
+                focusedInput = input.focusTarget
+            }
+        }
+        .onChange(of: input.query) { _, _ in refreshMatches() }
     }
 
     // MARK: - Shared header
@@ -109,47 +146,85 @@ struct DigestFileSheet: View {
     // MARK: - Add to an existing note
 
     private var addToList: some View {
-        List {
-            if matches.isEmpty {
-                Text(query.isEmpty ? "No notes in this vault yet." : "No notes match “\(query)”.")
-                    .foregroundStyle(AppTheme.secondaryText)
-                    .listRowBackground(NotoTheme.background)
-                    .accessibilityIdentifier("digestNotePickerEmptyState")
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(NotoTheme.muted)
+                TextField("Search notes", text: $input.query)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .focused($focusedInput, equals: .search)
+                    .accessibilityIdentifier("digestAddToSearchField")
             }
-            ForEach(matches) { document in
-                Button {
-                    onFile(.existingNote(url: document.fileURL, title: document.title))
-                    dismiss()
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(document.title)
-                            .font(.system(size: NotoTheme.FontSize.rowTitle, weight: .semibold))
-                            .foregroundStyle(NotoTheme.head)
-                            .lineLimit(1)
-                        Text(document.relativePath)
-                            .font(.system(size: NotoTheme.FontSize.subtitle))
-                            .foregroundStyle(NotoTheme.muted)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .background(NotoTheme.card, in: Capsule())
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+
+            List {
+                if isLoadingDestinations {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text("Loading notes…")
+                            .foregroundStyle(AppTheme.secondaryText)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+                    .listRowBackground(NotoTheme.background)
+                    .accessibilityIdentifier("digestNotePickerLoading")
+                } else if matches.isEmpty {
+                    Text(input.query.isEmpty ? "No notes in this vault yet." : "No notes match “\(input.query)”.")
+                        .foregroundStyle(AppTheme.secondaryText)
+                        .listRowBackground(NotoTheme.background)
+                        .accessibilityIdentifier("digestNotePickerEmptyState")
                 }
-                .buttonStyle(.plain)
-                .listRowBackground(NotoTheme.background)
-                .accessibilityIdentifier("digestNotePickerRow")
+                ForEach(matches) { document in
+                    Button {
+                        onFile(.existingNote(url: document.fileURL, title: document.title))
+                        dismiss()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(document.title)
+                                .font(.system(size: NotoTheme.FontSize.rowTitle, weight: .semibold))
+                                .foregroundStyle(NotoTheme.head)
+                                .lineLimit(1)
+                            Text(document.relativePath)
+                                .font(.system(size: NotoTheme.FontSize.subtitle))
+                                .foregroundStyle(NotoTheme.muted)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(NotoTheme.background)
+                    .accessibilityIdentifier("digestNotePickerRow")
+                }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .accessibilityIdentifier("digestNotePicker")
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search notes")
-        .accessibilityIdentifier("digestNotePicker")
     }
 
     private func refreshMatches() {
         matches = DigestNotePicker.filingCandidates(
-            vaultController.pageMentions(matching: query, limit: 120, allowEmptyQuery: true)
+            allCandidates,
+            matching: input.query
         )
+    }
+
+    private func loadDestinations() async {
+        let vaultURL = vaultController.vaultURL.standardizedFileURL
+        let rows = await Task.detached(priority: .userInitiated) {
+            (try? SidebarTreeLoader().loadRows(rootURL: vaultURL)) ?? []
+        }.value
+
+        allCandidates = DigestNotePicker.documents(from: rows, vaultURL: vaultURL)
+        folders = DigestFolderOption.options(from: rows, vaultURL: vaultURL)
+        refreshMatches()
+        isLoadingDestinations = false
     }
 
     // MARK: - Create a new note
@@ -158,25 +233,12 @@ struct DigestFileSheet: View {
         Form {
             Section("Title") {
                 HStack(spacing: 8) {
-                    TextField("Note title", text: $newTitle)
+                    TextField("Note title", text: $input.newTitle)
                         .textInputAutocapitalization(.sentences)
                         .submitLabel(.done)
                         .onSubmit { if canCreate { confirmCreate() } }
+                        .focused($focusedInput, equals: .title)
                         .accessibilityIdentifier("digestCreateTitleField")
-                    // The field is pre-filled from the capture's first line, which
-                    // is often a whole sentence. Without this you'd hold backspace
-                    // 60 times before you could type your own title.
-                    if !newTitle.isEmpty {
-                        Button {
-                            newTitle = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(NotoTheme.faint)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("digestCreateTitleClearButton")
-                        .accessibilityLabel("Clear title")
-                    }
                 }
             }
             Section("Folder") {
@@ -226,13 +288,35 @@ enum DigestNotePicker {
     /// over-fetches so these exclusions don't eat into the visible count.
     static func filingCandidates(
         _ documents: [PageMentionDocument],
+        matching query: String = "",
         limit: Int = visibleLimit
     ) -> [PageMentionDocument] {
         let inboxPrefix = DigestInbox.folderName.lowercased() + "/"
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return documents
-            .filter { !$0.relativePath.lowercased().hasPrefix(inboxPrefix) }
+            .filter {
+                !$0.relativePath.lowercased().hasPrefix(inboxPrefix)
+                    && (trimmedQuery.isEmpty || $0.title.localizedCaseInsensitiveContains(trimmedQuery))
+            }
             .prefix(limit)
             .map { $0 }
+    }
+
+    static func documents(from rows: [SidebarTreeNode], vaultURL: URL) -> [PageMentionDocument] {
+        let pathResolver = VaultPathResolver(vaultRootURL: vaultURL)
+        return rows.compactMap { row in
+            guard case .note = row.kind,
+                  let relativePath = pathResolver.relativePath(for: row.url) else {
+                return nil
+            }
+            return PageMentionDocument(
+                id: row.noteID ?? VaultDirectoryLoader.stableID(for: row.url),
+                title: row.name,
+                relativePath: relativePath,
+                fileURL: row.url
+            )
+        }
+        .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
 }
 
@@ -244,11 +328,10 @@ struct DigestFolderOption: Identifiable, Hashable {
 
     var id: URL { url }
 
-    /// The vault root plus every folder in it, excluding `inbox/` — filing a
-    /// capture back into the inbox is never the intent.
-    static func load(vaultURL: URL) -> [DigestFolderOption] {
+    /// The vault root plus every folder already loaded for this sheet, excluding
+    /// `inbox/` — filing a capture back into the inbox is never the intent.
+    static func options(from rows: [SidebarTreeNode], vaultURL: URL) -> [DigestFolderOption] {
         var options = [DigestFolderOption(url: vaultURL.standardizedFileURL, label: "Vault root")]
-        let rows = (try? SidebarTreeLoader().loadRows(rootURL: vaultURL)) ?? []
         for row in rows {
             guard case .folder = row.kind else { continue }
             guard row.url.lastPathComponent.lowercased() != DigestInbox.folderName else { continue }
@@ -261,31 +344,4 @@ struct DigestFolderOption: Identifiable, Hashable {
         }
         return options
     }
-
-    /// A sensible starting title: the capture's first line, stripped of markdown
-    /// heading and list markers, capped so the filename stays readable, and with
-    /// sentence punctuation trimmed off both ends.
-    ///
-    /// The trailing trim matters — a capture is usually a sentence, and keeping its
-    /// full stop produced filenames like `draft the Q4 roadmap one-pager..md`. The
-    /// leading trim keeps `VaultMarkdown.sanitizeFilename` from turning a "Note:
-    /// …"-style prefix colon into a fullwidth look-alike.
-    static func suggestedTitle(from capture: DigestEntry) -> String {
-        var line = capture.summary
-        if let heading = line.range(of: #"^#{1,6}\s*"#, options: .regularExpression) {
-            line = String(line[heading.upperBound...])
-        }
-        if let marker = line.range(of: #"^([-*+]|\d+\.)\s+(\[[ xX]\]\s*)?"#, options: .regularExpression) {
-            line = String(line[marker.upperBound...])
-        }
-        line = line.trimmingCharacters(in: .whitespaces)
-        if line.count > 60 {
-            line = String(line.prefix(60))
-        }
-        return line.trimmingCharacters(in: Self.titleTrimSet)
-    }
-
-    /// Whitespace plus the sentence punctuation that reads as noise in a filename.
-    /// Deliberately excludes `?` and `!` — "Ship the digest?" is a title.
-    private static let titleTrimSet = CharacterSet(charactersIn: ".,;:—–- ").union(.whitespacesAndNewlines)
 }

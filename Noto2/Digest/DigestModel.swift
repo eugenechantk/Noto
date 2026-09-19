@@ -14,7 +14,8 @@ struct DigestIndexRequest: Sendable, Equatable {
     let isRemoval: Bool
 }
 
-/// The Digest tab's queue: due captures from `inbox/`, oldest first, with the
+/// The Digest tab's queue: due captures from `inbox/`, newest first (a lapsed
+/// snooze counts from its wake time), with the
 /// front of the queue on the card.
 ///
 /// Every action follows the same shape — do the filesystem work off the main

@@ -7,7 +7,8 @@ import Testing
 /// | Test | Covers |
 /// | --- | --- |
 /// | `listsOnlyTopLevelMarkdown` | SC1 — non-`.md`, hidden, and nested files are ignored |
-/// | `ordersOldestCaptureFirst` | SC1 — ordering is by frontmatter `created:` |
+/// | `ordersNewestCaptureFirst` | SC1 — newest first by frontmatter `created:` |
+/// | `ordersLapsedSnoozeByWakeTime` | SC1 — a lapsed snooze sorts by `snoozed_until`, interleaved with new captures |
 /// | `hidesCapturesSnoozedIntoTheFuture` | SC1 — future `snoozed_until` drops out of `dueEntries` |
 /// | `showsCapturesWhoseSnoozeHasElapsed` | SC1 — a lapsed snooze returns to the digest |
 /// | `allEntriesStillIncludesSnoozed` | SC1 — the snoozed ones are readable, just not due |
@@ -33,17 +34,31 @@ struct DigestInboxTests {
         #expect(entries.first?.relativePath == "inbox/2026-08-30-aaaaaaaa.md")
     }
 
-    /// The digest works the backlog front-to-back, so the oldest thought surfaces
+    /// The freshest thought is the one you still have context on, so it surfaces
     /// first.
-    @Test("orders oldest capture first")
-    func ordersOldestCaptureFirst() {
+    @Test("orders newest capture first")
+    func ordersNewestCaptureFirst() {
         let vault = TempVault()
         vault.writeCapture(named: "2026-08-30-cccccccc.md", body: "Newest", created: "2026-08-30T09:00:00Z")
         vault.writeCapture(named: "2026-08-28-aaaaaaaa.md", body: "Oldest", created: "2026-08-28T09:00:00Z")
         vault.writeCapture(named: "2026-08-29-bbbbbbbb.md", body: "Middle", created: "2026-08-29T09:00:00Z")
 
         let bodies = DigestInbox(vaultURL: vault.rootURL).allEntries().map(\.body)
-        #expect(bodies == ["Oldest", "Middle", "Newest"])
+        #expect(bodies == ["Newest", "Middle", "Oldest"])
+    }
+
+    /// A capture back from a snooze is placed by its wake time, not its original
+    /// capture time — it interleaves with fresh captures as if it arrived then.
+    @Test("a lapsed snooze is ordered by its wake time among new captures")
+    func ordersLapsedSnoozeByWakeTime() {
+        let vault = TempVault()
+        vault.writeCapture(named: "new-late.md", body: "Captured Aug 30", created: "2026-08-30T09:00:00Z")
+        vault.writeCapture(named: "snoozed.md", body: "Woke Aug 29", created: "2026-08-01T09:00:00Z", snoozedUntil: "2026-08-29T12:00:00Z")
+        vault.writeCapture(named: "new-early.md", body: "Captured Aug 28", created: "2026-08-28T09:00:00Z")
+        vault.writeCapture(named: "old.md", body: "Captured Aug 10", created: "2026-08-10T09:00:00Z")
+
+        let bodies = DigestInbox(vaultURL: vault.rootURL).dueEntries(now: TestDates.now).map(\.body)
+        #expect(bodies == ["Captured Aug 30", "Woke Aug 29", "Captured Aug 28", "Captured Aug 10"])
     }
 
     /// The point of snoozing.

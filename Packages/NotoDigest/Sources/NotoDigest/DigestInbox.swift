@@ -21,7 +21,8 @@ public struct DigestInbox: Sendable {
         vaultURL.appendingPathComponent(Self.folderName, isDirectory: true)
     }
 
-    /// Every capture in `inbox/`, oldest first, including snoozed ones.
+    /// Every capture in `inbox/`, newest first by `queuedAt` (snooze wake time,
+    /// else capture time), including snoozed ones.
     public func allEntries() -> [DigestEntry] {
         guard let urls = try? FileManager.default.contentsOfDirectory(
             at: folderURL,
@@ -33,7 +34,7 @@ public struct DigestInbox: Sendable {
             .filter { $0.pathExtension.lowercased() == "md" }
             .compactMap(entry(at:))
             .sorted { lhs, rhs in
-                if lhs.capturedAt != rhs.capturedAt { return lhs.capturedAt < rhs.capturedAt }
+                if lhs.queuedAt != rhs.queuedAt { return lhs.queuedAt > rhs.queuedAt }
                 return lhs.relativePath < rhs.relativePath
             }
     }

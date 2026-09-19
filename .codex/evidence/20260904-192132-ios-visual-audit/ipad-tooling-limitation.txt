@@ -1,0 +1,10 @@
+Attempted iPad simulator audit on 2026-09-04.
+Simulator: cc-01a06c17-ipad
+UDID: C876CB9D-ED9F-45E0-9111-C14F951B84A3
+
+flowdeck apps --json:
+{"timestamp":"2026-09-04T11:27:41.580Z","message":"Listed 0 app(s)","data":{"runningCount":0,"apps":[],"staleRemoved":0,"totalCount":0},"operation":"LAUNCH","schemaVersion":"1.0.0","type":"app_list"}
+
+flowdeck ui simulator screen fallback errors:
+Failed to parse accessibility tree: The data couldn’t be read because it isn’t in the correct format.
+Failed to parse accessibility tree: The data couldn’t be read because it isn’t in the correct format.

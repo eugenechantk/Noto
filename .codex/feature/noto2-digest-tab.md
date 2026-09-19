@@ -10,8 +10,8 @@ a write-only pile.
 ## User Flow
 
 1. Open the **Digest** tab (4th tab, `tray.full`). It loads every due capture in
-   `inbox/`, oldest first, and shows the count ("3 to process").
-2. The oldest capture sits on a card, framed by a **plus target above** and a
+   `inbox/`, newest first (a lapsed snooze counts from its wake time), and shows the count ("3 to process").
+2. The newest capture sits on a card, framed by a **plus target above** and a
    **trash target below**. Long captures scroll inside the card. A second card
    peeks from behind whenever there is a next one; on the last capture there is no
    stack, so the final card reads as final.
@@ -29,8 +29,8 @@ a write-only pile.
      deleted, with **Undo** in the status line for six seconds.
    The card slides *under* both targets, so the highlight is visible exactly when it
    matters. Only the dominant axis signals, so a drag right never half-lights the
-   trash. `Add to` and `Create` also have buttons under the card, since both need
-   more input anyway; snooze and discard are gesture-only.
+   trash. `Add to` and `Create` open focused text-entry sheets directly from their
+   swipes; there are no duplicate action buttons under the card.
 4. After any successful action the card flies off, the next card rises, and the count
    drops. When the last card is processed, an empty state says the inbox is clear.
 5. Any write failure leaves the inbox file untouched, returns the card, and shows an
@@ -40,7 +40,7 @@ a write-only pile.
 
 | # | Criterion |
 |---|---|
-| SC1 | The digest lists exactly the `.md` files directly inside `inbox/`, excluding any whose frontmatter `snoozed_until` parses to a date in the future, ordered oldest capture first. |
+| SC1 | The digest lists exactly the `.md` files directly inside `inbox/`, excluding any whose frontmatter `snoozed_until` parses to a date in the future, ordered newest first — by capture time, or by `snoozed_until` for a capture back from a snooze, so it interleaves with new captures. |
 | SC2 | Snooze rewrites only the frontmatter: `snoozed_until` is set to (now + 7 days) in ISO-8601, every other frontmatter key and the entire body survive byte-for-byte, and a second snooze overwrites the existing key rather than appending a duplicate. |
 | SC3 | Add-to appends the capture body to the end of the target note's body, separated by exactly one blank line, refreshes the target's `updated:` stamp, and deletes the inbox file **only after** the target write succeeds. |
 | SC4 | Create writes `<folder>/<Title>.md` with fresh frontmatter (`id`, `created`, `updated`), a `# <Title>` heading, then the capture body; an existing filename resolves to `Title(2).md`; the inbox file is deleted only after the new file write succeeds. |
@@ -49,7 +49,7 @@ a write-only pile.
 | SC11 | A card behind the current one is visible whenever another capture is queued, and absent on the last one. |
 | SC6 | If any write in SC3/SC4 fails, the inbox file still exists afterwards and the action reports failure. |
 | SC7 | A capture whose file has no frontmatter, or an unparseable `snoozed_until`, is treated as due rather than crashing or being hidden. |
-| SC8 | The Digest tab renders the card stack, the remaining count, the four actions, and an empty state; swipe left snoozes and swipe right opens the file sheet. |
+| SC8 | The Digest tab renders the card stack, the remaining count, the four directional actions, and an empty state; swipe left snoozes, swipe right opens a focused note search, and swipe up opens an empty focused title field. |
 | SC9 | Selecting the Digest tab starts the deferred vault workspace (the tab needs the vault), and Capture-first cold launch is unaffected. |
 
 ## Test Strategy
@@ -154,8 +154,8 @@ the criteria list (both now fixed and re-verified — see Bugs).
 Not proven:
 
 - **Gesture tuning.** The commit thresholds and fly-off durations are copied from
-  `CaptureScreen`; only the left-swipe (snooze) path was exercised by hand. Right-swipe-to-open
-  the file sheet was verified via the buttons, not the swipe.
+  `CaptureScreen`; all direction mappings are unit-tested, and right/up sheet-opening swipes
+  are now simulator-verified, but thresholds still merit real-device use.
 - **`Title(2).md` collision resolution and the SC6 write-failure rollback** are proven by
   package tests but never seen in the running app.
 - **Large inboxes.** `dueEntries` reads and parses every file in `inbox/` on each load, on a
@@ -182,9 +182,15 @@ Not proven:
 2. **The "Add to" picker listed inbox captures.** Including the capture on the card, so you
    could file a note into itself. Fixed by `DigestNotePicker.filingCandidates`, now covered by
    `DigestNotePickerTests`.
-3. **Un-clearable seeded title.** The Create sheet pre-fills the title from the capture's
-   first line (up to 60 chars); clearing it meant holding backspace. Added an inline ✕ clear
-   button (`digestCreateTitleClearButton`).
+3. **Un-clearable seeded title (superseded).** The original Create sheet pre-filled the title
+   and later gained a clear button. Bug 032 removed title suggestions entirely: Create now
+   starts empty and focused, so the clear button is no longer needed.
+
+7. **Digest filing inputs required an extra tap.** Neither the Add to search field nor the
+   Create title field requested focus. The sheet also synchronously scanned the vault before
+   it could become interactive, and legacy Add to/Create buttons duplicated the gestures.
+   Bug 032 adds explicit focus state, loads the vault tree off-main, starts Create empty, and
+   removes the duplicate buttons. See `.codex/feature/noto2-digest-direct-input.md`.
 
 **Found by the independent visual audit, fixed and re-verified:**
 

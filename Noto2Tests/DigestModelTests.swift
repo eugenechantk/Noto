@@ -11,7 +11,7 @@ import Testing
 ///
 /// | Test | Covers |
 /// | --- | --- |
-/// | `loadsDueCapturesOldestFirst` | SC1 — front of the queue is the oldest due capture |
+/// | `loadsDueCapturesNewestFirst` | SC1 — front of the queue is the newest due capture |
 /// | `emptyStateOnlyAfterLoad` | SC8 — "inbox clear" never flashes before the first read |
 /// | `snoozePopsTheCardAndDropsTheCount` | SC8 — successful action advances the queue |
 /// | `snoozedCaptureIsGoneOnReload` | SC2 — the snooze survives a reload |
@@ -80,8 +80,8 @@ struct DigestModelTests {
 
     // MARK: - Loading
 
-    /// The digest works the backlog front-to-back.
-    @Test func loadsDueCapturesOldestFirst() async {
+    /// The freshest capture is in front.
+    @Test func loadsDueCapturesNewestFirst() async {
         let vault = makeVault()
         defer { try? FileManager.default.removeItem(at: vault) }
         writeCapture(in: vault, named: "b.md", body: "Newer", created: "2026-08-31T09:00:00Z")
@@ -91,8 +91,8 @@ struct DigestModelTests {
         await model.load()
 
         #expect(model.remaining == 2)
-        #expect(model.current?.body == "Older")
-        #expect(model.next?.body == "Newer")
+        #expect(model.current?.body == "Newer")
+        #expect(model.next?.body == "Older")
     }
 
     /// Showing "Inbox clear" before the folder has been read would be a lie on
@@ -113,8 +113,8 @@ struct DigestModelTests {
     @Test func snoozePopsTheCardAndDropsTheCount() async {
         let vault = makeVault()
         defer { try? FileManager.default.removeItem(at: vault) }
-        writeCapture(in: vault, named: "a.md", body: "Later", created: "2026-08-29T09:00:00Z")
-        writeCapture(in: vault, named: "b.md", body: "Next", created: "2026-08-30T09:00:00Z")
+        writeCapture(in: vault, named: "a.md", body: "Next", created: "2026-08-29T09:00:00Z")
+        writeCapture(in: vault, named: "b.md", body: "Later", created: "2026-08-30T09:00:00Z")
 
         let model = makeModel(vaultURL: vault)
         await model.load()
@@ -356,6 +356,7 @@ struct DigestModelTests {
 /// | --- | --- |
 /// | `excludesInboxCapturesFromTheNotePicker` | SC3 — you can't file a capture into another capture, or into itself |
 /// | `keepsNonInboxNotesAndCapsTheList` | SC3 — real notes survive the filter, and the list stays bounded |
+/// | `filtersTitlesCaseInsensitively` | typed search narrows the already-loaded destinations |
 @MainActor
 struct DigestNotePickerTests {
     private func document(_ relativePath: String) -> PageMentionDocument {
@@ -388,48 +389,33 @@ struct DigestNotePickerTests {
         #expect(DigestNotePicker.filingCandidates(many).count == DigestNotePicker.visibleLimit)
         #expect(DigestNotePicker.filingCandidates([document("inboxes/Ideas.md")]).count == 1)
     }
+
+    @Test func filtersTitlesCaseInsensitively() {
+        let candidates = DigestNotePicker.filingCandidates([
+            document("Projects/Launch Plan.md"),
+            document("Meetings/Weekly Review.md"),
+        ], matching: "LAUNCH")
+
+        #expect(candidates.map(\.relativePath) == ["Projects/Launch Plan.md"])
+    }
 }
 
-/// The title the Create sheet pre-fills from a capture.
-///
-/// | Test | Covers |
-/// | --- | --- |
-/// | `dropsSentencePunctuationThatWouldLandInTheFilename` | no more `one-pager..md` |
-/// | `stripsMarkdownHeadingAndListMarkers` | a captured heading or bullet isn't a title |
-/// | `keepsQuestionMarksAndCapsLength` | `?`/`!` are title-worthy; long captures are truncated |
+/// Initial text-entry state for the two filing destinations.
 @MainActor
-struct DigestSuggestedTitleTests {
-    private func capture(_ body: String) -> DigestEntry {
-        DigestEntry(
-            id: UUID(),
-            fileURL: URL(fileURLWithPath: "/vault/inbox/x.md"),
-            relativePath: "inbox/x.md",
-            body: body,
-            capturedAt: Date()
-        )
+struct DigestFileInputStateTests {
+    @Test func addToStartsWithEmptySearchAndSearchFocus() {
+        let state = DigestFileInputState(mode: .addTo)
+
+        #expect(state.query.isEmpty)
+        #expect(state.newTitle.isEmpty)
+        #expect(state.focusTarget == .search)
     }
 
-    /// A capture is usually a sentence; keeping its full stop produced filenames
-    /// like `draft the Q4 roadmap one-pager..md`.
-    @Test func dropsSentencePunctuationThatWouldLandInTheFilename() {
-        #expect(DigestFolderOption.suggestedTitle(from: capture("Draft the Q4 roadmap one-pager.")) == "Draft the Q4 roadmap one-pager")
-        #expect(DigestFolderOption.suggestedTitle(from: capture("Email Sam,")) == "Email Sam")
-        #expect(DigestFolderOption.suggestedTitle(from: capture("Q3 plan —")) == "Q3 plan")
-    }
+    @Test func createStartsWithEmptyTitleAndTitleFocus() {
+        let state = DigestFileInputState(mode: .create)
 
-    /// Captures often start as a heading or a to-do bullet; the marker is syntax,
-    /// not part of the title.
-    @Test func stripsMarkdownHeadingAndListMarkers() {
-        #expect(DigestFolderOption.suggestedTitle(from: capture("## Dentist appointment")) == "Dentist appointment")
-        #expect(DigestFolderOption.suggestedTitle(from: capture("- [ ] Call the dentist")) == "Call the dentist")
-        #expect(DigestFolderOption.suggestedTitle(from: capture("1. First thing")) == "First thing")
-    }
-
-    /// `?` and `!` carry meaning in a title, unlike a trailing full stop. Long
-    /// captures truncate so the filename stays readable.
-    @Test func keepsQuestionMarksAndCapsLength() {
-        #expect(DigestFolderOption.suggestedTitle(from: capture("Ship the digest?")) == "Ship the digest?")
-        let long = String(repeating: "word ", count: 40)
-        #expect(DigestFolderOption.suggestedTitle(from: capture(long)).count <= 60)
+        #expect(state.query.isEmpty)
+        #expect(state.newTitle.isEmpty)
+        #expect(state.focusTarget == .title)
     }
 }

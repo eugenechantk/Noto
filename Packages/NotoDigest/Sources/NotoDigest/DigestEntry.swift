@@ -18,7 +18,7 @@ public struct DigestEntry: Identifiable, Equatable, Sendable {
     /// Empty when `isAvailable` is false.
     public let body: String
     /// The frontmatter `created:` stamp, falling back to the file's modification
-    /// date. Drives oldest-first ordering.
+    /// date. Feeds `queuedAt`, which drives ordering.
     public let capturedAt: Date
     public let snoozedUntil: Date?
     /// False when the file exists but could not be read — on an iCloud vault a
@@ -43,6 +43,14 @@ public struct DigestEntry: Identifiable, Equatable, Sendable {
         self.capturedAt = capturedAt
         self.snoozedUntil = snoozedUntil
         self.isAvailable = isAvailable
+    }
+
+    /// When this capture (re)entered the digest: the snooze wake time for a
+    /// snoozed capture, otherwise when it was captured. Drives newest-first
+    /// ordering, so a capture returning from a snooze slots in among fresh
+    /// captures as if it had just arrived at its wake time.
+    public var queuedAt: Date {
+        snoozedUntil ?? capturedAt
     }
 
     /// True when this capture should appear in the digest at `date`.
