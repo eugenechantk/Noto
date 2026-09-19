@@ -1,0 +1,28 @@
+== after foregrounding Noto 2 Sat Sep 19 00:40:11 HKT 2026 ==
+pending-captures:
+total 0
+drwxr-xr-x  2 eugenechan  staff   64 Sep 19 00:39 .
+drwxr-xr-x@ 5 eugenechan  staff  160 Sep 18 23:52 ..
+
+inbox:
+total 48
+drwxr-xr-x   8 eugenechan  staff  256 Sep 19 00:39 .
+drwxr-xr-x@ 10 eugenechan  staff  320 Sep 19 00:29 ..
+-rw-r--r--@  1 eugenechan  staff  196 Sep 19 00:29 2026-09-19-1e2d8aee.md
+-rw-r--r--@  1 eugenechan  staff  244 Sep 19 00:35 2026-09-19-33ffeb0c.md
+-rw-r--r--@  1 eugenechan  staff  242 Sep 19 00:38 2026-09-19-55fea2fe.md
+-rw-r--r--@  1 eugenechan  staff  192 Sep 19 00:35 2026-09-19-6ab7ca4f.md
+-rw-r--r--@  1 eugenechan  staff  244 Sep 19 00:37 2026-09-19-953412e2.md
+-rw-r--r--@  1 eugenechan  staff  196 Sep 19 00:39 2026-09-19-d30a2468.md
+
+--- /Users/eugenechan/Library/Developer/CoreSimulator/Devices/B5B4FC33-FC58-4393-829C-62940C8378A3/data/Containers/Data/Application/70F9778A-F184-4331-9161-D9D5895AAE11/Documents/Noto/inbox/2026-09-19-d30a2468.md
+---
+id: DF7CFCE0-EBDA-4694-8D6B-9148AAED2115
+created: 2026-09-18T16:39:26Z
+updated: 2026-09-18T16:39:26Z
+type: note
+status: inbox
+---
+
+[Clojure - Wikipedia](https://en.wikipedia.org/wiki/Clojure)
+

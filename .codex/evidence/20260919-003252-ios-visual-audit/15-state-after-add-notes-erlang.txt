@@ -1,0 +1,59 @@
+== after Add notes (Erlang) Sat Sep 19 00:37:40 HKT 2026 ==
+pending-captures:
+total 0
+drwxr-xr-x  2 eugenechan  staff   64 Sep 19 00:37 .
+drwxr-xr-x@ 5 eugenechan  staff  160 Sep 18 23:52 ..
+
+inbox:
+total 32
+drwxr-xr-x   6 eugenechan  staff  192 Sep 19 00:37 .
+drwxr-xr-x@ 10 eugenechan  staff  320 Sep 19 00:29 ..
+-rw-r--r--@  1 eugenechan  staff  196 Sep 19 00:29 2026-09-19-1e2d8aee.md
+-rw-r--r--@  1 eugenechan  staff  244 Sep 19 00:35 2026-09-19-33ffeb0c.md
+-rw-r--r--@  1 eugenechan  staff  192 Sep 19 00:35 2026-09-19-6ab7ca4f.md
+-rw-r--r--@  1 eugenechan  staff  244 Sep 19 00:37 2026-09-19-953412e2.md
+
+--- /Users/eugenechan/Library/Developer/CoreSimulator/Devices/B5B4FC33-FC58-4393-829C-62940C8378A3/data/Containers/Data/Application/70F9778A-F184-4331-9161-D9D5895AAE11/Documents/Noto/inbox/2026-09-19-1e2d8aee.md
+---
+id: D32C5120-F077-41A2-96A6-E01FCEC87035
+created: 2026-09-18T16:29:54Z
+updated: 2026-09-18T16:29:54Z
+type: note
+status: inbox
+---
+
+[Haskell - Wikipedia](https://en.wikipedia.org/wiki/Haskell)
+
+--- /Users/eugenechan/Library/Developer/CoreSimulator/Devices/B5B4FC33-FC58-4393-829C-62940C8378A3/data/Containers/Data/Application/70F9778A-F184-4331-9161-D9D5895AAE11/Documents/Noto/inbox/2026-09-19-33ffeb0c.md
+---
+id: 30A7D62F-F85B-41AA-8DF6-3D5791C5B57F
+created: 2026-09-18T16:34:06Z
+updated: 2026-09-18T16:34:06Z
+type: note
+status: inbox
+---
+
+[Elixir (programming language) - Wikipedia](https://en.wikipedia.org/wiki/Elixir_%28programming_language%29)
+
+--- /Users/eugenechan/Library/Developer/CoreSimulator/Devices/B5B4FC33-FC58-4393-829C-62940C8378A3/data/Containers/Data/Application/70F9778A-F184-4331-9161-D9D5895AAE11/Documents/Noto/inbox/2026-09-19-6ab7ca4f.md
+---
+id: E702B980-CA7B-4FDA-890C-9DD49B9C5F92
+created: 2026-09-18T16:30:52Z
+updated: 2026-09-18T16:30:52Z
+type: note
+status: inbox
+---
+
+[OCaml - Wikipedia](https://en.wikipedia.org/wiki/OCaml)
+
+--- /Users/eugenechan/Library/Developer/CoreSimulator/Devices/B5B4FC33-FC58-4393-829C-62940C8378A3/data/Containers/Data/Application/70F9778A-F184-4331-9161-D9D5895AAE11/Documents/Noto/inbox/2026-09-19-953412e2.md
+---
+id: 8A456148-90B0-4FE1-8AE9-6B9A1DA50C63
+created: 2026-09-18T16:37:31Z
+updated: 2026-09-18T16:37:31Z
+type: note
+status: inbox
+---
+
+[Erlang (programming language) - Wikipedia](https://en.wikipedia.org/wiki/Erlang_%28programming_language%29)
+

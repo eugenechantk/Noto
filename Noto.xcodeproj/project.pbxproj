@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B70000000000000000000028 /* Noto2QuickCaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258D1BBCE132EE72D17CAB8E /* Noto2QuickCaptureIntent.swift */; };
+		B70000000000000000000027 /* NotoShareCapture in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000026 /* NotoShareCapture */; };
+		B70000000000000000000004 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000003 /* ShareViewController.swift */; };
+		B70000000000000000000007 /* NotoShareTitle.js in Resources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000006 /* NotoShareTitle.js */; };
+		B70000000000000000000002 /* Noto2ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B70000000000000000000001 /* Noto2ShareExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		B70000000000000000000021 /* NotoShareCapture in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000020 /* NotoShareCapture */; };
+		B70000000000000000000023 /* NotoShareCapture in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000022 /* NotoShareCapture */; };
+		B70000000000000000000025 /* NotoShareCapture in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000024 /* NotoShareCapture */; };
 		260C4638209FCE498F36DC11 /* Noto2QuickCaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258D1BBCE132EE72D17CAB8E /* Noto2QuickCaptureIntent.swift */; };
 		58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */; };
 		58A1D0018A1D001000000002 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */; };
@@ -34,6 +42,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		B70000000000000000000017 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5DF5FAF62F0EC372008EDC76 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B70000000000000000000010;
+			remoteInfo = Noto2ShareExtension;
+		};
 		40FD7D19E9BCC6B12BA6FBDE /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5DF5FAF62F0EC372008EDC76 /* Project object */;
@@ -79,6 +94,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				6835FFFD57E2EF429C10E5E9 /* Noto2QuickCaptureControl.appex in Embed App Extensions */,
+				B70000000000000000000002 /* Noto2ShareExtension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -86,6 +102,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B70000000000000000000001 /* Noto2ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; name = Noto2ShareExtension.appex; path = Noto2ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B70000000000000000000003 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		B70000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B70000000000000000000006 /* NotoShareTitle.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; path = NotoShareTitle.js; sourceTree = "<group>"; };
+		B70000000000000000000008 /* Noto2ShareExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Noto2ShareExtension.entitlements; sourceTree = "<group>"; };
 		258D1BBCE132EE72D17CAB8E /* Noto2QuickCaptureIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Noto2QuickCaptureIntent.swift; sourceTree = "<group>"; };
 		58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/ReadwiseSecrets.xcconfig; sourceTree = "<group>"; };
 		58FDAF8F6C5503B565EF0598 /* Noto2QuickCaptureControl.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; name = Noto2QuickCaptureControl.appex; path = Noto2QuickCaptureControl.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -175,6 +196,14 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		B70000000000000000000012 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B70000000000000000000021 /* NotoShareCapture in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5DE568F12F80191200EC8657 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -199,6 +228,7 @@
 				58A1D0018A1D001000000007 /* NotoSearch in Frameworks */,
 				58A1D0018A1D00100000000C /* NotoChat in Frameworks */,
 				58A1D0018A1D00100000000F /* NotoEmbedding in Frameworks */,
+				B70000000000000000000027 /* NotoShareCapture in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -221,6 +251,7 @@
 				A20000000000000000000033 /* NotoChat in Frameworks */,
 				A20000000000000000000034 /* NotoEmbedding in Frameworks */,
 				A20000000000000000000035 /* NotoDigest in Frameworks */,
+				B70000000000000000000023 /* NotoShareCapture in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -231,6 +262,7 @@
 				A20000000000000000000051 /* NotoVault in Frameworks */,
 				A20000000000000000000053 /* NotoSearch in Frameworks */,
 				A20000000000000000000055 /* NotoDigest in Frameworks */,
+				B70000000000000000000025 /* NotoShareCapture in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -245,6 +277,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B70000000000000000000009 /* Noto2ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				B70000000000000000000003 /* ShareViewController.swift */,
+				B70000000000000000000006 /* NotoShareTitle.js */,
+				B70000000000000000000005 /* Info.plist */,
+				B70000000000000000000008 /* Noto2ShareExtension.entitlements */,
+			);
+			name = Noto2ShareExtension;
+			path = Noto2ShareExtension;
+			sourceTree = "<group>";
+		};
 		1EFEFF571B44D62715EDA022 /* Noto2QuickCaptureControl */ = {
 			isa = PBXGroup;
 			children = (
@@ -272,6 +316,7 @@
 				5DF5FAFF2F0EC372008EDC76 /* Products */,
 				CFD6BB4D748C0DEBB9F47CEE /* Noto2ControlShared */,
 				1EFEFF571B44D62715EDA022 /* Noto2QuickCaptureControl */,
+				B70000000000000000000009 /* Noto2ShareExtension */,
 				6FDE297D4F15815607A57C36 /* Frameworks */,
 			);
 			sourceTree = "<group>";
@@ -286,6 +331,7 @@
 				5DE568F42F80191200EC8657 /* NotoMacOSUITests.xctest */,
 				5DE569032F80191F00EC8657 /* NotoiOSUITests.xctest */,
 				58FDAF8F6C5503B565EF0598 /* Noto2QuickCaptureControl.appex */,
+				B70000000000000000000001 /* Noto2ShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -318,6 +364,26 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		B70000000000000000000010 /* Noto2ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B70000000000000000000014 /* Build configuration list for PBXNativeTarget "Noto2ShareExtension" */;
+			buildPhases = (
+				B70000000000000000000011 /* Sources */,
+				B70000000000000000000012 /* Frameworks */,
+				B70000000000000000000013 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Noto2ShareExtension;
+			packageProductDependencies = (
+				B70000000000000000000020 /* NotoShareCapture */,
+			);
+			productName = Noto2ShareExtension;
+			productReference = B70000000000000000000001 /* Noto2ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		5DE568F32F80191200EC8657 /* NotoMacOSUITests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5DE568FC2F80191200EC8657 /* Build configuration list for PBXNativeTarget "NotoMacOSUITests" */;
@@ -385,6 +451,7 @@
 				58A1D0018A1D001000000008 /* NotoSearch */,
 				58A1D0018A1D00100000000B /* NotoChat */,
 				58A1D0018A1D00100000000E /* NotoEmbedding */,
+				B70000000000000000000026 /* NotoShareCapture */,
 			);
 			productName = Noto;
 			productReference = 5DF5FAFE2F0EC372008EDC76 /* Noto.app */;
@@ -429,6 +496,7 @@
 			);
 			dependencies = (
 				A641B88D4A0EC8D3CC76A49A /* PBXTargetDependency */,
+				B70000000000000000000018 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A20000000000000000000001 /* NotoShared */,
@@ -442,6 +510,7 @@
 				A20000000000000000000023 /* NotoChat */,
 				A20000000000000000000024 /* NotoEmbedding */,
 				A20000000000000000000025 /* NotoDigest */,
+				B70000000000000000000022 /* NotoShareCapture */,
 			);
 			productName = Noto2;
 			productReference = A20000000000000000000011 /* Noto2.app */;
@@ -468,6 +537,7 @@
 				A20000000000000000000050 /* NotoVault */,
 				A20000000000000000000052 /* NotoSearch */,
 				A20000000000000000000054 /* NotoDigest */,
+				B70000000000000000000024 /* NotoShareCapture */,
 			);
 			productName = Noto2Tests;
 			productReference = A20000000000000000000041 /* Noto2Tests.xctest */;
@@ -541,6 +611,7 @@
 				58A1D0018A1D00100000000A /* XCLocalSwiftPackageReference "NotoChat" */,
 				58A1D0018A1D00100000000D /* XCLocalSwiftPackageReference "NotoEmbedding" */,
 				A20000000000000000000070 /* XCLocalSwiftPackageReference "NotoDigest" */,
+				B70000000000000000000019 /* XCLocalSwiftPackageReference "NotoShareCapture" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DF5FAFF2F0EC372008EDC76 /* Products */;
@@ -554,11 +625,20 @@
 				A20000000000000000000010 /* Noto2 */,
 				A20000000000000000000040 /* Noto2Tests */,
 				C1B9129E154C7B9E50745334 /* Noto2QuickCaptureControl */,
+				B70000000000000000000010 /* Noto2ShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		B70000000000000000000013 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B70000000000000000000007 /* NotoShareTitle.js in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		0EE7FFB302D3EF233FEC92E1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -658,6 +738,15 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		B70000000000000000000011 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B70000000000000000000004 /* ShareViewController.swift in Sources */,
+				B70000000000000000000028 /* Noto2QuickCaptureIntent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5DE568F02F80191200EC8657 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -713,6 +802,12 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		B70000000000000000000018 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Noto2ShareExtension;
+			target = B70000000000000000000010 /* Noto2ShareExtension */;
+			targetProxy = B70000000000000000000017 /* PBXContainerItemProxy */;
+		};
 		5DE568FB2F80191200EC8657 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 5DF5FAFD2F0EC372008EDC76 /* Noto */;
@@ -742,6 +837,73 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		B70000000000000000000015 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Noto2ShareExtension/Noto2ShareExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Noto2ShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Noto 2";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.Noto2.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.eugenechan.Noto2.ShareExtension";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B70000000000000000000016 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Noto2ShareExtension/Noto2ShareExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39GJBP8V5A;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Noto2ShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Noto 2";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eugenechan.Noto2.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.eugenechan.Noto2.ShareExtension";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		0557F309D735C952E8C8B190 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1271,6 +1433,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		B70000000000000000000014 /* Build configuration list for PBXNativeTarget "Noto2ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B70000000000000000000015 /* Debug */,
+				B70000000000000000000016 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		5DE568FC2F80191200EC8657 /* Build configuration list for PBXNativeTarget "NotoMacOSUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1346,6 +1517,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		B70000000000000000000019 /* XCLocalSwiftPackageReference "NotoShareCapture" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoShareCapture;
+		};
 		5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "NotoReadwiseSync" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoReadwiseSync;
@@ -1377,6 +1552,22 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		B70000000000000000000026 /* NotoShareCapture */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoShareCapture;
+		};
+		B70000000000000000000020 /* NotoShareCapture */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoShareCapture;
+		};
+		B70000000000000000000022 /* NotoShareCapture */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoShareCapture;
+		};
+		B70000000000000000000024 /* NotoShareCapture */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoShareCapture;
+		};
 		58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoReadwiseSyncCore;

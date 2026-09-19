@@ -1,0 +1,3 @@
+Timestamp               Ty Process[PID:TID]
+2026-09-19 00:39:26.555 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-19 00:39:26.557 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture B0E70CD2-82FD-4079-8BF1-0691734909BF

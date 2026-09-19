@@ -105,6 +105,11 @@ struct DigestScreen: View {
         // "Inbox clear" over a folder that had captures in it.
         .task(id: appearCount) { await model.refresh() }
         .onAppear { appearCount &+= 1 }
+        // A share-sheet capture just landed in inbox/ — show it without
+        // waiting for the next scene activation or file-watcher tick.
+        .onReceive(NotificationCenter.default.publisher(for: SharedCaptureDrain.didFileNotification)) { _ in
+            Task { await model.refresh() }
+        }
         .onChange(of: scenePhase) { _, phase in
             // Captures can also arrive while the app is backgrounded — from the
             // Lock Screen quick-capture widget, or iCloud syncing another device.

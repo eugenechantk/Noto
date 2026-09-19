@@ -1,0 +1,6 @@
+Timestamp               Ty Process[PID:TID]
+2026-09-19 00:35:24.172 I  Noto2[87983:68b305] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-19-6ab7ca4f.md created=true
+2026-09-19 00:35:24.174 I  Noto2[87983:68b305] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-19-33ffeb0c.md created=true
+2026-09-19 00:35:24.174 I  Noto2[87983:68b2e7] [com.eugenechan.Noto2:RootTabView] Drained 2 shared capture(s); 0 left staged
+2026-09-19 00:35:24.175 I  Noto2[87983:68b2e7] [com.eugenechan.Noto2:RootTabView] Opening shared capture F4CA818C-5D8F-4883-853E-D88649E13EE5 at 2026-09-19-33ffeb0c.md
+2026-09-19 00:35:24.711 I  Noto2[87983:68b6cb] [com.eugenechan.Noto2:RootTabView] Search index sweep: scanned=9 upserted=0 deleted=0 skippedUnavailable=0 indexedNotes=9 sections=40

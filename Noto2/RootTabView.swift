@@ -31,6 +31,9 @@ struct RootTabView: View {
     @State private var hasStartedDeferredServices = false
     /// A note another tab asked Browse to open (a just-filed capture).
     @State private var pendingNoteURL: URL?
+    /// Where each share-sheet capture drained this session was filed, keyed by
+    /// its staged id, so the extension's "Add notes" link can open that note.
+    @State private var sharedCaptureNotes: [UUID: URL] = [:]
     @Environment(\.scenePhase) private var scenePhase
 
     init(
@@ -93,6 +96,9 @@ struct RootTabView: View {
         .background(NotoTheme.background.ignoresSafeArea())
         .task(id: vaultURL) {
             guard vaultURL != nil else { return }
+            // Share-sheet captures staged while the app was closed: file them
+            // as soon as the vault is usable, before any vault-wide work.
+            await drainSharedCaptures()
             if Noto2StartupPolicy.requiresWorkspace(selectedTab) {
                 startDeferredServicesIfNeeded()
                 return
@@ -106,7 +112,9 @@ struct RootTabView: View {
             startDeferredServicesIfNeeded()
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, hasStartedDeferredServices else { return }
+            guard phase == .active else { return }
+            Task { await drainSharedCaptures() }
+            guard hasStartedDeferredServices else { return }
             if selectedTab == .browse {
                 vaultController?.refreshRootForForegroundActivation()
             }
@@ -114,6 +122,12 @@ struct RootTabView: View {
         }
         .onChange(of: launchRouter.requestRevision) { _, _ in
             guard let requestedTab = launchRouter.requestedTab else { return }
+            if launchRouter.requestedSharedCaptureID != nil {
+                // The share extension's "Add notes": file the staged capture
+                // (if the activation drain has not already) and open its note.
+                Task { await drainSharedCaptures() }
+                return
+            }
             tabSelection.wrappedValue = requestedTab
         }
         .onChange(of: fileWatcher.changeCount) { _, _ in
@@ -129,6 +143,38 @@ struct RootTabView: View {
                     await Self.refreshSearchIndex(vaultURL: vaultURL)
                 }
             }
+        }
+    }
+
+    /// Files whatever the share extension staged in the App Group into
+    /// `inbox/`, then indexes each note and tells Digest to reload. Cheap when
+    /// nothing is staged (one directory listing), so it runs on every activation.
+    private func drainSharedCaptures() async {
+        guard let vaultURL, let drain = SharedCaptureDrain.appGroup(vaultURL: vaultURL) else { return }
+        let outcome = await Task.detached(priority: .userInitiated) { drain.drain() }.value
+        if !outcome.filed.isEmpty {
+            logger.info("Drained \(outcome.filed.count) shared capture(s); \(outcome.failed.count) left staged")
+            for entry in outcome.filed {
+                sharedCaptureNotes[entry.capture.id] = entry.filed.fileURL
+                await SearchIndexController.shared.scheduleRefreshFile(vaultURL: vaultURL, fileURL: entry.filed.fileURL)
+            }
+            NotificationCenter.default.post(name: SharedCaptureDrain.didFileNotification, object: nil)
+        }
+        openRequestedSharedCaptureIfNeeded()
+    }
+
+    /// The share extension asked for one capture's note. Open it if this
+    /// session filed it; otherwise (filed by an earlier launch, or the staged
+    /// file is gone) fall back to Digest, where every inbox capture lives.
+    private func openRequestedSharedCaptureIfNeeded() {
+        guard let id = launchRouter.requestedSharedCaptureID else { return }
+        launchRouter.clearSharedCaptureRequest()
+        if let noteURL = sharedCaptureNotes[id] {
+            logger.info("Opening shared capture \(id.uuidString, privacy: .public) at \(noteURL.lastPathComponent, privacy: .public)")
+            openFiledNote(noteURL)
+        } else {
+            logger.info("Shared capture \(id.uuidString, privacy: .public) not filed this session; showing Digest")
+            tabSelection.wrappedValue = .digest
         }
     }
 

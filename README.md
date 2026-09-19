@@ -48,6 +48,9 @@ Packages
   NotoSearch: UI-free markdown indexing, search, and refresh coordination
   NotoDigest: UI-free inbox triage — reading inbox/, snooze filtering, and the
               four filing actions (snooze, add-to, create, discard)
+  NotoShareCapture: UI-free share-sheet capture — `[title](url)` formatting, payload
+                    resolution, and the App Group staging store the extension and
+                    Noto 2 hand captures through
   NotoReadwiseSync: Readwise/Reader API client, sync engine, note rendering,
                     sync state, tests, and CLI
 ```
@@ -61,6 +64,7 @@ Since 2026-08-23 the project builds two apps from the same code:
 | `Noto` | `Noto-iOS`, `Noto-macOS`, `Noto` | `com.eugenechan.Noto` | the full iOS/iPadOS/macOS app |
 | `Noto2` | `Noto2` | `com.eugenechan.Noto2` | a separate, iOS-only four-screen app — Capture (editor + send to `inbox/`), Digest (process `inbox/` to zero), Search (hybrid hits + streamed summary), Browse — over the same vault |
 | `Noto2QuickCaptureControl` | embedded by `Noto2` | `com.eugenechan.Noto2.QuickCaptureControl` | WidgetKit accessory widget for opening Noto 2 Quick Capture from the Lock Screen widget area; the existing target name is retained for bundle/signing stability |
+| `Noto2ShareExtension` | embedded by `Noto2` | `com.eugenechan.Noto2.ShareExtension` | Share-sheet extension ("Noto 2" in the app row): stages a shared link as `[title](url)` in the App Group; Noto 2 files it into `inbox/` on its next activation |
 
 Both targets compile the `NotoShared/` synced folder, which holds everything that is
 app-level Swift but not specific to either app's chrome:
@@ -70,7 +74,7 @@ NotoShared/
   Editor/    TextKit2EditorView, NoteEditorSession, BlockEditingCommands, TodoMarkdown,
              EditableFrontmatter, EditorFind, FrontmatterBlockLayout, NoteContentCache, Block
   Storage/   VaultLocationManager, MarkdownNoteStore, VaultController, VaultFileWatcher,
-             CoordinatedFileManager, NoteTemplate, CaptureFilingService
+             CoordinatedFileManager, NoteTemplate, CaptureFilingService, SharedCaptureDrain
   Search/    SearchIndexController, SearchIndexStatusModel, SemanticSearchService
   Support/   DebugTrace, AppTheme, NotoTheme, NoteSyncCenter
   Chat/      OpenRouterKeyStore, OpenRouterBaseURLStore, ReadwiseSecretStore
@@ -80,6 +84,9 @@ Noto2ControlShared/
   Noto2QuickCaptureIntent     Strict capture URL route and launch router shared with the widget
 Noto2QuickCaptureControl/
   Noto2QuickCaptureControl    WidgetKit accessory widget extension embedded by Noto 2
+Noto2ShareExtension/
+  ShareViewController         Share-sheet extension: item-provider loading + confirmation pill
+  NotoShareTitle.js           Safari preprocessing script (document.title + URL)
 ```
 
 Rules that follow: a file in `NotoShared/` must compile for both targets (iOS-only Noto 2
@@ -265,6 +272,37 @@ Digest tab is the other half of that loop — it works the folder down to zero.
   resolution, per-direction signal strength). Put new gesture rules there so they stay
   testable — a threshold change that makes one action occasionally fire another is invisible
   in a screenshot.
+
+#### Share-sheet captures (`Noto2ShareExtension`)
+
+- The vault is an iCloud Drive folder held through Noto 2's own security-scoped bookmark,
+  and iOS bookmarks do not resolve from another sandbox — so the share extension **cannot
+  write the vault**. It stages instead: `NotoShareCapture.PendingCaptureStore` writes one
+  JSON file per capture into the App Group container (`group.com.eugenechan.Noto2`,
+  `pending-captures/`), never a single mutable list, because the extension and the app can
+  run at the same time.
+- The body is the vault's link format, `[title](url)` (`NotoShareCapture.SharedLinkCapture`):
+  brackets in the title become parentheses and `(`/`)`/spaces in the URL are percent-encoded,
+  so `HyperlinkMarkdown` always sees exactly one link. Safari's `document.title` comes from
+  `NotoShareTitle.js`; other apps fall back to the item's title or to the URL as link text.
+  Selected text shared alongside the URL follows as a second paragraph.
+- `SharedCaptureDrain` (`NotoShared/Storage`) runs in `RootTabView` when the vault becomes
+  available and on every return to `.active`. It files each staged capture through
+  `CaptureFilingService` with `now` pinned to the share time (so the inbox date is when the
+  link was shared, not when the app was opened), removes the staged file **only after** the
+  vault write succeeded, schedules search indexing, and posts
+  `SharedCaptureDrain.didFileNotification` so an on-screen Digest reloads.
+- After staging, the extension shows a **Link captured** sheet (SwiftUI hosted directly in the
+  extension's view — iOS already wraps the extension in a sheet container). **Keep editing** opens `noto2://capture?shared=<id>` (`Noto2LaunchRoute.openSharedCaptureURL`),
+  which `RootTabView` handles by draining and opening the note that capture was filed to
+  (`sharedCaptureNotes` ledger → `openFiledNote`), falling back to Digest for an id it did not
+  file this session. There is no public "open my app" API for share extensions: the code walks
+  the responder chain to `UIApplication` and calls `open(_:options:completionHandler:)` via its
+  IMP — `extensionContext.open` returns false and the legacy `openURL:` is refused by UIKit;
+  `UIWindowScene` answers the selector but crashes, so it is skipped.
+- Both `Noto2/Noto2.entitlements` and the extension's entitlements carry the App Group.
+  Device builds need that capability on all three App IDs before `bootstrap_match`
+  regenerates profiles; `fastlane/.env.noto2` lists the extension in `EXTENSION_TARGETS`.
 
 ### Mention Menu Lifecycle
 

@@ -1,0 +1,10 @@
+Timestamp               Ty Process[PID:TID]
+2026-09-19 00:38:27.753 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-19 00:38:27.754 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture 1E840800-19E4-4145-A087-1EDFA4287E32
+2026-09-19 00:38:31.581 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] opening Noto 2 with noto2://capture?shared=1E840800-19E4-4145-A087-1EDFA4287E32
+2026-09-19 00:38:31.581 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] open(_:options:completionHandler:) via UIApplication
+2026-09-19 00:38:31.612 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] UIApplication open completion success=true
+2026-09-19 00:38:31.643 I  Noto2[87983:69859b] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-19-55fea2fe.md created=true
+2026-09-19 00:38:31.643 I  Noto2[87983:68b2e7] [com.eugenechan.Noto2:RootTabView] Drained 1 shared capture(s); 0 left staged
+2026-09-19 00:38:31.644 I  Noto2[87983:68b2e7] [com.eugenechan.Noto2:RootTabView] Opening shared capture 1E840800-19E4-4145-A087-1EDFA4287E32 at 2026-09-19-55fea2fe.md
+2026-09-19 00:38:32.216 I  Noto2[87983:69859c] [com.eugenechan.Noto2:RootTabView] Search index sweep: scanned=11 upserted=0 deleted=0 skippedUnavailable=0 indexedNotes=11 sections=42

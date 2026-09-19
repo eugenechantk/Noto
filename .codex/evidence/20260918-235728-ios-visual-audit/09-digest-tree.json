@@ -1,0 +1,162 @@
+{
+  "accessibility" : {
+    "element_count" : 8,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 85
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 15,
+          "width" : 75,
+          "x" : 163,
+          "y" : 77
+        },
+        "id" : "digestRemainingCount",
+        "label" : "2 to process",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 175
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 46,
+          "width" : 46,
+          "x" : 178,
+          "y" : 152
+        },
+        "id" : "digestCreateTarget",
+        "label" : "Create a new note",
+        "role" : "Image",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 113,
+          "y" : 281
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 15,
+          "width" : 154,
+          "x" : 36,
+          "y" : 274
+        },
+        "id" : "digestCardDate",
+        "label" : "Sep 19, 2026 at 12:00 AM",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 193,
+          "y" : 328
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 57,
+          "width" : 314,
+          "x" : 36,
+          "y" : 299
+        },
+        "label" : "[Rust (programming language) - Wikipedia](https:\/\/en.wikipedia.org\/wiki\/Rust_%28programming_language%29)",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 200,
+          "y" : 465
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 352,
+          "width" : 344,
+          "x" : 28,
+          "y" : 289
+        },
+        "id" : "digestBackCard",
+        "role" : "GenericElement",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 712
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 46,
+          "width" : 46,
+          "x" : 178,
+          "y" : 689
+        },
+        "id" : "digestDiscardTarget",
+        "label" : "Discard this capture",
+        "role" : "Image",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20260918-235728-ios-visual-audit\/09-digest-tab.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 63196,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "B5B4FC33-FC58-4393-829C-62940C8378A3"
+  },
+  "success" : true,
+  "timestamp" : "2026-09-18T16:02:51Z",
+  "type" : "ui_snapshot"
+}

@@ -1,0 +1,10 @@
+== staged before Add notes Sat Sep 19 00:35:12 HKT 2026 ==
+total 16
+drwxr-xr-x  4 eugenechan  staff  128 Sep 19 00:34 .
+drwxr-xr-x@ 5 eugenechan  staff  160 Sep 18 23:52 ..
+-rw-r--r--  1 eugenechan  staff  141 Sep 19 00:30 001789749052110-980694FD-BE85-4CC3-BB04-774503B6F9D5.json
+-rw-r--r--  1 eugenechan  staff  193 Sep 19 00:34 001789749246063-F4CA818C-5D8F-4883-853E-D88649E13EE5.json
+/Users/eugenechan/Library/Developer/CoreSimulator/Devices/B5B4FC33-FC58-4393-829C-62940C8378A3/data/Containers/Shared/AppGroup/4A6CBF4D-6433-4725-8216-C81254AFF374/pending-captures/001789749052110-980694FD-BE85-4CC3-BB04-774503B6F9D5.json
+{"body":"[OCaml - Wikipedia](https:\/\/en.wikipedia.org\/wiki\/OCaml)","createdAt":1789749052110,"id":"980694FD-BE85-4CC3-BB04-774503B6F9D5"}
+/Users/eugenechan/Library/Developer/CoreSimulator/Devices/B5B4FC33-FC58-4393-829C-62940C8378A3/data/Containers/Shared/AppGroup/4A6CBF4D-6433-4725-8216-C81254AFF374/pending-captures/001789749246063-F4CA818C-5D8F-4883-853E-D88649E13EE5.json
+{"body":"[Elixir (programming language) - Wikipedia](https:\/\/en.wikipedia.org\/wiki\/Elixir_%28programming_language%29)","createdAt":1789749246063,"id":"F4CA818C-5D8F-4883-853E-D88649E13EE5"}

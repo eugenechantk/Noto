@@ -1,0 +1,5 @@
+== Noto2 process on sim B5B4FC33-FC58-4393-829C-62940C8378A3 before terminate ==
+32757 /Users/eugenechan/Library/Developer/CoreSimulator/Devices/B5B4FC33-FC58-4393-829C-62940C8378A3/data/Containers/Bundle/Application/D7562F7A-3445-4239-B129-FFB0DB189709/Noto2.app/Noto2
+pid=32757
+== after SIGTERM ==
+(none — Noto 2 not running)

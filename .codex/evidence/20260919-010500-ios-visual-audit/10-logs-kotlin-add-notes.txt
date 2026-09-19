@@ -1,0 +1,16 @@
+== extension log ==
+Timestamp               Ty Process[PID:TID]
+2026-09-19 00:51:30.607 Df launchd_sim[31459:6ab60c] [com.eugenechan.Noto2.ShareExtension:] Unknown key for Boolean: EnableTransactions
+2026-09-19 00:51:30.607 Df launchd_sim[31459:6ab60c] [com.eugenechan.Noto2.ShareExtension:] Unknown key for Boolean: EnablePressuredExit
+2026-09-19 00:51:31.872 I  Noto2ShareExtension[35845:6abbc8] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-19 00:51:31.892 I  Noto2ShareExtension[35845:6abbc8] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture BC6BDBEC-36FD-41D2-96FE-758E1367F782
+2026-09-19 00:51:51.496 I  Noto2ShareExtension[35845:6abbc8] [com.eugenechan.Noto2.ShareExtension:ShareViewController] opening Noto 2 with noto2://capture?shared=BC6BDBEC-36FD-41D2-96FE-758E1367F782
+2026-09-19 00:51:51.498 I  Noto2ShareExtension[35845:6abbc8] [com.eugenechan.Noto2.ShareExtension:ShareViewController] open(_:options:completionHandler:) via UIApplication
+2026-09-19 00:51:51.554 I  Noto2ShareExtension[35845:6abbc8] [com.eugenechan.Noto2.ShareExtension:ShareViewController] UIApplication open completion success=true
+== app log ==
+Timestamp               Ty Process[PID:TID]
+2026-09-19 00:50:19.974 I  Noto2[32757:6a9b7d] [com.eugenechan.Noto2:RootTabView] Search index sweep: scanned=6 upserted=0 deleted=1 skippedUnavailable=0 indexedNotes=6 sections=37
+2026-09-19 00:51:51.598 I  Noto2[32757:6a9eff] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-19-a8ca0d33.md created=true
+2026-09-19 00:51:51.610 I  Noto2[32757:6a9b63] [com.eugenechan.Noto2:RootTabView] Drained 1 shared capture(s); 0 left staged
+2026-09-19 00:51:51.611 I  Noto2[32757:6a9b63] [com.eugenechan.Noto2:RootTabView] Opening shared capture BC6BDBEC-36FD-41D2-96FE-758E1367F782 at 2026-09-19-a8ca0d33.md
+2026-09-19 00:51:52.237 I  Noto2[32757:6a9f18] [com.eugenechan.Noto2:RootTabView] Search index sweep: scanned=7 upserted=0 deleted=0 skippedUnavailable=0 indexedNotes=7 sections=38

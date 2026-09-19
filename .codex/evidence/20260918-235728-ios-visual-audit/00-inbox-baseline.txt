@@ -1,0 +1,4 @@
+total 8
+drwxr-xr-x   3 eugenechan  staff   96 Sep 18 23:53 .
+drwxr-xr-x@ 10 eugenechan  staff  320 Sep 18 23:53 ..
+-rw-r--r--@  1 eugenechan  staff  242 Sep 18 23:53 2026-09-18-6f53aba1.md

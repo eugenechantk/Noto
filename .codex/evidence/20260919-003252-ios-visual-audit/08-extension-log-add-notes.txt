@@ -1,0 +1,7 @@
+getpwuid_r did not find a match for uid 501
+Timestamp               Ty Process[PID:TID]
+2026-09-19 00:34:06.071 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-19 00:34:06.075 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture F4CA818C-5D8F-4883-853E-D88649E13EE5
+2026-09-19 00:35:24.024 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] opening Noto 2 with noto2://capture?shared=F4CA818C-5D8F-4883-853E-D88649E13EE5
+2026-09-19 00:35:24.043 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] open(_:options:completionHandler:) via UIApplication
+2026-09-19 00:35:24.109 I  Noto2ShareExtension[88821:68bcd6] [com.eugenechan.Noto2.ShareExtension:ShareViewController] UIApplication open completion success=true

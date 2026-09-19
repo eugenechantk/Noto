@@ -1,0 +1,16 @@
+# Drain proof (captured 2026-09-18T16:02:38Z)
+
+## pending-captures after foreground (expect empty)
+total 0
+drwxr-xr-x  2 eugenechan  staff   64 Sep 19 00:02 .
+drwxr-xr-x@ 5 eugenechan  staff  160 Sep 18 23:52 ..
+
+## inbox after foreground
+total 16
+drwxr-xr-x   4 eugenechan  staff  128 Sep 19 00:02 .
+drwxr-xr-x@ 10 eugenechan  staff  320 Sep 18 23:53 ..
+-rw-r--r--@  1 eugenechan  staff  242 Sep 18 23:53 2026-09-18-6f53aba1.md
+-rw-r--r--@  1 eugenechan  staff  240 Sep 19 00:02 2026-09-19-c941a054.md
+
+## staged createdAt 1789747214487 ms =
+2026-09-18T16:00:14.487000+00:00

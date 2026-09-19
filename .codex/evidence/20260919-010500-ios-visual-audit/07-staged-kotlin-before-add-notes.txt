@@ -1,0 +1,5 @@
+total 8
+drwxr-xr-x  3 eugenechan  staff   96 Sep 19 00:51 .
+drwxr-xr-x@ 5 eugenechan  staff  160 Sep 18 23:52 ..
+-rw-r--r--  1 eugenechan  staff  143 Sep 19 00:51 001789750291887-BC6BDBEC-36FD-41D2-96FE-758E1367F782.json
+{"body":"[Kotlin - Wikipedia](https:\/\/en.wikipedia.org\/wiki\/Kotlin)","createdAt":1789750291887,"id":"BC6BDBEC-36FD-41D2-96FE-758E1367F782"}
