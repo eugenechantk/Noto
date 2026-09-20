@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B70000000000000000000030 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000031 /* NotoLinkPreview */; };
+		B70000000000000000000032 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000033 /* NotoLinkPreview */; };
+		B70000000000000000000034 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000035 /* NotoLinkPreview */; };
 		260C4638209FCE498F36DC11 /* Noto2QuickCaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258D1BBCE132EE72D17CAB8E /* Noto2QuickCaptureIntent.swift */; };
 		58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */; };
 		58A1D0018A1D001000000002 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */; };
@@ -221,6 +224,7 @@
 				58A1D0018A1D00100000000C /* NotoChat in Frameworks */,
 				58A1D0018A1D00100000000F /* NotoEmbedding in Frameworks */,
 				B70000000000000000000027 /* NotoShareCapture in Frameworks */,
+				B70000000000000000000030 /* NotoLinkPreview in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -244,6 +248,7 @@
 				A20000000000000000000034 /* NotoEmbedding in Frameworks */,
 				A20000000000000000000035 /* NotoDigest in Frameworks */,
 				B70000000000000000000023 /* NotoShareCapture in Frameworks */,
+				B70000000000000000000032 /* NotoLinkPreview in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -255,6 +260,7 @@
 				A20000000000000000000053 /* NotoSearch in Frameworks */,
 				A20000000000000000000055 /* NotoDigest in Frameworks */,
 				B70000000000000000000025 /* NotoShareCapture in Frameworks */,
+				B70000000000000000000034 /* NotoLinkPreview in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -432,6 +438,7 @@
 				58A1D0018A1D00100000000B /* NotoChat */,
 				58A1D0018A1D00100000000E /* NotoEmbedding */,
 				B70000000000000000000026 /* NotoShareCapture */,
+				B70000000000000000000031 /* NotoLinkPreview */,
 			);
 			productName = Noto;
 			productReference = 5DF5FAFE2F0EC372008EDC76 /* Noto.app */;
@@ -491,6 +498,7 @@
 				A20000000000000000000024 /* NotoEmbedding */,
 				A20000000000000000000025 /* NotoDigest */,
 				B70000000000000000000022 /* NotoShareCapture */,
+				B70000000000000000000033 /* NotoLinkPreview */,
 			);
 			productName = Noto2;
 			productReference = A20000000000000000000011 /* Noto2.app */;
@@ -518,6 +526,7 @@
 				A20000000000000000000052 /* NotoSearch */,
 				A20000000000000000000054 /* NotoDigest */,
 				B70000000000000000000024 /* NotoShareCapture */,
+				B70000000000000000000035 /* NotoLinkPreview */,
 			);
 			productName = Noto2Tests;
 			productReference = A20000000000000000000041 /* Noto2Tests.xctest */;
@@ -612,6 +621,7 @@
 				58A1D0018A1D00100000000D /* XCLocalSwiftPackageReference "NotoEmbedding" */,
 				A20000000000000000000070 /* XCLocalSwiftPackageReference "NotoDigest" */,
 				B70000000000000000000019 /* XCLocalSwiftPackageReference "NotoShareCapture" */,
+				B70000000000000000000036 /* XCLocalSwiftPackageReference "NotoLinkPreview" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DF5FAFF2F0EC372008EDC76 /* Products */;
@@ -1517,6 +1527,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		B70000000000000000000036 /* XCLocalSwiftPackageReference "NotoLinkPreview" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoLinkPreview;
+		};
 		5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "NotoReadwiseSync" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoReadwiseSync;
@@ -1552,6 +1566,18 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		B70000000000000000000031 /* NotoLinkPreview */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoLinkPreview;
+		};
+		B70000000000000000000033 /* NotoLinkPreview */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoLinkPreview;
+		};
+		B70000000000000000000035 /* NotoLinkPreview */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoLinkPreview;
+		};
 		58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoReadwiseSyncCore;

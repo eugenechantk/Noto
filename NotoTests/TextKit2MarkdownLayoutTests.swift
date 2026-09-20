@@ -84,7 +84,7 @@ struct TextKit2MarkdownLayoutTests {
         let revealed = MarkdownParagraphStyler.style(
             text: text,
             kind: kind,
-            revealedDividerRanges: [NSRange(location: 0, length: 3)]
+            revealedBlockRanges: [NSRange(location: 0, length: 3)]
         )
         let hiddenColor = try #require(hidden.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
         let revealedColor = try #require(revealed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
@@ -101,8 +101,8 @@ struct TextKit2MarkdownLayoutTests {
         let frontmatterSelection = NSRange(location: 0, length: 0)
         let dividerSelection = NSRange(location: nsText.range(of: "---", options: .backwards).location, length: 0)
 
-        let frontmatterRanges = DividerMarkdown.rangesOnSelectedLines(in: text, selection: frontmatterSelection)
-        let dividerRanges = DividerMarkdown.rangesOnSelectedLines(in: text, selection: dividerSelection)
+        let frontmatterRanges = RevealableBlockMarkdown.rangesOnSelectedLines(in: text, selection: frontmatterSelection)
+        let dividerRanges = RevealableBlockMarkdown.rangesOnSelectedLines(in: text, selection: dividerSelection)
 
         #expect(frontmatterRanges.isEmpty)
         #expect(dividerRanges.count == 1)
@@ -497,6 +497,85 @@ struct TextKit2MarkdownLayoutTests {
         #expect(kind == .bullet(indent: 0))
     }
 
+    // MARK: - Link preview cards
+    //
+    // | Test | Covers |
+    // | --- | --- |
+    // | `bareURLLineIsALinkPreviewBlock` | SC1 — a lone `https://` line becomes a card |
+    // | `urlsInsideProseStayParagraphs` | SC1 — inline / hyperlink / image forms keep their kinds |
+    // | `linkPreviewParagraphReservesCardHeight` | SC2 — hidden text at the fixed card height |
+    // | `revealedLinkPreviewUsesBodyMetrics` | SC3 — caret on the line shows the raw URL |
+    // | `selectedLinkPreviewLineIsRevealable` | SC3 — selection discovery includes link lines |
+
+    @Test("A bare URL on its own line is a link-preview block")
+    func bareURLLineIsALinkPreviewBlock() {
+        #expect(MarkdownBlockKind.detect(from: "https://example.com/article") == .linkPreview(URL(string: "https://example.com/article")!))
+        #expect(MarkdownBlockKind.detect(from: "  <https://example.com/a>  ") == .linkPreview(URL(string: "https://example.com/a")!))
+        #expect(MarkdownBlockKind.detect(from: "https://example.com/article").isCaretRevealable)
+        #expect(MarkdownBlockKind.detect(from: "https://example.com/article").hidesBackingText)
+    }
+
+    @Test("URLs inside prose, hyperlinks, and images keep their own kinds")
+    func urlsInsideProseStayParagraphs() {
+        #expect(MarkdownBlockKind.detect(from: "See https://example.com for more") == .paragraph)
+        #expect(MarkdownBlockKind.detect(from: "[Example](https://example.com)") == .paragraph)
+        #expect(MarkdownBlockKind.detect(from: "- https://example.com") == .bullet(indent: 0))
+        guard case .imageLink = MarkdownBlockKind.detect(from: "![](https://example.com/a.png)") else {
+            Issue.record("Expected an image link, not a preview card")
+            return
+        }
+    }
+
+    @Test("Link-preview paragraph reserves the card height and hides its text")
+    func linkPreviewParagraphReservesCardHeight() throws {
+        let text = "https://example.com/article"
+        let kind = MarkdownBlockKind.detect(from: text)
+        let styled = MarkdownParagraphStyler.style(text: text, kind: kind)
+        let paragraphStyle = try #require(styled.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
+        let font = try #require(styled.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)
+        let color = try #require(styled.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        let lightTrait = UITraitCollection(userInterfaceStyle: .light)
+
+        #expect(paragraphStyle.minimumLineHeight == MarkdownVisualSpec.linkPreviewReservedHeight)
+        #expect(paragraphStyle.maximumLineHeight == MarkdownVisualSpec.linkPreviewReservedHeight)
+        #expect(MarkdownVisualSpec.linkPreviewReservedHeight == MarkdownVisualSpec.linkPreviewCardHeight)
+        #expect(font.pointSize < 1)
+        #expect(color.resolvedColor(with: lightTrait) == UIColor.clear.resolvedColor(with: lightTrait))
+    }
+
+    @Test("Revealed link-preview line uses body metrics and link colour")
+    func revealedLinkPreviewUsesBodyMetrics() throws {
+        let text = "https://example.com/article"
+        let kind = MarkdownBlockKind.detect(from: text)
+        let revealed = MarkdownParagraphStyler.style(
+            text: text,
+            kind: kind,
+            revealedBlockRanges: [NSRange(location: 0, length: (text as NSString).length)]
+        )
+        let paragraphStyle = try #require(revealed.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
+        let font = try #require(revealed.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)
+        let color = try #require(revealed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        let bodyStyle = MarkdownParagraphStyler.paragraphStyle(for: .paragraph, text: text)
+
+        #expect(paragraphStyle.minimumLineHeight == bodyStyle.minimumLineHeight)
+        #expect(font.pointSize == MarkdownVisualSpec.bodyFont.pointSize)
+        #expect(color == .systemBlue)
+    }
+
+    @Test("Selected link-preview line is discovered as revealable")
+    func selectedLinkPreviewLineIsRevealable() {
+        let text = "Intro\nhttps://example.com/article\nOutro"
+        let nsText = text as NSString
+        let urlLocation = nsText.range(of: "https://").location
+
+        let onURL = RevealableBlockMarkdown.rangesOnSelectedLines(in: text, selection: NSRange(location: urlLocation + 3, length: 0))
+        let onIntro = RevealableBlockMarkdown.rangesOnSelectedLines(in: text, selection: NSRange(location: 0, length: 0))
+
+        #expect(onURL.count == 1)
+        #expect(nsText.substring(with: onURL[0]) == "https://example.com/article")
+        #expect(onIntro.isEmpty)
+    }
+
     @Test("Dividers are unaffected by marker stripping")
     func dividersAreUnaffectedByMarkerStripping() {
         #expect(MarkdownBlockKind.detect(from: "---") == .divider)
@@ -850,7 +929,7 @@ struct TextKit2MarkdownLayoutMacTests {
         let revealed = MarkdownParagraphStyler.style(
             text: text,
             kind: kind,
-            revealedDividerRanges: [NSRange(location: 0, length: 3)]
+            revealedBlockRanges: [NSRange(location: 0, length: 3)]
         )
         let hiddenColor = try #require(hidden.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
         let revealedColor = try #require(revealed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)

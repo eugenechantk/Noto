@@ -1,5 +1,6 @@
 import SwiftUI
 import os.log
+import NotoLinkPreview
 import UniformTypeIdentifiers
 
 #if os(iOS)
@@ -467,9 +468,33 @@ enum MarkdownBlockKind: Equatable {
     case orderedList(number: Int, indent: Int)
     case frontmatter
     case imageLink(MarkdownImageLink)
+    /// A paragraph that is nothing but a web URL; rendered as a preview card.
+    case linkPreview(URL)
     case divider
     case xmlTag
     case collapsedXMLTagContent
+
+    /// Blocks whose backing markdown is hidden behind a native visual and comes back
+    /// as raw text while the caret is on the line (dividers, link cards).
+    var isCaretRevealable: Bool {
+        switch self {
+        case .divider, .linkPreview:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Blocks that reserve a fixed visual height and draw their backing text invisibly
+    /// (a native overlay stands in for it).
+    var hidesBackingText: Bool {
+        switch self {
+        case .imageLink, .linkPreview:
+            return true
+        default:
+            return false
+        }
+    }
 
     static func detect(from text: String, vaultRootURL: URL? = nil) -> MarkdownBlockKind {
         let indentCount = text.prefix(while: { $0 == " " }).count
@@ -486,6 +511,10 @@ enum MarkdownBlockKind: Equatable {
         if let markerStripped = MarkdownBlockMarker.stripping(from: stripped),
            let imageLink = MarkdownImageLinkParser.parse(from: markerStripped) {
             return .imageLink(imageLink.resolving(relativeTo: vaultRootURL))
+        }
+
+        if let previewURL = LinkPreviewDetector.url(inLine: stripped) {
+            return .linkPreview(previewURL)
         }
 
         if stripped == "---" {
@@ -540,7 +569,7 @@ enum MarkdownBlockKind: Equatable {
         case .orderedList(let number, _):
             let marker = "\(number). "
             return indentCount + (stripped.hasPrefix(marker) ? marker.count : 0)
-        case .frontmatter, .paragraph, .imageLink, .divider, .xmlTag, .collapsedXMLTagContent: return 0
+        case .frontmatter, .paragraph, .imageLink, .linkPreview, .divider, .xmlTag, .collapsedXMLTagContent: return 0
         }
     }
 
@@ -579,7 +608,7 @@ struct MarkdownRenderableBlock: Equatable {
     var isNativeOverlayEligible: Bool {
         guard !isCollapsedXMLTagContent else { return false }
         switch kind {
-        case .todo, .imageLink, .divider:
+        case .todo, .imageLink, .linkPreview, .divider:
             return true
         case .paragraph, .heading, .bullet, .orderedList, .frontmatter, .xmlTag, .collapsedXMLTagContent:
             return false
@@ -776,6 +805,12 @@ enum MarkdownVisualSpec {
     static let collapsedXMLTagContentFontSize: CGFloat = 0.01
     static let dividerLineHeight: CGFloat = 1
     static let dividerVerticalPadding: CGFloat = 10
+    // Link preview cards are a fixed height so the paragraph never relayouts when
+    // metadata arrives — only the overlay's content changes.
+    static let linkPreviewCardHeight: CGFloat = LinkPreviewCardLayout.defaultHeight
+    static let linkPreviewVerticalPadding: CGFloat = 0
+    static let linkPreviewReservedHeight: CGFloat = linkPreviewCardHeight + linkPreviewVerticalPadding * 2
+    static let linkPreviewBackingFontSize: CGFloat = 0.01
 
     static func listLeadingOffset(for indentLevel: Int) -> CGFloat {
         listBaseIndent + CGFloat(indentLevel) * listIndentStep
@@ -929,6 +964,16 @@ enum MarkdownParagraphStyler {
             paraStyle.paragraphSpacingBefore = 10
             paraStyle.paragraphSpacing = 12
 
+        case .linkPreview:
+            paraStyle.lineSpacing = 0
+            paraStyle.lineBreakMode = .byClipping
+            // A card is spaced exactly like a body paragraph: nothing before, the
+            // standard paragraph gap after. The line itself is the card's height.
+            paraStyle.minimumLineHeight = MarkdownVisualSpec.linkPreviewReservedHeight
+            paraStyle.maximumLineHeight = MarkdownVisualSpec.linkPreviewReservedHeight
+            paraStyle.paragraphSpacingBefore = 0
+            paraStyle.paragraphSpacing = MarkdownVisualSpec.paragraphSpacing
+
         case .divider:
             paraStyle.lineSpacing = 0
             paraStyle.paragraphSpacingBefore = MarkdownVisualSpec.dividerVerticalPadding
@@ -1005,7 +1050,7 @@ enum MarkdownParagraphStyler {
         kind: MarkdownBlockKind,
         paragraphLocation: Int = 0,
         revealedHyperlinkRanges: [NSRange] = [],
-        revealedDividerRanges: [NSRange] = []
+        revealedBlockRanges: [NSRange] = []
     ) -> NSAttributedString {
         let attributed = NSMutableAttributedString(string: text)
         let fullRange = NSRange(location: 0, length: attributed.length)
@@ -1079,9 +1124,30 @@ enum MarkdownParagraphStyler {
             ], range: fullRange)
             return attributed
 
+        case .linkPreview:
+            let fullDocumentRange = NSRange(location: paragraphLocation, length: fullRange.length)
+            let isRevealed = revealedBlockRanges.contains { NSEqualRanges($0, fullDocumentRange) }
+            if isRevealed {
+                attributed.addAttributes([
+                    .font: MarkdownTheme.bodyFont,
+                    .foregroundColor: MarkdownTheme.linkColor,
+                    .paragraphStyle: paragraphStyle(for: .paragraph, text: text),
+                ], range: fullRange)
+            } else {
+                attributed.addAttributes([
+                    .font: PlatformFont.systemFont(
+                        ofSize: MarkdownVisualSpec.linkPreviewBackingFontSize,
+                        weight: .regular
+                    ),
+                    .foregroundColor: PlatformColor.clear,
+                    .paragraphStyle: paraStyle,
+                ], range: fullRange)
+            }
+            return attributed
+
         case .divider:
             let fullDocumentRange = NSRange(location: paragraphLocation, length: fullRange.length)
-            let isRevealed = revealedDividerRanges.contains { NSEqualRanges($0, fullDocumentRange) }
+            let isRevealed = revealedBlockRanges.contains { NSEqualRanges($0, fullDocumentRange) }
             attributed.addAttributes([
                 .font: MarkdownTheme.bodyFont,
                 .foregroundColor: isRevealed ? MarkdownTheme.bodyColor : PlatformColor.clear,
@@ -1946,7 +2012,7 @@ fileprivate enum MarkdownImageLoader {
 /// Only the *changed* paragraph is re-styled — not the whole document.
 final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSTextLayoutManagerDelegate {
     var revealedHyperlinkRanges: [NSRange] = []
-    var revealedDividerRanges: [NSRange] = []
+    var revealedBlockRanges: [NSRange] = []
     var collapsedXMLTagRanges: [NSRange] = []
     var frontmatterRange: NSRange?
     var frontmatterDocument: EditableFrontmatterDocument?
@@ -1998,7 +2064,7 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
                 kind: kind,
                 paragraphLocation: range.location,
                 revealedHyperlinkRanges: revealedHyperlinkRanges,
-                revealedDividerRanges: revealedDividerRanges
+                revealedBlockRanges: revealedBlockRanges
             )
             if let cacheKey {
                 styledParagraphCache.setObject(styled, forKey: cacheKey)
@@ -2025,7 +2091,7 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
         if revealedHyperlinkRanges.contains(where: { NSIntersectionRange($0, range).length > 0 }) {
             return nil
         }
-        if revealedDividerRanges.contains(where: { NSIntersectionRange($0, range).length > 0 }) {
+        if revealedBlockRanges.contains(where: { NSIntersectionRange($0, range).length > 0 }) {
             return nil
         }
         return "\(kindCacheToken(kind))|\(text)" as NSString
@@ -2040,6 +2106,7 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
         case .orderedList(let number, let indent): return "o\(number)-\(indent)"
         case .frontmatter: return "f"
         case .imageLink: return "i"
+        case .linkPreview(let url): return "l\(url.absoluteString)"
         case .divider: return "d"
         case .xmlTag: return "x"
         case .collapsedXMLTagContent: return "c"
@@ -2047,7 +2114,9 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
     }
 
     private func newlineAttributes(for kind: MarkdownBlockKind, text: String) -> [NSAttributedString.Key: Any] {
-        if case .imageLink = kind {
+        // Fixed-height native blocks hide their trailing newline too, otherwise the
+        // document's extra line fragment inherits the reserved height as empty space.
+        if kind.hidesBackingText {
             let paragraphStyle = NSMutableParagraphStyle()
             paragraphStyle.lineSpacing = 0
             paragraphStyle.minimumLineHeight = MarkdownVisualSpec.collapsedXMLTagContentFontSize
@@ -2199,10 +2268,11 @@ enum HyperlinkSelectionRanges {
     }
 }
 
-enum DividerMarkdown {
-    static func isDividerLine(_ text: String) -> Bool {
-        let indentCount = text.prefix(while: { $0 == " " }).count
-        return String(text.dropFirst(indentCount)) == "---"
+/// Finds the lines under the selection whose native visual (divider rule, link card)
+/// should give way to raw markdown while the caret is there.
+enum RevealableBlockMarkdown {
+    static func isRevealableLine(_ text: String) -> Bool {
+        MarkdownBlockKind.detect(from: text).isCaretRevealable
     }
 
     static func rangesOnSelectedLines(in text: String, selection: NSRange) -> [NSRange] {
@@ -2225,7 +2295,7 @@ enum DividerMarkdown {
             let lineRange = nsText.lineRange(for: NSRange(location: location, length: 0))
             let visibleLineRange = MarkdownLineRanges.visibleLineRange(from: lineRange, in: nsText)
             let lineText = nsText.substring(with: visibleLineRange)
-            if isDividerLine(lineText),
+            if isRevealableLine(lineText),
                !MarkdownFrontmatter.contains(position: visibleLineRange.location, inRange: frontmatterRange) {
                 ranges.append(visibleLineRange)
             }
@@ -2257,6 +2327,15 @@ enum MarkdownLineRanges {
 private enum FrontmatterEditingTarget: Equatable {
     case existingValue(key: String)
     case newField
+}
+
+/// How the keyboard accessory toolbar renders.
+/// `.docked` — Noto's v2 full-width #1A1C22 bar (default, unchanged).
+/// `.floating` — iOS 26 Liquid Glass pill floating above the keyboard (Noto 2).
+/// Declared outside the platform sections because `EditorContentView` (shared) carries it.
+enum EditorKeyboardToolbarStyle {
+    case docked
+    case floating
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -2895,14 +2974,6 @@ private final class FrontmatterBlockView: UIView {
     }
 }
 
-/// How the keyboard accessory toolbar renders.
-/// `.docked` — Noto's v2 full-width #1A1C22 bar (default, unchanged).
-/// `.floating` — iOS 26 Liquid Glass pill floating above the keyboard (Noto 2).
-enum EditorKeyboardToolbarStyle {
-    case docked
-    case floating
-}
-
 struct TextKit2EditorView: UIViewControllerRepresentable {
     @Binding var text: String
     var documentID: String = ""
@@ -3060,7 +3131,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var pendingPageMentionTriggerLocation: Int?
     private var suppressedPageMentionLocation: Int?
     var revealedHyperlinkRanges: [NSRange] = []
-    var revealedDividerRanges: [NSRange] = []
+    var revealedBlockRanges: [NSRange] = []
     private var hyperlinkRangesAtTapStart: [NSRange] = []
     private weak var hyperlinkTapRecognizer: UITapGestureRecognizer?
     private var isRestylingText = false
@@ -3088,6 +3159,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var findHighlightViews: [UIView] = []
     private var dividerLineViews: [Int: UIView] = [:]
     private var imageOverlayViews: [Int: UIImageView] = [:]
+    private var linkPreviewCardViews: [Int: LinkPreviewCardView] = [:]
+    private var linkPreviewObserverToken: NSObjectProtocol?
     // v2 redesign: the inline "Metadata" frontmatter block is removed from the
     // editor — properties are surfaced via the More menu → Properties sheet. The
     // frontmatter text stays collapsed (~0 height) in the document. Set true to
@@ -3147,6 +3220,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         ]
         textView.translatesAutoresizingMaskIntoConstraints = false
         installHyperlinkTapRecognizer()
+        startLinkPreviewObservation()
         view.addSubview(textView)
 
         NSLayoutConstraint.activate([
@@ -3180,6 +3254,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         pendingEditorPublishTask?.cancel()
         stopKeyboardObservation()
         stopAppLifecycleObservation()
+        if let linkPreviewObserverToken {
+            NotificationCenter.default.removeObserver(linkPreviewObserverToken)
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -4388,7 +4465,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         invalidateRenderableBlockCache()
         if !isRestylingText {
             updateRevealedMarkdownRangesForSelection(restyle: false)
-            applyDividerRenderAttributesToTextStorage(in: dividerRefreshRangesForCurrentSelection())
+            applyRevealedBlockRenderAttributesToTextStorage(in: revealedBlockRefreshRangesForCurrentSelection())
         }
         scheduleEditorTextPublish()
         updateTypingAttributes(documentText: textStorageString)
@@ -4749,6 +4826,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         refreshFrontmatterControls()
         refreshTodoMarkerButtons(in: blocks)
         refreshImageOverlayViews(in: blocks)
+        refreshLinkPreviewCardViews(in: blocks)
         refreshFindHighlightOverlays()
     }
 
@@ -4800,6 +4878,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         refreshTodoMarkerButtons(in: blocks)
         refreshDividerLineViews(in: blocks)
         refreshImageOverlayViews(in: blocks)
+        refreshLinkPreviewCardViews(in: blocks)
     }
 
     private func syncCollapsedXMLTagState() {
@@ -5408,6 +5487,94 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         )
     }
 
+    // MARK: Link preview cards
+
+    private func startLinkPreviewObservation() {
+        guard linkPreviewObserverToken == nil else { return }
+        linkPreviewObserverToken = NotificationCenter.default.addObserver(
+            forName: LinkPreviewService.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.scheduleEditorOverlayRefresh()
+        }
+    }
+
+    private func refreshLinkPreviewCardViews(in blocks: [MarkdownRenderableBlock]) {
+        guard isViewLoaded, textView != nil else { return }
+        let visibleRect = textView.bounds.insetBy(dx: -8, dy: -200)
+        var activeLocations: Set<Int> = []
+
+        for block in blocks {
+            guard case .linkPreview(let url) = block.kind,
+                  !block.isCollapsedXMLTagContent,
+                  !revealedBlockRanges.contains(where: { NSEqualRanges($0, block.visibleLineRange) }),
+                  let rect = linkPreviewCardRect(for: block),
+                  rect.intersects(visibleRect) else {
+                continue
+            }
+
+            let location = block.paragraphRange.location
+            activeLocations.insert(location)
+
+            let card = linkPreviewCardViews[location] ?? LinkPreviewCardView(frame: .zero)
+            card.frame = rect.integral
+            let state = LinkPreviewSupport.service.state(for: url)
+            card.configure(content: LinkPreviewCardContent.make(url: url, state: state))
+            card.accessibilityIdentifier = "link_preview_card_\(location)"
+            card.onOpen = { UIApplication.shared.open(url) }
+            let lineRange = block.visibleLineRange
+            card.onEdit = { [weak self] in
+                self?.placeCaret(atEndOfLine: lineRange)
+            }
+            if card.superview !== textView {
+                textView.addSubview(card)
+            }
+            linkPreviewCardViews[location] = card
+        }
+
+        for (location, card) in linkPreviewCardViews where !activeLocations.contains(location) {
+            card.removeFromSuperview()
+            linkPreviewCardViews.removeValue(forKey: location)
+        }
+    }
+
+    private func linkPreviewCardRect(for block: MarkdownRenderableBlock) -> CGRect? {
+        guard let position = textView.position(
+            from: textView.beginningOfDocument,
+            offset: block.visibleLineRange.location
+        ) else {
+            return nil
+        }
+
+        let caretRect = textView.caretRect(for: position)
+        guard isFiniteRect(caretRect) else { return nil }
+
+        let leading = textView.textContainerInset.left + textView.textContainer.lineFragmentPadding
+        let trailing = textView.bounds.width
+            - textView.textContainerInset.right
+            - textView.textContainer.lineFragmentPadding
+        let width = max(0, trailing - leading)
+        guard width > 0 else { return nil }
+
+        return CGRect(
+            x: leading,
+            y: caretRect.minY + MarkdownVisualSpec.linkPreviewVerticalPadding,
+            width: width,
+            height: MarkdownVisualSpec.linkPreviewCardHeight
+        )
+    }
+
+    private func placeCaret(atEndOfLine lineRange: NSRange) {
+        guard let textView else { return }
+        let length = (textView.text as NSString).length
+        let location = min(NSMaxRange(lineRange), length)
+        if !textView.isFirstResponder {
+            textView.becomeFirstResponder()
+        }
+        textView.selectedRange = NSRange(location: location, length: 0)
+    }
+
     private func imageLink(in block: MarkdownRenderableBlock) -> MarkdownImageLink? {
         if case .imageLink(let link) = block.kind {
             // Renderable blocks are detected without a vault root (the analyzer is
@@ -5480,7 +5647,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         for block in blocks {
             guard block.kind == .divider,
                   !block.isCollapsedXMLTagContent,
-                  !revealedDividerRanges.contains(where: { NSEqualRanges($0, block.visibleLineRange) }),
+                  !revealedBlockRanges.contains(where: { NSEqualRanges($0, block.visibleLineRange) }),
                   let rect = dividerLineRect(for: block),
                   rect.intersects(visibleRect) else {
                 continue
@@ -6258,7 +6425,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var hyperlinkInsertionPopover: NSPopover?
     private var scrollBoundsObserver: NSObjectProtocol?
     var revealedHyperlinkRanges: [NSRange] = []
-    var revealedDividerRanges: [NSRange] = []
+    var revealedBlockRanges: [NSRange] = []
     private var isRestylingText = false
     private var isOverlayRefreshScheduled = false
     private var isImageLayoutInvalidationScheduled = false
@@ -6280,6 +6447,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private var findHighlightViews: [NSView] = []
     private var dividerLineViews: [Int: NSView] = [:]
     private var imageOverlayViews: [Int: NSImageView] = [:]
+    private var linkPreviewCardViews: [Int: LinkPreviewCardView] = [:]
+    private var linkPreviewObserver: NSObjectProtocol?
     private var isFrontmatterBlockExpanded = false
     // v2 redesign: the inline "Metadata" frontmatter block is removed — properties
     // live in the More menu / form sheet, matching iOS. Suppress draw + reserved inset.
@@ -6449,6 +6618,14 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         ) { [weak self] notification in
             guard self?.handlesWindowScopedCommand(notification) == true else { return }
             self?.handleHyperlinkCommand()
+        }
+
+        linkPreviewObserver = NotificationCenter.default.addObserver(
+            forName: LinkPreviewService.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.scheduleEditorOverlayRefresh()
         }
 
         scrollBoundsObserver = NotificationCenter.default.addObserver(
@@ -6784,7 +6961,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         invalidateRenderableBlockCache()
         if !isRestylingText {
             updateRevealedMarkdownRangesForSelection(restyle: false)
-            applyDividerRenderAttributesToTextStorage(in: dividerRefreshRangesForCurrentSelection())
+            applyRevealedBlockRenderAttributesToTextStorage(in: revealedBlockRefreshRangesForCurrentSelection())
         }
         flushTextToBinding()
         updateTypingAttributes()
@@ -7434,6 +7611,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         refreshFrontmatterEditingFieldFrame()
         refreshDividerLineViews()
         refreshImageOverlayViews()
+        refreshLinkPreviewCardViews()
         refreshFindHighlightOverlays()
     }
 
@@ -7818,6 +7996,74 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         imageOverlayViews.removeAll()
     }
 
+    // MARK: Link preview cards
+
+    private func refreshLinkPreviewCardViews() {
+        guard isViewLoaded, textView != nil else { return }
+
+        let blocks = currentRenderableBlocks()
+        let visibleRect = textView.visibleRect.insetBy(dx: -8, dy: -200)
+        var activeLocations: Set<Int> = []
+
+        for block in blocks {
+            guard case .linkPreview(let url) = block.kind,
+                  !block.isCollapsedXMLTagContent,
+                  !revealedBlockRanges.contains(where: { NSEqualRanges($0, block.visibleLineRange) }),
+                  let rect = linkPreviewCardRect(for: block),
+                  rect.intersects(visibleRect) else {
+                continue
+            }
+
+            let location = block.paragraphRange.location
+            activeLocations.insert(location)
+
+            let card = linkPreviewCardViews[location] ?? LinkPreviewCardView(frame: .zero)
+            card.frame = rect.integral
+            let state = LinkPreviewSupport.service.state(for: url)
+            card.configure(content: LinkPreviewCardContent.make(url: url, state: state))
+            card.setAccessibilityIdentifier("link_preview_card_\(location)")
+            card.onOpen = { NSWorkspace.shared.open(url) }
+            if card.superview !== textView {
+                textView.addSubview(card)
+            }
+            linkPreviewCardViews[location] = card
+        }
+
+        for (location, card) in linkPreviewCardViews where !activeLocations.contains(location) {
+            card.removeFromSuperview()
+            linkPreviewCardViews.removeValue(forKey: location)
+        }
+    }
+
+    private func linkPreviewCardRect(for block: MarkdownRenderableBlock) -> NSRect? {
+        let screenRect = textView.firstRect(
+            forCharacterRange: NSRange(location: block.visibleLineRange.location, length: 0),
+            actualRange: nil
+        )
+        guard let window = textView.window,
+              isFiniteRect(screenRect) else {
+            return nil
+        }
+
+        let windowRect = window.convertFromScreen(screenRect)
+        let caretRect = textView.convert(windowRect, from: nil)
+        guard isFiniteRect(caretRect) else { return nil }
+
+        let inset = textView.textContainerInset.width
+        let padding = textView.textContainer?.lineFragmentPadding ?? 0
+        let leading = inset + padding
+        let trailing = textView.bounds.width - inset - padding
+        let width = max(0, trailing - leading)
+        guard width > 0 else { return nil }
+
+        return NSRect(
+            x: leading,
+            y: caretRect.minY + MarkdownVisualSpec.linkPreviewVerticalPadding,
+            width: width,
+            height: MarkdownVisualSpec.linkPreviewCardHeight
+        )
+    }
+
     private func refreshDividerLineViews() {
         guard isViewLoaded, textView != nil else { return }
 
@@ -7828,7 +8074,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         for block in blocks {
             guard block.kind == .divider,
                   !block.isCollapsedXMLTagContent,
-                  !revealedDividerRanges.contains(where: { NSEqualRanges($0, block.visibleLineRange) }),
+                  !revealedBlockRanges.contains(where: { NSEqualRanges($0, block.visibleLineRange) }),
                   let rect = dividerLineRect(for: block),
                   rect.intersects(visibleRect) else {
                 continue
@@ -8017,6 +8263,9 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         if let scrollBoundsObserver {
             NotificationCenter.default.removeObserver(scrollBoundsObserver)
         }
+        if let linkPreviewObserver {
+            NotificationCenter.default.removeObserver(linkPreviewObserver)
+        }
     }
 }
 
@@ -8038,7 +8287,7 @@ protocol MarkdownRevealRenderingHost: AnyObject {
     var renderMarkdownDelegate: MarkdownTextDelegate { get }
 
     var revealedHyperlinkRanges: [NSRange] { get set }
-    var revealedDividerRanges: [NSRange] { get set }
+    var revealedBlockRanges: [NSRange] { get set }
 
     var cachedRenderableBlocks: [MarkdownRenderableBlock] { get set }
     var cachedRenderableBlocksText: String { get set }
@@ -8062,30 +8311,30 @@ extension MarkdownRevealRenderingHost {
         renderMarkdownDelegate.revealedHyperlinkRanges = ranges
     }
 
-    func setRevealedDividerRanges(_ ranges: [NSRange]) {
-        revealedDividerRanges = ranges
-        renderMarkdownDelegate.revealedDividerRanges = ranges
+    func setRevealedBlockRanges(_ ranges: [NSRange]) {
+        revealedBlockRanges = ranges
+        renderMarkdownDelegate.revealedBlockRanges = ranges
     }
 
     func updateRevealedMarkdownRangesForSelection(restyle: Bool) {
         let text = renderDocumentText
         let hyperlinkRanges = HyperlinkSelectionRanges.fullRangesOnSelectedLines(in: text, selection: renderSelectedRange)
-        let dividerRanges = DividerMarkdown.rangesOnSelectedLines(in: text, selection: renderSelectedRange)
+        let blockRanges = RevealableBlockMarkdown.rangesOnSelectedLines(in: text, selection: renderSelectedRange)
         let previousHyperlinkRanges = revealedHyperlinkRanges
-        let previousDividerRanges = revealedDividerRanges
+        let previousBlockRanges = revealedBlockRanges
         let changed = !nsRangesEqual(hyperlinkRanges, revealedHyperlinkRanges)
-            || !nsRangesEqual(dividerRanges, revealedDividerRanges)
+            || !nsRangesEqual(blockRanges, revealedBlockRanges)
         guard changed else { return }
 
         setRevealedHyperlinkRanges(hyperlinkRanges)
-        setRevealedDividerRanges(dividerRanges)
+        setRevealedBlockRanges(blockRanges)
         if restyle {
             restyleTextPreservingSelection(
                 affectedHyperlinkRanges: previousHyperlinkRanges + hyperlinkRanges,
-                affectedDividerRanges: previousDividerRanges + dividerRanges
+                affectedBlockRanges: previousBlockRanges + blockRanges
             )
         } else {
-            applyDividerRenderAttributesToTextStorage(in: previousDividerRanges + dividerRanges)
+            applyRevealedBlockRenderAttributesToTextStorage(in: previousBlockRanges + blockRanges)
             scheduleEditorOverlayRefresh()
         }
     }
@@ -8100,10 +8349,10 @@ extension MarkdownRevealRenderingHost {
 
     func restyleTextPreservingSelection(
         affectedHyperlinkRanges: [NSRange]? = nil,
-        affectedDividerRanges: [NSRange]? = nil
+        affectedBlockRanges: [NSRange]? = nil
     ) {
         applyHyperlinkRenderAttributesToTextStorage(in: affectedHyperlinkRanges)
-        applyDividerRenderAttributesToTextStorage(in: affectedDividerRanges)
+        applyRevealedBlockRenderAttributesToTextStorage(in: affectedBlockRanges)
         applyFindHighlights()
         refreshTypingAttributes()
         scheduleEditorOverlayRefresh()
@@ -8190,7 +8439,7 @@ extension MarkdownRevealRenderingHost {
         ]
     }
 
-    func applyDividerRenderAttributesToTextStorage(in affectedRanges: [NSRange]? = nil) {
+    func applyRevealedBlockRenderAttributesToTextStorage(in affectedRanges: [NSRange]? = nil) {
         guard let textStorage = renderTextStorage else { return }
         let blocks: [MarkdownRenderableBlock]
         if let affectedRanges {
@@ -8200,7 +8449,7 @@ extension MarkdownRevealRenderingHost {
         }
         var styledLocations: Set<Int> = []
 
-        for block in blocks where block.kind == .divider && !block.isCollapsedXMLTagContent {
+        for block in blocks where block.kind.isCaretRevealable && !block.isCollapsedXMLTagContent {
             guard styledLocations.insert(block.paragraphRange.location).inserted else {
                 continue
             }
@@ -8209,20 +8458,47 @@ extension MarkdownRevealRenderingHost {
                 continue
             }
 
-            let isRevealed = revealedDividerRanges.contains { NSEqualRanges($0, block.visibleLineRange) }
-            textStorage.addAttributes([
-                .font: MarkdownTheme.bodyFont,
-                .foregroundColor: isRevealed ? MarkdownTheme.bodyColor : PlatformColor.clear,
-                .paragraphStyle: MarkdownParagraphStyler.paragraphStyle(
-                    for: isRevealed ? .paragraph : .divider,
-                    text: block.lineText
-                ),
-            ], range: block.visibleLineRange)
+            let isRevealed = revealedBlockRanges.contains { NSEqualRanges($0, block.visibleLineRange) }
+            textStorage.addAttributes(
+                Self.revealedBlockAttributes(for: block.kind, text: block.lineText, isRevealed: isRevealed),
+                range: block.visibleLineRange
+            )
         }
     }
 
-    func dividerRefreshRangesForCurrentSelection() -> [NSRange] {
-        var ranges = revealedDividerRanges
+    /// The attribute set a caret-revealable block wears in each state. Dividers keep
+    /// body metrics either way (only the colour flips); link cards collapse to an
+    /// invisible hairline font so the reserved card height holds.
+    static func revealedBlockAttributes(
+        for kind: MarkdownBlockKind,
+        text: String,
+        isRevealed: Bool
+    ) -> [NSAttributedString.Key: Any] {
+        let paragraphStyle = MarkdownParagraphStyler.paragraphStyle(
+            for: isRevealed ? .paragraph : kind,
+            text: text
+        )
+        switch kind {
+        case .linkPreview:
+            let font: PlatformFont = isRevealed
+                ? MarkdownTheme.bodyFont
+                : PlatformFont.systemFont(ofSize: MarkdownVisualSpec.linkPreviewBackingFontSize, weight: .regular)
+            return [
+                .font: font,
+                .foregroundColor: isRevealed ? MarkdownTheme.linkColor : PlatformColor.clear,
+                .paragraphStyle: paragraphStyle,
+            ]
+        default:
+            return [
+                .font: MarkdownTheme.bodyFont,
+                .foregroundColor: isRevealed ? MarkdownTheme.bodyColor : PlatformColor.clear,
+                .paragraphStyle: paragraphStyle,
+            ]
+        }
+    }
+
+    func revealedBlockRefreshRangesForCurrentSelection() -> [NSRange] {
+        var ranges = revealedBlockRanges
         if let selectedLineRange = selectedLineRange() {
             ranges.append(selectedLineRange)
         }
