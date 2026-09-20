@@ -7,9 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B70000000000000000000030 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000031 /* NotoLinkPreview */; };
-		B70000000000000000000032 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000033 /* NotoLinkPreview */; };
-		B70000000000000000000034 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000035 /* NotoLinkPreview */; };
 		260C4638209FCE498F36DC11 /* Noto2QuickCaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258D1BBCE132EE72D17CAB8E /* Noto2QuickCaptureIntent.swift */; };
 		58A1D0018A1D001000000001 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */; };
 		58A1D0018A1D001000000002 /* NotoReadwiseSyncCore in Frameworks */ = {isa = PBXBuildFile; productRef = 58A1D0018A1D001000000004 /* NotoReadwiseSyncCore */; };
@@ -41,6 +38,9 @@
 		B70000000000000000000025 /* NotoShareCapture in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000024 /* NotoShareCapture */; };
 		B70000000000000000000027 /* NotoShareCapture in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000026 /* NotoShareCapture */; };
 		B70000000000000000000028 /* Noto2QuickCaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258D1BBCE132EE72D17CAB8E /* Noto2QuickCaptureIntent.swift */; };
+		B70000000000000000000030 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000031 /* NotoLinkPreview */; };
+		B70000000000000000000032 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000033 /* NotoLinkPreview */; };
+		B70000000000000000000034 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000035 /* NotoLinkPreview */; };
 		E35366682A4BD0316C8999B4 /* Noto2QuickCaptureControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C668640928AB37E2CA8673D /* Noto2QuickCaptureControl.swift */; };
 /* End PBXBuildFile section */
 
@@ -1527,10 +1527,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		B70000000000000000000036 /* XCLocalSwiftPackageReference "NotoLinkPreview" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/NotoLinkPreview;
-		};
 		5831AD9D88F8B9B95655CC96 /* XCLocalSwiftPackageReference "NotoReadwiseSync" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoReadwiseSync;
@@ -1559,6 +1555,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoShareCapture;
 		};
+		B70000000000000000000036 /* XCLocalSwiftPackageReference "NotoLinkPreview" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotoLinkPreview;
+		};
 		DD2E424822EC2E30DB9B7950 /* XCLocalSwiftPackageReference "NotoSearch" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/NotoSearch;
@@ -1566,18 +1566,6 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		B70000000000000000000031 /* NotoLinkPreview */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = NotoLinkPreview;
-		};
-		B70000000000000000000033 /* NotoLinkPreview */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = NotoLinkPreview;
-		};
-		B70000000000000000000035 /* NotoLinkPreview */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = NotoLinkPreview;
-		};
 		58A1D0018A1D001000000003 /* NotoReadwiseSyncCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoReadwiseSyncCore;
@@ -1653,6 +1641,18 @@
 		B70000000000000000000026 /* NotoShareCapture */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoShareCapture;
+		};
+		B70000000000000000000031 /* NotoLinkPreview */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoLinkPreview;
+		};
+		B70000000000000000000033 /* NotoLinkPreview */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoLinkPreview;
+		};
+		B70000000000000000000035 /* NotoLinkPreview */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoLinkPreview;
 		};
 		CCDD000B000000000000000B /* NotoVault */ = {
 			isa = XCSwiftPackageProductDependency;
