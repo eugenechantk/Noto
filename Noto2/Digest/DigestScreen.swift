@@ -1,4 +1,5 @@
 import NotoDigest
+import NotoLinkPreview
 import SwiftUI
 import UIKit
 import os.log
@@ -242,11 +243,29 @@ struct DigestScreen: View {
 
                 if entry.isAvailable {
                     ScrollView {
-                        Text(entry.body)
-                            .font(.system(size: NotoTheme.FontSize.body))
-                            .foregroundStyle(NotoTheme.ink)
+                        // A capture that is a link (share sheet, or a typed URL)
+                        // gets the editor's preview card; any text after it
+                        // follows as before.
+                        if let split = DigestLinkCardSplit.split(body: entry.body) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                DigestLinkCard(url: split.url)
+                                    .frame(height: LinkPreviewCardLayout.defaultHeight)
+                                if let remainder = split.remainder {
+                                    Text(remainder)
+                                        .font(.system(size: NotoTheme.FontSize.body))
+                                        .foregroundStyle(NotoTheme.ink)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .textSelection(.enabled)
+                                }
+                            }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
+                        } else {
+                            Text(entry.body)
+                                .font(.system(size: NotoTheme.FontSize.body))
+                                .foregroundStyle(NotoTheme.ink)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                        }
                     }
                     .scrollBounceBehavior(.basedOnSize)
                     .accessibilityIdentifier("digestCardBody")

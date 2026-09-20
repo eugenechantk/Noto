@@ -51,6 +51,9 @@ Packages
   NotoShareCapture: UI-free share-sheet capture — `[title](url)` formatting, payload
                     resolution, and the App Group staging store the extension and
                     Noto 2 hand captures through
+  NotoLinkPreview: UI-free link preview cards — which lines card (bare URL or a lone
+                   `[title](url)`), LinkPresentation fetch, disk cache, single-flight
+                   service, card content/layout
   NotoReadwiseSync: Readwise/Reader API client, sync engine, note rendering,
                     sync state, tests, and CLI
 ```
@@ -301,6 +304,11 @@ Digest tab is the other half of that loop — it works the folder down to zero.
   IMP — `extensionContext.open` returns false and the legacy `openURL:` is refused by UIKit;
   `UIWindowScene` answers the selector but crashes, so it is skipped.
 - Both `Noto2/Noto2.entitlements` and the extension's entitlements carry the App Group.
+- **Link captures render as cards.** `LinkPreviewDetector` treats a line that is exactly
+  `[title](url)` the same as a bare URL, so the Capture editor and the note behind Keep
+  editing show the editor's preview card (raw markdown revealed on caret). The Digest card
+  does the same through `DigestLinkCardSplit` + `DigestLinkCard` (`Noto2/Digest/`), a
+  SwiftUI host for the editor's `LinkPreviewCardView` fed by `LinkPreviewSupport.service`.
   Device builds need that capability on all three App IDs before `bootstrap_match`
   regenerates profiles; `fastlane/.env.noto2` lists the extension in `EXTENSION_TARGETS`.
 

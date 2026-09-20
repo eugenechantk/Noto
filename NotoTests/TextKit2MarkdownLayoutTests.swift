@@ -353,12 +353,14 @@ struct TextKit2MarkdownLayoutTests {
         #expect(url.path == "/tmp/Noto Vault/.attachments/Camera Roll.jpg")
     }
 
-    @Test("Non-image empty links stay regular paragraphs")
+    @Test("Non-image empty links are not images")
     func nonImageEmptyLinksStayRegularParagraphs() {
+        // `[](url)` has no `!`, so it is a (title-less) hyperlink line — a preview
+        // card whose title comes from the page — not an image.
         let text = "[](https://example.com/article)"
         let kind = MarkdownBlockKind.detect(from: text)
 
-        #expect(kind == .paragraph)
+        #expect(kind == .linkPreview(URL(string: "https://example.com/article")!))
     }
 
     @Test("No-label image links with spaces in the path are detected and resolve")
@@ -433,13 +435,14 @@ struct TextKit2MarkdownLayoutTests {
         #expect(imageLink.urlString == "https://img.shields.io/github/stars/owner/repo")
     }
 
-    @Test("Extension-less links without a ! prefix stay regular paragraphs")
+    @Test("Extension-less links without a ! prefix are not images")
     func extensionlessLinksWithoutImagePrefixStayParagraphs() {
-        // Guards the loosened `!` rule from swallowing ordinary links.
+        // Guards the loosened `!` rule from swallowing ordinary links. A line that
+        // is only a hyperlink now becomes a preview card, never an image.
         let text = "[Read the docs](https://example.com/docs)"
         let kind = MarkdownBlockKind.detect(from: text)
 
-        #expect(kind == .paragraph)
+        #expect(kind == .linkPreview(URL(string: "https://example.com/docs")!))
     }
 
     @Test("Images behind a blockquote marker are detected")
@@ -515,10 +518,10 @@ struct TextKit2MarkdownLayoutTests {
         #expect(MarkdownBlockKind.detect(from: "https://example.com/article").hidesBackingText)
     }
 
-    @Test("URLs inside prose, hyperlinks, and images keep their own kinds")
+    @Test("URLs inside prose and images keep their own kinds; a lone hyperlink line cards")
     func urlsInsideProseStayParagraphs() {
         #expect(MarkdownBlockKind.detect(from: "See https://example.com for more") == .paragraph)
-        #expect(MarkdownBlockKind.detect(from: "[Example](https://example.com)") == .paragraph)
+        #expect(MarkdownBlockKind.detect(from: "[Example](https://example.com)") == .linkPreview(URL(string: "https://example.com")!))
         #expect(MarkdownBlockKind.detect(from: "- https://example.com") == .bullet(indent: 0))
         guard case .imageLink = MarkdownBlockKind.detect(from: "![](https://example.com/a.png)") else {
             Issue.record("Expected an image link, not a preview card")
