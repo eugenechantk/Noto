@@ -1,0 +1,271 @@
+{
+ "element_count": 15,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "3037bf5df033b4c4",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Noto 2",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 174,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 44,
+    "width": 315,
+    "x": 16,
+    "y": 70
+   },
+   "ref": "e1",
+   "role": "TextField",
+   "value": "Kitchen stone surfaces",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 307,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 19,
+    "width": 19,
+    "x": 296,
+    "y": 82
+   },
+   "label": "Clear text",
+   "ref": "e2",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 364,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 44,
+    "width": 44,
+    "x": 342,
+    "y": 70
+   },
+   "label": "Close",
+   "ref": "e3",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "ref": "e4",
+   "role": "Group",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 23,
+    "y": 138
+   },
+   "enabled": true,
+   "frame": {
+    "height": 14,
+    "width": 12,
+    "x": 17,
+    "y": 131
+   },
+   "id": "searchSummaryCaption",
+   "label": "Sparkle",
+   "ref": "e5",
+   "role": "Image",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 65,
+    "y": 138
+   },
+   "enabled": true,
+   "frame": {
+    "height": 15,
+    "width": 57,
+    "x": 36,
+    "y": 130
+   },
+   "id": "searchSummaryCaption",
+   "label": "Summary",
+   "ref": "e6",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 251
+   },
+   "enabled": true,
+   "frame": {
+    "height": 196,
+    "width": 370,
+    "x": 16,
+    "y": 152
+   },
+   "id": "summaryText",
+   "label": "Regarding kitchen stone surfaces, your notes indicate the following:\n\n*   **2026-08-24-6156e49a**: A quartzite sample from the showroom was preferred over granite.\n*   **2026-08-24-52479890**: A quote for a marble countertop was received and found to be within budget.",
+   "ref": "e7",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 118,
+    "y": 362
+   },
+   "enabled": true,
+   "frame": {
+    "height": 14,
+    "width": 203,
+    "x": 16,
+    "y": 355
+   },
+   "label": "From the top 4 notes \u00b7 AI-generated",
+   "ref": "e8",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 421
+   },
+   "enabled": true,
+   "frame": {
+    "height": 35,
+    "width": 402,
+    "x": 0,
+    "y": 403
+   },
+   "id": "searchResultCount",
+   "label": "4 results for \u201cKitchen stone surfaces\u201d",
+   "ref": "e9",
+   "role": "Heading",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 480
+   },
+   "enabled": true,
+   "frame": {
+    "height": 82,
+    "width": 402,
+    "x": 0,
+    "y": 439
+   },
+   "id": "searchResultRow",
+   "label": "Long Scrolling Note, Aug 23, ...The toolbar should remain centered on the app surface while the content continues underneath with enough inset to keep the last lines reachable.\nSection...",
+   "ref": "e10",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 572
+   },
+   "enabled": true,
+   "frame": {
+    "height": 100,
+    "width": 402,
+    "x": 0,
+    "y": 521
+   },
+   "id": "searchResultRow",
+   "label": "The $120K Blueprint: What 2 Years of\"Building in Public\" Won't Teach You About Actually Making Money, Aug 23, ...Listen for the emotional/business outcome underneath the surface ask.\nSame skill, different platform = different product. His design ability didn't change from Behance..., Captures",
+   "ref": "e11",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 672
+   },
+   "enabled": true,
+   "frame": {
+    "height": 100,
+    "width": 402,
+    "x": 0,
+    "y": 622
+   },
+   "id": "searchResultRow",
+   "label": "2026-08-24-6156e49a, Quartzite sample from the showroom looked better than granite, inbox",
+   "ref": "e12",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 763
+   },
+   "enabled": true,
+   "frame": {
+    "height": 80,
+    "width": 402,
+    "x": 0,
+    "y": 722
+   },
+   "id": "searchResultRow",
+   "label": "2026-08-24-52479890, Marble countertop quote came in under budget, inbox",
+   "ref": "e13",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 833
+   },
+   "enabled": true,
+   "frame": {
+    "height": 83,
+    "width": 402,
+    "x": 0,
+    "y": 791
+   },
+   "label": "Tab Bar",
+   "ref": "e14",
+   "role": "Group",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}

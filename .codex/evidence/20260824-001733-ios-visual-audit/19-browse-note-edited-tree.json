@@ -1,0 +1,187 @@
+{
+ "element_count": 10,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "861dd4ad35a86202",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Noto 2",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 89
+   },
+   "enabled": true,
+   "frame": {
+    "height": 54,
+    "width": 402,
+    "x": 0,
+    "y": 62
+   },
+   "id": "Shopping List",
+   "ref": "e1",
+   "role": "Group",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "id": "note_editor",
+   "ref": "e2",
+   "role": "TextArea",
+   "value": "---\nid: a1b2c3d4-e5f6-7890-abcd-000000000002\ncreated: 2026-03-15T10:00:00Z\nmodified: 2026-03-15T10:00:00Z\n---\n# Shopping List\n\n- Fruits\n- Vegetables\n- Dairy\n\n## Notes\n\nCheck the farmers market on Saturday for fresh produce.\n Audit edit AUD1",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 26,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 8,
+    "y": 830
+   },
+   "id": "toggle_todo_button",
+   "label": "Toggle Todo",
+   "ref": "e3",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 66,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 48,
+    "y": 830
+   },
+   "id": "indent_button",
+   "label": "Indent",
+   "ref": "e4",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 106,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 88,
+    "y": 830
+   },
+   "id": "outdent_button",
+   "label": "Outdent",
+   "ref": "e5",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 146,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 128,
+    "y": 830
+   },
+   "id": "toggle_strikethrough_button",
+   "label": "Strikethrough",
+   "ref": "e6",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 186,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 168,
+    "y": 830
+   },
+   "id": "toggle_hyperlink_button",
+   "label": "Link",
+   "ref": "e7",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 226,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 208,
+    "y": 830
+   },
+   "id": "insert_image_button",
+   "label": "Insert Image",
+   "ref": "e8",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 376,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 358,
+    "y": 830
+   },
+   "id": "hide_keyboard_button",
+   "label": "Hide Keyboard",
+   "ref": "e9",
+   "role": "Button",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}

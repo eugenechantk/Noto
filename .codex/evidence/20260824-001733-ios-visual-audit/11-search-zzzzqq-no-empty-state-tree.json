@@ -1,0 +1,253 @@
+{
+ "element_count": 14,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "7f98035d61c2556d",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Noto 2",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 174,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 44,
+    "width": 315,
+    "x": 16,
+    "y": 70
+   },
+   "ref": "e1",
+   "role": "TextField",
+   "value": "Zzzzqq",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 307,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 19,
+    "width": 19,
+    "x": 296,
+    "y": 82
+   },
+   "label": "Clear text",
+   "ref": "e2",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 364,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 44,
+    "width": 44,
+    "x": 342,
+    "y": 70
+   },
+   "label": "Close",
+   "ref": "e3",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "ref": "e4",
+   "role": "Group",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 23,
+    "y": 138
+   },
+   "enabled": true,
+   "frame": {
+    "height": 14,
+    "width": 12,
+    "x": 17,
+    "y": 131
+   },
+   "id": "searchSummaryCaption",
+   "label": "Sparkle",
+   "ref": "e5",
+   "role": "Image",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 65,
+    "y": 138
+   },
+   "enabled": true,
+   "frame": {
+    "height": 15,
+    "width": 57,
+    "x": 36,
+    "y": 130
+   },
+   "id": "searchSummaryCaption",
+   "label": "Summary",
+   "ref": "e6",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 317
+   },
+   "enabled": true,
+   "frame": {
+    "height": 328,
+    "width": 370,
+    "x": 16,
+    "y": 152
+   },
+   "id": "summaryText",
+   "label": "The provided notes do not contain any information regarding \"Zzzzqq.\" The notes cover distinct topics:\n\n*   **The $120K Blueprint:** Discusses service business positioning, emphasizing selling transformations over skills, reframing client needs, and using pricing as a signal of value.\n*   **The State of Consumer AI - Usage:** Explores product patterns for AI tools, noting that successful apps focus on low-friction, repeated workflows rather than novelty.\n*   **2026-08-24-6156e49a:** A brief observation comparing the appearance of quartzite and granite samples.",
+   "ref": "e7",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 118,
+    "y": 494
+   },
+   "enabled": true,
+   "frame": {
+    "height": 14,
+    "width": 203,
+    "x": 16,
+    "y": 487
+   },
+   "label": "From the top 3 notes \u00b7 AI-generated",
+   "ref": "e8",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 553
+   },
+   "enabled": true,
+   "frame": {
+    "height": 35,
+    "width": 402,
+    "x": 0,
+    "y": 535
+   },
+   "id": "searchResultCount",
+   "label": "3 results for \u201cZzzzqq\u201d",
+   "ref": "e9",
+   "role": "Heading",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 621
+   },
+   "enabled": true,
+   "frame": {
+    "height": 100,
+    "width": 402,
+    "x": 0,
+    "y": 571
+   },
+   "id": "searchResultRow",
+   "label": "The $120K Blueprint: What 2 Years of\"Building in Public\" Won't Teach You About Actually Making Money, Net-Net (translatable to apps/products)\nPlatform choice determines what you're really selling. Optimize for belief/conviction on the platform where your buyer is, not views on the platform where your peers are.\nProvocation \u2192 Education \u2192 Pro, Captures",
+   "ref": "e10",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 722
+   },
+   "enabled": true,
+   "frame": {
+    "height": 100,
+    "width": 402,
+    "x": 0,
+    "y": 671
+   },
+   "id": "searchResultRow",
+   "label": "The State of Consumer AI - Usage, Product patterns\nFast return paths matter more than novelty after the first session.\nLinks such as related usage notes should render as clickable titles when the caret is outside the link line.\nImported highlights should stay readable witho, Captures",
+   "ref": "e11",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 823
+   },
+   "enabled": true,
+   "frame": {
+    "height": 100,
+    "width": 402,
+    "x": 0,
+    "y": 772
+   },
+   "id": "searchResultRow",
+   "label": "2026-08-24-6156e49a, Quartzite sample from the showroom looked better than granite, inbox",
+   "ref": "e12",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 833
+   },
+   "enabled": true,
+   "frame": {
+    "height": 83,
+    "width": 402,
+    "x": 0,
+    "y": 791
+   },
+   "label": "Tab Bar",
+   "ref": "e13",
+   "role": "Group",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}

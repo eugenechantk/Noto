@@ -1,0 +1,15 @@
+---
+id: a1b2c3d4-e5f6-7890-abcd-000000000003
+created: 2026-03-15T11:00:00Z
+modified: 2026-03-15T11:00:00Z
+---
+# Project Plan
+
+- [ ] Design wireframes
+- [ ] Build prototype
+- [ ] Write documentation
+
+## Completed
+
+- [x] Set up repository
+- [x] Review requirements AUD2 edit

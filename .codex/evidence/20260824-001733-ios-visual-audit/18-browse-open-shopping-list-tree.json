@@ -1,0 +1,61 @@
+{
+ "element_count": 3,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "5b2722d51e027c7b",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Noto 2",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 89
+   },
+   "enabled": true,
+   "frame": {
+    "height": 54,
+    "width": 402,
+    "x": 0,
+    "y": 62
+   },
+   "id": "Shopping List",
+   "ref": "e1",
+   "role": "Group",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "id": "note_editor",
+   "ref": "e2",
+   "role": "TextArea",
+   "value": "---\nid: a1b2c3d4-e5f6-7890-abcd-000000000002\ncreated: 2026-03-15T10:00:00Z\nmodified: 2026-03-15T10:00:00Z\n---\n# Shopping List\n\n- Fruits\n- Vegetables\n- Dairy\n\n## Notes\n\nCheck the farmers market on Saturday for fresh produce.\n",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}

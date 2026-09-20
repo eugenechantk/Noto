@@ -1,0 +1,290 @@
+{
+ "element_count": 16,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "74b590befe466df3",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Noto 2",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 174,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 44,
+    "width": 315,
+    "x": 16,
+    "y": 70
+   },
+   "ref": "e1",
+   "role": "TextField",
+   "value": "Meeting roadmap",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 307,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 19,
+    "width": 19,
+    "x": 296,
+    "y": 82
+   },
+   "label": "Clear text",
+   "ref": "e2",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 364,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 44,
+    "width": 44,
+    "x": 342,
+    "y": 70
+   },
+   "label": "Close",
+   "ref": "e3",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "ref": "e4",
+   "role": "Group",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 23,
+    "y": 138
+   },
+   "enabled": true,
+   "frame": {
+    "height": 14,
+    "width": 12,
+    "x": 17,
+    "y": 131
+   },
+   "id": "searchSummaryCaption",
+   "label": "Sparkle",
+   "ref": "e5",
+   "role": "Image",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 65,
+    "y": 138
+   },
+   "enabled": true,
+   "frame": {
+    "height": 15,
+    "width": 57,
+    "x": 36,
+    "y": 130
+   },
+   "id": "searchSummaryCaption",
+   "label": "Summary",
+   "ref": "e6",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 107,
+    "y": 138
+   },
+   "enabled": true,
+   "frame": {
+    "height": 14,
+    "width": 14,
+    "x": 100,
+    "y": 131
+   },
+   "id": "searchSummaryCaption",
+   "ref": "e7",
+   "role": "GenericElement",
+   "value": "1",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 187,
+    "y": 207
+   },
+   "enabled": true,
+   "frame": {
+    "height": 108,
+    "width": 342,
+    "x": 16,
+    "y": 152
+   },
+   "id": "summaryText",
+   "label": "Regarding the meeting roadmap, **Meeting Notes** indicates that the upcoming agenda focuses on the Q2 roadmap and resource allocation for a new mobile app project. The notes include a follow-up task to",
+   "ref": "e8",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 313
+   },
+   "enabled": true,
+   "frame": {
+    "height": 35,
+    "width": 402,
+    "x": 0,
+    "y": 295
+   },
+   "id": "searchResultCount",
+   "label": "5 results for \u201cMeeting roadmap\u201d",
+   "ref": "e9",
+   "role": "Heading",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 372
+   },
+   "enabled": true,
+   "frame": {
+    "height": 82,
+    "width": 402,
+    "x": 0,
+    "y": 330
+   },
+   "id": "searchResultRow",
+   "label": "Meeting Notes, Aug 23, Meeting Notes\nAgenda\nDiscuss Q2 roadmap and resource allocation for the new mobile app project.\nAction Items\nFollow up with the design team about...",
+   "ref": "e10",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 463
+   },
+   "enabled": true,
+   "frame": {
+    "height": 100,
+    "width": 402,
+    "x": 0,
+    "y": 413
+   },
+   "id": "searchResultRow",
+   "label": "The $120K Blueprint: What 2 Years of\"Building in Public\" Won't Teach You About Actually Making Money, Today > October 2025 SUN 19 MON 20 GMT+01 8 AM 9 AM 10 AM 11 AM 12 PM 1PM 2 PM 3 PM 4 PM 5 PM 6 PM Bintang X Tuki Meeting on W 1S Min Meeting between Kreos 5 Min Meeting between Kreos 15 Min Meeting between Kreos 5 Min Meeting between Kreos, Captures",
+   "ref": "e11",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 555
+   },
+   "enabled": true,
+   "frame": {
+    "height": 82,
+    "width": 402,
+    "x": 0,
+    "y": 513
+   },
+   "id": "searchResultRow",
+   "label": "Project Plan, Project Plan\nDesign wireframes\nBuild prototype\nWrite documentation\nCompleted\nSet up repository\nReview requirements",
+   "ref": "e12",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 646
+   },
+   "enabled": true,
+   "frame": {
+    "height": 100,
+    "width": 402,
+    "x": 0,
+    "y": 596
+   },
+   "id": "searchResultRow",
+   "label": "The State of Consumer AI - Usage, The State of Consumer AI - Usage\nSource: The State of Consumer AI - Usage\nReadwise: Open in Reader\nCaptured: 2026-03-15T13:00:00Z\n<!-- noto:highlights:start -->\nConsumer AI apps become useful daily tools when they combine repeated use, low , Captures",
+   "ref": "e13",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 738
+   },
+   "enabled": true,
+   "frame": {
+    "height": 82,
+    "width": 402,
+    "x": 0,
+    "y": 696
+   },
+   "id": "searchResultRow",
+   "label": "Long Scrolling Note, Reference Paragraphs\nThe paragraphs below intentionally repeat the same rhythm. They make the document tall enough to test repeated scrolling without needing thousands of generated files in the small seed vault.\nSection one focuses on the t",
+   "ref": "e14",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 833
+   },
+   "enabled": true,
+   "frame": {
+    "height": 83,
+    "width": 402,
+    "x": 0,
+    "y": 791
+   },
+   "label": "Tab Bar",
+   "ref": "e15",
+   "role": "Group",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}

@@ -1,0 +1,95 @@
+{
+ "element_count": 5,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "49dced60268fe781",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Noto 2",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 261,
+    "y": 499
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 250,
+    "x": 136,
+    "y": 62
+   },
+   "ref": "e1",
+   "role": "Group",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 261,
+    "y": 93
+   },
+   "enabled": true,
+   "frame": {
+    "height": 42,
+    "width": 250,
+    "x": 136,
+    "y": 72
+   },
+   "id": "searchMenuOpenRouterKey",
+   "label": "OpenRouter key\u2026",
+   "ref": "e2",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 261,
+    "y": 135
+   },
+   "enabled": true,
+   "frame": {
+    "height": 42,
+    "width": 250,
+    "x": 136,
+    "y": 114
+   },
+   "id": "searchMenuRebuildIndex",
+   "label": "Rebuild index",
+   "ref": "e3",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Dismiss context menu",
+   "ref": "e4",
+   "role": "Button",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}

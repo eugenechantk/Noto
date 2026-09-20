@@ -1,0 +1,217 @@
+{
+ "element_count": 12,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "bdfa64fb6470edce",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Noto 2",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 174,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 44,
+    "width": 315,
+    "x": 16,
+    "y": 70
+   },
+   "ref": "e1",
+   "role": "TextField",
+   "value": "Granite",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 307,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 19,
+    "width": 19,
+    "x": 296,
+    "y": 82
+   },
+   "label": "Clear text",
+   "ref": "e2",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 364,
+    "y": 92
+   },
+   "enabled": true,
+   "frame": {
+    "height": 44,
+    "width": 44,
+    "x": 342,
+    "y": 70
+   },
+   "label": "Close",
+   "ref": "e3",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "ref": "e4",
+   "role": "Group",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 23,
+    "y": 138
+   },
+   "enabled": true,
+   "frame": {
+    "height": 14,
+    "width": 12,
+    "x": 17,
+    "y": 131
+   },
+   "id": "searchSummaryCaption",
+   "label": "Sparkle",
+   "ref": "e5",
+   "role": "Image",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 65,
+    "y": 138
+   },
+   "enabled": true,
+   "frame": {
+    "height": 15,
+    "width": 57,
+    "x": 36,
+    "y": 130
+   },
+   "id": "searchSummaryCaption",
+   "label": "Summary",
+   "ref": "e6",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 195,
+    "y": 185
+   },
+   "enabled": true,
+   "frame": {
+    "height": 64,
+    "width": 358,
+    "x": 16,
+    "y": 152
+   },
+   "id": "summaryText",
+   "label": "* **2026-08-24-6156e49a**: A quartzite sample viewed at the showroom was preferred over granite.",
+   "ref": "e7",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 114,
+    "y": 230
+   },
+   "enabled": true,
+   "frame": {
+    "height": 14,
+    "width": 195,
+    "x": 16,
+    "y": 223
+   },
+   "label": "From the top 1 note \u00b7 AI-generated",
+   "ref": "e8",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 289
+   },
+   "enabled": true,
+   "frame": {
+    "height": 35,
+    "width": 402,
+    "x": 0,
+    "y": 271
+   },
+   "id": "searchResultCount",
+   "label": "1 result for \u201cGranite\u201d",
+   "ref": "e9",
+   "role": "Heading",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 357
+   },
+   "enabled": true,
+   "frame": {
+    "height": 100,
+    "width": 402,
+    "x": 0,
+    "y": 307
+   },
+   "id": "searchResultRow",
+   "label": "2026-08-24-6156e49a, Aug 24, Quartzite sample from the showroom looked better than granite, inbox",
+   "ref": "e10",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 833
+   },
+   "enabled": true,
+   "frame": {
+    "height": 83,
+    "width": 402,
+    "x": 0,
+    "y": 791
+   },
+   "label": "Tab Bar",
+   "ref": "e11",
+   "role": "Group",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}

@@ -1,0 +1,114 @@
+{
+ "element_count": 6,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "ffa060223d94333b",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Noto 2",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 364,
+    "y": 84
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 30,
+    "x": 349,
+    "y": 66
+   },
+   "id": "searchMenuButton",
+   "label": "More",
+   "ref": "e1",
+   "role": "PopUpButton",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 139
+   },
+   "enabled": true,
+   "frame": {
+    "height": 44,
+    "width": 370,
+    "x": 16,
+    "y": 117
+   },
+   "ref": "e2",
+   "role": "TextField",
+   "value": "Search notes",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 465
+   },
+   "enabled": true,
+   "frame": {
+    "height": 90,
+    "width": 185,
+    "x": 108,
+    "y": 419
+   },
+   "id": "searchEmptyPrompt",
+   "label": "Search your notes",
+   "ref": "e3",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 522
+   },
+   "enabled": true,
+   "frame": {
+    "height": 18,
+    "width": 109,
+    "x": 146,
+    "y": 513
+   },
+   "id": "searchEmptyPrompt",
+   "label": "8 notes indexed",
+   "ref": "e4",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 833
+   },
+   "enabled": true,
+   "frame": {
+    "height": 83,
+    "width": 402,
+    "x": 0,
+    "y": 791
+   },
+   "label": "Tab Bar",
+   "ref": "e5",
+   "role": "Group",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}

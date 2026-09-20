@@ -1,0 +1,223 @@
+{
+ "element_count": 12,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "a997506b21012032",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Noto 2",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 364,
+    "y": 84
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 345,
+    "y": 66
+   },
+   "id": "captureSendButton",
+   "label": "File capture",
+   "ref": "e1",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 103,
+    "y": 126
+   },
+   "enabled": true,
+   "frame": {
+    "height": 20,
+    "width": 165,
+    "x": 20,
+    "y": 116
+   },
+   "id": "capturePlaceholder",
+   "label": "What's on your mind?",
+   "ref": "e2",
+   "role": "StaticText",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 448
+   },
+   "enabled": true,
+   "frame": {
+    "height": 663,
+    "width": 402,
+    "x": 0,
+    "y": 116
+   },
+   "id": "note_editor",
+   "ref": "e3",
+   "role": "TextArea",
+   "value": "   ",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 833
+   },
+   "enabled": true,
+   "frame": {
+    "height": 83,
+    "width": 402,
+    "x": 0,
+    "y": 791
+   },
+   "label": "Tab Bar",
+   "ref": "e4",
+   "role": "Group",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 26,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 8,
+    "y": 830
+   },
+   "id": "toggle_todo_button",
+   "label": "Toggle Todo",
+   "ref": "e5",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 66,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 48,
+    "y": 830
+   },
+   "id": "indent_button",
+   "label": "Indent",
+   "ref": "e6",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 106,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 88,
+    "y": 830
+   },
+   "id": "outdent_button",
+   "label": "Outdent",
+   "ref": "e7",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 146,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 128,
+    "y": 830
+   },
+   "id": "toggle_strikethrough_button",
+   "label": "Strikethrough",
+   "ref": "e8",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 186,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 168,
+    "y": 830
+   },
+   "id": "toggle_hyperlink_button",
+   "label": "Link",
+   "ref": "e9",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 226,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 208,
+    "y": 830
+   },
+   "id": "insert_image_button",
+   "label": "Insert Image",
+   "ref": "e10",
+   "role": "Button",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 376,
+    "y": 848
+   },
+   "enabled": true,
+   "frame": {
+    "height": 36,
+    "width": 36,
+    "x": 358,
+    "y": 830
+   },
+   "id": "hide_keyboard_button",
+   "label": "Hide Keyboard",
+   "ref": "e11",
+   "role": "Button",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}

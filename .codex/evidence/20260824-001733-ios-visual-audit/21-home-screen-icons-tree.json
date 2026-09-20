@@ -1,0 +1,216 @@
+{
+ "element_count": 11,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "76396407931e2637",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": " ",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 62,
+    "y": 133
+   },
+   "enabled": true,
+   "frame": {
+    "height": 90,
+    "width": 68,
+    "x": 28,
+    "y": 88
+   },
+   "id": "Fitness",
+   "label": "Fitness",
+   "ref": "e1",
+   "role": "Button",
+   "value": "",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 155,
+    "y": 133
+   },
+   "enabled": true,
+   "frame": {
+    "height": 90,
+    "width": 68,
+    "x": 120,
+    "y": 88
+   },
+   "id": "Watch",
+   "label": "Watch",
+   "ref": "e2",
+   "role": "Button",
+   "value": "",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 247,
+    "y": 133
+   },
+   "enabled": true,
+   "frame": {
+    "height": 90,
+    "width": 72,
+    "x": 211,
+    "y": 88
+   },
+   "id": "Contacts",
+   "label": "Contacts",
+   "ref": "e3",
+   "role": "Button",
+   "value": "",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 340,
+    "y": 133
+   },
+   "enabled": true,
+   "frame": {
+    "height": 90,
+    "width": 68,
+    "x": 306,
+    "y": 88
+   },
+   "id": "Files",
+   "label": "Files",
+   "ref": "e4",
+   "role": "Button",
+   "value": "",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 62,
+    "y": 234
+   },
+   "enabled": true,
+   "frame": {
+    "height": 90,
+    "width": 68,
+    "x": 28,
+    "y": 188
+   },
+   "id": "Preview",
+   "label": "Preview",
+   "ref": "e5",
+   "role": "Button",
+   "value": "",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 155,
+    "y": 234
+   },
+   "enabled": true,
+   "frame": {
+    "height": 90,
+    "width": 68,
+    "x": 120,
+    "y": 188
+   },
+   "id": "Utilities",
+   "label": "Utilities folder",
+   "ref": "e6",
+   "role": "Button",
+   "value": "2 apps",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 248,
+    "y": 234
+   },
+   "enabled": true,
+   "frame": {
+    "height": 90,
+    "width": 68,
+    "x": 213,
+    "y": 188
+   },
+   "id": "Noto 2",
+   "label": "Noto 2",
+   "ref": "e7",
+   "role": "Button",
+   "value": "",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 719
+   },
+   "enabled": true,
+   "frame": {
+    "height": 30,
+    "width": 78,
+    "x": 162,
+    "y": 703
+   },
+   "id": "spotlight-pill",
+   "label": "Search",
+   "ref": "e8",
+   "role": "Slider",
+   "value": "Page 2 of 2",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 157,
+    "y": 805
+   },
+   "enabled": true,
+   "frame": {
+    "height": 68,
+    "width": 68,
+    "x": 123,
+    "y": 771
+   },
+   "id": "Safari",
+   "label": "Safari",
+   "ref": "e9",
+   "role": "Button",
+   "value": "",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 245,
+    "y": 805
+   },
+   "enabled": true,
+   "frame": {
+    "height": 68,
+    "width": 68,
+    "x": 211,
+    "y": 771
+   },
+   "id": "Messages",
+   "label": "Messages",
+   "ref": "e10",
+   "role": "Button",
+   "value": "",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}

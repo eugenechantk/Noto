@@ -1,0 +1,61 @@
+{
+ "element_count": 3,
+ "frame_space": "points",
+ "orientation": "portrait",
+ "screen_hash": "4a5d74792fde2dc6",
+ "tree": [
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "label": "Noto 2",
+   "ref": "e0",
+   "role": "Application",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 89
+   },
+   "enabled": true,
+   "frame": {
+    "height": 54,
+    "width": 402,
+    "x": 0,
+    "y": 62
+   },
+   "id": "Quartzite sample from the showroom looked better than granite",
+   "ref": "e1",
+   "role": "Group",
+   "visible": true
+  },
+  {
+   "center": {
+    "x": 201,
+    "y": 437
+   },
+   "enabled": true,
+   "frame": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+   },
+   "id": "note_editor",
+   "ref": "e2",
+   "role": "TextArea",
+   "value": "---\nid: D7E5C7C8-86D7-4E2B-AB5F-D80967224272\ncreated: 2026-08-23T16:16:13Z\nupdated: 2026-08-23T16:16:13Z\ntype: note\nstatus: inbox\n---\n\nQuartzite sample from the showroom looked better than granite\n",
+   "visible": true
+  }
+ ],
+ "tree_mode": "full"
+}
