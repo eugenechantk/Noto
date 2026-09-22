@@ -3,7 +3,7 @@ import SwiftUI
 import NotoVault
 import NotoTags
 
-/// v2 Properties sheet (`NotoPropertyList` / `noto-properties-hig.jsx`) presented over the
+/// Shared v2 Properties sheet (`NotoPropertyList` / `noto-properties-hig.jsx`) presented over the
 /// editor on iPhone/iPad. macOS uses its own native grouped `Form` (`MacPropertiesForm`).
 /// Renders the note's YAML frontmatter as an inset-grouped list and edits it
 /// through `EditableFrontmatterDocument` + `session.applyExternalContentEdit`, which

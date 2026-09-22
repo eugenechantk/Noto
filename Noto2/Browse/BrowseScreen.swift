@@ -64,7 +64,11 @@ struct BrowseScreen: View {
                 OpenRouterSettingsSheet(locationManager: locationManager)
             }
             .navigationDestination(for: BrowseDestination.self) { destination in
-                BrowseDestinationView(destination: destination, vaultController: vaultController, onOpen: { path.append($0) })
+                BrowseDestinationView(
+                    destination: destination,
+                    vaultController: vaultController,
+                    onOpen: { path.append($0) }
+                )
                     // A pending note replaces the stack with `[note]`. When a
                     // note is already pushed, that keeps the same stack position,
                     // and without explicit identity SwiftUI reuses the existing
@@ -105,8 +109,17 @@ struct BrowseDestinationView: View {
         case .folder(let folder):
             FolderListView(store: vaultController.store(for: folder), title: folder.name, vaultController: vaultController, onOpen: onOpen)
         case .note(let note, let directoryURL):
-            NoteScreen(store: vaultController.store(for: directoryURL), note: note, vaultController: vaultController)
+            NoteScreen(
+                store: vaultController.store(for: directoryURL),
+                note: note,
+                vaultController: vaultController,
+                onNoteDeleted: refreshAfterEditorMutation
+            )
         }
+    }
+
+    private func refreshAfterEditorMutation() {
+        vaultController.refreshRootForForegroundActivation()
     }
 }
 
@@ -163,10 +176,8 @@ struct FolderListView: View {
         .refreshable {
             store.loadItemsInBackground()
         }
-        .task {
-            if store.items.isEmpty {
-                store.loadItemsInBackground()
-            }
+        .onAppear {
+            store.loadItemsInBackground()
         }
     }
 }

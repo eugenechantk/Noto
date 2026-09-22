@@ -33,12 +33,6 @@ struct EditorNavigationChrome: ViewModifier {
         horizontalSizeClass == .regular
     }
 
-    private static let countFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return formatter
-    }()
-
     func body(content: Content) -> some View {
         content
             .navigationTitle("")
@@ -134,45 +128,14 @@ struct EditorNavigationChrome: ViewModifier {
     }
 
     private var moreMenu: some View {
-        Menu {
-            // Search + Properties share the top section; Search sits above Properties.
-            Button(action: onSearchRequested) {
-                Label("Search in Note", systemImage: "magnifyingglass")
-            }
-            .keyboardShortcut("f", modifiers: [.command])
-            .accessibilityIdentifier("search_in_note_menu_item")
-
-            if let onShowProperties {
-                Button(action: onShowProperties) {
-                    // Two Text views in a menu button render as title + subtitle.
-                    Text("Properties")
-                    Text("\(propertyCount) \(propertyCount == 1 ? "property" : "properties")")
-                    Image(systemName: "info.circle")
-                }
-                .accessibilityIdentifier("properties_menu_item")
-            }
-
-            Divider()
-
-            Button(action: onMoveRequested) {
-                Label("Move Note", systemImage: "folder")
-            }
-            .keyboardShortcut("m", modifiers: [.command, .shift])
-            .accessibilityIdentifier("move_note_menu_item")
-
-            Button(role: .destructive, action: onDeleteRequested) {
-                Label("Delete Note", systemImage: "trash")
-            }
-            Divider()
-            Text("\(formatted(statusCount.words)) words")
-                .accessibilityIdentifier("editor_word_count_menu_item")
-            Text("\(formatted(statusCount.characters)) characters")
-                .accessibilityIdentifier("editor_character_count_menu_item")
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 18, weight: .regular))
-        }
-        .accessibilityIdentifier("more_menu_button")
+        NoteEditorActionsMenu(
+            statusCount: statusCount,
+            onSearchRequested: onSearchRequested,
+            onShowProperties: onShowProperties,
+            propertyCount: propertyCount,
+            onMoveRequested: onMoveRequested,
+            onDeleteRequested: onDeleteRequested
+        )
     }
 
     private var hidesSystemBackButton: Bool {
@@ -182,9 +145,6 @@ struct EditorNavigationChrome: ViewModifier {
         return true
     }
 
-    private func formatted(_ value: Int) -> String {
-        Self.countFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
-    }
 }
 
 /// Horizontally scrollable breadcrumb showing the folder chain from vault root
