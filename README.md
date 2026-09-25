@@ -51,6 +51,9 @@ Packages
   NotoShareCapture: UI-free share-sheet capture — `[title](url)` formatting, payload
                     resolution, and the App Group staging store the extension and
                     Noto 2 hand captures through
+  NotoSocialMedia: X / Instagram post resolvers, media downloader, capture-note
+                   appender and the `noto-share-media` CLI Hermes runs to drain
+                   the share-media Cloudflare queue (macOS side)
   NotoLinkPreview: UI-free link preview cards — which lines card (bare URL or a lone
                    `[title](url)`), LinkPresentation fetch, disk cache, single-flight
                    service, card content/layout
@@ -304,6 +307,21 @@ Digest tab is the other half of that loop — it works the folder down to zero.
   IMP — `extensionContext.open` returns false and the legacy `openURL:` is refused by UIKit;
   `UIWindowScene` answers the selector but crashes, so it is skipped.
 - Both `Noto2/Noto2.entitlements` and the extension's entitlements carry the App Group.
+- **Share-sheet media (X / Instagram) via Cloudflare Queue + Hermes.** For an X status or
+  Instagram post/reel URL the extension also sends a `ShareMediaJob` (capture id, URL, the
+  `inbox/…md` path from `CaptureNotePath`, share time) to the Worker in
+  `web/noto-share-media-worker` (`cloudflare.eugenechantk.me/noto/*`, bearer token from the
+  gitignored `Config/LocalSecrets.xcconfig` → Info.plist), which enqueues it on the
+  `noto-share-media` queue. Undelivered jobs wait in the App Group `pending-media-jobs/`
+  outbox and `RootTabView` re-sends them on activation. On the MacBook Pro, Hermes job
+  "Noto share media" (every minute, `~/.hermes/scripts/noto_share_media.sh`) runs
+  `Packages/NotoSocialMedia`'s `noto-share-media run`: pull, resolve (X syndication endpoint /
+  Instagram embed page, no login), download into `.attachments/`, and append
+  `**@author**` + text + `![](…)` lines to the capture note — only once the phone has filed it
+  (Hermes never creates notes; it parks the block for up to 7 days, and re-appends for 10
+  minutes if an in-flight autosave drops it). The editor renders `![](x.mp4)` as the video's
+  first frame; Noto 2's open note reloads on external change. Feature doc:
+  `.codex/feature/noto2-share-media-queue.md`.
 - **Link captures render as cards.** `LinkPreviewDetector` treats a line that is exactly
   `[title](url)` the same as a bare URL, so the Capture editor and the note behind Keep
   editing show the editor's preview card (raw markdown revealed on caret). The Digest card
@@ -328,6 +346,7 @@ Readwise is split across the app target and package:
 - `ReadwiseSyncController` lives in the app target and owns token UI state, keychain access, automatic sync state, and Settings integration.
 - `Packages/NotoReadwiseSync/Sources/NotoReadwiseSyncCore` owns API models, the Readwise client, Reader/Readwise sync engines, source-note rendering, and sync state.
 - `Packages/NotoReadwiseSync/Sources/noto-readwise-sync` contains the CLI wrapper around the same core package.
+- `noto-readwise-sync --incremental` runs the same checkpointed Reader + Readwise library sync headlessly. On Eugene's MacBook Pro, Hermes job `5cb9aa45d9be` runs it every 15 minutes before the existing Readwise digest worker, so Noto 2 does not need to be opened for imports to reach the shared iCloud vault.
 
 ### Deep Link Lifecycle
 
