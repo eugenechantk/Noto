@@ -1197,6 +1197,31 @@ enum DirectoryContentListPresentation {
     case sidebar
 }
 
+enum NoteListContextAction: String, CaseIterable, Identifiable {
+    case move
+    case delete
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .move: "Move"
+        case .delete: "Delete"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .move: "folder"
+        case .delete: "trash"
+        }
+    }
+
+    var isDestructive: Bool {
+        self == .delete
+    }
+}
+
 /// Shared directory page body that shows one directory's direct folders and notes.
 /// File-view sort order (folders are always alphabetical first; this orders notes).
 enum FileSortKey: Hashable { case recent, name }
@@ -1210,9 +1235,13 @@ struct DirectoryContentListView: View {
     var onOpenFolder: (NotoFolder, MarkdownNoteStore) -> Void
     var onOpenNote: (MarkdownNote, MarkdownNoteStore, Bool) -> Void
     var onDeleteItem: (DirectoryItem, MarkdownNoteStore) -> Void
+    var onMoveNote: (MarkdownNote, MarkdownNoteStore, URL) -> Void
     #if os(macOS)
     var onNoteDrag: ((MarkdownNote) -> NSItemProvider)? = nil
     #endif
+
+    @State private var notePendingMove: MarkdownNote?
+    @State private var notePendingDeletion: MarkdownNote?
 
     /// Folders first (alphabetical), then notes ordered by the chosen sort key.
     private var displayedItems: [DirectoryItem] {
@@ -1288,6 +1317,36 @@ struct DirectoryContentListView: View {
                 .allowsHitTesting(false)
             }
         }
+        .confirmationDialog(
+            "Delete this note?",
+            isPresented: deleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Note", role: .destructive) {
+                guard let note = notePendingDeletion else { return }
+                onDeleteItem(.note(note), store)
+                notePendingDeletion = nil
+            }
+            .accessibilityIdentifier("confirm_delete_note_button")
+
+            Button("Cancel", role: .cancel) {
+                notePendingDeletion = nil
+            }
+        }
+        .sheet(item: $notePendingMove) { note in
+            MoveNoteDestinationPicker(
+                vaultRootURL: store.vaultRootURL,
+                currentDirectoryURL: note.fileURL.deletingLastPathComponent(),
+                directoryLoader: store.directoryLoader,
+                onCancel: {
+                    notePendingMove = nil
+                },
+                onMove: { destinationURL in
+                    onMoveNote(note, store, destinationURL)
+                    notePendingMove = nil
+                }
+            )
+        }
     }
 
     @ViewBuilder
@@ -1335,6 +1394,16 @@ struct DirectoryContentListView: View {
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .accessibilityIdentifier("note_\(note.title)")
+        .contextMenu {
+            ForEach(NoteListContextAction.allCases) { action in
+                Button(role: action.isDestructive ? .destructive : nil) {
+                    handleContextAction(action, for: note)
+                } label: {
+                    Label(action.title, systemImage: action.systemImage)
+                }
+                .accessibilityIdentifier("note_context_\(action.rawValue)_action")
+            }
+        }
 
         #if os(macOS)
         if let onNoteDrag {
@@ -1406,6 +1475,26 @@ struct DirectoryContentListView: View {
     private func deleteItems(at offsets: IndexSet) {
         for index in offsets {
             onDeleteItem(displayedItems[index], store)
+        }
+    }
+
+    private var deleteConfirmationPresented: Binding<Bool> {
+        Binding(
+            get: { notePendingDeletion != nil },
+            set: { isPresented in
+                if !isPresented {
+                    notePendingDeletion = nil
+                }
+            }
+        )
+    }
+
+    private func handleContextAction(_ action: NoteListContextAction, for note: MarkdownNote) {
+        switch action {
+        case .move:
+            notePendingMove = note
+        case .delete:
+            notePendingDeletion = note
         }
     }
 }
@@ -1572,6 +1661,9 @@ struct FolderContentView: View {
                 },
                 onDeleteItem: { item, noteStore in
                     onIntent(.deleteItem(item, in: noteStore))
+                },
+                onMoveNote: { note, noteStore, destinationURL in
+                    onIntent(.moveNote(note, from: noteStore, to: destinationURL))
                 }
             )
         }

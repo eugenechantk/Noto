@@ -86,7 +86,7 @@ struct OwnershipDependencyTests {
         let folderContentSource = try sourceSection(
             in: source,
             startingAt: "struct FolderContentView",
-            endingBefore: "// MARK: - Shared iOS Bottom Toolbar"
+            endingBefore: "// MARK: - Shared App Bottom Toolbar"
         )
 
         let forbiddenSnippets = [

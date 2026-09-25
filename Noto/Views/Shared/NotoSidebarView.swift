@@ -43,6 +43,7 @@ struct NotoSidebarView: View {
                 onOpenFolder: openFolder,
                 onOpenNote: openNote,
                 onDeleteItem: deleteItem,
+                onMoveNote: moveNote,
                 onNoteDrag: noteDragProvider
             )
             .contextMenu {
@@ -57,7 +58,8 @@ struct NotoSidebarView: View {
                 sort: sort,
                 onOpenFolder: openFolder,
                 onOpenNote: openNote,
-                onDeleteItem: deleteItem
+                onDeleteItem: deleteItem,
+                onMoveNote: moveNote
             )
             .contextMenu {
                 sidebarContextMenu
@@ -472,6 +474,10 @@ struct NotoSidebarView: View {
 
     private func deleteItem(_ item: DirectoryItem, noteStore: MarkdownNoteStore) {
         onIntent(.deleteItem(item, in: noteStore))
+    }
+
+    private func moveNote(_ note: MarkdownNote, noteStore: MarkdownNoteStore, destinationURL: URL) {
+        onIntent(.moveNote(note, from: noteStore, to: destinationURL))
     }
 
     private func createFolder() {
