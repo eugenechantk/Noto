@@ -1,0 +1,18 @@
+{
+  "app": "Noto 2",
+  "bundleID": "com.eugenechan.Noto2",
+  "appStoreConnectID": "6804900143",
+  "version": "0.1.1",
+  "build": "202609260029",
+  "sourceCommit": "107a91daba12d1262f40749b8295da3118fd4af0",
+  "processingState": "VALID",
+  "internalBuildState": "IN_BETA_TESTING",
+  "highestTrain": "0.1.1",
+  "canonicalVerifier": "passed",
+  "ipaSHA256": "b16f48e8c8feedaf1548f0e87296938101fdffa27638d02b10704a2663c36d07",
+  "snapshotPackageTests": {
+    "NotoVault": 113,
+    "NotoLinkPreview": 43
+  },
+  "pushPerformed": false
+}
