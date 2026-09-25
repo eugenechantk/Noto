@@ -11,7 +11,31 @@ struct NotoReadwiseSyncCLI {
                 return
             }
 
-            if options.saveMode {
+            if options.incrementalMode {
+                guard let token = options.token?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty else {
+                    throw CLIError.missingToken
+                }
+                let result = try await SourceLibrarySyncEngine(client: ReadwiseClient(token: token))
+                    .syncIncrementally(
+                        vaultURL: options.vaultURL,
+                        sourceDirectory: options.sourceDirectory,
+                        includeDeleted: options.includeDeleted,
+                        dryRun: options.dryRun,
+                        limit: options.limit
+                    )
+
+                print("""
+                Incremental source library sync complete\(options.dryRun ? " (dry run)" : "").
+                Reader documents fetched: \(result.fetchedReaderDocuments)
+                Reader notes created: \(result.reader.created)
+                Reader notes updated: \(result.reader.updated)
+                Readwise sources fetched: \(result.fetchedReadwiseBooks)
+                Readwise notes created: \(result.readwise.created)
+                Readwise notes updated: \(result.readwise.updated)
+                Joined Reader highlight sources: \(result.fetchedJoinedReadwiseBooks)
+                Source directory: \(result.reader.sourceDirectoryURL.path)
+                """)
+            } else if options.saveMode {
                 guard !options.saveURLs.isEmpty else {
                     throw CLIError.missingSaveURL
                 }
@@ -178,6 +202,7 @@ private struct CLIOptions {
     var readerTags: [String] = []
     var readerJoinHighlights: Bool = true
     var includeDeleted: Bool = true
+    var incrementalMode: Bool = false
     var saveMode: Bool = false
     var saveURLs: [String] = []
     var saveTitle: String?
@@ -194,6 +219,7 @@ private struct CLIOptions {
 
     static let helpText = """
     Usage:
+      noto-readwise-sync --incremental --vault <vault-path> [options] # Incrementally sync Reader and Readwise.
       noto-readwise-sync --vault <vault-path> [options]          # Import from Readwise/Reader into the vault.
       noto-readwise-sync --save <url> [options]                  # Save URL(s) to Reader.
 
@@ -206,6 +232,7 @@ private struct CLIOptions {
       --vault <path>              Noto vault path.
       --source-dir <path>         Source note directory, relative to vault unless absolute. Default: Captures.
       --updated-after <iso-date>  Fetch Readwise sources updated after this ISO 8601 date.
+      --incremental               Sync Reader and Readwise using the vault's saved checkpoints.
       --limit <count>             Sync only the first N fetched sources. Useful for test backfills.
       --reader                    Import saved Reader documents with full html_content instead of Readwise highlights.
       --reader-id <id>            Reader document id to import. Implies --reader.
@@ -276,6 +303,8 @@ private struct CLIOptions {
                 options.includeDeleted = true
             case "--no-include-deleted":
                 options.includeDeleted = false
+            case "--incremental":
+                options.incrementalMode = true
             case "--save":
                 options.saveMode = true
                 options.saveURLs.append(try requiredValue(iterator.next(), option: arg))
@@ -311,6 +340,15 @@ private struct CLIOptions {
             default:
                 throw CLIError.unknownOption(arg)
             }
+        }
+
+        if options.incrementalMode && (
+            options.saveMode
+                || options.readerMode
+                || options.fixtureURL != nil
+                || options.updatedAfter != nil
+        ) {
+            throw CLIError.conflictingIncrementalMode
         }
 
         if options.saveMode && options.readerMode {
@@ -356,6 +394,7 @@ private enum CLIError: Error, CustomStringConvertible {
     case tooManyReaderTags
     case unknownOption(String)
     case conflictingModes
+    case conflictingIncrementalMode
     case missingSaveURL
 
     var description: String {
@@ -372,6 +411,8 @@ private enum CLIError: Error, CustomStringConvertible {
             "Unknown option: \(option)."
         case .conflictingModes:
             "--save cannot be combined with --reader / --reader-* options. Run them separately."
+        case .conflictingIncrementalMode:
+            "--incremental cannot be combined with --save, --reader, --fixture, or --updated-after."
         case .missingSaveURL:
             "Save mode requires at least one --save <url>."
         }
