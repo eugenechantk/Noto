@@ -37,6 +37,8 @@ struct DigestScreen: View {
     @State private var pendingFly: DigestSwipe?
     @State private var cardArriving = false
     @State private var flyDuration: Double = 0.25
+    /// A video tapped on the card, playing full screen.
+    @State private var playingVideo: PlayingVideo?
 
     init(vaultController: VaultController) {
         self.vaultController = vaultController
@@ -116,6 +118,10 @@ struct DigestScreen: View {
             // Lock Screen quick-capture widget, or iCloud syncing another device.
             guard phase == .active else { return }
             Task { await model.refresh() }
+        }
+        .fullScreenCover(item: $playingVideo) { video in
+            VideoPlayerScreen(url: video.url)
+                .ignoresSafeArea()
         }
         .sheet(item: $fileMode) { mode in
             if let entry = model.current {
@@ -242,16 +248,19 @@ struct DigestScreen: View {
                     .accessibilityIdentifier("digestCardDate")
 
                 if entry.isAvailable {
-                    ScrollView {
-                        // A capture that is a link (share sheet, or a typed URL)
-                        // gets the editor's preview card; any text after it
-                        // follows as before.
-                        if let split = DigestLinkCardSplit.split(body: entry.body) {
+                    let link = DigestLinkCardSplit.split(body: entry.body)
+                    let media = DigestMediaSplit.split(link.map { $0.remainder ?? "" } ?? entry.body, vaultURL: model.vaultURL)
+                    VStack(alignment: .leading, spacing: 12) {
+                        ScrollView {
+                            // A capture that is a link (share sheet, or a typed URL)
+                            // gets the editor's preview card; the prose follows.
                             VStack(alignment: .leading, spacing: 12) {
-                                DigestLinkCard(url: split.url)
-                                    .frame(height: LinkPreviewCardLayout.defaultHeight)
-                                if let remainder = split.remainder {
-                                    Text(remainder)
+                                if let link {
+                                    DigestLinkCard(url: link.url)
+                                        .frame(height: LinkPreviewCardLayout.defaultHeight)
+                                }
+                                if let prose = media.text {
+                                    Text(DigestCardText.attributed(prose))
                                         .font(.system(size: NotoTheme.FontSize.body))
                                         .foregroundStyle(NotoTheme.ink)
                                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -259,16 +268,27 @@ struct DigestScreen: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            Text(entry.body)
-                                .font(.system(size: NotoTheme.FontSize.body))
-                                .foregroundStyle(NotoTheme.ink)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
+                        }
+                        .scrollBounceBehavior(.basedOnSize)
+                        // Soft bottom edge (as on the Capture card) so text that
+                        // continues under the media row reads as scrollable.
+                        .mask(
+                            VStack(spacing: 0) {
+                                Rectangle().fill(Color.black)
+                                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                                    .frame(height: 18)
+                            }
+                        )
+                        .accessibilityIdentifier("digestCardBody")
+
+                        // Pinned below the scrolling text so the media is always
+                        // fully visible, however long the post is.
+                        if !media.media.isEmpty {
+                            DigestMediaStrip(items: media.media) { url in
+                                if VideoPlayback.prepare(url) { playingVideo = PlayingVideo(url: url) }
+                            }
                         }
                     }
-                    .scrollBounceBehavior(.basedOnSize)
-                    .accessibilityIdentifier("digestCardBody")
                 } else {
                     // Dataless iCloud stub — say so rather than showing a blank card.
                     VStack(spacing: 8) {

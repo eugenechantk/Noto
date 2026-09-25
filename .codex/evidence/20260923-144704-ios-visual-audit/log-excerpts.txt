@@ -1,0 +1,101 @@
+# Key log excerpts (xcrun simctl spawn CC08DBB1-A2C2-44FE-8D68-CA7381A64EC2 log show --style compact --predicate 'process == "Noto2"')
+
+## A. SC7/SC8 run 2: play inline, enter full screen, exit (22:59:24-22:59:40)
+2026-09-23 22:59:24.982 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:24.996 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:25.012 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController initWithNibName:bundle:] 511
+2026-09-23 22:59:25.015 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVMobileFullscreenController updatePresentationStateTo:] current presentation state: 0 -> new presentation state: 2
+2026-09-23 22:59:25.035 Df Noto2[25071:bba38f] [com.apple.coremedia:] <<<< Boss >>>> FigPlaybackBossSetStopAtEnd: <0x1035aab50|I/UWU.01> TRUE
+2026-09-23 22:59:25.035 Df Noto2[25071:bba38f] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x1050b9c00] P/XZ new playback state: Playing (Player) (playerRate: 1.000), NEED TO update boss rate (1.000
+2026-09-23 22:59:27.431 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:27.436 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:31.442 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:31.453 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:31.905 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:31.912 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:31.914 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController(AVPlaybackControlsViewControllerActions) enterFullScreen:] 10336 0x1061a8400
+2026-09-23 22:59:32.372 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVMobileFullscreenController updatePresentationStateTo:] current presentation state: 2 -> new presentation state: 0
+2026-09-23 22:59:33.313 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:33.314 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:37.870 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:37.879 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:38.319 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:38.329 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:59:38.330 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController(AVPlaybackControlsViewControllerActions) exitFullscreen:] 10371 0x1061a8400
+2026-09-23 22:59:38.818 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVMobileFullscreenController updatePresentationStateTo:] current presentation state: 0 -> new presentation state: 2
+2026-09-23 22:59:38.819 Df Noto2[25071:bbab9f] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x1050b9c00] P/XZ new playback state: Paused (Player) (playerRate: 0.000), NEED TO update boss rate (0.000)
+
+## B. SC9: landscape plays, tap portrait (landscape stops, portrait plays), back button (23:01:25-23:01:45)
+2026-09-23 23:01:25.988 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 23:01:25.996 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 23:01:26.010 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController initWithNibName:bundle:] 511
+2026-09-23 23:01:26.014 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVMobileFullscreenController updatePresentationStateTo:] current presentation state: 0 -> new presentation state: 2
+2026-09-23 23:01:26.034 Df Noto2[25071:bbdf9b] [com.apple.coremedia:] <<<< Boss >>>> FigPlaybackBossSetStopAtEnd: <0x1035a54c0|I/FTD.01> TRUE
+2026-09-23 23:01:26.034 Df Noto2[25071:bbdf9b] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x111893000] P/PY new playback state: Playing (Player) (playerRate: 1.000), NEED TO update boss rate (1.000
+2026-09-23 23:01:29.286 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 23:01:29.296 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 23:01:29.297 Df Noto2[25071:bbdf9c] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x111893000] P/PY new playback state: Paused (Player) (playerRate: 0.000), NEED TO update boss rate (0.000)
+2026-09-23 23:01:29.303 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController initWithNibName:bundle:] 511
+2026-09-23 23:01:29.305 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVMobileFullscreenController updatePresentationStateTo:] current presentation state: 0 -> new presentation state: 2
+2026-09-23 23:01:29.309 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController dealloc] 625 0x1078b4000
+2026-09-23 23:01:29.344 Df Noto2[25071:bbdfa8] [com.apple.coremedia:] <<<< Boss >>>> FigPlaybackBossSetStopAtEnd: <0x103493fd0|I/ONT.01> TRUE
+2026-09-23 23:01:29.344 Df Noto2[25071:bbdfa8] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x106848a00] P/RN new playback state: Playing (Player) (playerRate: 1.000), NEED TO update boss rate (1.000
+2026-09-23 23:01:29.346 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer dealloc]: AVPlayer [0x600000047a70] P/PY releasing figPlayer 0x600003a322f0
+2026-09-23 23:01:29.347 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer dealloc]: AVPlayer [0x60000021e9c0] P/ZR releasing figPlayer 0x0
+2026-09-23 23:01:43.254 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 23:01:43.262 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 23:01:43.775 Df Noto2[25071:bbe699] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x106848a00] P/RN new playback state: Paused (Player) (playerRate: 0.000), NEED TO update boss rate (0.000)
+2026-09-23 23:01:43.776 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController dealloc] 625 0x107985a00
+2026-09-23 23:01:43.811 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer dealloc]: AVPlayer [0x600000047b50] P/RN releasing figPlayer 0x600003a1d380
+2026-09-23 23:01:43.811 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer dealloc]: AVPlayer [0x600000456580] P/CW releasing figPlayer 0x0
+audio buffers enqueued 23:01:30-23:01:43.2 (portrait playing): 66
+audio buffers enqueued after back (after 23:01:43.8): 0
+
+## C. SC9: playing landscape scrolled completely off screen (23:05:50-23:06:16)
+2026-09-23 23:05:51.159 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController initWithNibName:bundle:] 511
+2026-09-23 23:05:51.162 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVMobileFullscreenController updatePresentationStateTo:] current presentation state: 0 -> new presentation state: 2
+2026-09-23 23:05:51.181 Df Noto2[25071:bc4fff] [com.apple.coremedia:] <<<< Boss >>>> FigPlaybackBossSetStopAtEnd: <0x1036a4db0|I/PUI.01> TRUE
+2026-09-23 23:05:51.182 Df Noto2[25071:bc4fff] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x1079c9200] P/MS new playback state: Playing (Player) (playerRate: 1.000), NEED TO update boss rate (1.000
+2026-09-23 23:06:14.578 Df Noto2[25071:bc5aaa] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x1079c9200] P/MS new playback state: Paused (Player) (playerRate: 0.000), NEED TO update boss rate (0.000)
+2026-09-23 23:06:14.581 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController dealloc] 625 0x1068ef000
+2026-09-23 23:06:14.620 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer dealloc]: AVPlayer [0x60000004cb10] P/MS releasing figPlayer 0x600003a3c000
+2026-09-23 23:06:14.621 Df Noto2[25071:bc4fff] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer dealloc]: AVPlayer [0x600000442520] P/BQ releasing figPlayer 0x0
+audio buffers enqueued after stop (after 23:06:14.6): 0
+
+## D. Unexplained touches (not issued by the auditor) 22:52:43-22:52:46
+Auditor's own touches: 22:51:57 and 22:52:31 (tap 350,345). No auditor tap between 22:52:32 and 22:55:54.
+2026-09-23 22:52:31.882 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:52:31.896 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:52:43.708 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:52:43.717 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:52:43.718 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer _setRate:rateChangeReason:figPlayerSetRateHandler:]_block_invoke: P/CP setting timeControlStatus=0, reasonForWaitingToPlay=(null)
+2026-09-23 22:52:43.741 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController initWithNibName:bundle:] 511
+2026-09-23 22:52:43.742 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer _runOnIvarAccessQueueOperationThatMayChangeCurrentItemWithPreflightBlock:modificationBlock:error:]_block_invoke: P/EZ setting timeControlSta
+2026-09-23 22:52:43.744 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVMobileFullscreenController updatePresentationStateTo:] current presentation state: 0 -> new presentation state: 2
+2026-09-23 22:52:43.744 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer _setRate:rateChangeReason:figPlayerSetRateHandler:]_block_invoke: P/EZ setting timeControlStatus=1, reasonForWaitingToPlay=AVPlayerWaitingWh
+2026-09-23 22:52:43.750 Df Noto2[25071:ba83d0] [com.apple.avkit:AVKit] -[AVPlayerViewController dealloc] 625 0x1058f1400
+2026-09-23 22:52:43.786 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer dealloc]: AVPlayer [0x60000004c780] P/CP releasing figPlayer 0x600003912490
+2026-09-23 22:52:43.788 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer dealloc]: AVPlayer [0x6000003e02c0] P/KG releasing figPlayer 0x0
+2026-09-23 22:52:43.802 Df Noto2[25071:baee1c] [com.apple.coremedia:] <<<< Boss >>>> FigPlaybackBossSetStopAtEnd: <0x104c25ba0|I/WRW.01> TRUE
+2026-09-23 22:52:43.802 Df Noto2[25071:baee1c] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x1120a6a00] P/EZ new playback state: Playing (Player) (playerRate: 1.000), NEED TO update boss rate (1.000
+2026-09-23 22:52:43.808 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> avplayer_fpNotificationCallback_block_invoke_11: P/EZ setting timeControlStatus=2, reasonForWaitingToPlay=(null) triggeredByNotificationName=PlaybackSt
+2026-09-23 22:52:44.030 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:52:44.129 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:52:44.130 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer _setRate:rateChangeReason:figPlayerSetRateHandler:]_block_invoke: P/EZ setting timeControlStatus=0, reasonForWaitingToPlay=(null)
+2026-09-23 22:52:44.131 Df Noto2[25071:baee06] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x1120a6a00] P/EZ new playback state: Paused (Player) (playerRate: 0.000), NEED TO update boss rate (0.000)
+2026-09-23 22:52:44.863 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:52:44.869 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:52:44.871 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer _setRate:rateChangeReason:figPlayerSetRateHandler:]_block_invoke: P/EZ setting timeControlStatus=1, reasonForWaitingToPlay=AVPlayerWaitingWh
+2026-09-23 22:52:44.872 Df Noto2[25071:baee06] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x1120a6a00] P/EZ new playback state: Playing (Player) (playerRate: 1.000), NEED TO update boss rate (1.000
+2026-09-23 22:52:44.873 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> avplayer_fpNotificationCallback_block_invoke_11: P/EZ setting timeControlStatus=2, reasonForWaitingToPlay=(null) triggeredByNotificationName=PlaybackSt
+2026-09-23 22:52:45.363 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:52:45.412 Df Noto2[25071:ba83d0] [com.apple.UIKit:EventDispatch] Sending UIEvent type: 0; subtype: 0; to windows: 1
+2026-09-23 22:52:45.414 Df Noto2[25071:ba83d0] [com.apple.coremedia:] <<<< AVPlayer >>>> -[AVPlayer _setRate:rateChangeReason:figPlayerSetRateHandler:]_block_invoke: P/EZ setting timeControlStatus=0, reasonForWaitingToPlay=(null)
+2026-09-23 22:52:45.414 Df Noto2[25071:baee06] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x1120a6a00] P/EZ new playback state: Paused (Player) (playerRate: 0.000), NEED TO update boss rate (0.000)
+
+## E. Whole-session checks since 22:49
+AVKit 'deallocated while its contents were being presented full screen' count: 0
+RebuildIOContext/StartIO count: 0
+
+## F. Full (untruncated) pause line after full-screen exit (O1)
+2026-09-23 22:59:38.819 Df Noto2[25071:bbab9f] [com.apple.coremedia:player] <<<< FigFilePlayer >>>> playerfig_getNextPlaybackState: [0x1050b9c00] P/XZ new playback state: Paused (Player) (playerRate: 0.000), NEED TO update boss rate (0.000), previous state: Playing, change reason: ClientInitiated, playthrough prediction: likely, options: None

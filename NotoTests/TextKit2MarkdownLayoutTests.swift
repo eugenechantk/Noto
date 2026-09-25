@@ -627,6 +627,25 @@ struct TextKit2MarkdownLayoutTests {
         #expect(abs(height - expectedFragmentHeight) < 0.5)
     }
 
+    @Test("Capped fragment height reserves exactly the overlay's height, so no gap follows a portrait image")
+    func cappedFragmentHeightMatchesOverlay() throws {
+        let padding = MarkdownVisualSpec.imagePreviewVerticalPadding
+        let maxImage = MarkdownVisualSpec.imagePreviewMaxImageHeight
+        let portrait = CGSize(width: 720, height: 1280)
+        let capped = try #require(ImageFragmentGeometry.aspectAdjustedFragmentHeight(
+            imageSize: portrait, containerWidth: 360, maxImageHeight: maxImage
+        ))
+        let overlay = ImageFragmentGeometry.overlaySize(imageSize: portrait, availableWidth: 360, fillsWidth: true)
+        #expect(capped == overlay.height + padding * 2)
+        #expect(capped == MarkdownVisualSpec.imagePreviewReservedHeight)
+
+        // Short images are unaffected by the cap.
+        let landscape = try #require(ImageFragmentGeometry.aspectAdjustedFragmentHeight(
+            imageSize: CGSize(width: 1280, height: 720), containerWidth: 360, maxImageHeight: maxImage
+        ))
+        #expect(abs(landscape - (202.5 + padding * 2)) < 0.01)
+    }
+
     @Test("Aspect-adjusted fragment height returns nil when inputs are invalid")
     func aspectAdjustedFragmentHeightReturnsNilForInvalidInputs() {
         #expect(ImageFragmentGeometry.aspectAdjustedFragmentHeight(
@@ -886,6 +905,51 @@ struct TextKit2MarkdownLayoutTests {
         #expect(rect.minY == 20)
         #expect(rect.width == 320)
         #expect(rect.height == MarkdownVisualSpec.imagePreviewReservedHeight - MarkdownVisualSpec.imagePreviewVerticalPadding * 2)
+    }
+
+    @Test("Image overlay keeps landscape images full width and caps portrait ones to the reserved height")
+    func imageOverlaySizeCapsPortraitImages() {
+        let maxHeight = MarkdownVisualSpec.imagePreviewReservedHeight - MarkdownVisualSpec.imagePreviewVerticalPadding * 2
+        let landscape = ImageFragmentGeometry.overlaySize(imageSize: CGSize(width: 1280, height: 720), availableWidth: 360)
+        #expect(landscape.width == 360)
+        #expect(abs(landscape.height - 202.5) < 0.01)
+
+        let portrait = ImageFragmentGeometry.overlaySize(imageSize: CGSize(width: 720, height: 1280), availableWidth: 360)
+        #expect(portrait.height == maxHeight)
+        #expect(abs(portrait.width / portrait.height - 720.0 / 1280.0) < 0.001)
+
+        let unknown = ImageFragmentGeometry.overlaySize(imageSize: nil, availableWidth: 360)
+        #expect(unknown == CGSize(width: 360, height: maxHeight))
+        #expect(ImageFragmentGeometry.overlaySize(imageSize: CGSize(width: 10, height: 10), availableWidth: 0) == .zero)
+    }
+
+    @Test("Viewport lines include a media line the bottom probe landed at the start of")
+    func viewportLinesIncludeTheProbedMediaLine() throws {
+        let text = "Intro\nText above\n![](.attachments/v.mp4)\nText below\n" as NSString
+        let mediaStart = text.range(of: "![](").location
+        let mediaLine = text.lineRange(for: NSRange(location: mediaStart, length: 0))
+
+        // Bottom probe inside the tall media line resolves to the line's start.
+        let fromTop = try #require(EditorViewportLines.lineRange(startOffset: 0, endOffset: mediaStart, in: text))
+        #expect(NSIntersectionRange(fromTop, mediaLine).length == mediaLine.length)
+
+        // Top probe resolving to the start of the line after the media line.
+        let belowStart = NSMaxRange(mediaLine)
+        let fromBelow = try #require(EditorViewportLines.lineRange(startOffset: belowStart, endOffset: text.length, in: text))
+        #expect(NSIntersectionRange(fromBelow, mediaLine).length == mediaLine.length)
+
+        #expect(EditorViewportLines.lineRange(startOffset: 0, endOffset: 0, in: "" as NSString) == nil)
+    }
+
+    @Test("Video overlays fill the content width, capped to the reserved height")
+    func videoOverlaySizeFillsWidth() {
+        let maxHeight = MarkdownVisualSpec.imagePreviewReservedHeight - MarkdownVisualSpec.imagePreviewVerticalPadding * 2
+        let portrait = ImageFragmentGeometry.overlaySize(imageSize: CGSize(width: 720, height: 1280), availableWidth: 360, fillsWidth: true)
+        #expect(portrait == CGSize(width: 360, height: maxHeight))
+
+        let landscape = ImageFragmentGeometry.overlaySize(imageSize: CGSize(width: 1280, height: 720), availableWidth: 360, fillsWidth: true)
+        #expect(landscape.width == 360)
+        #expect(abs(landscape.height - 202.5) < 0.01)
     }
 
     @Test("Image fragment rect expands to available note width")

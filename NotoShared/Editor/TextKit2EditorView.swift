@@ -800,6 +800,8 @@ enum MarkdownVisualSpec {
     static let imagePreviewReservedHeight: CGFloat = 300
     static let imagePreviewVerticalPadding: CGFloat = 8
     static let imagePreviewCornerRadius: CGFloat = 8
+    /// Tallest an iOS image/video overlay draws: the reserved line minus its padding.
+    static let imagePreviewMaxImageHeight: CGFloat = max(0, imagePreviewReservedHeight - imagePreviewVerticalPadding * 2)
     static let imagePreviewBackingFontSize: CGFloat = 0.01
     static let xmlTagCollapseControlSize: CGFloat = 24
     static let collapsedXMLTagContentFontSize: CGFloat = 0.01
@@ -1654,6 +1656,23 @@ final class TodoLayoutFragment: NSTextLayoutFragment {
     }
 }
 
+// MARK: - Viewport lines
+
+enum EditorViewportLines {
+    /// Whole lines between two offsets probed at the viewport's top and bottom
+    /// edges, including the lines the probes landed on plus one line past each.
+    /// `closestPosition(to:)` at a point inside a tall media line returns the
+    /// start of that line (or of the next one); a half-open range then dropped
+    /// the media line, and a video whose top was near the bottom of the screen
+    /// was not drawn until it scrolled well into view.
+    static func lineRange(startOffset: Int, endOffset: Int, in text: NSString) -> NSRange? {
+        guard text.length > 0 else { return nil }
+        let lower = max(0, min(startOffset, endOffset, text.length) - 1)
+        let upper = min(text.length, max(startOffset, endOffset, 0) + 1)
+        return text.lineRange(for: NSRange(location: lower, length: max(0, upper - lower)))
+    }
+}
+
 // MARK: - ImageLayoutFragment
 
 enum ImageFragmentGeometry {
@@ -1693,9 +1712,40 @@ enum ImageFragmentGeometry {
         )
     }
 
+    /// Size of the iOS image overlay: full content width at the image's aspect
+    /// ratio, capped to the paragraph's reserved height. A portrait image would
+    /// otherwise draw far taller than the 300 pt line TextKit reserves — over
+    /// the following text, or past the end of the note where it can't be
+    /// scrolled to — so it shrinks to fit, keeping its shape.
+    ///
+    /// `fillsWidth` (videos) keeps the full width even when capped: a portrait
+    /// video becomes a full-width box at the capped height with the picture
+    /// centred inside, the framing the native inline player uses.
+    static func overlaySize(imageSize: CGSize?, availableWidth: CGFloat, fillsWidth: Bool = false) -> CGSize {
+        let maxHeight = MarkdownVisualSpec.imagePreviewMaxImageHeight
+        guard availableWidth > 0 else { return .zero }
+        guard let imageSize, imageSize.width > 0, imageSize.height > 0 else {
+            return CGSize(width: availableWidth, height: maxHeight)
+        }
+        let fullWidthHeight = availableWidth * (imageSize.height / imageSize.width)
+        if fullWidthHeight <= maxHeight {
+            return CGSize(width: availableWidth, height: fullWidthHeight)
+        }
+        if fillsWidth {
+            return CGSize(width: availableWidth, height: maxHeight)
+        }
+        return CGSize(width: maxHeight * (imageSize.width / imageSize.height), height: maxHeight)
+    }
+
+    /// Height of an image line: the image at full container width plus
+    /// padding. `maxImageHeight` caps the image part — iOS passes the overlay
+    /// cap so the line reserves exactly what `overlaySize` draws (uncapped, a
+    /// portrait video reserved ~650 pt under a 284 pt box and left a gap
+    /// before the next line). macOS draws inside the fragment and stays uncapped.
     static func aspectAdjustedFragmentHeight(
         imageSize: CGSize,
-        containerWidth: CGFloat
+        containerWidth: CGFloat,
+        maxImageHeight: CGFloat? = nil
     ) -> CGFloat? {
         guard imageSize.width > 0,
               imageSize.height > 0,
@@ -1704,7 +1754,10 @@ enum ImageFragmentGeometry {
             return nil
         }
 
-        let imageHeight = containerWidth * (imageSize.height / imageSize.width)
+        var imageHeight = containerWidth * (imageSize.height / imageSize.width)
+        if let maxImageHeight {
+            imageHeight = min(imageHeight, maxImageHeight)
+        }
         return imageHeight + MarkdownVisualSpec.imagePreviewVerticalPadding * 2
     }
 }
@@ -1816,9 +1869,15 @@ final class ImageLayoutFragment: NSTextLayoutFragment {
               let imageSize = MarkdownImageDimensionCache.cachedSize(for: url)
         else { return nil }
 
+        #if os(iOS)
+        let maxImageHeight: CGFloat? = MarkdownVisualSpec.imagePreviewMaxImageHeight
+        #else
+        let maxImageHeight: CGFloat? = nil
+        #endif
         return ImageFragmentGeometry.aspectAdjustedFragmentHeight(
             imageSize: imageSize,
-            containerWidth: containerWidth
+            containerWidth: containerWidth,
+            maxImageHeight: maxImageHeight
         )
     }
 
@@ -1972,6 +2031,26 @@ fileprivate enum MarkdownImageLoader {
         if let cached = cachedImage(for: url) {
             MarkdownImageDimensionCache.setSize(cached.size, for: url)
             completion(cached)
+            return
+        }
+
+        if url.isFileURL, VideoPosterRenderer.isVideo(url) {
+            guard CoordinatedFileManager.isDownloaded(at: url) else {
+                CoordinatedFileManager.startDownloading(at: url)
+                completion(nil)
+                return
+            }
+            VideoPosterRenderer.poster(for: url) { frame in
+                DispatchQueue.main.async {
+                    #if os(iOS)
+                    let image = frame.map { PlatformImage(cgImage: $0) }
+                    #elseif os(macOS)
+                    let image = frame.map { PlatformImage(cgImage: $0, size: CGSize(width: $0.width, height: $0.height)) }
+                    #endif
+                    if let image { store(image: image, for: url) }
+                    completion(image)
+                }
+            }
             return
         }
 
@@ -3158,7 +3237,9 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     private var findBackgroundSnapshots: [EditorFindBackgroundSnapshot] = []
     private var findHighlightViews: [UIView] = []
     private var dividerLineViews: [Int: UIView] = [:]
-    private var imageOverlayViews: [Int: UIImageView] = [:]
+    private var imageOverlayViews: [Int: MediaOverlayImageView] = [:]
+    /// The one video playing inline over its thumbnail, if any.
+    private let inlineVideo = InlineVideoPlayer()
     private var linkPreviewCardViews: [Int: LinkPreviewCardView] = [:]
     private var linkPreviewObserverToken: NSObjectProtocol?
     // v2 redesign: the inline "Metadata" frontmatter block is removed from the
@@ -3248,6 +3329,12 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         stopKeyboardObservation()
         rememberCurrentContentOffset()
         stopAppLifecycleObservation()
+        // Leaving the note stops an inline video. Not in viewWillDisappear:
+        // entering the player's own full screen also "disappears" this
+        // controller, and that callback fires before AVKit reports full
+        // screen — stopping there deallocated the playing controller. By now
+        // the full-screen flag is set, and `stop()` ignores it.
+        inlineVideo.stop()
     }
 
     deinit {
@@ -5347,12 +5434,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
 
         let start = textView.offset(from: textView.beginningOfDocument, to: startPosition)
         let end = textView.offset(from: textView.beginningOfDocument, to: endPosition)
-        let nsText = textView.textStorage.mutableString
-        guard nsText.length > 0 else { return nil }
-
-        let lowerBound = max(0, min(start, end, nsText.length))
-        let upperBound = max(0, min(max(start, end), nsText.length))
-        return nsText.lineRange(for: NSRange(location: lowerBound, length: upperBound - lowerBound))
+        return EditorViewportLines.lineRange(startOffset: start, endOffset: end, in: textView.textStorage.mutableString)
     }
 
     private func requestImageLoad(for url: URL) {
@@ -5386,7 +5468,13 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             return
         }
         textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
+        // Lay the viewport out again before placing overlays: placing them
+        // straight after invalidation used stale line frames, so an image that
+        // loaded under an open editor (a live reload, a share-sheet video)
+        // landed on top of the lines above it.
+        textLayoutManager.textViewportLayoutController.layoutViewport()
         refreshImageOverlayViews()
+        scheduleEditorOverlayRefresh()
     }
 
     private func refreshImageOverlayViews() {
@@ -5412,6 +5500,16 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             let view = imageOverlayViews[block.paragraphRange.location] ?? makeImageOverlayView()
             view.frame = rect.integral
             applyImage(to: view, imageLink: imageLink, displayRect: rect)
+            // Videos are tap-to-play; images stay inert so taps reach the text.
+            let lineRange = block.visibleLineRange
+            view.configureVideo(VideoPosterRenderer.playableVideoURL(for: imageLink.url), location: block.paragraphRange.location)
+            view.onPlay = { [weak self, weak view] url in
+                guard let self, let view else { return }
+                self.inlineVideo.play(url, frame: view.frame, in: self.textView, parent: self)
+            }
+            view.onEdit = { [weak self] in
+                self?.placeCaret(atEndOfLine: lineRange)
+            }
             if view.superview !== textView {
                 textView.addSubview(view)
             }
@@ -5422,10 +5520,23 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
             view.removeFromSuperview()
             imageOverlayViews.removeValue(forKey: location)
         }
+        followInlineVideo()
     }
 
-    private func makeImageOverlayView() -> UIImageView {
-        let view = UIImageView(frame: .zero)
+    /// Glues the inline player to its thumbnail; stops it once that video is
+    /// no longer on screen (scrolled away, line deleted, note replaced).
+    private func followInlineVideo() {
+        guard inlineVideo.isActive, let url = inlineVideo.url else { return }
+        let visibleRect = textView.bounds
+        if let thumbnail = imageOverlayViews.values.first(where: { $0.videoURL == url && $0.frame.intersects(visibleRect) }) {
+            inlineVideo.follow(frame: thumbnail.frame)
+        } else {
+            inlineVideo.stop()
+        }
+    }
+
+    private func makeImageOverlayView() -> MediaOverlayImageView {
+        let view = MediaOverlayImageView(frame: .zero)
         view.layer.cornerRadius = MarkdownVisualSpec.imagePreviewCornerRadius
         view.layer.masksToBounds = true
         view.backgroundColor = AppTheme.uiCodeBackground
@@ -5470,20 +5581,19 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         guard width > 0 else { return nil }
 
         let verticalPadding = MarkdownVisualSpec.imagePreviewVerticalPadding
-        let totalHeight: CGFloat
-        if let url = imageLink(in: block)?.url,
-           let imageSize = MarkdownImageDimensionCache.cachedSize(for: url),
-           imageSize.width > 0 {
-            totalHeight = width * (imageSize.height / imageSize.width)
-        } else {
-            totalHeight = max(0, MarkdownVisualSpec.imagePreviewReservedHeight - verticalPadding * 2)
-        }
+        let imageURL = imageLink(in: block)?.url
+        let imageSize = imageURL.flatMap(MarkdownImageDimensionCache.cachedSize(for:))
+        let size = ImageFragmentGeometry.overlaySize(
+            imageSize: imageSize,
+            availableWidth: width,
+            fillsWidth: VideoPosterRenderer.playableVideoURL(for: imageURL) != nil
+        )
 
         return CGRect(
             x: leading,
             y: caretRect.minY + verticalPadding,
-            width: width,
-            height: totalHeight
+            width: size.width,
+            height: size.height
         )
     }
 

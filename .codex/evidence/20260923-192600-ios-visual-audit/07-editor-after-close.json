@@ -1,0 +1,95 @@
+{
+  "accessibility" : {
+    "element_count" : 4,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 89
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 54,
+          "width" : 402,
+          "x" : 0,
+          "y" : 62
+        },
+        "id" : "Video Playback Test",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "id" : "note_editor",
+        "role" : "TextArea",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 408
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 203,
+          "width" : 360,
+          "x" : 21,
+          "y" : 307
+        },
+        "id" : "editor_video_157",
+        "label" : "Play video",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : "\/Users\/eugenechan\/dev\/personal\/Noto\/.codex\/evidence\/20260923-192600-ios-visual-audit\/07-editor-after-close.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 172496,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "BBFC620B-6BB0-4435-8C86-582EE0E8EB14"
+  },
+  "success" : true,
+  "timestamp" : "2026-09-23T11:31:57Z",
+  "type" : "ui_snapshot"
+}

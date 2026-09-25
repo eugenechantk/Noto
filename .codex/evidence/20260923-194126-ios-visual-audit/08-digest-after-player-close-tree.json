@@ -1,0 +1,230 @@
+{
+  "accessibility" : {
+    "element_count" : 12,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 85
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 15,
+          "width" : 75,
+          "x" : 163,
+          "y" : 77
+        },
+        "id" : "digestRemainingCount",
+        "label" : "3 to process",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 175
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 46,
+          "width" : 46,
+          "x" : 178,
+          "y" : 152
+        },
+        "id" : "digestCreateTarget",
+        "label" : "Create a new note",
+        "role" : "Image",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 111,
+          "y" : 281
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 15,
+          "width" : 150,
+          "x" : 36,
+          "y" : 274
+        },
+        "id" : "digestCardDate",
+        "label" : "Sep 23, 2026 at 6:30 PM",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 340
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 104,
+          "width" : 330,
+          "x" : 36,
+          "y" : 288
+        },
+        "id" : "digestLinkCard",
+        "label" : "Thais Castello Branco (@thaiscbranco_) 96 likes · 5 replies",
+        "role" : "Link",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 183,
+          "y" : 442
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 76,
+          "width" : 295,
+          "x" : 36,
+          "y" : 404
+        },
+        "label" : "@thaiscbranco_\nThree videos and two images from the launch.\nLAST PROSE LINE must stay fully visible.",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 88,
+          "y" : 553
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 120,
+          "width" : 104,
+          "x" : 36,
+          "y" : 493
+        },
+        "id" : "digestVideoThumbnail_0",
+        "label" : "Play video",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 553
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 120,
+          "width" : 104,
+          "x" : 148,
+          "y" : 493
+        },
+        "id" : "digestVideoThumbnail_1",
+        "label" : "Play video",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 313,
+          "y" : 553
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 120,
+          "width" : 104,
+          "x" : 261,
+          "y" : 493
+        },
+        "id" : "digestImageThumbnail_2",
+        "label" : "Image",
+        "role" : "Image",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 200,
+          "y" : 465
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 352,
+          "width" : 344,
+          "x" : 28,
+          "y" : 289
+        },
+        "id" : "digestBackCard",
+        "role" : "GenericElement",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 712
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 46,
+          "width" : 46,
+          "x" : 178,
+          "y" : 689
+        },
+        "id" : "digestDiscardTarget",
+        "label" : "Discard this capture",
+        "role" : "Image",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20260923-194126-ios-visual-audit\/08-digest-after-player-close.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 140630,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "E45291BA-85D3-4EE1-AD0A-3F116DC6636D"
+  },
+  "success" : true,
+  "timestamp" : "2026-09-23T11:50:53Z",
+  "type" : "ui_snapshot"
+}

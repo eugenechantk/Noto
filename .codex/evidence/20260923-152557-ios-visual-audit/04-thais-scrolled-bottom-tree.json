@@ -1,0 +1,126 @@
+{
+  "accessibility" : {
+    "element_count" : 6,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 89
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 54,
+          "width" : 402,
+          "x" : 0,
+          "y" : 62
+        },
+        "id" : "[Thais on X](https:\/\/x.com\/thaiscbranco_\/status\/2100400751357083664)",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : -147
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 105,
+          "width" : 360,
+          "x" : 21,
+          "y" : -200
+        },
+        "id" : "link_preview_card_135",
+        "label" : "Thais Castello Branco (@thaiscbranco_) 96 likes · 5 replies",
+        "role" : "Link",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "id" : "note_editor",
+        "role" : "TextArea",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 289
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 203,
+          "width" : 360,
+          "x" : 21,
+          "y" : 188
+        },
+        "id" : "editor_video_306",
+        "label" : "Play video",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 554
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 285,
+          "width" : 360,
+          "x" : 21,
+          "y" : 412
+        },
+        "id" : "editor_video_352",
+        "label" : "Play video",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : false,
+    "height" : 874,
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "CC08DBB1-A2C2-44FE-8D68-CA7381A64EC2"
+  },
+  "success" : true,
+  "timestamp" : "2026-09-23T15:31:38Z",
+  "type" : "ui_snapshot"
+}
