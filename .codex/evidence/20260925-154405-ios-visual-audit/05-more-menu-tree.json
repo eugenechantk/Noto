@@ -1,0 +1,108 @@
+{
+  "accessibility" : {
+    "element_count" : 5,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 269,
+          "y" : 499
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 250,
+          "x" : 144,
+          "y" : 62
+        },
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 269,
+          "y" : 93
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 42,
+          "width" : 250,
+          "x" : 144,
+          "y" : 72
+        },
+        "id" : "browse_new_note_action",
+        "label" : "New Note",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 269,
+          "y" : 135
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 42,
+          "width" : 250,
+          "x" : 144,
+          "y" : 114
+        },
+        "id" : "browse_new_folder_action",
+        "label" : "New Folder",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Dismiss context menu",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : false,
+    "height" : 874,
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "727E1067-EE0F-4CBA-8395-FA00929AEDDF"
+  },
+  "success" : true,
+  "timestamp" : "2026-09-25T07:45:15Z",
+  "type" : "ui_snapshot"
+}

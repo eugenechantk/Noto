@@ -129,7 +129,7 @@ struct NoteScreen: View {
 
                 editorContent
                     .overlay(alignment: .top) {
-                        NoteEditorTopChromeFade(chromeHeight: chromeHeight)
+                        Noto2TopChromeFade(chromeHeight: chromeHeight)
                             .offset(y: -chromeHeight)
                     }
             }
@@ -219,18 +219,19 @@ struct NoteScreen: View {
 
 /// Pure layout math for the top chrome mask, separated so the transition can
 /// be regression-tested without rendering SwiftUI or Liquid Glass.
-struct Noto2EditorTopChromeLayout: Equatable {
+struct Noto2TopChromeLayout: Equatable {
     static let tail: CGFloat = 36
-    static let barRow: CGFloat = 44
+    static let defaultBarRow: CGFloat = 44
 
     let totalHeight: CGFloat
     let statusBottom: CGFloat
     let chromeBottom: CGFloat
 
-    init(chromeHeight: CGFloat) {
+    init(chromeHeight: CGFloat, barRow: CGFloat = Self.defaultBarRow) {
         let clampedChromeHeight = max(chromeHeight, 0)
+        let clampedBarRow = max(barRow, 0)
         totalHeight = clampedChromeHeight + Self.tail
-        statusBottom = max(clampedChromeHeight - Self.barRow, 0) / totalHeight
+        statusBottom = max(clampedChromeHeight - clampedBarRow, 0) / totalHeight
         chromeBottom = clampedChromeHeight / totalHeight
     }
 }
@@ -240,12 +241,13 @@ struct Noto2EditorTopChromeLayout: Equatable {
 /// at the status bar. The oversized glass shape keeps its specular perimeter
 /// outside the visible mask, avoiding another hard lower edge.
 @available(iOS 26.0, *)
-private struct NoteEditorTopChromeFade: View {
+struct Noto2TopChromeFade: View {
     let chromeHeight: CGFloat
+    var barRow: CGFloat = Noto2TopChromeLayout.defaultBarRow
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let layout = Noto2EditorTopChromeLayout(chromeHeight: chromeHeight)
+        let layout = Noto2TopChromeLayout(chromeHeight: chromeHeight, barRow: barRow)
         let glassMask = LinearGradient(
             stops: [
                 .init(color: .black, location: 0),
