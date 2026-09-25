@@ -12,10 +12,16 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 /// captured**, with "Keep editing" (opens the app straight into that
 /// capture note) and a close button. Staging rather than writing the vault
 /// directly is deliberate — see `PendingCaptureStore`.
+///
+/// For an X or Instagram post it also sends a media job (through the App
+/// Group outbox) to the Cloudflare queue that Hermes drains; Hermes downloads
+/// the post's photos and videos and appends them to the capture note.
 final class ShareViewController: UIViewController {
     private var didPresent = false
     private var didFinish = false
     private var content: UIHostingController<LinkCapturedSheet>?
+    /// In-flight media-job send; `finish` waits briefly for it.
+    private var mediaDelivery: Task<Bool, Never>?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -51,15 +57,34 @@ final class ShareViewController: UIViewController {
         do {
             let capture = try store.enqueue(body: resolved.body)
             logger.info("staged shared capture \(capture.id.uuidString, privacy: .public)")
+            let fetchesMedia = startMediaJob(for: capture, url: resolved.url, title: resolved.title)
             presentSheet(.captured(LinkCapturedSheet.Capture(
                 id: capture.id,
                 title: resolved.title ?? resolved.url.absoluteString,
-                host: resolved.url.host ?? resolved.url.absoluteString
+                host: resolved.url.host ?? resolved.url.absoluteString,
+                fetchesMedia: fetchesMedia
             )))
         } catch {
             logger.error("staging failed: \(String(describing: error), privacy: .public)")
             presentSheet(.failure(message: "Couldn't save the link. Try again."))
         }
+    }
+
+    /// Sends the X / Instagram media job. Returns whether one was started.
+    private func startMediaJob(for capture: PendingCapture, url: URL, title: String?) -> Bool {
+        guard let job = ShareMediaJob.make(for: capture, url: url, title: title) else { return false }
+        guard let outbox = ShareMediaOutbox.appGroup(),
+              let endpoint = ShareMediaEndpoint(infoDictionary: Bundle.main.infoDictionary) else {
+            logger.error("share-media endpoint or App Group unavailable; media job not sent")
+            return false
+        }
+        let dispatcher = ShareMediaDispatcher(outbox: outbox, endpoint: endpoint)
+        mediaDelivery = Task {
+            let accepted = await dispatcher.deliver(job)
+            logger.info("media job \(job.captureId.uuidString, privacy: .public) accepted=\(accepted)")
+            return accepted
+        }
+        return true
     }
 
     // MARK: - Sheet
@@ -90,10 +115,25 @@ final class ShareViewController: UIViewController {
     private func finish(cancelled: Bool) {
         guard !didFinish else { return }
         didFinish = true
-        if cancelled {
-            extensionContext?.cancelRequest(withError: CocoaError(.userCancelled))
-        } else {
-            extensionContext?.completeRequest(returningItems: nil)
+        let delivery = mediaDelivery
+        Task { @MainActor [weak self] in
+            // Give the media job up to 3 s to reach the Worker; if it does not,
+            // it stays in the outbox and Noto 2 re-sends it on its next launch.
+            if let delivery {
+                _ = await withTaskGroup(of: Bool.self) { group -> Bool in
+                    group.addTask { await delivery.value }
+                    group.addTask { try? await Task.sleep(for: .seconds(3)); return false }
+                    let first = await group.next() ?? false
+                    group.cancelAll()
+                    return first
+                }
+            }
+            guard let self else { return }
+            if cancelled {
+                self.extensionContext?.cancelRequest(withError: CocoaError(.userCancelled))
+            } else {
+                self.extensionContext?.completeRequest(returningItems: nil)
+            }
         }
     }
 
@@ -159,6 +199,8 @@ struct LinkCapturedSheet: View {
         let id: UUID
         let title: String
         let host: String
+        /// X / Instagram post whose photos and videos Hermes will add.
+        var fetchesMedia = false
     }
 
     enum State {
@@ -240,9 +282,12 @@ struct LinkCapturedSheet: View {
                 .background(card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
 
-                Text("Saved to your inbox as a quick capture.")
+                Text(capture.fetchesMedia
+                     ? "Saved to your inbox. Its photos and videos will be added in a minute."
+                     : "Saved to your inbox as a quick capture.")
                     .font(.footnote)
                     .foregroundStyle(.white.opacity(0.62))
+                    .accessibilityIdentifier("linkCapturedStatus")
 
                 Button {
                     onKeepEditing(capture.id)

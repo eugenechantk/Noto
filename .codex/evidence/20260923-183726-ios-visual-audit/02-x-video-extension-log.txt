@@ -1,0 +1,4 @@
+Timestamp               Ty Process[PID:TID]
+2026-09-23 18:38:36.774 I  Noto2ShareExtension[81447:9d061a] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-23 18:38:36.791 I  Noto2ShareExtension[81447:9d061a] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture A06643FD-6093-43CE-9404-FB01F421D10D
+2026-09-23 18:38:39.039 I  Noto2ShareExtension[81447:9d061a] [com.eugenechan.Noto2.ShareExtension:ShareViewController] media job A06643FD-6093-43CE-9404-FB01F421D10D accepted=true

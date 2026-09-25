@@ -1,0 +1,79 @@
+===== inbox/2026-09-23-e3ad907c.md (366 bytes, md5 29505615aad83229ce510a6d442e3727)
+---
+id: 928CD8F9-8389-49E1-8324-3A2C90E036E2
+created: 2026-09-23T10:38:36Z
+updated: 2026-09-23T10:38:36Z
+type: note
+status: inbox
+---
+
+[Jacob Rodri on X: "I can see a potential $100k/month app here" / X](https://x.com/jacobrodri_/status/2102386784814735508)
+
+**@jacobrodri_**
+I can see a potential $100k/month app here
+
+![](.attachments/x-2102386784814735508-1.mp4)
+
+===== inbox/2026-09-23-be44e062.md (563 bytes, md5 027559bafbbc2245f09f4a45da59964a)
+---
+id: 84BF98BF-63FA-411A-95A2-D86F9C0B7A0D
+created: 2026-09-23T10:44:11Z
+updated: 2026-09-23T10:44:11Z
+type: note
+status: inbox
+---
+
+[Thais Castello Branco on X: "congrats quiver team! this is awesome" / X](https://x.com/thaiscbranco_/status/2100400751357083664)
+
+**@thaiscbranco_**
+congrats quiver team! this is awesome
+
+Quoting **@QuiverAI**
+Introducing Arrow 2
+
+Our latest and most advanced models for generating precise, editable vector graphics.
+
+Higher quality. Faster outputs. Available now in App and API.
+
+![](.attachments/x-2100295136261349802-1.mp4)
+
+===== inbox/2026-09-23-e0009e4a.md (704 bytes, md5 126cf8c7c8134455b4d97d1bdb436cb8)
+---
+id: ED12AF22-5792-463A-81A0-A442A2F0D795
+created: 2026-09-23T10:46:45Z
+updated: 2026-09-23T10:46:45Z
+type: note
+status: inbox
+---
+
+[Instagram](https://www.instagram.com/p/Daw8hiys2w1/)
+
+**@instaagent.ai**
+拍廣告片唔一定要貴！
+立即 Whatsapp：http://wa.me/85261612623
+
+拍一條 Studio 級數嘅廣告片，其實唔駛幾萬蚊。 我哋幫你慳返大量製作費：
+✅ 唔駛租場、租器材
+✅ 唔駛請 Crew、請 Model
+✅ 唔駛等幾星期後期製作
+
+InstaAgent 結合「AI 生成」與「專業團隊監修」，用最抵價錢，做最 High-End 效果。
+
+精明老闆之選 💡 
+立即 WhatsApp 我哋睇成功案例！👇
+
+![](.attachments/instagram-Daw8hiys2w1-1.mp4)
+
+===== .attachments
+total 30728
+drwxr-xr-x@  6 eugenechan  staff      192 Sep 23 18:49 .
+drwxr-xr-x@ 12 eugenechan  staff      384 Sep 23 18:49 ..
+-rw-r--r--@  1 eugenechan  staff    54525 Sep 23 18:49 audit-control-portrait.png
+-rw-r--r--@  1 eugenechan  staff  3804815 Sep 23 18:47 instagram-Daw8hiys2w1-1.mp4
+-rw-r--r--@  1 eugenechan  staff  4455756 Sep 23 18:44 x-2100295136261349802-1.mp4
+-rw-r--r--@  1 eugenechan  staff  7411259 Sep 23 18:40 x-2102386784814735508-1.mp4
+
+===== CLI state dir
+/private/tmp/claude-501/-Users-eugenechan-dev-personal-Noto/56c91326-2c9e-4ac5-8610-8f371398e6b6/scratchpad/state/pending-appends/A06643FD-6093-43CE-9404-FB01F421D10D.json
+/private/tmp/claude-501/-Users-eugenechan-dev-personal-Noto/56c91326-2c9e-4ac5-8610-8f371398e6b6/scratchpad/state/pending-appends/4E8FBF8A-4D02-49AE-BC11-6B933EC92F9D.json
+/private/tmp/claude-501/-Users-eugenechan-dev-personal-Noto/56c91326-2c9e-4ac5-8610-8f371398e6b6/scratchpad/state/pending-appends/20905274-1DC7-4546-86FB-ED49E856C404.json

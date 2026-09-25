@@ -1,0 +1,7 @@
+Timestamp               Ty Process[PID:TID]
+2026-09-23 18:46:45.353 I  Noto2ShareExtension[81447:9d061a] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-23 18:46:45.353 I  Noto2ShareExtension[81447:9d061a] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture 4E8FBF8A-4D02-49AE-BC11-6B933EC92F9D
+2026-09-23 18:46:46.343 I  Noto2ShareExtension[81447:9d061a] [com.eugenechan.Noto2.ShareExtension:ShareViewController] media job 4E8FBF8A-4D02-49AE-BC11-6B933EC92F9D accepted=true
+2026-09-23 18:47:01.910 I  Noto2ShareExtension[81447:9d061a] [com.eugenechan.Noto2.ShareExtension:ShareViewController] opening Noto 2 with noto2://capture?shared=4E8FBF8A-4D02-49AE-BC11-6B933EC92F9D
+2026-09-23 18:47:01.911 I  Noto2ShareExtension[81447:9d061a] [com.eugenechan.Noto2.ShareExtension:ShareViewController] open(_:options:completionHandler:) via UIApplication
+2026-09-23 18:47:01.943 I  Noto2ShareExtension[81447:9d061a] [com.eugenechan.Noto2.ShareExtension:ShareViewController] UIApplication open completion success=true

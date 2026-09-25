@@ -46,7 +46,7 @@ public enum SharedLinkCapture {
 
     /// Percent-encodes the characters that would end the markdown link early.
     /// Everything else stays as the URL was shared.
-    static func linkDestination(for url: URL) -> String {
+    public static func linkDestination(for url: URL) -> String {
         url.absoluteString
             .replacingOccurrences(of: "(", with: "%28")
             .replacingOccurrences(of: ")", with: "%29")

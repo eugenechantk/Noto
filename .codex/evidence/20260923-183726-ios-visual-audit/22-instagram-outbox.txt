@@ -1,0 +1,6 @@
+# App Group after share 3 + Keep editing (18:47:07)
+$ ls -la pending-media-jobs/
+total 0
+drwxr-xr-x  2 eugenechan  staff   64 Sep 23 18:46 .
+drwxr-xr-x@ 6 eugenechan  staff  192 Sep 23 18:38 ..
+$ find pending-captures -type f

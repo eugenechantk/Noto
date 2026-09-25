@@ -1,5 +1,5 @@
-import CryptoKit
 import Foundation
+import NotoShareCapture
 import NotoVault
 
 /// Files a quick capture into the vault's `inbox/` folder as
@@ -23,7 +23,7 @@ struct CaptureFilingService {
         case writeFailed(String)
     }
 
-    static let inboxFolderName = "inbox"
+    static let inboxFolderName = CaptureNotePath.inboxFolderName
     static let pageType = "note"
     static let inboxStatus = "inbox"
 
@@ -42,27 +42,25 @@ struct CaptureFilingService {
 
     // MARK: - Pure pieces (unit-testable)
 
-    /// Trims outer whitespace and normalizes line endings so the hash is stable
-    /// across editors. The stored body keeps the trimmed text as-is.
+    // The path rules live in `NotoShareCapture.CaptureNotePath` so the share
+    // extension can name a capture's note (for its media job) before this
+    // service has written it.
+
     static func normalizedBody(_ raw: String) -> String {
-        raw.replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        CaptureNotePath.normalizedBody(raw)
     }
 
     static func hash8(of normalizedBody: String) -> String {
-        let digest = SHA256.hash(data: Data(normalizedBody.utf8))
-        return digest.prefix(4).map { String(format: "%02x", $0) }.joined()
+        CaptureNotePath.hash8(of: normalizedBody)
     }
 
     static func dateStamp(for date: Date, calendar: Calendar) -> String {
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+        CaptureNotePath.dateStamp(for: date, calendar: calendar)
     }
 
     /// `inbox/<YYYY-MM-DD>-<sha8>.md`
     static func relativePath(for normalizedBody: String, date: Date, calendar: Calendar) -> String {
-        "\(inboxFolderName)/\(dateStamp(for: date, calendar: calendar))-\(hash8(of: normalizedBody)).md"
+        CaptureNotePath.relativePath(for: normalizedBody, date: date, calendar: calendar)
     }
 
     /// Frontmatter block followed by one blank line, so the body starts on its own paragraph.

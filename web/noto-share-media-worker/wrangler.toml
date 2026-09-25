@@ -1,0 +1,19 @@
+# Noto share-media intake: the Noto 2 share extension POSTs a media job here;
+# the Worker validates it and puts it on the `noto-share-media` queue, which
+# Hermes on the MacBook Pro drains with an HTTP pull consumer.
+#
+# Secret (not in this file): NOTO_SHARE_MEDIA_TOKEN — the bearer token the app
+# sends; the same value lives in the gitignored Config/LocalSecrets.xcconfig.
+name = "noto-share-media-intake"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+workers_dev = false
+
+# More specific than the Linear worker's `cloudflare.eugenechantk.me/*`, so it wins for /noto/*.
+routes = [
+  { pattern = "cloudflare.eugenechantk.me/noto/*", zone_name = "eugenechantk.me" }
+]
+
+[[queues.producers]]
+binding = "SHARE_MEDIA_QUEUE"
+queue = "noto-share-media"

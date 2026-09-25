@@ -1,0 +1,43 @@
+{
+  "accessibility" : {
+    "element_count" : 1,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Safari",
+        "role" : "Application",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : false,
+    "height" : 874,
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "CAD9EFE5-2CE7-4EEE-A2EA-8230DE08B35F"
+  },
+  "success" : true,
+  "timestamp" : "2026-09-23T10:38:59Z",
+  "type" : "ui_snapshot"
+}

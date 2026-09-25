@@ -1,3 +1,4 @@
+import NotoShareCapture
 import SwiftUI
 import os.log
 
@@ -93,6 +94,9 @@ struct RootTabView: View {
             }
         }
         .tint(AppTheme.primaryText)
+        // Open notes reload when their file changes on disk (iCloud edits from
+        // another device, or Hermes adding share-sheet media).
+        .environment(fileWatcher)
         .background(NotoTheme.background.ignoresSafeArea())
         .task(id: vaultURL) {
             guard vaultURL != nil else { return }
@@ -150,6 +154,7 @@ struct RootTabView: View {
     /// `inbox/`, then indexes each note and tells Digest to reload. Cheap when
     /// nothing is staged (one directory listing), so it runs on every activation.
     private func drainSharedCaptures() async {
+        await flushShareMediaJobs()
         guard let vaultURL, let drain = SharedCaptureDrain.appGroup(vaultURL: vaultURL) else { return }
         let outcome = await Task.detached(priority: .userInitiated) { drain.drain() }.value
         if !outcome.filed.isEmpty {
@@ -161,6 +166,15 @@ struct RootTabView: View {
             NotificationCenter.default.post(name: SharedCaptureDrain.didFileNotification, object: nil)
         }
         openRequestedSharedCaptureIfNeeded()
+    }
+
+    /// Re-sends X / Instagram media jobs the share extension could not deliver
+    /// (offline, or the extension closed before the Worker answered).
+    private func flushShareMediaJobs() async {
+        guard let outbox = ShareMediaOutbox.appGroup(), !outbox.pending().isEmpty,
+              let endpoint = ShareMediaEndpoint(infoDictionary: Bundle.main.infoDictionary) else { return }
+        let sent = await ShareMediaDispatcher(outbox: outbox, endpoint: endpoint).flush()
+        logger.info("Re-sent \(sent) share media job(s)")
     }
 
     /// The share extension asked for one capture's note. Open it if this

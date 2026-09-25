@@ -1375,6 +1375,7 @@
 		};
 		B70000000000000000000015 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
@@ -1408,6 +1409,7 @@
 		};
 		B70000000000000000000016 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 58A1D0018A1D001000000005 /* ReadwiseSecrets.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;

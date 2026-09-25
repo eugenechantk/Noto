@@ -1,0 +1,8 @@
+# App Group after share 2, ✕ tapped (18:44:32)
+$ ls -la pending-media-jobs/
+total 0
+drwxr-xr-x  2 eugenechan  staff   64 Sep 23 18:44 .
+drwxr-xr-x@ 6 eugenechan  staff  192 Sep 23 18:38 ..
+
+$ find pending-captures -type f
+/Users/eugenechan/Library/Developer/CoreSimulator/Devices/CAD9EFE5-2CE7-4EEE-A2EA-8230DE08B35F/data/Containers/Shared/AppGroup/7DD35C82-DCC2-4FA9-9918-03CD49802CCA/pending-captures/001790160251249-20905274-1DC7-4546-86FB-ED49E856C404.json
