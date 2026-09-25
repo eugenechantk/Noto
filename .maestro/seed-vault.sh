@@ -76,7 +76,7 @@ while [ "$#" -gt 0 ]; do
             shift 2
             ;;
         --initial-tab)
-            INITIAL_TAB="${2:?Error: --initial-tab requires capture|digest|search|browse.}"
+            INITIAL_TAB="${2:?Error: --initial-tab requires capture|digest|search|media|browse.}"
             shift 2
             ;;
         --draft-file)

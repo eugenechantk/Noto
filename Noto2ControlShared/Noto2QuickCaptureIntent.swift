@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 enum Noto2Tab: String, Hashable, Sendable {
-    case capture, digest, search, browse
+    case capture, digest, search, media, browse
 }
 
 /// The URLs that open Noto 2 from outside the app. Compiled into the app, the

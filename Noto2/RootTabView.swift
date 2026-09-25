@@ -81,6 +81,13 @@ struct RootTabView: View {
                     deferredTabPlaceholder
                 }
             }
+            Tab("Media", systemImage: "square.grid.2x2", value: Noto2Tab.media) {
+                if let vaultController {
+                    MediaBoardScreen(vaultController: vaultController)
+                } else {
+                    deferredTabPlaceholder
+                }
+            }
             Tab("Browse", systemImage: "folder", value: Noto2Tab.browse) {
                 if let vaultController {
                     BrowseScreen(

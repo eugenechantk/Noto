@@ -19,6 +19,7 @@ public final class LinkPreviewCache: @unchecked Sendable {
     private let now: @Sendable () -> Date
     private let lock = NSLock()
     private var memory: [String: Entry] = [:]
+    private var searchMemory: [String: String] = [:]
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -38,6 +39,38 @@ public final class LinkPreviewCache: @unchecked Sendable {
 
     /// Live entry for `url`, or `nil` when there is none or it has expired.
     public func entry(for url: URL) -> Entry? {
+        guard let entry = storedEntry(for: url), isLive(entry) else { return nil }
+        return entry
+    }
+
+    /// Read-only search projection of saved metadata. Display expiry requests
+    /// a refresh, but must not make previously saved words disappear offline.
+    /// Missing/failed entries contribute no metadata and never initiate a fetch.
+    public func searchText(for url: URL) -> String? {
+        let key = Self.key(for: url)
+        lock.lock()
+        let cachedText = searchMemory[key]
+        lock.unlock()
+        if let cachedText { return cachedText }
+        // The lightweight last-success projection survives a failed preview
+        // refresh, without retaining image bytes in the search index.
+        if let savedText = try? String(contentsOf: searchFileURL(for: key), encoding: .utf8) {
+            lock.lock()
+            let currentText = searchMemory[key] ?? savedText
+            searchMemory[key] = currentText
+            lock.unlock()
+            return currentText
+        }
+        guard case .metadata(let metadata)? = storedEntry(for: url) else { return nil }
+        return Self.searchText(for: metadata)
+    }
+
+    private static func searchText(for metadata: LinkPreviewMetadata) -> String {
+        return [metadata.title, metadata.summary, metadata.host, metadata.url.absoluteString]
+            .compactMap { $0 }.joined(separator: "\n")
+    }
+
+    private func storedEntry(for url: URL) -> Entry? {
         let key = Self.key(for: url)
 
         lock.lock()
@@ -56,29 +89,42 @@ public final class LinkPreviewCache: @unchecked Sendable {
             entry = nil
         }
 
-        guard let entry, isLive(entry) else { return nil }
         return entry
     }
 
     public func store(_ entry: Entry, for url: URL) {
         let key = Self.key(for: url)
+        let text: String?
+        if case .metadata(let metadata) = entry {
+            text = Self.searchText(for: metadata)
+        } else if case .metadata(let previous)? = storedEntry(for: url) {
+            // Migrate an older cache entry before a failed refetch replaces it.
+            text = Self.searchText(for: previous)
+        } else { text = nil }
         lock.lock()
         memory[key] = entry
+        if let text { searchMemory[key] = text }
         lock.unlock()
         writeToDisk(entry, key: key)
+        if let text {
+            try? text.write(to: searchFileURL(for: key), atomically: true, encoding: .utf8)
+        }
     }
 
     public func remove(for url: URL) {
         let key = Self.key(for: url)
         lock.lock()
         memory.removeValue(forKey: key)
+        searchMemory.removeValue(forKey: key)
         lock.unlock()
         try? FileManager.default.removeItem(at: fileURL(for: key))
+        try? FileManager.default.removeItem(at: searchFileURL(for: key))
     }
 
     public func removeAll() {
         lock.lock()
         memory.removeAll()
+        searchMemory.removeAll()
         lock.unlock()
         try? FileManager.default.removeItem(at: directoryURL)
     }
@@ -102,6 +148,10 @@ public final class LinkPreviewCache: @unchecked Sendable {
 
     func fileURL(for key: String) -> URL {
         directoryURL.appendingPathComponent(key).appendingPathExtension("json")
+    }
+
+    private func searchFileURL(for key: String) -> URL {
+        directoryURL.appendingPathComponent(key).appendingPathExtension("search.txt")
     }
 
     private func loadFromDisk(key: String) -> Entry? {

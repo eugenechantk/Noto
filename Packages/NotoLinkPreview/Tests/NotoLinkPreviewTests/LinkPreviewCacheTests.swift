@@ -117,6 +117,43 @@ struct LinkPreviewCacheTests {
         #expect(key.count == 64)
         #expect(key.allSatisfy { $0.isHexDigit })
     }
+
+    @Test("search reads saved titles summaries hosts and URLs even after display expiry")
+    func savedMetadataRemainsSearchableOffline() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fetchedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let cache = LinkPreviewCache(directoryURL: directory, successTTL: 1, now: { fetchedAt.addingTimeInterval(100) })
+        cache.store(.metadata(LinkPreviewMetadata(url: url, title: "Botanical atlas", summary: "Ferns and moss", host: "Woodland Journal", fetchedAt: fetchedAt)), for: url)
+        #expect(cache.entry(for: url) == nil)
+        let saved = LinkPreviewCache(directoryURL: directory).searchText(for: url)
+        for term in ["Botanical atlas", "Ferns and moss", "Woodland Journal", url.absoluteString] {
+            #expect(saved?.contains(term) == true)
+        }
+        cache.store(.failure(Date()), for: url)
+        #expect(cache.searchText(for: url)?.contains("Botanical atlas") == true)
+        #expect(LinkPreviewCache(directoryURL: directory).searchText(for: url)?.contains("Botanical atlas") == true)
+        #expect(cache.searchText(for: URL(string: "https://missing.example.com")!) == nil)
+        cache.remove(for: url)
+        #expect(cache.searchText(for: url) == nil)
+        #expect(LinkPreviewCache(directoryURL: directory).searchText(for: url) == nil)
+    }
+
+    @Test("updated metadata replaces old search words and failures without a prior success stay empty")
+    func searchProjectionTracksMetadataUpdates() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = LinkPreviewCache(directoryURL: directory)
+        cache.store(.failure(Date()), for: url)
+        #expect(cache.searchText(for: url) == nil)
+        cache.store(.metadata(LinkPreviewMetadata(url: url, title: "Original", host: "example.com")), for: url)
+        #expect(cache.searchText(for: url)?.contains("Original") == true)
+        cache.store(.metadata(LinkPreviewMetadata(url: url, title: "Updated", host: "example.com")), for: url)
+        #expect(cache.searchText(for: url)?.contains("Original") == false)
+        #expect(LinkPreviewCache(directoryURL: directory).searchText(for: url)?.contains("Updated") == true)
+        cache.removeAll()
+        #expect(cache.searchText(for: url) == nil)
+    }
 }
 
 final class MutableClock: @unchecked Sendable {

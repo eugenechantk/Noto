@@ -68,7 +68,7 @@ Since 2026-08-23 the project builds two apps from the same code:
 | Target | Scheme | Bundle id | What it is |
 | --- | --- | --- | --- |
 | `Noto` | `Noto-iOS`, `Noto-macOS`, `Noto` | `com.eugenechan.Noto` | the full iOS/iPadOS/macOS app |
-| `Noto2` | `Noto2` | `com.eugenechan.Noto2` | a separate, iOS-only four-screen app — Capture (editor + send to `inbox/`), Digest (process `inbox/` to zero), Search (hybrid hits + streamed summary), Browse — over the same vault |
+| `Noto2` | `Noto2` | `com.eugenechan.Noto2` | a separate, iOS-only five-tab app — Capture (editor + send to `inbox/`), Digest (process `inbox/` to zero), Search (hybrid hits + streamed summary), Media (visual board of note attachments), Browse — over the same vault |
 | `Noto2QuickCaptureControl` | embedded by `Noto2` | `com.eugenechan.Noto2.QuickCaptureControl` | WidgetKit accessory widget for opening Noto 2 Quick Capture from the Lock Screen widget area; the existing target name is retained for bundle/signing stability |
 | `Noto2ShareExtension` | embedded by `Noto2` | `com.eugenechan.Noto2.ShareExtension` | Share-sheet extension ("Noto 2" in the app row): stages a shared link as `[title](url)` in the App Group; Noto 2 files it into `inbox/` on its next activation |
 
@@ -329,6 +329,27 @@ Digest tab is the other half of that loop — it works the folder down to zero.
   SwiftUI host for the editor's `LinkPreviewCardView` fed by `LinkPreviewSupport.service`.
   Device builds need that capability on all three App IDs before `bootstrap_match`
   regenerates profiles; `fastlane/.env.noto2` lists the extension in `EXTENSION_TARGETS`.
+
+### Media Board Lifecycle
+
+Noto 2's Media tab projects media references from vault markdown into a lazy,
+adaptive masonry board. `NotoVault.VaultMediaLibrary` owns recursive read-only
+discovery, type classification, safe vault-relative URLs, source-note association,
+deduplication within each note, newest-note ordering, and text/type filtering.
+Media search covers full note content, saved frontmatter, and saved link-preview
+titles, summaries, domains, and URLs. Noto2 injects the existing preview cache into
+the background scan; preview updates refresh results without resetting the query.
+The board uses the same compact toolbar title as Browse. Its search button pushes
+a dedicated search view; there are no file-type controls. Returning from a source
+note preserves the search, while leaving search restores the complete board.
+The cache keeps a lightweight last-success search projection for offline lookup,
+including when a preview expires or its refresh fails.
+`Noto2/Media` owns thumbnails and presentation. Image decoding and scanning run
+off the main thread; thumbnail memory is bounded. Discovery starts when Media
+appears and refreshes after note saves, file changes, foreground activation, and
+pull to refresh. A tile opens the existing `BrowseDestinationView` editor inside
+Media's own navigation stack, preserving the board on Back. Missing previews
+remain navigable; unreadable iCloud notes are counted and requested for download.
 
 ### Mention Menu Lifecycle
 

@@ -1,0 +1,19 @@
+{
+  "packageTests": {
+    "suite": "NotoVault",
+    "count": 113,
+    "status": "passed"
+  },
+  "appBuildRun": "passed",
+  "visualAudit": {
+    "status": "passed",
+    "report": ".codex/evidence/20260926-001333-ios-visual-audit/evidence.md",
+    "device": "iPhone 17 / iOS 26.3",
+    "recordingSeconds": 255.13
+  },
+  "limitations": [
+    "iPad runtime not verified",
+    "Software keyboard hidden by simulator hardware-keyboard configuration; no-tap typing proves focus",
+    "Broad app test suite not rerun for presentation-only changes"
+  ]
+}
