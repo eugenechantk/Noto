@@ -86,3 +86,67 @@ struct ExplorerSortingTests {
         #expect(labels(ExplorerSorting.sorted(items)) == labels(ExplorerSorting.sorted(Array(items.reversed()))))
     }
 }
+
+@MainActor
+struct ExplorerDirectoryActionsTests {
+    private func makeVault() throws -> (root: URL, directory: URL, controller: VaultController, store: MarkdownNoteStore) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Noto2ExplorerActions-\(UUID().uuidString)", isDirectory: true)
+        let directory = root.appendingPathComponent("Projects", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let controller = VaultController(vaultURL: root, autoloadRoot: false)
+        let store = controller.store(for: directory, autoload: false)
+        return (root, directory, controller, store)
+    }
+
+    @Test func newNoteTargetsTheDisplayedDirectoryAndOpensAsNew() throws {
+        let fixture = try makeVault()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        let destination = ExplorerDirectoryActions(
+            vaultController: fixture.controller,
+            store: fixture.store
+        ).createNoteDestination()
+
+        guard case .note(let note, let directoryURL, let isNew) = destination else {
+            Issue.record("Expected a note destination")
+            return
+        }
+        #expect(note.fileURL.deletingLastPathComponent().standardizedFileURL == fixture.directory.standardizedFileURL)
+        #expect(directoryURL.standardizedFileURL == fixture.directory.standardizedFileURL)
+        #expect(FileManager.default.fileExists(atPath: note.fileURL.path))
+        #expect(isNew)
+    }
+
+    @Test func newFolderTrimsItsNameAndTargetsTheDisplayedDirectory() throws {
+        let fixture = try makeVault()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        let folder = ExplorerDirectoryActions(
+            vaultController: fixture.controller,
+            store: fixture.store
+        ).createFolder(named: "  Ideas  ")
+
+        #expect(folder?.name == "Ideas")
+        #expect(folder?.folderURL.deletingLastPathComponent().standardizedFileURL == fixture.directory.standardizedFileURL)
+        #expect(FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("Ideas").path))
+        #expect(fixture.store.items.contains { item in
+            guard case .folder(let candidate) = item else { return false }
+            return candidate.name == "Ideas"
+        })
+    }
+
+    @Test func whitespaceOnlyFolderNameIsRejected() throws {
+        let fixture = try makeVault()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let originalItems = fixture.store.items
+
+        let folder = ExplorerDirectoryActions(
+            vaultController: fixture.controller,
+            store: fixture.store
+        ).createFolder(named: "  \n\t  ")
+
+        #expect(folder == nil)
+        #expect(fixture.store.items == originalItems)
+    }
+}

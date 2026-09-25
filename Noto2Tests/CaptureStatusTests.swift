@@ -79,12 +79,13 @@ struct CaptureStatusTests {
         let controller = VaultController(vaultURL: vault, autoloadRoot: false)
         let destination = BrowseDestination.note(at: noteURL, in: controller)
 
-        guard case .note(let note, let directoryURL)? = destination else {
+        guard case .note(let note, let directoryURL, let isNew)? = destination else {
             Issue.record("expected a note destination, got \(String(describing: destination))")
             return
         }
         #expect(note.fileURL.standardizedFileURL == noteURL.standardizedFileURL)
         #expect(directoryURL.standardizedFileURL == vault.standardizedFileURL)
+        #expect(!isNew)
     }
 
     @MainActor
@@ -99,13 +100,14 @@ struct CaptureStatusTests {
         let controller = VaultController(vaultURL: vault, autoloadRoot: false)
         let destination = BrowseDestination.note(at: noteURL, in: controller)
 
-        guard case .note(let note, let directoryURL)? = destination else {
+        guard case .note(let note, let directoryURL, let isNew)? = destination else {
             Issue.record("expected a note destination, got \(String(describing: destination))")
             return
         }
         #expect(note.fileURL.standardizedFileURL == noteURL.standardizedFileURL)
         // The editor must write through the inbox store, not the vault root.
         #expect(directoryURL.standardizedFileURL == inbox.standardizedFileURL)
+        #expect(!isNew)
     }
 
     @MainActor
