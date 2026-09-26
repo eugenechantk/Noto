@@ -41,6 +41,7 @@
 		B70000000000000000000030 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000031 /* NotoLinkPreview */; };
 		B70000000000000000000032 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000033 /* NotoLinkPreview */; };
 		B70000000000000000000034 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000035 /* NotoLinkPreview */; };
+		B70000000000000000000037 /* NotoLinkPreview in Frameworks */ = {isa = PBXBuildFile; productRef = B70000000000000000000038 /* NotoLinkPreview */; };
 		E35366682A4BD0316C8999B4 /* Noto2QuickCaptureControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C668640928AB37E2CA8673D /* Noto2QuickCaptureControl.swift */; };
 /* End PBXBuildFile section */
 
@@ -269,6 +270,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B70000000000000000000021 /* NotoShareCapture in Frameworks */,
+				B70000000000000000000037 /* NotoLinkPreview in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -547,6 +549,7 @@
 			name = Noto2ShareExtension;
 			packageProductDependencies = (
 				B70000000000000000000020 /* NotoShareCapture */,
+				B70000000000000000000038 /* NotoLinkPreview */,
 			);
 			productName = Noto2ShareExtension;
 			productReference = B70000000000000000000001 /* Noto2ShareExtension.appex */;
@@ -1653,6 +1656,10 @@
 			productName = NotoLinkPreview;
 		};
 		B70000000000000000000035 /* NotoLinkPreview */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotoLinkPreview;
+		};
+		B70000000000000000000038 /* NotoLinkPreview */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotoLinkPreview;
 		};

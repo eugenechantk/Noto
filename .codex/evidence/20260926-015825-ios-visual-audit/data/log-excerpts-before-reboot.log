@@ -1,0 +1,47 @@
+# Verbatim excerpts from `xcrun simctl spawn BA34BC0A-... log show --info --style compact` taken live during the audit.
+# Info-level logs do not survive a simulator reboot, so these were copied from the command output at the time.
+
+## Run 1 - apple.com/newsroom, closed with the X (10:00)
+2026-09-26 10:00:21.968 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-26 10:00:21.978 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture 17EEC6E6-228C-46BA-87E9-5E1B36A49846
+
+## Run 2 - developer.apple.com/news, Keep editing, Noto 2 COLD (not yet launched since boot) -> Digest fallback (10:04-10:05)
+2026-09-26 10:04:51.657 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-26 10:04:51.661 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture 22478479-BA18-46FA-A832-C839710C306F
+2026-09-26 10:05:08.515 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] opening Noto 2 with noto2://capture?shared=22478479-BA18-46FA-A832-C839710C306F
+2026-09-26 10:05:08.518 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] open(_:options:completionHandler:) via UIApplication
+2026-09-26 10:05:08.622 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] UIApplication open completion success=true
+2026-09-26 10:05:08.786 I  Noto2[33363:cb2cda] [com.eugenechan.Noto2:VaultLocationManager] Using local vault at .../Documents/Noto
+2026-09-26 10:05:09.759 I  Noto2[33363:cb2d1f] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-78733423.md created=true
+2026-09-26 10:05:09.760 I  Noto2[33363:cb2d46] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-78733423.md created=true
+2026-09-26 10:05:09.762 I  Noto2[33363:cb2d1f] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-924a8e1d.md created=true
+2026-09-26 10:05:09.763 I  Noto2[33363:cb2d46] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-924a8e1d.md created=true
+2026-09-26 10:05:09.812 I  Noto2[33363:cb2cda] [com.eugenechan.Noto2:RootTabView] Drained 2 shared capture(s); 0 left staged
+2026-09-26 10:05:09.813 I  Noto2[33363:cb2cda] [com.eugenechan.Noto2:RootTabView] Drained 2 shared capture(s); 0 left staged
+2026-09-26 10:05:09.813 I  Noto2[33363:cb2cda] [com.eugenechan.Noto2:RootTabView] Shared capture 22478479-BA18-46FA-A832-C839710C306F not filed this session; showing Digest
+
+## Run 3 - swift.org/blog, Keep editing, Noto 2 WARM -> opens the note (10:07)
+2026-09-26 10:07:14.231 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] opening Noto 2 with noto2://capture?shared=EDF7D1C3-48DC-44AF-93E9-500C644EE1B7
+2026-09-26 10:07:14.293 I  Noto2[33363:cb2f03] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-1ead3042.md created=true
+2026-09-26 10:07:14.293 I  Noto2[33363:cb2cda] [com.eugenechan.Noto2:RootTabView] Drained 1 shared capture(s); 0 left staged
+2026-09-26 10:07:14.293 I  Noto2[33363:cb2cda] [com.eugenechan.Noto2:RootTabView] Opening shared capture EDF7D1C3-48DC-44AF-93E9-500C644EE1B7 at 2026-09-26-1ead3042.md
+
+## Run 4 - wikipedia.org, Close (10:08) ; Run 5 - example.com, swipe down (10:09)
+2026-09-26 10:08:16.903 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture C66D07DD-FED2-49DA-8A63-1C2A76E732C9
+2026-09-26 10:09:28.829 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture D488CAD2-4812-41E0-B41C-B45241283DC7
+2026-09-26 10:09:48.072 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] sheet swiped away
+
+## Run 6 - selected plain text "examples", failure state (10:11)
+2026-09-26 10:11:39.953 I  Noto2ShareExtension[12415:ca2692] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=0 texts=1 pageTitle=false
+
+## Run 7 - python.org, Keep editing, COLD after reboot, 1 staged -> opens the note (10:23)
+2026-09-26 10:23:16.756 I  Noto2[91429:cdd493] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-7f039ccf.md created=true
+2026-09-26 10:23:16.756 I  Noto2[91429:cdd471] [com.eugenechan.Noto2:RootTabView] Drained 1 shared capture(s); 0 left staged
+2026-09-26 10:23:16.757 I  Noto2[91429:cdd488] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-7f039ccf.md created=true
+2026-09-26 10:23:16.757 I  Noto2[91429:cdd471] [com.eugenechan.Noto2:RootTabView] Drained 1 shared capture(s); 0 left staged
+2026-09-26 10:23:16.757 I  Noto2[91429:cdd471] [com.eugenechan.Noto2:RootTabView] Opening shared capture C63F3274-DC84-492C-9299-E9B255CE2726 at 2026-09-26-7f039ccf.md
+2026-09-26 10:23:16.758 I  Noto2[91429:cdd48d] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-7f039ccf.md created=true
+2026-09-26 10:23:17.091 I  Noto2[91429:cdd471] [com.eugenechan.Noto2:RootTabView] Drained 1 shared capture(s); 0 left staged
+
+## Run 8 - gnu.org X + w3.org Keep editing, COLD after reboot, 2 staged -> opens the note (10:26)
+# see noto2-and-extension.log (captured after the last reboot)

@@ -1,0 +1,10 @@
+2026-09-26-0322e07c.md  [The GNU Operating System and the Free Software Movement](https://www.gnu.org/)
+2026-09-26-1ead3042.md  [Blog | Swift.org](https://www.swift.org/blog/)
+2026-09-26-212b21eb.md  [W3C](https://www.w3.org/)
+2026-09-26-78733423.md  [Newsroom - Apple](https://www.apple.com/newsroom/)
+2026-09-26-7f039ccf.md  [Welcome to Python.org](https://www.python.org/)
+2026-09-26-834687b3.md  [The Verge](https://www.theverge.com/)
+2026-09-26-91e19b34.md  [Wikipedia](https://www.wikipedia.org/)
+2026-09-26-924a8e1d.md  [Latest News - Apple Developer](https://developer.apple.com/news/)
+2026-09-26-cards001.md  Link cards
+2026-09-26-ed72b168.md  [Example Domain](https://example.com/)

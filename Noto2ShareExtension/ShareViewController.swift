@@ -1,3 +1,4 @@
+import NotoLinkPreview
 import NotoShareCapture
 import SwiftUI
 import UIKit
@@ -8,10 +9,10 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto
 
 /// The share-sheet entry for Noto 2. It reads the shared URL (and page title,
 /// when Safari's preprocessing script ran), stages `[title](url)` in the App
-/// Group for Noto 2 to file into `inbox/`, then shows a sheet: **Link
-/// captured**, with "Keep editing" (opens the app straight into that
-/// capture note) and a close button. Staging rather than writing the vault
-/// directly is deliberate — see `PendingCaptureStore`.
+/// Group for Noto 2 to file into `inbox/`, then shows the **Link captured**
+/// sheet (see `LinkCapturedSheet`): "Keep editing" opens the app straight into
+/// that capture note; Close, the ✕, or a swipe down end the share.
+/// Staging rather than writing the vault directly is deliberate — see `PendingCaptureStore`.
 ///
 /// For an X or Instagram post it also sends a media job (through the App
 /// Group outbox) to the Cloudflare queue that Hermes drains; Hermes downloads
@@ -38,6 +39,16 @@ final class ShareViewController: UIViewController {
         Task { await captureSharedItems() }
     }
 
+    /// The host owns the sheet, so a swipe down never reaches a presentation
+    /// delegate here; the view simply disappears. End the request like Close
+    /// does — the capture is already staged by then.
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        guard didPresent, !didFinish else { return }
+        logger.info("sheet swiped away")
+        finish(cancelled: false)
+    }
+
     // MARK: - Work
 
     private func captureSharedItems() async {
@@ -60,8 +71,8 @@ final class ShareViewController: UIViewController {
             let fetchesMedia = startMediaJob(for: capture, url: resolved.url, title: resolved.title)
             presentSheet(.captured(LinkCapturedSheet.Capture(
                 id: capture.id,
-                title: resolved.title ?? resolved.url.absoluteString,
-                host: resolved.url.host ?? resolved.url.absoluteString,
+                url: resolved.url,
+                pageTitle: resolved.title,
                 fetchesMedia: fetchesMedia
             )))
         } catch {
@@ -90,8 +101,13 @@ final class ShareViewController: UIViewController {
     // MARK: - Sheet
 
     private func presentSheet(_ state: LinkCapturedSheet.State) {
+        var preview: ShareLinkPreviewModel?
+        if case .captured(let capture) = state {
+            preview = ShareLinkPreviewModel(url: capture.url, fallbackTitle: capture.pageTitle)
+        }
         let sheet = LinkCapturedSheet(
             state: state,
+            preview: preview,
             onKeepEditing: { [weak self] id in self?.openNoteInNoto2(id: id) },
             onClose: { [weak self] in self?.finish(cancelled: false) }
         )
@@ -191,14 +207,16 @@ final class ShareViewController: UIViewController {
 
 // MARK: - Sheet content
 
-/// "Link captured" — the confirmation sheet. HIG sheet header: leading circular
-/// ✕ (close); the confirm action is the labelled primary button in the body
-/// ("Keep editing"), which reads better than a bare ✓ here.
+/// "Link captured" — the confirmation sheet. Centred: a saved badge, the title,
+/// a line about where it went, and the link as the same preview card the
+/// editor shows. Pinned to the bottom: **Keep editing** (opens the capture note)
+/// and **Close**. The ✕ top right and a swipe down also close it.
 struct LinkCapturedSheet: View {
     struct Capture {
         let id: UUID
-        let title: String
-        let host: String
+        let url: URL
+        /// Safari's page title, shown on the card until the preview loads.
+        let pageTitle: String?
         /// X / Instagram post whose photos and videos Hermes will add.
         var fetchesMedia = false
     }
@@ -209,136 +227,210 @@ struct LinkCapturedSheet: View {
     }
 
     static let uiBackground = UIColor(red: 0x0E / 255, green: 0x11 / 255, blue: 0x16 / 255, alpha: 1)
+    static let accent = Color(red: 0xFF / 255, green: 0x6A / 255, blue: 0x2E / 255)
 
     let state: State
+    let preview: ShareLinkPreviewModel?
     let onKeepEditing: (UUID) -> Void
     let onClose: () -> Void
 
-    private let accent = Color(red: 0xFF / 255, green: 0x6A / 255, blue: 0x2E / 255)
-    private let card = Color(red: 0x1C / 255, green: 0x20 / 255, blue: 0x27 / 255)
+    @SwiftUI.State private var badgeBounce = false
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-                .padding(.top, 8)
-                .padding(.horizontal, 12)
-            content
+            HStack {
+                Spacer()
+                closeButton
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+
+            GeometryReader { proxy in
+                ScrollView {
+                    mainContent
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+
+            buttons
                 .padding(.horizontal, 20)
-                .padding(.top, 10)
-            Spacer(minLength: 0)
+                .padding(.top, 12)
+                .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(red: 0x0E / 255, green: 0x11 / 255, blue: 0x16 / 255).ignoresSafeArea())
+        .background(Color(uiColor: Self.uiBackground).ignoresSafeArea())
         .preferredColorScheme(.dark)
         .accessibilityIdentifier("linkCapturedSheet")
+        .onAppear { badgeBounce.toggle() }
     }
 
-    private var header: some View {
-        ZStack {
+    // MARK: Pieces
+
+    private var closeButton: some View {
+        Button(action: onClose) {
+            Image(systemName: "xmark")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(width: 44, height: 44)
+                .glassEffect(.regular.interactive(), in: .circle)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close")
+        .accessibilityIdentifier("linkCapturedCloseButton")
+    }
+
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            badge
             Text(title)
-                .font(.headline)
+                .font(.title2.weight(.bold))
                 .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .padding(.top, 20)
                 .accessibilityIdentifier("linkCapturedTitle")
-            HStack {
-                circleButton(systemName: "xmark", identifier: "linkCapturedCloseButton", label: "Close", action: onClose)
-                Spacer()
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.64))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
+                .accessibilityIdentifier(isFailure ? "linkCapturedErrorMessage" : "linkCapturedStatus")
+            if let preview {
+                LinkPreviewCard(content: preview.content, style: .share)
+                    .padding(.top, 28)
+                    .accessibilityIdentifier("linkCapturedLinkCard")
             }
         }
-        .frame(height: 44)
+        .frame(maxWidth: 440)
     }
 
-    private var title: String {
-        switch state {
-        case .captured: return "Link captured"
-        case .failure: return "Couldn't capture link"
+    private var badge: some View {
+        let tint = isFailure ? Color(red: 1, green: 0x5A / 255, blue: 0x5F / 255) : Self.accent
+        return ZStack {
+            Circle().fill(tint.opacity(0.16))
+            Circle().strokeBorder(tint.opacity(0.45), lineWidth: 1.5)
+            Image(systemName: isFailure ? "exclamationmark" : "checkmark")
+                .font(.system(size: 30, weight: .bold))
+                .foregroundStyle(tint)
+                .symbolEffect(.bounce, value: badgeBounce)
         }
+        .frame(width: 76, height: 76)
+        .accessibilityElement()
+        .accessibilityLabel(isFailure ? "Not saved" : "Saved")
+        .accessibilityIdentifier("linkCapturedIcon")
     }
 
-    @ViewBuilder
-    private var content: some View {
-        switch state {
-        case .captured(let capture):
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    Image(systemName: "link")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(accent)
-                        .frame(width: 40, height: 40)
-                        .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(capture.title)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                            .accessibilityIdentifier("linkCapturedLinkTitle")
-                        Text(capture.host)
-                            .font(.footnote)
-                            .foregroundStyle(.white.opacity(0.62))
-                            .lineLimit(1)
+    private var buttons: some View {
+        GlassEffectContainer(spacing: 8) {
+            VStack(spacing: 12) {
+                if case .captured(let capture) = state {
+                    Button {
+                        onKeepEditing(capture.id)
+                    } label: {
+                        Label("Keep editing", systemImage: "square.and.pencil")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, minHeight: 36)
                     }
-                    Spacer(minLength: 0)
+                    .buttonStyle(.glassProminent)
+                    .tint(Self.accent)
+                    .controlSize(.large)
+                    .accessibilityIdentifier("linkCapturedKeepEditingButton")
                 }
-                .padding(14)
-                .background(card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
-
-                Text(capture.fetchesMedia
-                     ? "Saved to your inbox. Its photos and videos will be added in a minute."
-                     : "Saved to your inbox as a quick capture.")
-                    .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.62))
-                    .accessibilityIdentifier("linkCapturedStatus")
-
-                Button {
-                    onKeepEditing(capture.id)
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.and.pencil")
-                        Text("Keep editing")
-                    }
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("linkCapturedKeepEditingButton")
-            }
-        case .failure(let message):
-            VStack(alignment: .leading, spacing: 14) {
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.75))
-                    .accessibilityIdentifier("linkCapturedErrorMessage")
                 Button(action: onClose) {
                     Text("Close")
                         .font(.headline)
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .frame(maxWidth: .infinity, minHeight: 36)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.glass)
+                .controlSize(.large)
+                .accessibilityIdentifier("linkCapturedDismissButton")
             }
         }
     }
 
-    private func circleButton(systemName: String, identifier: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 36, height: 36)
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay(Circle().stroke(Color.white.opacity(0.14), lineWidth: 0.5))
-        }
-        .buttonStyle(.plain)
-        .frame(minWidth: 44, minHeight: 44)
-        .contentShape(Circle())
-        .accessibilityLabel(label)
-        .accessibilityIdentifier(identifier)
+    // MARK: Copy
+
+    private var isFailure: Bool {
+        if case .failure = state { return true }
+        return false
     }
+
+    private var title: String {
+        isFailure ? "Couldn't capture link" : "Link captured"
+    }
+
+    private var message: String {
+        switch state {
+        case .captured(let capture):
+            return capture.fetchesMedia
+                ? "Saved to your inbox as a quick capture. Its photos and videos will be added in a minute."
+                : "Saved to your inbox as a quick capture."
+        case .failure(let message):
+            return message
+        }
+    }
+}
+
+extension LinkPreviewCardStyle {
+    /// Noto's dark theme (the extension can't see the app's `AppTheme`).
+    static let share = LinkPreviewCardStyle(
+        background: Color(red: 0x27 / 255, green: 0x27 / 255, blue: 0x2A / 255).opacity(0.55),
+        border: Color(red: 0x27 / 255, green: 0x27 / 255, blue: 0x2A / 255),
+        title: Color(red: 0xEC / 255, green: 0xEC / 255, blue: 0xEE / 255),
+        summary: Color(red: 0xD4 / 255, green: 0xD4 / 255, blue: 0xD4 / 255),
+        host: Color(red: 0x8A / 255, green: 0x8A / 255, blue: 0x8E / 255),
+        placeholder: Color(red: 0x27 / 255, green: 0x27 / 255, blue: 0x2A / 255)
+    )
+}
+
+/// The shared card's content for one URL, refreshed when the preview service
+/// finishes fetching it.
+@MainActor
+@Observable
+final class ShareLinkPreviewModel {
+    private(set) var content: LinkPreviewCardContent
+
+    @ObservationIgnored private let url: URL
+    @ObservationIgnored private let fallbackTitle: String?
+    @ObservationIgnored private var token: NSObjectProtocol?
+
+    init(url: URL, fallbackTitle: String?) {
+        self.url = url
+        self.fallbackTitle = fallbackTitle
+        content = LinkPreviewCardContent.make(url: url, state: ShareLinkPreviews.service.state(for: url), fallbackTitle: fallbackTitle)
+        token = NotificationCenter.default.addObserver(
+            forName: LinkPreviewService.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let changed = notification.userInfo?[LinkPreviewService.urlUserInfoKey] as? URL else { return }
+            MainActor.assumeIsolated {
+                guard let self, changed == self.url else { return }
+                self.content = LinkPreviewCardContent.make(url: self.url, state: ShareLinkPreviews.service.state(for: self.url), fallbackTitle: self.fallbackTitle)
+            }
+        }
+    }
+
+    deinit {
+        if let token { NotificationCenter.default.removeObserver(token) }
+    }
+}
+
+/// The extension's own preview service: same fetchers as the app, cached in the
+/// extension's Caches directory.
+enum ShareLinkPreviews {
+    @MainActor
+    static let service: LinkPreviewService = {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let cache = LinkPreviewCache(directoryURL: caches.appendingPathComponent("LinkPreviews", isDirectory: true))
+        let fetcher = CompositeLinkPreviewFetcher(primary: LinkPresentationFetcher(), secondary: OpenGraphFetcher())
+        return LinkPreviewService(cache: cache, fetcher: fetcher)
+    }()
 }
 
 // MARK: - Item providers
