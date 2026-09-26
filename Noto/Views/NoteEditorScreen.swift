@@ -151,6 +151,11 @@ struct NoteEditorScreen: View {
             onCreateRootNote: onCreateRootNote,
             onMoveRequested: { showMoveSheet = true },
             onDeleteRequested: { showDeleteConfirmation = true },
+            onCopyPathRequested: {
+                let path = store.vaultRelativePath(for: session.note.fileURL)
+                    ?? session.note.fileURL.standardizedFileURL.path
+                NotePathClipboard.copy(path)
+            },
             onSearchRequested: showFind,
             onShowProperties: { withAnimation(.easeInOut(duration: 0.18)) { showProperties = true } },
             propertyCount: propertyCount,

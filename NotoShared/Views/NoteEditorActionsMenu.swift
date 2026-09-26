@@ -1,5 +1,17 @@
 import NotoVault
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
+
+#if os(iOS)
+@MainActor
+enum NotePathClipboard {
+    static func copy(_ path: String) {
+        UIPasteboard.general.string = path
+    }
+}
+#endif
 
 /// The editor More menu shared by Noto and Noto 2. Keeping the menu in the
 /// shared layer prevents the two apps from drifting as editor actions evolve.
@@ -8,6 +20,7 @@ struct NoteEditorActionsMenu: View {
     let onSearchRequested: () -> Void
     let onShowProperties: (() -> Void)?
     let propertyCount: Int
+    let onCopyPathRequested: () -> Void
     let onMoveRequested: () -> Void
     let onDeleteRequested: () -> Void
 
@@ -33,6 +46,11 @@ struct NoteEditorActionsMenu: View {
                 }
                 .accessibilityIdentifier("properties_menu_item")
             }
+
+            Button(action: onCopyPathRequested) {
+                Label("Copy Path", systemImage: "doc.on.doc")
+            }
+            .accessibilityIdentifier("copy_note_path_menu_item")
 
             Divider()
 

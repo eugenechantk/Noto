@@ -61,6 +61,7 @@ struct NoteScreen: View {
                         onSearchRequested: showFind,
                         onShowProperties: presentProperties,
                         propertyCount: propertyCount,
+                        onCopyPathRequested: copyNotePath,
                         onMoveRequested: { showMoveSheet = true },
                         onDeleteRequested: { showDeleteConfirmation = true }
                     )
@@ -115,6 +116,12 @@ struct NoteScreen: View {
                     .accessibilityIdentifier("confirm_delete_note_button")
                 Button("Cancel", role: .cancel) {}
             }
+    }
+
+    private func copyNotePath() {
+        let path = store.vaultRelativePath(for: session.note.fileURL)
+            ?? session.note.fileURL.standardizedFileURL.path
+        NotePathClipboard.copy(path)
     }
 
     /// The editor remains full-screen underneath the navigation chrome. The
@@ -288,7 +295,7 @@ struct Noto2TopChromeFade: View {
 
 /// The custom full-width fade owns the backdrop on iOS 26; leaving the system
 /// navigation material visible underneath would restore the rectangular seam.
-private struct NoteEditorNavigationBarBackdropVisibility: ViewModifier {
+struct NoteEditorNavigationBarBackdropVisibility: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
