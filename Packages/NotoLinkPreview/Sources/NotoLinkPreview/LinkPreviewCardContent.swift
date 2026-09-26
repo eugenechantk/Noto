@@ -23,22 +23,26 @@ public struct LinkPreviewCardContent: Equatable, Sendable {
         self.iconData = iconData
     }
 
-    public static func make(url: URL, state: LinkPreviewService.State) -> LinkPreviewCardContent {
+    /// `fallbackTitle` is a title known before any fetch — the share sheet has
+    /// Safari's page title — shown in place of the host / URL until (or unless)
+    /// metadata supplies one.
+    public static func make(url: URL, state: LinkPreviewService.State, fallbackTitle: String? = nil) -> LinkPreviewCardContent {
         let host = LinkPreviewMetadata.displayHost(for: url)
+        let fallback = fallbackTitle.flatMap(nonEmpty)
 
         switch state {
         case .loading:
-            return LinkPreviewCardContent(title: host, subtitle: loadingSubtitle, host: host)
+            return LinkPreviewCardContent(title: fallback ?? host, subtitle: loadingSubtitle, host: host)
 
         case .failed:
             return LinkPreviewCardContent(
-                title: displayURL(url),
+                title: fallback ?? displayURL(url),
                 subtitle: unavailableSubtitle,
                 host: host
             )
 
         case .loaded(let metadata):
-            let title = metadata.title.flatMap(nonEmpty) ?? displayURL(url)
+            let title = metadata.title.flatMap(nonEmpty) ?? fallback ?? displayURL(url)
             return LinkPreviewCardContent(
                 title: title,
                 subtitle: metadata.summary.flatMap(nonEmpty),

@@ -12,6 +12,7 @@ import Testing
 /// | `corruptFileReadsAsMissing` | a bad JSON file never crashes or poisons the cache |
 /// | `removeForgetsOneURL` | `remove(for:)` clears memory and disk |
 /// | `keyIsStablePerURL` | file name is deterministic and safe for the filesystem |
+/// | `olderFetcherGenerationIsRefetchedButStillSearchable` | pre-versioning entries decode as generation 1, read as missing, keep their search text |
 @Suite("LinkPreviewCache")
 struct LinkPreviewCacheTests {
     private func makeDirectory() throws -> URL {
@@ -22,6 +23,26 @@ struct LinkPreviewCacheTests {
     }
 
     private let url = URL(string: "https://example.com/article")!
+
+    @Test("an older fetcher generation is refetched but stays searchable")
+    func olderFetcherGenerationIsRefetchedButStillSearchable() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        // What the previous fetcher wrote: no schemaVersion key.
+        let legacy = #"{"metadata":{"_0":{"url":"https://example.com/article","title":"Old title","host":"example.com","fetchedAt":"\#(ISO8601DateFormatter().string(from: Date()))"}}}"#
+        let file = directory.appendingPathComponent(LinkPreviewCache.key(for: url) + ".json")
+        try Data(legacy.utf8).write(to: file)
+
+        let cache = LinkPreviewCache(directoryURL: directory)
+        #expect(cache.entry(for: url) == nil)
+        #expect(cache.searchText(for: url)?.contains("Old title") == true)
+
+        let fresh = LinkPreviewMetadata(url: url, title: "New title", host: "example.com")
+        #expect(fresh.schemaVersion == LinkPreviewMetadata.currentSchemaVersion)
+        cache.store(.metadata(fresh), for: url)
+        #expect(cache.entry(for: url) == .metadata(fresh))
+    }
 
     @Test("metadata round-trips through disk")
     func metadataRoundTripsThroughDisk() throws {

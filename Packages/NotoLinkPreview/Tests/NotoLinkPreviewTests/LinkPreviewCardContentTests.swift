@@ -13,9 +13,34 @@ import Testing
 /// | `blankSummaryIsDropped` | whitespace-only descriptions render nothing |
 /// | `displayHostStripsWWW` | `www.` never shows |
 /// | `displayURLStripsSchemeAndTrailingSlash` | URL fallback reads cleanly |
+/// | `fallbackTitleShowsWhileLoadingAndAfterFailure` | share sheet: Safari's page title stands in until metadata arrives |
+/// | `fetchedTitleWinsOverFallbackAndBlankFallbackIsIgnored` | metadata beats the fallback; whitespace fallback does nothing |
 @Suite("LinkPreviewCardContent")
 struct LinkPreviewCardContentTests {
     private let url = URL(string: "https://www.example.com/article/")!
+
+    @Test("fallback title shows while loading and after a failed fetch")
+    func fallbackTitleShowsWhileLoadingAndAfterFailure() {
+        let loading = LinkPreviewCardContent.make(url: url, state: .loading, fallbackTitle: "  The Article  ")
+        #expect(loading.title == "The Article")
+        #expect(loading.subtitle == LinkPreviewCardContent.loadingSubtitle)
+        #expect(loading.host == "example.com")
+
+        let failed = LinkPreviewCardContent.make(url: url, state: .failed, fallbackTitle: "The Article")
+        #expect(failed.title == "The Article")
+        #expect(failed.subtitle == LinkPreviewCardContent.unavailableSubtitle)
+    }
+
+    @Test("fetched title wins over the fallback; a blank fallback is ignored")
+    func fetchedTitleWinsOverFallbackAndBlankFallbackIsIgnored() {
+        let metadata = LinkPreviewMetadata(url: url, title: "Fetched title", summary: nil, host: "example.com")
+        #expect(LinkPreviewCardContent.make(url: url, state: .loaded(metadata), fallbackTitle: "Page title").title == "Fetched title")
+
+        let untitled = LinkPreviewMetadata(url: url, title: nil, summary: nil, host: "example.com")
+        #expect(LinkPreviewCardContent.make(url: url, state: .loaded(untitled), fallbackTitle: "Page title").title == "Page title")
+
+        #expect(LinkPreviewCardContent.make(url: url, state: .loading, fallbackTitle: "   ").title == "example.com")
+    }
 
     @Test("loading shows host and loading line")
     func loadingShowsHostAndLoadingLine() {

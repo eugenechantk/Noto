@@ -15,6 +15,12 @@ public struct LinkPreviewMetadata: Codable, Equatable, Sendable {
     /// Site icon bytes, if the page provided one.
     public var iconData: Data?
     public var fetchedAt: Date
+    /// Which fetcher generation produced this. Cached metadata from an older
+    /// generation counts as expired, so improving the fetcher refreshes old cards.
+    public var schemaVersion: Int
+
+    /// 2 — Open Graph tags fill what `LinkPresentation` misses (2026-09-25).
+    public static let currentSchemaVersion = 2
 
     public init(
         url: URL,
@@ -23,7 +29,8 @@ public struct LinkPreviewMetadata: Codable, Equatable, Sendable {
         host: String,
         imageData: Data? = nil,
         iconData: Data? = nil,
-        fetchedAt: Date = Date()
+        fetchedAt: Date = Date(),
+        schemaVersion: Int = LinkPreviewMetadata.currentSchemaVersion
     ) {
         self.url = url
         self.title = title
@@ -32,6 +39,24 @@ public struct LinkPreviewMetadata: Codable, Equatable, Sendable {
         self.imageData = imageData
         self.iconData = iconData
         self.fetchedAt = fetchedAt
+        self.schemaVersion = schemaVersion
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case url, title, summary, host, imageData, iconData, fetchedAt, schemaVersion
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        url = try container.decode(URL.self, forKey: .url)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        summary = try container.decodeIfPresent(String.self, forKey: .summary)
+        host = try container.decode(String.self, forKey: .host)
+        imageData = try container.decodeIfPresent(Data.self, forKey: .imageData)
+        iconData = try container.decodeIfPresent(Data.self, forKey: .iconData)
+        fetchedAt = try container.decode(Date.self, forKey: .fetchedAt)
+        // Entries written before versioning are generation 1.
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
     }
 
     /// `www.example.com` → `example.com`; keeps everything else as-is.

@@ -135,7 +135,8 @@ public final class LinkPreviewCache: @unchecked Sendable {
         let current = now()
         switch entry {
         case .metadata(let metadata):
-            return current.timeIntervalSince(metadata.fetchedAt) < successTTL
+            return metadata.schemaVersion >= LinkPreviewMetadata.currentSchemaVersion
+                && current.timeIntervalSince(metadata.fetchedAt) < successTTL
         case .failure(let failedAt):
             return current.timeIntervalSince(failedAt) < failureRetryInterval
         }

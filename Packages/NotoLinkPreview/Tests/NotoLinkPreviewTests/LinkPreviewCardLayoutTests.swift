@@ -9,41 +9,39 @@ import UniformTypeIdentifiers
 ///
 /// | Test | Covers |
 /// | --- | --- |
-/// | `withoutImageTextSpansTheCard` | no thumbnail → text column fills the width |
-/// | `withImageThumbnailIsTrailingSquare` | thumbnail is a square flush with the trailing edge |
-/// | `narrowCardCapsThumbnailWidth` | thumbnail never eats more than 40% of a narrow card |
+/// | `bannerOnTopTextBelow` | full-width banner, text block inset below it |
+/// | `cardMatchesAnImageLine` | one fixed height (an image line's 300 pt), whatever loads |
+/// | `shortCardClampsTheBanner` | a card shorter than the banner never produces negative rects |
 /// | `zeroWidthIsSafe` | degenerate sizes produce empty, not negative, rects |
 /// | `downsamplerBoundsTheLongestSide` | a 1200px image comes back ≤ 200px on its long side |
 /// | `downsamplerRejectsGarbage` | non-image bytes return nil rather than crash |
 /// | `downsamplerReportsPixelSize` | size probe reads dimensions without decoding |
 @Suite("LinkPreviewCardLayout")
 struct LinkPreviewCardLayoutTests {
-    @Test("without image the text column spans the card")
-    func withoutImageTextSpansTheCard() {
-        let layout = LinkPreviewCardLayout(width: 320, height: 96, hasImage: false, padding: 12)
-        #expect(layout.imageRect == nil)
-        #expect(layout.textRect == CGRect(x: 12, y: 12, width: 296, height: 72))
+    @Test("banner on top, text below")
+    func bannerOnTopTextBelow() {
+        let layout = LinkPreviewCardLayout(width: 320, height: 300, padding: 12)
+        #expect(layout.bannerRect == CGRect(x: 0, y: 0, width: 320, height: LinkPreviewCardLayout.bannerHeight))
+        #expect(layout.textRect == CGRect(x: 12, y: LinkPreviewCardLayout.bannerHeight + 12, width: 296, height: 300 - LinkPreviewCardLayout.bannerHeight - 24))
     }
 
-    @Test("with image the thumbnail is a trailing square")
-    func withImageThumbnailIsTrailingSquare() {
-        let layout = LinkPreviewCardLayout(width: 320, height: 96, hasImage: true, padding: 12)
-        #expect(layout.imageRect == CGRect(x: 224, y: 0, width: 96, height: 96))
-        #expect(layout.textRect == CGRect(x: 12, y: 12, width: 200, height: 72))
+    @Test("card height matches an image line")
+    func cardMatchesAnImageLine() {
+        #expect(LinkPreviewCardLayout.defaultHeight == 300)
+        #expect(LinkPreviewCardLayout(width: 320).bounds.height == 300)
     }
 
-    @Test("narrow card caps the thumbnail width")
-    func narrowCardCapsThumbnailWidth() {
-        let layout = LinkPreviewCardLayout(width: 150, height: 96, hasImage: true, padding: 12)
-        #expect(layout.imageRect?.width == 60)
-        #expect(layout.imageRect?.maxX == 150)
-        #expect(layout.textRect.maxX == 78)
+    @Test("short card clamps the banner")
+    func shortCardClampsTheBanner() {
+        let layout = LinkPreviewCardLayout(width: 200, height: 100, padding: 12)
+        #expect(layout.bannerRect.height == 100)
+        #expect(layout.textRect.height == 0)
     }
 
     @Test("zero width is safe")
     func zeroWidthIsSafe() {
-        let layout = LinkPreviewCardLayout(width: 0, hasImage: true)
-        #expect(layout.imageRect == nil)
+        let layout = LinkPreviewCardLayout(width: 0)
+        #expect(layout.bannerRect.width == 0)
         #expect(layout.textRect.width == 0)
         #expect(layout.bounds == CGRect(x: 0, y: 0, width: 0, height: LinkPreviewCardLayout.defaultHeight))
     }
