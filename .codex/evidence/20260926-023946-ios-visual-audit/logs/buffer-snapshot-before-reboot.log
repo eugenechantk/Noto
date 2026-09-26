@@ -1,0 +1,36 @@
+getpwuid_r did not find a match for uid 501
+Timestamp               Ty Process[PID:TID]
+2026-09-26 10:48:37.999 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-26 10:48:38.000 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture 9356FA7D-FA2D-479C-BDF8-249C1EC4C2F0
+2026-09-26 10:49:20.051 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-26 10:49:20.052 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture 4CCC49BD-6BCE-4D9F-B6E3-292B9A228CC3
+2026-09-26 10:49:34.311 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] opening Noto 2 with noto2://capture?shared=4CCC49BD-6BCE-4D9F-B6E3-292B9A228CC3
+2026-09-26 10:49:34.311 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] open(_:options:completionHandler:) via UIApplication
+2026-09-26 10:49:34.405 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] UIApplication open completion success=true
+2026-09-26 10:49:34.560 I  Noto2[69089:d14fbc] [com.eugenechan.Noto2:VaultLocationManager] Using local vault at /Users/eugenechan/Library/Developer/CoreSimulator/Devices/BA34BC0A-B394-456D-96CC-8F4E10E46F0E/data/Containers/Data/Application/EBF03D9D-9F40-4DEE-9BF6-F58E2A9DD3BD/Documents/Noto
+2026-09-26 10:49:35.290 I  Noto2[69089:d14ff5] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-43648c94.md created=true
+2026-09-26 10:49:35.293 I  Noto2[69089:d14ff5] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-74444741.md created=true
+2026-09-26 10:49:35.295 I  Noto2[69089:d14ff5] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-0e6b1a38.md created=true
+2026-09-26 10:49:35.372 I  Noto2[69089:d14fbc] [com.eugenechan.Noto2:RootTabView] Drained 3 shared capture(s); 0 left staged
+2026-09-26 10:49:35.373 I  Noto2[69089:d14fbc] [com.eugenechan.Noto2:RootTabView] Opening shared capture 4CCC49BD-6BCE-4D9F-B6E3-292B9A228CC3 at 2026-09-26-0e6b1a38.md
+2026-09-26 10:49:35.374 I  Noto2[69089:d14fbc] [com.eugenechan.Noto2:VaultFileWatcher] Started watching Noto
+2026-09-26 10:49:35.771 I  Noto2[69089:d14ff1] [com.eugenechan.Noto2:RootTabView] Search index sweep: scanned=29 upserted=0 deleted=0 skippedUnavailable=0 indexedNotes=29 sections=60
+2026-09-26 10:49:43.661 I  Noto2[69089:d14fef] [com.eugenechan.Noto2:SemanticIndexCoordinator] semantic refresh refreshed=3 embedded=3 deleted=0
+2026-09-26 10:49:43.661 I  Noto2[69089:d14fef] [com.eugenechan.Noto2:SemanticSearchService] semantic index updated notes=3 chunks=3 deleted=0
+2026-09-26 10:50:26.352 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-26 10:50:26.353 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture 3172D1F4-0841-446A-B581-8564D0AB1C6A
+2026-09-26 10:50:31.795 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] opening Noto 2 with noto2://capture?shared=3172D1F4-0841-446A-B581-8564D0AB1C6A
+2026-09-26 10:50:31.795 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] open(_:options:completionHandler:) via UIApplication
+2026-09-26 10:50:31.823 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] UIApplication open completion success=true
+2026-09-26 10:50:31.857 I  Noto2[69089:d16212] [com.eugenechan.Noto2:SharedCaptureDrain] shared capture filed inbox/2026-09-26-1831f05b.md created=true
+2026-09-26 10:50:31.857 I  Noto2[69089:d14fbc] [com.eugenechan.Noto2:RootTabView] Drained 1 shared capture(s); 0 left staged
+2026-09-26 10:50:31.857 I  Noto2[69089:d14fbc] [com.eugenechan.Noto2:RootTabView] Opening shared capture 3172D1F4-0841-446A-B581-8564D0AB1C6A at 2026-09-26-1831f05b.md
+2026-09-26 10:50:32.548 I  Noto2[69089:d16212] [com.eugenechan.Noto2:RootTabView] Search index sweep: scanned=30 upserted=0 deleted=0 skippedUnavailable=0 indexedNotes=30 sections=61
+2026-09-26 10:50:33.499 I  Noto2[69089:d14fbc] [com.eugenechan.Noto2:VaultFileWatcher] External change detected (count: 1)
+2026-09-26 10:50:35.383 I  Noto2[69089:d16212] [com.eugenechan.Noto2:SemanticIndexCoordinator] semantic refresh refreshed=1 embedded=1 deleted=0
+2026-09-26 10:50:35.383 I  Noto2[69089:d16212] [com.eugenechan.Noto2:SemanticSearchService] semantic index updated notes=1 chunks=1 deleted=0
+2026-09-26 10:51:12.832 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-26 10:51:12.834 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture DEF47F86-BEE3-44A1-9555-F72E38A2E812
+2026-09-26 10:51:51.386 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] share payload urls=1 texts=1 pageTitle=true
+2026-09-26 10:51:51.387 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] staged shared capture 888D67EA-3C1C-48B5-8C7A-9CEF4F1BE713
+2026-09-26 10:52:07.587 I  Noto2ShareExtension[32695:cfc7f2] [com.eugenechan.Noto2.ShareExtension:ShareViewController] sheet swiped away

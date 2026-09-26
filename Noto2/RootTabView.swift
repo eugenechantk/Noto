@@ -35,6 +35,8 @@ struct RootTabView: View {
     /// Where each share-sheet capture drained this session was filed, keyed by
     /// its staged id, so the extension's "Add notes" link can open that note.
     @State private var sharedCaptureNotes: [UUID: URL] = [:]
+    /// Launch, activation and the "Keep editing" link all drain; one pass at a time (bug 036).
+    @State private var drainQueue = SharedCaptureDrainQueue()
     @Environment(\.scenePhase) private var scenePhase
 
     init(
@@ -161,6 +163,13 @@ struct RootTabView: View {
     /// `inbox/`, then indexes each note and tells Digest to reload. Cheap when
     /// nothing is staged (one directory listing), so it runs on every activation.
     private func drainSharedCaptures() async {
+        await drainQueue.run { await drainSharedCapturesOnce() }
+        // Only once no pass is left: a pass that did not file the requested
+        // capture must not give up on it while another is still filing it.
+        openRequestedSharedCaptureIfNeeded()
+    }
+
+    private func drainSharedCapturesOnce() async {
         await flushShareMediaJobs()
         guard let vaultURL, let drain = SharedCaptureDrain.appGroup(vaultURL: vaultURL) else { return }
         let outcome = await Task.detached(priority: .userInitiated) { drain.drain() }.value
@@ -172,7 +181,6 @@ struct RootTabView: View {
             }
             NotificationCenter.default.post(name: SharedCaptureDrain.didFileNotification, object: nil)
         }
-        openRequestedSharedCaptureIfNeeded()
     }
 
     /// Re-sends X / Instagram media jobs the share extension could not deliver
