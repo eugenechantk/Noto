@@ -1,0 +1,47 @@
+Building for debugging...
+[0/5] Write sources
+[1/5] Write swift-version--58304C5D6DBC2206.txt
+[3/7] Compiling NotoVault VaultMediaLibrary.swift
+[4/7] Emitting module NotoVault
+/Users/eugenechan/dev/personal/Noto/Packages/NotoVault/Sources/NotoVault/VaultManager.swift:15:17: warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 13 | public final class VaultManager: Sendable {
+ 14 |     public let rootURL: URL
+ 15 |     private let fileManager = FileManager.default
+    |                 `- warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 16 |     private let logger = Logger(subsystem: "com.noto", category: "VaultManager")
+ 17 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSFileManager.h:96:12: note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 94 | extern NSNotificationName const NSUbiquityIdentityDidChangeNotification API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
+ 95 | 
+ 96 | @interface NSFileManager : NSObject
+    |            `- note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 97 | 
+ 98 | /* Returns the default singleton instance.
+[5/10] Emitting module NotoAgentCore
+[5/10] Write Objects.LinkFileList
+[7/11] Emitting module NotoAgentCoreTests
+[7/11] Write Objects.LinkFileList
+[8/11] Linking NotoAgentCLIPackageTests
+[9/11] Linking noto-agent
+[10/11] Applying noto-agent
+Build complete! (3.90s)
+Test Suite 'All tests' started at 2026-09-25 23:43:52.562.
+Test Suite 'All tests' passed at 2026-09-25 23:43:52.566.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.004) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "Noto agent filesystem integration" started.
+􀟈  Test "daily append creates the templated note and deduplicates retries" started.
+􁁛  Test "daily append creates the templated note and deduplicates retries" passed after 0.060 seconds.
+􀟈  Test "append preserves frontmatter, stamps modified, and refreshes search" started.
+􁁛  Test "append preserves frontmatter, stamps modified, and refreshes search" passed after 0.023 seconds.
+􀟈  Test "read supports bounded line ranges" started.
+􁁛  Test "read supports bounded line ranges" passed after 0.003 seconds.
+􀟈  Test "append rejects traversal and symlinks that escape the vault" started.
+􁁛  Test "append rejects traversal and symlinks that escape the vault" passed after 0.002 seconds.
+􀟈  Test "health reports the temporary vault and note counts" started.
+􁁛  Test "health reports the temporary vault and note counts" passed after 0.002 seconds.
+􁁛  Suite "Noto agent filesystem integration" passed after 0.092 seconds.
+􁁛  Test run with 5 tests in 1 suite passed after 0.092 seconds.

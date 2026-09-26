@@ -1,0 +1,4 @@
+Build guard: waiting for the active build/test job.
+{"payload":{"timestamp":"2026-09-25T15:52:07.570Z","type":"status","operation":"TEST","message":"Resolving Package Graph...","stage":"RESOLVING_PACKAGES"},"$schema":"https:\/\/schemas.flowdeck.dev\/cli\/events\/v1\/status-event.schema.json","schemaVersion":"1.0.0"}
+{"payload":{"timestamp":"2026-09-25T15:52:15.878Z","type":"status","operation":"TEST","message":"Compiling...","stage":"COMPILING"},"$schema":"https:\/\/schemas.flowdeck.dev\/cli\/events\/v1\/status-event.schema.json","schemaVersion":"1.0.0"}
+Build guard: stopping owned job: memory monitoring failed: Command '['/bin/ps', '-axo', 'pid=,ppid=,pgid=']' timed out after 5 seconds

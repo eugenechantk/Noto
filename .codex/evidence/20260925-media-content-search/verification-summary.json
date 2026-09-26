@@ -1,0 +1,107 @@
+{
+  "packageRuns": [
+    {
+      "suite": "NotoAgentCLI",
+      "tests": 5,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoAgentCLI.log"
+    },
+    {
+      "suite": "NotoChat",
+      "tests": 65,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoChat.log"
+    },
+    {
+      "suite": "NotoDigest",
+      "tests": 42,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoDigest.log"
+    },
+    {
+      "suite": "NotoEdit",
+      "tests": 24,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoEdit.log"
+    },
+    {
+      "suite": "NotoEmbedding",
+      "tests": 10,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoEmbedding.log"
+    },
+    {
+      "suite": "NotoReadwiseSync",
+      "tests": 30,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoReadwiseSync.log"
+    },
+    {
+      "suite": "NotoSearch-rerun",
+      "tests": 129,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoSearch-rerun.log"
+    },
+    {
+      "suite": "NotoSearch",
+      "tests": 129,
+      "result": "failed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoSearch.log"
+    },
+    {
+      "suite": "NotoShareCapture",
+      "tests": 28,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoShareCapture.log"
+    },
+    {
+      "suite": "NotoSocialMedia",
+      "tests": 29,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoSocialMedia.log"
+    },
+    {
+      "suite": "NotoTags",
+      "tests": 28,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/package-tests/NotoTags.log"
+    },
+    {
+      "suite": "vault-tests",
+      "tests": 113,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/vault-tests.log"
+    },
+    {
+      "suite": "link-preview-tests",
+      "tests": 45,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/link-preview-tests.log"
+    },
+    {
+      "suite": "link-preview-final-tests",
+      "tests": 54,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-content-search/link-preview-final-tests.log"
+    }
+  ],
+  "note": "All 12 packages have a passing full run. NotoSearch timing failure passed full standalone rerun. LinkPreview rerun after concurrent UI/API updates passed 54 tests. App-test infrastructure could not complete; final build/run and independent iPhone UI audit passed.",
+  "latestPassingPackageTestCount": 557,
+  "appTests": {
+    "status": "incomplete",
+    "firstRun": "Cancelled after test runner failed to return results for over five minutes.",
+    "serialRetry": "Build guard exited75: ps process monitoring timed out after5seconds. No completed app-test results.",
+    "logs": [
+      ".codex/evidence/20260925-media-content-search/noto2-tests.log",
+      ".codex/evidence/20260925-media-content-search/noto2-tests-serial.log"
+    ]
+  },
+  "visualAudit": {
+    "status": "passed",
+    "device": "iPhone 17 / iOS 26.3",
+    "simulatorUDID": "7FE84808-DCA6-4AF5-9089-DBD8172FF34A",
+    "report": ".codex/evidence/20260925-235406-ios-visual-audit/evidence.md",
+    "recording": ".codex/evidence/20260925-235406-ios-visual-audit/media-content-search-flow.mov",
+    "iPad": "not verified"
+  }
+}

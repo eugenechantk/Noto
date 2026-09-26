@@ -1,0 +1,58 @@
+Building for debugging...
+[0/2] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.10s)
+Test Suite 'All tests' started at 2026-09-25 23:44:44.856.
+Test Suite 'All tests' passed at 2026-09-25 23:44:44.857.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Test "edit resolves a unique target to a replace op" started.
+􀟈  Test "addition after a non-unique anchor is ambiguous" started.
+􀟈  Test "multi-byte characters keep ranges correct" started.
+􀟈  Test "LineDiff: pure deletion" started.
+􀟈  Test "a stale out-of-bounds range throws rather than corrupting" started.
+􀟈  Test "empty target is unresolved empty" started.
+􀟈  Test "overlapping ops are rejected" started.
+􀟈  Test "block carries the nearest preceding heading as a location hint" started.
+􀟈  Test "edit with no match is unresolved notFound" started.
+􀟈  Test "LineDiff: replace shows removed then added" started.
+􀟈  Test "edit with multiple matches is unresolved ambiguous" started.
+􀟈  Test "addition before an anchor" started.
+􀟈  Test "applying multiple blocks together preserves offsets" started.
+􀟈  Test "addition at start of document" started.
+􀟈  Test "changes at distant spots produce SEPARATE blocks (Eugene's line-9 / line-12 rule)" started.
+􀟈  Test "deletion removes the target and its trailing newline when it owns the line" started.
+􀟈  Test "addition after an anchor inserts a new line shown as a pure + row" started.
+􀟈  Test "accepting one block applies only that spot" started.
+􀟈  Test "addition at end of document" started.
+􀟈  Test "addition into an empty document works" started.
+􀟈  Test "expand toggle re-renders with more context" started.
+􀟈  Test "LineDiff: pure addition keeps the anchor line as context" started.
+􀟈  Test "same-spot replace expressed as delete+add coalesces into ONE block" started.
+􁁛  Test "LineDiff: pure deletion" passed after 0.001 seconds.
+􀟈  Test "context lines are clamped at the start of the note and flag no expand-up" started.
+􁁛  Test "addition after a non-unique anchor is ambiguous" passed after 0.001 seconds.
+􁁛  Test "edit resolves a unique target to a replace op" passed after 0.001 seconds.
+􁁛  Test "edit with multiple matches is unresolved ambiguous" passed after 0.001 seconds.
+􁁛  Test "edit with no match is unresolved notFound" passed after 0.001 seconds.
+􁁛  Test "LineDiff: replace shows removed then added" passed after 0.001 seconds.
+􁁛  Test "empty target is unresolved empty" passed after 0.001 seconds.
+􁁛  Test "applying multiple blocks together preserves offsets" passed after 0.001 seconds.
+􁁛  Test "block carries the nearest preceding heading as a location hint" passed after 0.001 seconds.
+􁁛  Test "changes at distant spots produce SEPARATE blocks (Eugene's line-9 / line-12 rule)" passed after 0.001 seconds.
+􁁛  Test "addition at start of document" passed after 0.001 seconds.
+􁁛  Test "overlapping ops are rejected" passed after 0.001 seconds.
+􁁛  Test "addition before an anchor" passed after 0.001 seconds.
+􁁛  Test "addition at end of document" passed after 0.001 seconds.
+􁁛  Test "multi-byte characters keep ranges correct" passed after 0.001 seconds.
+􁁛  Test "addition after an anchor inserts a new line shown as a pure + row" passed after 0.001 seconds.
+􁁛  Test "a stale out-of-bounds range throws rather than corrupting" passed after 0.001 seconds.
+􁁛  Test "accepting one block applies only that spot" passed after 0.001 seconds.
+􁁛  Test "addition into an empty document works" passed after 0.001 seconds.
+􁁛  Test "deletion removes the target and its trailing newline when it owns the line" passed after 0.001 seconds.
+􁁛  Test "LineDiff: pure addition keeps the anchor line as context" passed after 0.001 seconds.
+􁁛  Test "same-spot replace expressed as delete+add coalesces into ONE block" passed after 0.001 seconds.
+􁁛  Test "context lines are clamped at the start of the note and flag no expand-up" passed after 0.001 seconds.
+􁁛  Test "expand toggle re-renders with more context" passed after 0.001 seconds.
+􁁛  Test run with 24 tests in 0 suites passed after 0.001 seconds.

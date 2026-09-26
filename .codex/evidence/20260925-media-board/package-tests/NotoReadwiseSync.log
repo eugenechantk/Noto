@@ -1,0 +1,97 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write swift-version--58304C5D6DBC2206.txt
+[2/18] Compiling NotoReadwiseSyncCore ReadwiseModels.swift
+[3/18] Compiling NotoReadwiseSyncCore SaveModels.swift
+[4/18] Compiling NotoReadwiseSyncCore ReaderModels.swift
+[5/18] Compiling NotoReadwiseSyncCore HTMLToMarkdown.swift
+[6/18] Compiling NotoReadwiseSyncCore ReadwiseClient.swift
+[7/18] Compiling NotoReadwiseSyncCore FrontmatterDocument.swift
+[8/18] Compiling NotoReadwiseSyncCore DateFormatters.swift
+[9/18] Emitting module NotoReadwiseSyncCore
+[10/18] Compiling NotoReadwiseSyncCore SourceNoteSyncEngine.swift
+[11/18] Compiling NotoReadwiseSyncCore SourceNoteRenderer.swift
+[12/18] Compiling NotoReadwiseSyncCore SourceLibrarySyncEngine.swift
+[13/18] Compiling NotoReadwiseSyncCore SyncState.swift
+[14/23] Compiling noto_readwise_sync main.swift
+[15/23] Emitting module noto_readwise_sync
+[15/23] Write Objects.LinkFileList
+[16/23] Linking noto-readwise-sync
+[17/23] Applying noto-readwise-sync
+[19/23] Compiling NotoReadwiseSyncCoreTests resource_bundle_accessor.swift
+[20/23] Emitting module NotoReadwiseSyncCoreTests
+[21/23] Compiling NotoReadwiseSyncCoreTests ReadwiseSyncTests.swift
+[22/25] Emitting module NotoReadwiseSyncPackageTests
+[23/25] Compiling NotoReadwiseSyncPackageTests runner.swift
+[23/25] Write Objects.LinkFileList
+[24/25] Linking NotoReadwiseSyncPackageTests
+Build complete! (6.69s)
+Test Suite 'All tests' started at 2026-09-25 23:19:43.523.
+Test Suite 'All tests' passed at 2026-09-25 23:19:43.524.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "Readwise Source Sync" started.
+􀟈  Test decodeReaderFixture() started.
+􀟈  Test syncReportsWrittenURLsForEveryNonDeletedBook() started.
+􀟈  Test syncUsesCapturesAsDefaultSourceDirectory() started.
+􀟈  Test incrementalSyncDoesNotDeleteReaderNoteWhenReaderReturnsNoDocuments() started.
+􀟈  Test syncSkipsDeletedReadwiseSourceWithoutDeletingLocalNote() started.
+􀟈  Test incrementalSyncUsesSavedTimestampsAndJoinsKnownReaderHighlights() started.
+􀟈  Test readerUpdateMigratesUnmarkedMetadataIntoGeneratedBlock() started.
+􀟈  Test readerUpdatePreservesManualMarkdownBetweenMetadataAndGeneratedBlocks() started.
+􀟈  Test syncCanRunAgainstLimitedBookSet() started.
+􀟈  Test syncReaderDocumentCreatesFullContentSourceNote() started.
+􀟈  Test saveDocumentResponseDecodes() started.
+􀟈  Test saveDocumentRequestEncodesOnlyURLWhenOptionalFieldsAreNil() started.
+􀟈  Test syncReaderDocumentCanJoinMatchingReadwiseHighlights() started.
+􀟈  Test readerUpdatePreservesManualFrontmatterFields() started.
+􀟈  Test renderSourceNoteUsesUpdatedAndMinimalBodyMetadata() started.
+􀟈  Test readwiseHighlightUpdatePreservesReaderContentBlock() started.
+􀟈  Test dryRunSyncReportsNoWrittenURLs() started.
+􀟈  Test readerUpdateReplacesExistingMetadataBlock() started.
+􀟈  Test saveDocumentRequestEncodesAllFieldsWithSnakeCaseKeys() started.
+􀟈  Test decodeNumericNextPageCursor() started.
+􀟈  Test readerUpdateMigratesEmptyHighlightsPlaceholder() started.
+􀟈  Test decodeFixture() started.
+􀟈  Test htmlToMarkdownConvertsImagesToImageSyntax() started.
+􀟈  Test syncRecoversWhenSourceMapPathIsStale() started.
+􀟈  Test readerDocumentTagMatchingRequiresAllRequestedTags() started.
+􀟈  Test syncCreatesFlatSourceNotesAndResolvesFilenameConflicts() started.
+􀟈  Test updateMigratesEmptyPlaceholdersToEmptyBlocks() started.
+􀟈  Test joinedReaderDocumentFallsBackToReaderURLFromDocumentID() started.
+􀟈  Test replaceGeneratedBlockPreservesManualMarkdown() started.
+􀟈  Test readerUpdatePreservesExistingFrontmatterTags() started.
+􁁛  Test saveDocumentResponseDecodes() passed after 0.009 seconds.
+􁁛  Test saveDocumentRequestEncodesOnlyURLWhenOptionalFieldsAreNil() passed after 0.009 seconds.
+􁁛  Test decodeReaderFixture() passed after 0.009 seconds.
+􁁛  Test renderSourceNoteUsesUpdatedAndMinimalBodyMetadata() passed after 0.009 seconds.
+􁁛  Test dryRunSyncReportsNoWrittenURLs() passed after 0.009 seconds.
+􁁛  Test saveDocumentRequestEncodesAllFieldsWithSnakeCaseKeys() passed after 0.009 seconds.
+􁁛  Test readerUpdatePreservesManualFrontmatterFields() passed after 0.009 seconds.
+􁁛  Test decodeFixture() passed after 0.009 seconds.
+􁁛  Test readwiseHighlightUpdatePreservesReaderContentBlock() passed after 0.009 seconds.
+􁁛  Test readerUpdateMigratesUnmarkedMetadataIntoGeneratedBlock() passed after 0.009 seconds.
+􁁛  Test decodeNumericNextPageCursor() passed after 0.009 seconds.
+􁁛  Test htmlToMarkdownConvertsImagesToImageSyntax() passed after 0.009 seconds.
+􁁛  Test readerDocumentTagMatchingRequiresAllRequestedTags() passed after 0.009 seconds.
+􁁛  Test readerUpdateReplacesExistingMetadataBlock() passed after 0.009 seconds.
+􁁛  Test updateMigratesEmptyPlaceholdersToEmptyBlocks() passed after 0.009 seconds.
+􁁛  Test readerUpdatePreservesManualMarkdownBetweenMetadataAndGeneratedBlocks() passed after 0.009 seconds.
+􁁛  Test readerUpdateMigratesEmptyHighlightsPlaceholder() passed after 0.009 seconds.
+􁁛  Test replaceGeneratedBlockPreservesManualMarkdown() passed after 0.009 seconds.
+􁁛  Test syncSkipsDeletedReadwiseSourceWithoutDeletingLocalNote() passed after 0.011 seconds.
+􁁛  Test readerUpdatePreservesExistingFrontmatterTags() passed after 0.012 seconds.
+􁁛  Test syncUsesCapturesAsDefaultSourceDirectory() passed after 0.015 seconds.
+􁁛  Test syncCanRunAgainstLimitedBookSet() passed after 0.016 seconds.
+􁁛  Test incrementalSyncDoesNotDeleteReaderNoteWhenReaderReturnsNoDocuments() passed after 0.016 seconds.
+􁁛  Test syncReaderDocumentCanJoinMatchingReadwiseHighlights() passed after 0.017 seconds.
+􁁛  Test syncReaderDocumentCreatesFullContentSourceNote() passed after 0.017 seconds.
+􁁛  Test syncReportsWrittenURLsForEveryNonDeletedBook() passed after 0.018 seconds.
+􁁛  Test joinedReaderDocumentFallsBackToReaderURLFromDocumentID() passed after 0.018 seconds.
+􁁛  Test syncCreatesFlatSourceNotesAndResolvesFilenameConflicts() passed after 0.018 seconds.
+􁁛  Test syncRecoversWhenSourceMapPathIsStale() passed after 0.019 seconds.
+􁁛  Test incrementalSyncUsesSavedTimestampsAndJoinsKnownReaderHighlights() passed after 0.019 seconds.
+􁁛  Suite "Readwise Source Sync" passed after 0.020 seconds.
+􁁛  Test run with 30 tests in 1 suite passed after 0.020 seconds.

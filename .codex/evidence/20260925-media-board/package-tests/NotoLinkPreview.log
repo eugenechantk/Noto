@@ -1,0 +1,164 @@
+[0/1] Planning build
+Building for debugging...
+[0/3] Write swift-version--58304C5D6DBC2206.txt
+[2/11] Compiling NotoLinkPreview LinkPreviewMetadata.swift
+[3/11] Compiling NotoLinkPreview LinkPreviewService.swift
+[4/11] Compiling NotoLinkPreview LinkPreviewCardLayout.swift
+[5/11] Compiling NotoLinkPreview LinkPreviewCardContent.swift
+[6/11] Compiling NotoLinkPreview LinkPreviewCache.swift
+[7/11] Compiling NotoLinkPreview LinkPreviewDetector.swift
+[8/11] Emitting module NotoLinkPreview
+[9/11] Compiling NotoLinkPreview LinkPreviewFetching.swift
+[10/17] Compiling NotoLinkPreviewTests LinkPreviewServiceTests.swift
+/Users/eugenechan/dev/personal/Noto/Packages/NotoLinkPreview/Tests/NotoLinkPreviewTests/LinkPreviewServiceTests.swift:148:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+146 | 
+147 |     func fetch(_ url: URL) async throws -> LinkPreviewMetadata {
+148 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+149 |         calls.append(url)
+150 |         let shouldWait = holdUntilReleased && !released
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/eugenechan/dev/personal/Noto/Packages/NotoLinkPreview/Tests/NotoLinkPreviewTests/LinkPreviewServiceTests.swift:151:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+149 |         calls.append(url)
+150 |         let shouldWait = holdUntilReleased && !released
+151 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+152 | 
+153 |         if shouldWait {
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/eugenechan/dev/personal/Noto/Packages/NotoLinkPreview/Tests/NotoLinkPreviewTests/LinkPreviewServiceTests.swift:184:68: warning: main actor-isolated class property 'urlUserInfoKey' can not be referenced from a Sendable closure
+182 |     init(center: NotificationCenter, name: Notification.Name) {
+183 |         token = center.addObserver(forName: name, object: nil, queue: nil) { [weak self] notification in
+184 |             if let url = notification.userInfo?[LinkPreviewService.urlUserInfoKey] as? URL {
+    |                                                                    `- warning: main actor-isolated class property 'urlUserInfoKey' can not be referenced from a Sendable closure
+185 |                 self?.urls.append(url)
+186 |             }
+
+/Users/eugenechan/dev/personal/Noto/Packages/NotoLinkPreview/Sources/NotoLinkPreview/LinkPreviewService.swift:16:23: note: class property declared here
+ 14 | 
+ 15 |     public static let didChangeNotification = Notification.Name("NotoLinkPreview.didChange")
+ 16 |     public static let urlUserInfoKey = "url"
+    |                       `- note: class property declared here
+ 17 | 
+ 18 |     public let cache: LinkPreviewCache
+[11/17] Emitting module NotoLinkPreviewTests
+[12/17] Compiling NotoLinkPreviewTests LinkPreviewCacheTests.swift
+[13/17] Compiling NotoLinkPreviewTests LinkPreviewCardLayoutTests.swift
+[14/17] Compiling NotoLinkPreviewTests LinkPreviewCardContentTests.swift
+[15/17] Compiling NotoLinkPreviewTests LinkPreviewDetectorTests.swift
+[16/19] Compiling NotoLinkPreviewPackageTests runner.swift
+[17/19] Emitting module NotoLinkPreviewPackageTests
+[17/19] Write Objects.LinkFileList
+[18/19] Linking NotoLinkPreviewPackageTests
+Build complete! (11.13s)
+Test Suite 'All tests' started at 2026-09-25 23:19:35.504.
+Test Suite 'All tests' passed at 2026-09-25 23:19:35.505.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "LinkPreviewService" started.
+􀟈  Suite "LinkPreviewDetector" started.
+􀟈  Suite "LinkPreviewCardContent" started.
+􀟈  Suite "LinkPreviewCache" started.
+􀟈  Test "display URL strips scheme and trailing slash" started.
+􀟈  Test "first request starts one fetch and reports loading" started.
+􀟈  Suite "LinkPreviewCardLayout" started.
+􀟈  Test "display host strips www" started.
+􀟈  Test "blank summary is dropped" started.
+􀟈  Test "surrounding whitespace is ignored" started.
+􀟈  Test "bare http line is detected" started.
+􀟈  Test "markdown link with surrounding text is not detected" started.
+􀟈  Test "loaded uses title, summary, host and image" started.
+􀟈  Test "text around the URL is not detected" started.
+􀟈  Test "loading shows host and loading line" started.
+􀟈  Test "angle-bracket autolink is unwrapped" started.
+􀟈  Test "image link is not detected" started.
+􀟈  Test "loaded without title falls back to URL" started.
+􀟈  Test "non-web schemes are not detected" started.
+􀟈  Test "query and fragment survive" started.
+􀟈  Test "unfinished host is not detected" started.
+􀟈  Test "failure is cached and reported as failed" started.
+􀟈  Test "localhost is allowed" started.
+􀟈  Test "markdown link to a non-web URL is not detected" started.
+􀟈  Test "empty and blank lines are not detected" started.
+􀟈  Test "a line that is exactly a markdown link is detected" started.
+􀟈  Test "bare https line is detected" started.
+􀟈  Test "success is cached and announced" started.
+􀟈  Test "markdown link with percent-encoded parentheses in the URL is detected" started.
+􀟈  Test "cached metadata skips the fetcher" started.
+􀟈  Test "cachedMetadata does not trigger a fetch" started.
+􀟈  Test "metadata round-trips through disk" started.
+􀟈  Test "corrupt file reads as missing" started.
+􀟈  Test "failure is remembered until the retry window passes" started.
+􀟈  Test "stale metadata reads as missing" started.
+􀟈  Test "failed shows readable URL and unavailable line" started.
+􀟈  Test "with image the thumbnail is a trailing square" started.
+􀟈  Test "downsampler rejects garbage" started.
+􀟈  Test "narrow card caps the thumbnail width" started.
+􀟈  Test "zero width is safe" started.
+􀟈  Test "without image the text column spans the card" started.
+􀟈  Test "key is stable per URL" started.
+􁁛  Test "display URL strips scheme and trailing slash" passed after 0.001 seconds.
+􁁛  Test "text around the URL is not detected" passed after 0.001 seconds.
+􁁛  Test "display host strips www" passed after 0.001 seconds.
+􁁛  Test "markdown link with surrounding text is not detected" passed after 0.001 seconds.
+􁁛  Test "image link is not detected" passed after 0.001 seconds.
+􁁛  Test "loaded without title falls back to URL" passed after 0.001 seconds.
+􁁛  Test "unfinished host is not detected" passed after 0.001 seconds.
+􁁛  Test "localhost is allowed" passed after 0.001 seconds.
+􁁛  Test "angle-bracket autolink is unwrapped" passed after 0.001 seconds.
+􀟈  Test "downsampler bounds the longest side" started.
+􁁛  Test "bare http line is detected" passed after 0.001 seconds.
+􁁛  Test "blank summary is dropped" passed after 0.001 seconds.
+􀟈  Test "downsampler reports pixel size" started.
+􁁛  Test "non-web schemes are not detected" passed after 0.001 seconds.
+􁁛  Test "loading shows host and loading line" passed after 0.001 seconds.
+􀟈  Test "remove forgets one URL" started.
+􀟈  Test "concurrent requests share one fetch" started.
+􁁛  Test "loaded uses title, summary, host and image" passed after 0.001 seconds.
+􁁛  Test "failed shows readable URL and unavailable line" passed after 0.001 seconds.
+􁁛  Test "markdown link with percent-encoded parentheses in the URL is detected" passed after 0.001 seconds.
+􁁛  Test "query and fragment survive" passed after 0.001 seconds.
+􁁛  Test "surrounding whitespace is ignored" passed after 0.001 seconds.
+􁁛  Test "a line that is exactly a markdown link is detected" passed after 0.001 seconds.
+􁁛  Test "zero width is safe" passed after 0.001 seconds.
+􁁛  Test "with image the thumbnail is a trailing square" passed after 0.001 seconds.
+􁁛  Test "empty and blank lines are not detected" passed after 0.001 seconds.
+􁁛  Test "markdown link to a non-web URL is not detected" passed after 0.001 seconds.
+􁁛  Test "bare https line is detected" passed after 0.001 seconds.
+􁁛  Test "without image the text column spans the card" passed after 0.001 seconds.
+􁁛  Test "narrow card caps the thumbnail width" passed after 0.001 seconds.
+􁁛  Suite "LinkPreviewCardContent" passed after 0.001 seconds.
+􁁛  Suite "LinkPreviewDetector" passed after 0.001 seconds.
+􁁛  Test "key is stable per URL" passed after 0.001 seconds.
+􁁛  Test "corrupt file reads as missing" passed after 0.006 seconds.
+􁁛  Test "failure is remembered until the retry window passes" passed after 0.006 seconds.
+􁁛  Test "stale metadata reads as missing" passed after 0.006 seconds.
+􁁛  Test "metadata round-trips through disk" passed after 0.006 seconds.
+􁁛  Test "remove forgets one URL" passed after 0.007 seconds.
+􁁛  Suite "LinkPreviewCache" passed after 0.007 seconds.
+􁁛  Test "cached metadata skips the fetcher" passed after 0.008 seconds.
+􁁛  Test "downsampler rejects garbage" passed after 0.007 seconds.
+􁁛  Test "downsampler reports pixel size" passed after 0.008 seconds.
+􁁛  Test "first request starts one fetch and reports loading" passed after 0.010 seconds.
+􁁛  Test "failure is cached and reported as failed" passed after 0.010 seconds.
+􁁛  Test "success is cached and announced" passed after 0.010 seconds.
+􁁛  Test "cachedMetadata does not trigger a fetch" passed after 0.010 seconds.
+􁁛  Test "concurrent requests share one fetch" passed after 0.010 seconds.
+􁁛  Suite "LinkPreviewService" passed after 0.011 seconds.
+􁁛  Test "downsampler bounds the longest side" passed after 0.031 seconds.
+􁁛  Suite "LinkPreviewCardLayout" passed after 0.032 seconds.
+􁁛  Test run with 41 tests in 5 suites passed after 0.032 seconds.

@@ -1,0 +1,245 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write sources
+[1/4] Write swift-version--58304C5D6DBC2206.txt
+[3/29] Compiling NotoVault VaultPathResolver.swift
+[4/30] Compiling NotoVault VaultMarkdown.swift
+[5/30] Compiling NotoEdit LineDiff.swift
+[6/30] Emitting module NotoEdit
+[7/30] Compiling NotoEdit EditApplier.swift
+[8/30] Compiling NotoEdit Models.swift
+[9/30] Compiling NotoVault AttachmentStore.swift
+[10/30] Compiling NotoVault BoundedFileRead.swift
+[11/30] Emitting module NotoVault
+/Users/eugenechan/dev/personal/Noto/Packages/NotoVault/Sources/NotoVault/VaultManager.swift:15:17: warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 13 | public final class VaultManager: Sendable {
+ 14 |     public let rootURL: URL
+ 15 |     private let fileManager = FileManager.default
+    |                 `- warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 16 |     private let logger = Logger(subsystem: "com.noto", category: "VaultManager")
+ 17 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSFileManager.h:96:12: note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 94 | extern NSNotificationName const NSUbiquityIdentityDidChangeNotification API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
+ 95 | 
+ 96 | @interface NSFileManager : NSObject
+    |            `- note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 97 | 
+ 98 | /* Returns the default singleton instance.
+[12/30] Compiling NotoVault NoteRepository.swift
+[13/30] Compiling NotoVault NoteTitleResolver.swift
+[14/30] Compiling NotoVault VaultListItem.swift
+[15/30] Compiling NotoVault SidebarTreeLoader.swift
+[16/30] Compiling NotoVault VaultDirectoryLoader.swift
+[17/30] Compiling NotoVault NoteFrontmatter.swift
+[18/30] Compiling NotoVault NoteProperty.swift
+[19/30] Compiling NotoVault VaultFileSystem.swift
+[20/30] Compiling NotoVault VaultManager.swift
+/Users/eugenechan/dev/personal/Noto/Packages/NotoVault/Sources/NotoVault/VaultManager.swift:15:17: warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 13 | public final class VaultManager: Sendable {
+ 14 |     public let rootURL: URL
+ 15 |     private let fileManager = FileManager.default
+    |                 `- warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 16 |     private let logger = Logger(subsystem: "com.noto", category: "VaultManager")
+ 17 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSFileManager.h:96:12: note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 94 | extern NSNotificationName const NSUbiquityIdentityDidChangeNotification API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
+ 95 | 
+ 96 | @interface NSFileManager : NSObject
+    |            `- note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 97 | 
+ 98 | /* Returns the default singleton instance.
+[21/30] Compiling NotoVault Frontmatter.swift
+[22/30] Compiling NotoVault NoteFile.swift
+[23/30] Compiling NotoVault DailyNoteService.swift
+[24/30] Compiling NotoVault FolderRepository.swift
+[25/30] Compiling NotoVault VaultMediaLibrary.swift
+[26/30] Compiling NotoVault NotoDeepLink.swift
+[27/30] Compiling NotoVault RelativeDate.swift
+[28/30] Compiling NotoVault WordCounter.swift
+[29/38] Compiling NotoChat Models.swift
+[30/38] Emitting module NotoChat
+[31/38] Compiling NotoChat VaultEditTool.swift
+[32/38] Compiling NotoChat ChatAgent.swift
+[33/38] Compiling NotoChat VaultTools.swift
+[34/38] Compiling NotoChat SearchTool.swift
+[35/38] Compiling NotoChat OpenRouterClient.swift
+[36/38] Compiling NotoChat Transcript.swift
+[37/50] Compiling NotoChatTests TestSupport.swift
+[38/50] Compiling NotoChatTests TranscriptTests.swift
+[39/50] Compiling NotoChatTests SSEStreamDecoderTests.swift
+[40/50] Compiling NotoChatTests SearchToolTests.swift
+[41/50] Compiling NotoChatTests VaultEditToolTests.swift
+[42/50] Compiling NotoChatTests VaultToolsTests.swift
+[43/50] Compiling NotoChatTests RealVaultTests.swift
+[44/50] Compiling NotoChatTests DateFilterTests.swift
+[45/50] Compiling NotoChatTests OpenRouterClientTests.swift
+[46/50] Emitting module NotoChatTests
+[47/50] Compiling NotoChatTests LiveChatTests.swift
+[48/50] Compiling NotoChatTests ChatAgentTests.swift
+[49/52] Emitting module NotoChatPackageTests
+[50/52] Compiling NotoChatPackageTests runner.swift
+[50/52] Write Objects.LinkFileList
+[51/52] Linking NotoChatPackageTests
+Build complete! (38.27s)
+Test Suite 'All tests' started at 2026-09-25 23:18:38.467.
+Test Suite 'All tests' passed at 2026-09-25 23:18:38.468.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite SSEStreamDecoderTests started.
+􀟈  Suite LiveChatTests started.
+􀟈  Suite TranscriptTests started.
+􀟈  Suite SearchToolTests started.
+􀟈  Suite OpenRouterClientTests started.
+􀟈  Test "propose_edits is advertised in the tool definitions" started.
+􀟈  Test "propose_edits reports unresolved edits back to the model" started.
+􀟈  Suite RealVaultTests started.
+􀟈  Suite DateFilterTests started.
+􀟈  Test "propose_edits defaults to the in-context note when path is omitted" started.
+􀟈  Test accumulatesToolCallArgumentsAcrossChunks() started.
+􀟈  Test handlesTwoParallelToolCallsByIndex() started.
+􀟈  Test sanitizesFileName() started.
+􀟈  Suite VaultToolsTests started.
+􀟈  Test rendersFrontmatterAndTurns() started.
+􀟈  Test rendersPerTurnReferenceLines() started.
+􀟈  Suite ChatAgentTests started.
+􀟈  Test liveDiariesInTheLastFiveDays() started.
+􀟈  Test testNoResultsMessageMentionsFilters() started.
+􀟈  Test liveAgenticChatAgainstRealVault() started.
+􀟈  Test "the agent loop surfaces .editProposal for a propose_edits tool call" started.
+􀟈  Test timesDateFilterOverRealVault() started.
+􀟈  Test parsesIncrementalTextDeltasThenFinish() started.
+􀟈  Test testFolderArgumentReachesProvider() started.
+􀟈  Test "literal \n in model content is normalized to a real newline before applying" started.
+􀟈  Test testSearchAdvertisedOnlyWithProvider() started.
+􀟈  Test savesToChatsDirectory() started.
+􀟈  Test testDispatchParsesQueryDatesAndLimit() started.
+􀟈  Test testOutputFormatAndSurfacedPaths() started.
+􀟈  Test testMissingQueryReturnsError() started.
+􀟈  Test grepDistinctiveTermAndReadKnownNote() started.
+􀟈  Test testProviderFailureReturnsErrorText() started.
+􀟈  Test runWithDateOnlyArgsListsNotes() started.
+􀟈  Test testFolderAppearsInOutputAndNoResultsMessage() started.
+􀟈  Test parsesDateOnlyAndFullISO() started.
+􀟈  Test listsNotesUpdatedAfterCutoffMostRecentFirst() started.
+􀟈  Test grepAndReadAgainstRealVault() started.
+􀟈  Test "propose_edits parses edits, strips frontmatter, and returns rendered blocks" started.
+􀟈  Test "normalizeEscapes turns literal escape sequences into real characters" started.
+􀟈  Test "propose_edits without a path or default errors cleanly" started.
+􀟈  Test grepWithoutQueryOrFilterIsRejected() started.
+􀟈  Test grepCombinesKeywordWithDateFilter() started.
+􀟈  Test listScopedToFolderWithDateFilter() started.
+[RealVaultTests] NOTO_VAULT not set — skipping.
+[LiveChatTests] OPENROUTER_API_KEY not set — skipping.
+[LiveChatTests] env not set — skipping diaries test.
+􀟈  Test buildsCorrectChatCompletionsRequest() started.
+[RealVaultTests] NOTO_VAULT not set — skipping.
+[RealVaultTests] NOTO_VAULT not set — skipping.
+􀟈  Test readRejectsPathEscape() started.
+􀟈  Test runDispatchesGrepToolCall() started.
+􀟈  Test runReadToolCallReportsSourcePath() started.
+􀟈  Test grepRespectsPathScope() started.
+􀟈  Test readReturnsFullFile() started.
+􀟈  Test readReturnsLineRange() started.
+􀟈  Test readMissingFileFails() started.
+􀟈  Test listShowsDirectoriesFirstThenNotes() started.
+􀟈  Test grepFindsMatchesCaseInsensitiveWithLineNumbers() started.
+􀟈  Test grepReturnsEmptyWhenNoMatch() started.
+􁁛  Test sanitizesFileName() passed after 0.004 seconds.
+􀟈  Test runsToolRoundThenAnswersAndCollectsSources() started.
+􀟈  Test rejectsCitationsForFilesNotSurfaced() started.
+􀟈  Test strippedComposedUserContentPassesPlainTextThrough() started.
+􀟈  Test answersImmediatelyWithoutTools() started.
+􀟈  Test strippedComposedUserContentRecoversTypedMessage() started.
+􀟈  Test droppedReferenceRemovesItsInlineCitation() started.
+􀟈  Test mentionedFilesArePreAttachedAsContextAndSources() started.
+􀟈  Test nonContiguousCitationNumbersAreRenumbered() started.
+􀟈  Test groupedCitationsRenumberMemberWise() started.
+􀟈  Test contiguousCitationsPassThroughUnchanged() started.
+􀟈  Test strippedComposedUserContentHandlesDelimiterInsideAttachment() started.
+􀟈  Test renumberingLeavesMarkdownLinksAndDefinitionsAlone() started.
+􀟈  Test citesGrepSurfacedFilesWithoutReading() started.
+􀟈  Test streamingEmitsToolProgressAndTextDeltas() started.
+􁁛  Test timesDateFilterOverRealVault() passed after 0.005 seconds.
+􀟈  Test stopsAtRoundLimit() started.
+􁁛  Test liveAgenticChatAgainstRealVault() passed after 0.005 seconds.
+􁁛  Test handlesTwoParallelToolCallsByIndex() passed after 0.005 seconds.
+􁁛  Test accumulatesToolCallArgumentsAcrossChunks() passed after 0.005 seconds.
+􁁛  Test parsesIncrementalTextDeltasThenFinish() passed after 0.005 seconds.
+􁁛  Test liveDiariesInTheLastFiveDays() passed after 0.005 seconds.
+􁁛  Test rendersPerTurnReferenceLines() passed after 0.005 seconds.
+􁁛  Test rendersFrontmatterAndTurns() passed after 0.005 seconds.
+􁁛  Test grepDistinctiveTermAndReadKnownNote() passed after 0.005 seconds.
+􁁛  Test testProviderFailureReturnsErrorText() passed after 0.005 seconds.
+􁁛  Test testFolderArgumentReachesProvider() passed after 0.005 seconds.
+􁁛  Test testMissingQueryReturnsError() passed after 0.005 seconds.
+􁁛  Test testSearchAdvertisedOnlyWithProvider() passed after 0.005 seconds.
+􁁛  Test grepAndReadAgainstRealVault() passed after 0.005 seconds.
+􁁛  Test "normalizeEscapes turns literal escape sequences into real characters" passed after 0.005 seconds.
+􁁛  Test testOutputFormatAndSurfacedPaths() passed after 0.006 seconds.
+􁁛  Test parsesDateOnlyAndFullISO() passed after 0.011 seconds.
+􁁛  Test testDispatchParsesQueryDatesAndLimit() passed after 0.020 seconds.
+􁁛  Test testFolderAppearsInOutputAndNoResultsMessage() passed after 0.020 seconds.
+􁁛  Test testNoResultsMessageMentionsFilters() passed after 0.022 seconds.
+􁁛  Test "propose_edits is advertised in the tool definitions" passed after 0.022 seconds.
+􁁛  Test "propose_edits without a path or default errors cleanly" passed after 0.022 seconds.
+􁁛  Test grepWithoutQueryOrFilterIsRejected() passed after 0.022 seconds.
+􁁛  Test readRejectsPathEscape() passed after 0.018 seconds.
+􁁛  Test runDispatchesGrepToolCall() passed after 0.018 seconds.
+􁁛  Test grepRespectsPathScope() passed after 0.018 seconds.
+􁁛  Test buildsCorrectChatCompletionsRequest() passed after 0.021 seconds.
+􁁛  Test runWithDateOnlyArgsListsNotes() passed after 0.022 seconds.
+􁁛  Test grepCombinesKeywordWithDateFilter() passed after 0.022 seconds.
+􁁛  Test listsNotesUpdatedAfterCutoffMostRecentFirst() passed after 0.022 seconds.
+􁁛  Test "propose_edits reports unresolved edits back to the model" passed after 0.022 seconds.
+􁁛  Test listScopedToFolderWithDateFilter() passed after 0.022 seconds.
+􁁛  Test "literal \n in model content is normalized to a real newline before applying" passed after 0.022 seconds.
+􁁛  Test strippedComposedUserContentPassesPlainTextThrough() passed after 0.017 seconds.
+􁁛  Test "propose_edits defaults to the in-context note when path is omitted" passed after 0.023 seconds.
+􁁛  Test "propose_edits parses edits, strips frontmatter, and returns rendered blocks" passed after 0.023 seconds.
+􁁛  Test contiguousCitationsPassThroughUnchanged() passed after 0.018 seconds.
+􁁛  Test strippedComposedUserContentHandlesDelimiterInsideAttachment() passed after 0.018 seconds.
+􁁛  Test droppedReferenceRemovesItsInlineCitation() passed after 0.018 seconds.
+􁁛  Test nonContiguousCitationNumbersAreRenumbered() passed after 0.018 seconds.
+􁁛  Suite RealVaultTests passed after 0.023 seconds.
+􁁛  Test groupedCitationsRenumberMemberWise() passed after 0.018 seconds.
+􁁛  Test renumberingLeavesMarkdownLinksAndDefinitionsAlone() passed after 0.018 seconds.
+􁁛  Suite LiveChatTests passed after 0.024 seconds.
+􁁛  Suite SSEStreamDecoderTests passed after 0.024 seconds.
+􁁛  Suite SearchToolTests passed after 0.023 seconds.
+􁁛  Suite DateFilterTests passed after 0.024 seconds.
+􁁛  Test savesToChatsDirectory() passed after 0.024 seconds.
+􁁛  Test readReturnsFullFile() passed after 0.020 seconds.
+􁁛  Test rejectsCitationsForFilesNotSurfaced() passed after 0.019 seconds.
+􁁛  Test listShowsDirectoriesFirstThenNotes() passed after 0.020 seconds.
+􁁛  Test readMissingFileFails() passed after 0.020 seconds.
+􀟈  Test missingAPIKeyThrows() started.
+􁁛  Test answersImmediatelyWithoutTools() passed after 0.019 seconds.
+􁁛  Suite TranscriptTests passed after 0.025 seconds.
+􁁛  Test runReadToolCallReportsSourcePath() passed after 0.020 seconds.
+􁁛  Test missingAPIKeyThrows() passed after 0.001 seconds.
+􀟈  Test customBaseURLAcceptsRootOrFullEndpoint() started.
+􁁛  Test "the agent loop surfaces .editProposal for a propose_edits tool call" passed after 0.025 seconds.
+􁁛  Test customBaseURLAcceptsRootOrFullEndpoint() passed after 0.001 seconds.
+􀟈  Test completeParsesAssistantMessage() started.
+􁁛  Test citesGrepSurfacedFilesWithoutReading() passed after 0.020 seconds.
+􁁛  Test grepReturnsEmptyWhenNoMatch() passed after 0.021 seconds.
+􁁛  Test grepFindsMatchesCaseInsensitiveWithLineNumbers() passed after 0.021 seconds.
+􁁛  Test readReturnsLineRange() passed after 0.022 seconds.
+􁁛  Suite VaultToolsTests passed after 0.027 seconds.
+􁁛  Test runsToolRoundThenAnswersAndCollectsSources() passed after 0.024 seconds.
+􁁛  Test mentionedFilesArePreAttachedAsContextAndSources() passed after 0.025 seconds.
+􁁛  Test completeParsesAssistantMessage() passed after 0.005 seconds.
+􀟈  Test streamYieldsTextDeltasAndFinish() started.
+􁁛  Test strippedComposedUserContentRecoversTypedMessage() passed after 0.026 seconds.
+􁁛  Test streamYieldsTextDeltasAndFinish() passed after 0.001 seconds.
+􀟈  Test streamSurfacesHTTPErrorBody() started.
+􁁛  Test streamingEmitsToolProgressAndTextDeltas() passed after 0.027 seconds.
+􁁛  Test streamSurfacesHTTPErrorBody() passed after 0.001 seconds.
+􁁛  Suite OpenRouterClientTests passed after 0.033 seconds.
+􁁛  Test stopsAtRoundLimit() passed after 0.032 seconds.
+􁁛  Suite ChatAgentTests passed after 0.038 seconds.
+􁁛  Test run with 65 tests in 9 suites passed after 0.038 seconds.

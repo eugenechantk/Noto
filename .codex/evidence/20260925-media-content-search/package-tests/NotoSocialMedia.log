@@ -1,0 +1,122 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write swift-version--58304C5D6DBC2206.txt
+[2/13] Compiling NotoShareCapture ShareMediaDelivery.swift
+[3/13] Emitting module NotoShareCapture
+[4/13] Compiling NotoShareCapture SharedLinkPayload.swift
+[5/13] Compiling NotoShareCapture PendingCaptureStore.swift
+[6/13] Compiling NotoShareCapture ShareMediaJob.swift
+[7/13] Compiling NotoShareCapture SharedLinkCapture.swift
+[8/13] Compiling NotoShareCapture CaptureNotePath.swift
+[9/21] Compiling NotoSocialMedia XPostResolver.swift
+[10/21] Compiling NotoSocialMedia YtDlpInstagram.swift
+[11/21] Compiling NotoSocialMedia ShareMediaNote.swift
+[12/21] Compiling NotoSocialMedia SocialPost.swift
+[13/21] Compiling NotoSocialMedia CloudflareQueueClient.swift
+[14/21] Emitting module NotoSocialMedia
+/Users/eugenechan/dev/personal/Noto/Packages/NotoSocialMedia/Sources/NotoSocialMedia/ShareMediaProcessor.swift:69:60: warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 67 |     public init(vaultURL: URL, stateDirectory: URL, http: any HTTPFetching = URLSessionFetcher(),
+ 68 |                 instagramFallback: (any InstagramLoginFallback)? = nil,
+ 69 |                 now: @escaping @Sendable () -> Date = Date.init) {
+    |                                                            `- warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 70 |         self.vaultURL = vaultURL
+ 71 |         self.store = PendingAppendStore(stateDirectory: stateDirectory)
+[15/21] Compiling NotoSocialMedia InstagramPostResolver.swift
+[16/21] Compiling NotoSocialMedia ShareMediaProcessor.swift
+/Users/eugenechan/dev/personal/Noto/Packages/NotoSocialMedia/Sources/NotoSocialMedia/ShareMediaProcessor.swift:69:60: warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 67 |     public init(vaultURL: URL, stateDirectory: URL, http: any HTTPFetching = URLSessionFetcher(),
+ 68 |                 instagramFallback: (any InstagramLoginFallback)? = nil,
+ 69 |                 now: @escaping @Sendable () -> Date = Date.init) {
+    |                                                            `- warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 70 |         self.vaultURL = vaultURL
+ 71 |         self.store = PendingAppendStore(stateDirectory: stateDirectory)
+[17/30] Compiling noto_share_media main.swift
+[18/30] Emitting module noto_share_media
+[18/30] Write Objects.LinkFileList
+[19/30] Linking noto-share-media
+[20/30] Applying noto-share-media
+[22/30] Compiling NotoSocialMediaTests InstagramLoginFallbackTests.swift
+[23/30] Compiling NotoSocialMediaTests resource_bundle_accessor.swift
+[24/30] Compiling NotoSocialMediaTests Support.swift
+[25/30] Compiling NotoSocialMediaTests NoteAndProcessorTests.swift
+[26/30] Emitting module NotoSocialMediaTests
+[27/30] Compiling NotoSocialMediaTests CloudflareQueueClientTests.swift
+[28/30] Compiling NotoSocialMediaTests ResolverTests.swift
+[29/32] Compiling NotoSocialMediaPackageTests runner.swift
+[30/32] Emitting module NotoSocialMediaPackageTests
+[30/32] Write Objects.LinkFileList
+[31/32] Linking NotoSocialMediaPackageTests
+Build complete! (3.16s)
+Test Suite 'All tests' started at 2026-09-25 23:45:28.809.
+Test Suite 'All tests' passed at 2026-09-25 23:45:28.810.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite ResolverTests started.
+􀟈  Suite NoteAndProcessorTests started.
+􀟈  Suite CloudflareQueueClientTests started.
+􀟈  Suite InstagramLoginFallbackTests started.
+􀟈  Test xQuotePostCarriesQuotedVideo() started.
+􀟈  Test downloadNamesFilesStablyAndSkipsExistingFiles() started.
+􀟈  Test instagramVideoEmbedParses() started.
+􀟈  Test xMissingPostIsUnreadable() started.
+􀟈  Test overwrittenBlockIsRestoredWithinVerifyWindowOnly() started.
+􀟈  Test resolverRoutesByPlatform() started.
+􀟈  Test parkedBlockIsDroppedAfterSevenDays() started.
+􀟈  Test instagramCarouselKeepsEveryChildInOrder() started.
+􀟈  Test instagramShortcodeIsReadFromEveryURLShape() started.
+􀟈  Test appendAddsBlockOnceAfterABlankLine() started.
+􀟈  Test blockQuotesTextListsMediaAndNestsQuotedPost() started.
+􀟈  Test xTokenMatchesJavaScript() started.
+􀟈  Test instagramLoginWallIsUnreadable() started.
+􀟈  Test pullAndAckSendAuthenticatedRequests() started.
+􀟈  Test xStatusIDIsReadFromEveryURLShape() started.
+􀟈  Test xVideoPostKeepsDisplayTextAndBestMP4() started.
+􀟈  Test dashOnlyVideoFallsBackToItsThumbnail() started.
+􀟈  Test acceptParksUntilNoteAppearsThenAppends() started.
+􀟈  Test commandReadsCookiesLiveFromTheBrowser() started.
+􀟈  Test resolverWithoutFallbackStillReportsUnreadable() started.
+􀟈  Test reelPicksTheProgressiveMP4() started.
+􀟈  Test locateUsesInboxPathThenSearchesByURL() started.
+􀟈  Test bodyIsNormalisedFromStringObjectOrBase64() started.
+􀟈  Test resolverFallsBackWhenTheEmbedIsUnreadable() started.
+􀟈  Test loginFetchFailuresAreRetriedNotSkipped() started.
+􀟈  Test xPhotoPostUsesLargeImagesAndExpandsLinks() started.
+􀟈  Test apiErrorsSurface() started.
+􀟈  Test unusableOutputThrows() started.
+􀟈  Test carouselKeepsEntriesInOrder() started.
+􁁛  Test instagramShortcodeIsReadFromEveryURLShape() passed after 0.003 seconds.
+􁁛  Test xTokenMatchesJavaScript() passed after 0.003 seconds.
+􁁛  Test xStatusIDIsReadFromEveryURLShape() passed after 0.003 seconds.
+􁁛  Test xMissingPostIsUnreadable() passed after 0.003 seconds.
+􁁛  Test instagramLoginWallIsUnreadable() passed after 0.003 seconds.
+􁁛  Test dashOnlyVideoFallsBackToItsThumbnail() passed after 0.003 seconds.
+􁁛  Test blockQuotesTextListsMediaAndNestsQuotedPost() passed after 0.003 seconds.
+􁁛  Test instagramCarouselKeepsEveryChildInOrder() passed after 0.003 seconds.
+􁁛  Test commandReadsCookiesLiveFromTheBrowser() passed after 0.003 seconds.
+􁁛  Test bodyIsNormalisedFromStringObjectOrBase64() passed after 0.003 seconds.
+􁁛  Test loginFetchFailuresAreRetriedNotSkipped() passed after 0.003 seconds.
+􁁛  Test resolverFallsBackWhenTheEmbedIsUnreadable() passed after 0.003 seconds.
+􁁛  Test resolverWithoutFallbackStillReportsUnreadable() passed after 0.003 seconds.
+􁁛  Test pullAndAckSendAuthenticatedRequests() passed after 0.003 seconds.
+􁁛  Test apiErrorsSurface() passed after 0.003 seconds.
+􁁛  Test xPhotoPostUsesLargeImagesAndExpandsLinks() passed after 0.003 seconds.
+􁁛  Test unusableOutputThrows() passed after 0.003 seconds.
+􁁛  Test carouselKeepsEntriesInOrder() passed after 0.003 seconds.
+􁁛  Suite CloudflareQueueClientTests passed after 0.003 seconds.
+􁁛  Test xVideoPostKeepsDisplayTextAndBestMP4() passed after 0.003 seconds.
+􁁛  Test reelPicksTheProgressiveMP4() passed after 0.003 seconds.
+􁁛  Test xQuotePostCarriesQuotedVideo() passed after 0.003 seconds.
+􁁛  Suite InstagramLoginFallbackTests passed after 0.004 seconds.
+􁁛  Test downloadNamesFilesStablyAndSkipsExistingFiles() passed after 0.005 seconds.
+􁁛  Test locateUsesInboxPathThenSearchesByURL() passed after 0.005 seconds.
+􁁛  Test parkedBlockIsDroppedAfterSevenDays() passed after 0.007 seconds.
+􁁛  Test instagramVideoEmbedParses() passed after 0.007 seconds.
+􁁛  Test appendAddsBlockOnceAfterABlankLine() passed after 0.007 seconds.
+􁁛  Test resolverRoutesByPlatform() passed after 0.007 seconds.
+􁁛  Suite ResolverTests passed after 0.007 seconds.
+􁁛  Test acceptParksUntilNoteAppearsThenAppends() passed after 0.011 seconds.
+􁁛  Test overwrittenBlockIsRestoredWithinVerifyWindowOnly() passed after 0.013 seconds.
+􁁛  Suite NoteAndProcessorTests passed after 0.014 seconds.
+􁁛  Test run with 29 tests in 4 suites passed after 0.014 seconds.

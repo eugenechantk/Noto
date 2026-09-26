@@ -1,0 +1,94 @@
+[0/1] Planning build
+Building for debugging...
+[0/3] Write swift-version--58304C5D6DBC2206.txt
+[2/10] Compiling NotoShareCapture SharedLinkPayload.swift
+[3/10] Compiling NotoShareCapture ShareMediaJob.swift
+[4/10] Compiling NotoShareCapture SharedLinkCapture.swift
+[5/10] Compiling NotoShareCapture PendingCaptureStore.swift
+[6/10] Emitting module NotoShareCapture
+[7/10] Compiling NotoShareCapture CaptureNotePath.swift
+[8/10] Compiling NotoShareCapture ShareMediaDelivery.swift
+[9/16] Compiling NotoShareCaptureTests SharedLinkPayloadTests.swift
+[10/16] Compiling NotoShareCaptureTests SharedLinkCaptureTests.swift
+[11/16] Compiling NotoShareCaptureTests ShareMediaDeliveryTests.swift
+[12/16] Emitting module NotoShareCaptureTests
+[13/16] Compiling NotoShareCaptureTests PendingCaptureStoreTests.swift
+[14/16] Compiling NotoShareCaptureTests ShareMediaJobTests.swift
+[15/18] Emitting module NotoShareCapturePackageTests
+[16/18] Compiling NotoShareCapturePackageTests runner.swift
+[16/18] Write Objects.LinkFileList
+[17/18] Linking NotoShareCapturePackageTests
+Build complete! (5.98s)
+Test Suite 'All tests' started at 2026-09-25 23:20:22.630.
+Test Suite 'All tests' passed at 2026-09-25 23:20:22.631.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite SharedLinkCaptureTests started.
+􀟈  Suite SharedLinkPayloadTests started.
+􀟈  Suite PendingCaptureStoreTests started.
+􀟈  Suite ShareMediaDeliveryTests started.
+􀟈  Suite ShareMediaJobTests started.
+􀟈  Test textEqualToURLOrTitleIsNotRepeated() started.
+􀟈  Test parenthesesInURLArePercentEncoded() started.
+􀟈  Test titleBracketsAndNewlinesAreNeutralised() started.
+􀟈  Test missingFolderIsEmptyNotError() started.
+􀟈  Test sharedTextFollowsLinkAsSecondParagraph() started.
+􀟈  Test pendingReturnsOldestFirst() started.
+􀟈  Test notePathMatchesInboxShape() started.
+􀟈  Test instagramPostAndReelURLsAreRouted() started.
+􀟈  Test removeDeletesOnlyThatCapture() started.
+􀟈  Test bodyFallsBackToURLAsTitle() started.
+􀟈  Test bodyIsMarkdownLinkWithTitle() started.
+􀟈  Test jobJSONRoundTripsWithISODates() started.
+􀟈  Test failedJobStaysInOutboxAndFlushSendsItLater() started.
+􀟈  Test xStatusURLsAreRouted() started.
+􀟈  Test jobCarriesCaptureIdentityAndNotePath() started.
+􀟈  Test corruptFilesAreSkippedNotFatal() started.
+􀟈  Test enqueueWritesOneFilePerCapture() started.
+􀟈  Test urlIsExtractedFromTextWhenNoAttachment() started.
+􀟈  Test acceptedJobLeavesNoOutboxCopy() started.
+􀟈  Test otherURLsAreNotRouted() started.
+􀟈  Test resolvedBodyUsesLinkFormat() started.
+􀟈  Test requestIsAuthenticatedJSONPost() started.
+􀟈  Test flushSendsOldestFirstAndCountsAccepted() started.
+􀟈  Test inboxPathValidatorRejectsTraversal() started.
+􀟈  Test pageTitleFromPreprocessingIsPreferredOverItemTitle() started.
+􀟈  Test explicitURLWins() started.
+􀟈  Test payloadWithoutURLResolvesToNil() started.
+􀟈  Test endpointReadsInfoPlistAndIgnoresUnexpandedVariables() started.
+􁁛  Test bodyFallsBackToURLAsTitle() passed after 0.001 seconds.
+􁁛  Test instagramPostAndReelURLsAreRouted() passed after 0.001 seconds.
+􁁛  Test textEqualToURLOrTitleIsNotRepeated() passed after 0.001 seconds.
+􁁛  Test sharedTextFollowsLinkAsSecondParagraph() passed after 0.001 seconds.
+􁁛  Test xStatusURLsAreRouted() passed after 0.001 seconds.
+􁁛  Test urlIsExtractedFromTextWhenNoAttachment() passed after 0.001 seconds.
+􁁛  Test resolvedBodyUsesLinkFormat() passed after 0.001 seconds.
+􁁛  Test bodyIsMarkdownLinkWithTitle() passed after 0.001 seconds.
+􁁛  Test otherURLsAreNotRouted() passed after 0.001 seconds.
+􁁛  Test jobJSONRoundTripsWithISODates() passed after 0.001 seconds.
+􁁛  Test notePathMatchesInboxShape() passed after 0.001 seconds.
+􁁛  Test inboxPathValidatorRejectsTraversal() passed after 0.001 seconds.
+􁁛  Test explicitURLWins() passed after 0.001 seconds.
+􁁛  Test pageTitleFromPreprocessingIsPreferredOverItemTitle() passed after 0.001 seconds.
+􁁛  Test endpointReadsInfoPlistAndIgnoresUnexpandedVariables() passed after 0.001 seconds.
+􁁛  Test parenthesesInURLArePercentEncoded() passed after 0.001 seconds.
+􁁛  Test titleBracketsAndNewlinesAreNeutralised() passed after 0.001 seconds.
+􁁛  Suite SharedLinkCaptureTests passed after 0.001 seconds.
+􁁛  Test payloadWithoutURLResolvesToNil() passed after 0.001 seconds.
+􁁛  Suite SharedLinkPayloadTests passed after 0.001 seconds.
+􁁛  Test requestIsAuthenticatedJSONPost() passed after 0.001 seconds.
+􁁛  Test missingFolderIsEmptyNotError() passed after 0.002 seconds.
+􁁛  Test jobCarriesCaptureIdentityAndNotePath() passed after 0.002 seconds.
+􁁛  Suite ShareMediaJobTests passed after 0.002 seconds.
+􁁛  Test acceptedJobLeavesNoOutboxCopy() passed after 0.004 seconds.
+􁁛  Test enqueueWritesOneFilePerCapture() passed after 0.004 seconds.
+􁁛  Test failedJobStaysInOutboxAndFlushSendsItLater() passed after 0.004 seconds.
+􁁛  Test corruptFilesAreSkippedNotFatal() passed after 0.004 seconds.
+􁁛  Test removeDeletesOnlyThatCapture() passed after 0.004 seconds.
+􁁛  Test pendingReturnsOldestFirst() passed after 0.005 seconds.
+􁁛  Test flushSendsOldestFirstAndCountsAccepted() passed after 0.004 seconds.
+􁁛  Suite ShareMediaDeliveryTests passed after 0.005 seconds.
+􁁛  Suite PendingCaptureStoreTests passed after 0.005 seconds.
+􁁛  Test run with 28 tests in 5 suites passed after 0.005 seconds.

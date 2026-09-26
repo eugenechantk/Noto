@@ -1,0 +1,83 @@
+{
+  "packages": [
+    {
+      "package": "NotoAgentCLI",
+      "tests": 5,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoAgentCLI.log"
+    },
+    {
+      "package": "NotoChat",
+      "tests": 65,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoChat.log"
+    },
+    {
+      "package": "NotoDigest",
+      "tests": 42,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoDigest.log"
+    },
+    {
+      "package": "NotoEdit",
+      "tests": 24,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoEdit.log"
+    },
+    {
+      "package": "NotoEmbedding",
+      "tests": 10,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoEmbedding.log"
+    },
+    {
+      "package": "NotoLinkPreview",
+      "tests": 41,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoLinkPreview.log"
+    },
+    {
+      "package": "NotoReadwiseSync",
+      "tests": 30,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoReadwiseSync.log"
+    },
+    {
+      "package": "NotoSearch",
+      "tests": 129,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoSearch.log"
+    },
+    {
+      "package": "NotoShareCapture",
+      "tests": 28,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoShareCapture.log"
+    },
+    {
+      "package": "NotoSocialMedia",
+      "tests": 21,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoSocialMedia.log"
+    },
+    {
+      "package": "NotoTags",
+      "tests": 28,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/package-tests/NotoTags.log"
+    },
+    {
+      "package": "NotoVault",
+      "tests": 110,
+      "result": "passed",
+      "log": ".codex/evidence/20260925-media-board/vault-tests.log"
+    }
+  ],
+  "packageTestCount": 533,
+  "noto2": {
+    "tests": 113,
+    "failures": 0,
+    "log": ".codex/evidence/20260925-media-board/noto2-tests.log"
+  },
+  "scope": "Package/app suite results at the recorded run times. Unrelated concurrent edits in Browse, link previews, and Xcode project are preserved; independent Media audit rebuilds current workspace."
+}

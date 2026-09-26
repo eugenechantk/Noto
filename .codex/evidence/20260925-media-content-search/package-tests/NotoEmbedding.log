@@ -1,0 +1,34 @@
+Building for debugging...
+[0/2] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.10s)
+Test Suite 'All tests' started at 2026-09-25 23:44:45.407.
+Test Suite 'All tests' passed at 2026-09-25 23:44:45.408.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "GraniteTokenizer" started.
+􀟈  Suite GraniteEmbedderTests started.
+􀟈  Test truncationCapsAt512WithSEPLast() started.
+􀟈  Test doubleEncodeIsDeterministic() started.
+􀟈  Test truncationNoOpWhenUnderBudget() started.
+􀟈  Test specialTokensWrapEveryEncoding() started.
+􀟈  Test goldenFixtureMatchesPython() started.
+􀟈  Test emptyStringIsSpecialsOnly() started.
+􀟈  Test goldenVectorsMatchPythonReference() started.
+􁁛  Test emptyStringIsSpecialsOnly() passed after 3.231 seconds.
+􁁛  Test truncationNoOpWhenUnderBudget() passed after 3.231 seconds.
+􁁛  Test specialTokensWrapEveryEncoding() passed after 3.231 seconds.
+􁁛  Test doubleEncodeIsDeterministic() passed after 3.232 seconds.
+􁁛  Test truncationCapsAt512WithSEPLast() passed after 3.234 seconds.
+􁁛  Test goldenFixtureMatchesPython() passed after 3.236 seconds.
+􁁛  Suite "GraniteTokenizer" passed after 3.236 seconds.
+􁁛  Test goldenVectorsMatchPythonReference() passed after 9.567 seconds.
+􀟈  Test embeddingsAreNormalizedAndDeterministic() started.
+􁁛  Test embeddingsAreNormalizedAndDeterministic() passed after 0.028 seconds.
+􀟈  Test longTextTruncatesWithoutError() started.
+􁁛  Test longTextTruncatesWithoutError() passed after 0.047 seconds.
+􀟈  Test constantsMatchModelContract() started.
+􁁛  Test constantsMatchModelContract() passed after 0.001 seconds.
+􁁛  Suite GraniteEmbedderTests passed after 9.643 seconds.
+􁁛  Test run with 10 tests in 2 suites passed after 9.643 seconds.

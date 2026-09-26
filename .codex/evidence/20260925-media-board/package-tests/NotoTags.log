@@ -1,0 +1,92 @@
+[0/1] Planning build
+Building for debugging...
+[0/3] Write swift-version--58304C5D6DBC2206.txt
+[2/10] Compiling NotoTags TagMembershipIndex.swift
+[3/10] Compiling NotoTags TagRegistry.swift
+[4/10] Compiling NotoTags TagName.swift
+[5/10] Compiling NotoTags TagTemplateApplier.swift
+[6/10] Compiling NotoTags TagRegistryStore.swift
+[7/10] Emitting module NotoTags
+[8/10] Compiling NotoTags TagDefinition.swift
+[9/12] Emitting module NotoTagsTests
+[10/12] Compiling NotoTagsTests NotoTagsTests.swift
+[11/14] Emitting module NotoTagsPackageTests
+[12/14] Compiling NotoTagsPackageTests runner.swift
+[12/14] Write Objects.LinkFileList
+[13/14] Linking NotoTagsPackageTests
+Build complete! (7.74s)
+Test Suite 'All tests' started at 2026-09-25 23:20:39.793.
+Test Suite 'All tests' passed at 2026-09-25 23:20:39.794.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "TagDefinition" started.
+􀟈  Suite "TagRegistry" started.
+􀟈  Suite "TagTemplateApplier" started.
+􀟈  Suite "TagRegistryStore" started.
+􀟈  Suite "TagMembershipIndex" started.
+􀟈  Suite "TagName" started.
+􀟈  Test testTagMembershipCountForTag() started.
+􀟈  Test testTagDefinitionUsesNameAsIdentity() started.
+􀟈  Test testTagMembershipEmptyInput() started.
+􀟈  Test testTagRegistryCodableVersionedEnvelope() started.
+􀟈  Test testTagMembershipNotesForTagStableOrder() started.
+􀟈  Test testTagRegistryDecodesUnknownTopLevelFields() started.
+􀟈  Test testTagRegistryRemoveRemovesDefinition() started.
+􀟈  Test testTagRegistryAllDefinitionsSorted() started.
+􀟈  Test testTagDefinitionDecodesNormalizedName() started.
+􀟈  Test testTagDefinitionCodableToleratesUnknownKeys() started.
+􀟈  Test testTagRegistryEnsureCreatesThenReuses() started.
+􀟈  Test testTagTemplateApplyCanHandleFullContent() started.
+􀟈  Test testTagTemplateApplyIsIdempotent() started.
+􀟈  Test testTagDefinitionCodableRoundTrip() started.
+􀟈  Test testTagMembershipAllTagsDedupedSorted() started.
+􀟈  Test testTagRegistryUpsertReplacesExistingDefinition() started.
+􀟈  Test testTagNameNormalizationRejectsEmptyInputs() started.
+􀟈  Test testTagRegistryStoreSaveAndLoadRoundTrip() started.
+􀟈  Test testTagNameNormalizationRules() started.
+􀟈  Test testTagNameCodableRoundTripsAsString() started.
+􀟈  Test testTagRegistryStoreSaveCreatesDirectory() started.
+􀟈  Test testTagRegistryStoreLoadEmptyFile() started.
+􀟈  Test testTagTemplateApplySkipsEmptyTemplate() started.
+􀟈  Test testTagNameComparableSortOrder() started.
+􀟈  Test testTagRegistryStoreLoadMissingFile() started.
+􀟈  Test testTagRegistryDefinitionForName() started.
+􀟈  Test testTagTemplateApplyKeepsMultipleTagsSeparate() started.
+􀟈  Test testTagTemplateApplyAppendsOnceWithSeparator() started.
+􁁛  Test testTagRegistryEnsureCreatesThenReuses() passed after 0.001 seconds.
+􁁛  Test testTagMembershipEmptyInput() passed after 0.001 seconds.
+􁁛  Test testTagMembershipNotesForTagStableOrder() passed after 0.001 seconds.
+􁁛  Test testTagTemplateApplyIsIdempotent() passed after 0.001 seconds.
+􁁛  Test testTagRegistryAllDefinitionsSorted() passed after 0.001 seconds.
+􁁛  Test testTagTemplateApplyCanHandleFullContent() passed after 0.001 seconds.
+􁁛  Test testTagRegistryRemoveRemovesDefinition() passed after 0.001 seconds.
+􁁛  Test testTagNameNormalizationRejectsEmptyInputs() passed after 0.001 seconds.
+􁁛  Test testTagMembershipCountForTag() passed after 0.002 seconds.
+􁁛  Test testTagDefinitionUsesNameAsIdentity() passed after 0.001 seconds.
+􁁛  Test testTagTemplateApplySkipsEmptyTemplate() passed after 0.001 seconds.
+􁁛  Test testTagNameCodableRoundTripsAsString() passed after 0.001 seconds.
+􁁛  Test testTagMembershipAllTagsDedupedSorted() passed after 0.001 seconds.
+􁁛  Test testTagNameNormalizationRules() passed after 0.001 seconds.
+􁁛  Test testTagRegistryDefinitionForName() passed after 0.002 seconds.
+􁁛  Test testTagNameComparableSortOrder() passed after 0.001 seconds.
+􁁛  Test testTagRegistryUpsertReplacesExistingDefinition() passed after 0.001 seconds.
+􁁛  Test testTagTemplateApplyAppendsOnceWithSeparator() passed after 0.001 seconds.
+􁁛  Test testTagTemplateApplyKeepsMultipleTagsSeparate() passed after 0.001 seconds.
+􁁛  Suite "TagMembershipIndex" passed after 0.002 seconds.
+􁁛  Suite "TagName" passed after 0.002 seconds.
+􁁛  Test testTagDefinitionDecodesNormalizedName() passed after 0.002 seconds.
+􁁛  Test testTagDefinitionCodableToleratesUnknownKeys() passed after 0.002 seconds.
+􁁛  Suite "TagTemplateApplier" passed after 0.002 seconds.
+􁁛  Test testTagDefinitionCodableRoundTrip() passed after 0.002 seconds.
+􁁛  Test testTagRegistryDecodesUnknownTopLevelFields() passed after 0.002 seconds.
+􁁛  Suite "TagDefinition" passed after 0.002 seconds.
+􁁛  Test testTagRegistryCodableVersionedEnvelope() passed after 0.002 seconds.
+􁁛  Suite "TagRegistry" passed after 0.002 seconds.
+􁁛  Test testTagRegistryStoreLoadMissingFile() passed after 0.004 seconds.
+􁁛  Test testTagRegistryStoreLoadEmptyFile() passed after 0.004 seconds.
+􁁛  Test testTagRegistryStoreSaveCreatesDirectory() passed after 0.005 seconds.
+􁁛  Test testTagRegistryStoreSaveAndLoadRoundTrip() passed after 0.005 seconds.
+􁁛  Suite "TagRegistryStore" passed after 0.005 seconds.
+􁁛  Test run with 28 tests in 6 suites passed after 0.005 seconds.

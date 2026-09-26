@@ -1,0 +1,57 @@
+[0/1] Planning build
+Building for debugging...
+[0/3] Write swift-version--58304C5D6DBC2206.txt
+[2/17] Compiling NotoEmbedding resource_bundle_accessor.swift
+[3/17] Compiling NotoEmbedding Tokenizer.swift
+[4/17] Compiling NotoEmbedding PostProcessor.swift
+[5/17] Compiling NotoEmbedding String+PreTokenization.swift
+[6/17] Compiling NotoEmbedding PreTokenizer.swift
+[7/17] Compiling NotoEmbedding Normalizer.swift
+[8/17] Compiling NotoEmbedding ByteEncoder.swift
+[9/17] Compiling NotoEmbedding Decoder.swift
+[10/17] Compiling NotoEmbedding Config.swift
+[11/17] Compiling NotoEmbedding BPETokenizer.swift
+[12/17] Compiling NotoEmbedding BinaryDistinct.swift
+[13/17] Compiling NotoEmbedding GraniteTokenizer.swift
+[14/17] Emitting module NotoEmbedding
+[15/17] Compiling NotoEmbedding GraniteEmbedder.swift
+[16/21] Emitting module NotoEmbeddingTests
+[17/21] Compiling NotoEmbeddingTests GraniteTokenizerTests.swift
+[18/21] Compiling NotoEmbeddingTests resource_bundle_accessor.swift
+[19/21] Compiling NotoEmbeddingTests GraniteEmbedderTests.swift
+[20/23] Compiling NotoEmbeddingPackageTests runner.swift
+[21/23] Emitting module NotoEmbeddingPackageTests
+[21/23] Write Objects.LinkFileList
+[22/23] Linking NotoEmbeddingPackageTests
+Build complete! (12.45s)
+Test Suite 'All tests' started at 2026-09-25 23:19:11.507.
+Test Suite 'All tests' passed at 2026-09-25 23:19:11.508.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "GraniteTokenizer" started.
+􀟈  Suite GraniteEmbedderTests started.
+􀟈  Test truncationNoOpWhenUnderBudget() started.
+􀟈  Test specialTokensWrapEveryEncoding() started.
+􀟈  Test doubleEncodeIsDeterministic() started.
+􀟈  Test emptyStringIsSpecialsOnly() started.
+􀟈  Test truncationCapsAt512WithSEPLast() started.
+􀟈  Test goldenFixtureMatchesPython() started.
+􀟈  Test goldenVectorsMatchPythonReference() started.
+􁁛  Test emptyStringIsSpecialsOnly() passed after 3.260 seconds.
+􁁛  Test specialTokensWrapEveryEncoding() passed after 3.260 seconds.
+􁁛  Test truncationNoOpWhenUnderBudget() passed after 3.260 seconds.
+􁁛  Test doubleEncodeIsDeterministic() passed after 3.262 seconds.
+􁁛  Test truncationCapsAt512WithSEPLast() passed after 3.266 seconds.
+􁁛  Test goldenFixtureMatchesPython() passed after 3.267 seconds.
+􁁛  Suite "GraniteTokenizer" passed after 3.268 seconds.
+􁁛  Test goldenVectorsMatchPythonReference() passed after 10.653 seconds.
+􀟈  Test embeddingsAreNormalizedAndDeterministic() started.
+􁁛  Test embeddingsAreNormalizedAndDeterministic() passed after 0.029 seconds.
+􀟈  Test longTextTruncatesWithoutError() started.
+􁁛  Test longTextTruncatesWithoutError() passed after 0.027 seconds.
+􀟈  Test constantsMatchModelContract() started.
+􁁛  Test constantsMatchModelContract() passed after 0.001 seconds.
+􁁛  Suite GraniteEmbedderTests passed after 10.711 seconds.
+􁁛  Test run with 10 tests in 2 suites passed after 10.711 seconds.

@@ -1,0 +1,102 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write swift-version--58304C5D6DBC2206.txt
+[2/13] Compiling NotoShareCapture SharedLinkPayload.swift
+[3/13] Compiling NotoShareCapture SharedLinkCapture.swift
+[4/13] Compiling NotoShareCapture ShareMediaJob.swift
+[5/13] Compiling NotoShareCapture PendingCaptureStore.swift
+[6/13] Compiling NotoShareCapture CaptureNotePath.swift
+[7/13] Emitting module NotoShareCapture
+[8/13] Compiling NotoShareCapture ShareMediaDelivery.swift
+[9/20] Compiling NotoSocialMedia CloudflareQueueClient.swift
+[10/20] Compiling NotoSocialMedia ShareMediaProcessor.swift
+/Users/eugenechan/dev/personal/Noto/Packages/NotoSocialMedia/Sources/NotoSocialMedia/ShareMediaProcessor.swift:68:60: warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 66 | 
+ 67 |     public init(vaultURL: URL, stateDirectory: URL, http: any HTTPFetching = URLSessionFetcher(),
+ 68 |                 now: @escaping @Sendable () -> Date = Date.init) {
+    |                                                            `- warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 69 |         self.vaultURL = vaultURL
+ 70 |         self.store = PendingAppendStore(stateDirectory: stateDirectory)
+[11/20] Compiling NotoSocialMedia InstagramPostResolver.swift
+[12/20] Compiling NotoSocialMedia XPostResolver.swift
+[13/20] Compiling NotoSocialMedia ShareMediaNote.swift
+[14/20] Emitting module NotoSocialMedia
+/Users/eugenechan/dev/personal/Noto/Packages/NotoSocialMedia/Sources/NotoSocialMedia/ShareMediaProcessor.swift:68:60: warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 66 | 
+ 67 |     public init(vaultURL: URL, stateDirectory: URL, http: any HTTPFetching = URLSessionFetcher(),
+ 68 |                 now: @escaping @Sendable () -> Date = Date.init) {
+    |                                                            `- warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 69 |         self.vaultURL = vaultURL
+ 70 |         self.store = PendingAppendStore(stateDirectory: stateDirectory)
+[15/20] Compiling NotoSocialMedia SocialPost.swift
+[16/28] Compiling noto_share_media main.swift
+[17/28] Emitting module noto_share_media
+[17/28] Write Objects.LinkFileList
+[18/28] Linking noto-share-media
+[19/28] Applying noto-share-media
+[21/28] Compiling NotoSocialMediaTests Support.swift
+[22/28] Compiling NotoSocialMediaTests resource_bundle_accessor.swift
+[23/28] Compiling NotoSocialMediaTests CloudflareQueueClientTests.swift
+[24/28] Compiling NotoSocialMediaTests NoteAndProcessorTests.swift
+[25/28] Compiling NotoSocialMediaTests ResolverTests.swift
+[26/28] Emitting module NotoSocialMediaTests
+[27/30] Emitting module NotoSocialMediaPackageTests
+[28/30] Compiling NotoSocialMediaPackageTests runner.swift
+[28/30] Write Objects.LinkFileList
+[29/30] Linking NotoSocialMediaPackageTests
+Build complete! (6.92s)
+Test Suite 'All tests' started at 2026-09-25 23:20:30.753.
+Test Suite 'All tests' passed at 2026-09-25 23:20:30.755.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite ResolverTests started.
+􀟈  Suite NoteAndProcessorTests started.
+􀟈  Suite CloudflareQueueClientTests started.
+􀟈  Test downloadNamesFilesStablyAndSkipsExistingFiles() started.
+􀟈  Test xStatusIDIsReadFromEveryURLShape() started.
+􀟈  Test xMissingPostIsUnreadable() started.
+􀟈  Test instagramLoginWallIsUnreadable() started.
+􀟈  Test xVideoPostKeepsDisplayTextAndBestMP4() started.
+􀟈  Test acceptParksUntilNoteAppearsThenAppends() started.
+􀟈  Test resolverRoutesByPlatform() started.
+􀟈  Test parkedBlockIsDroppedAfterSevenDays() started.
+􀟈  Test appendAddsBlockOnceAfterABlankLine() started.
+􀟈  Test bodyIsNormalisedFromStringObjectOrBase64() started.
+􀟈  Test overwrittenBlockIsRestoredWithinVerifyWindowOnly() started.
+􀟈  Test xTokenMatchesJavaScript() started.
+􀟈  Test xQuotePostCarriesQuotedVideo() started.
+􀟈  Test blockQuotesTextListsMediaAndNestsQuotedPost() started.
+􀟈  Test instagramVideoEmbedParses() started.
+􀟈  Test instagramShortcodeIsReadFromEveryURLShape() started.
+􀟈  Test pullAndAckSendAuthenticatedRequests() started.
+􀟈  Test xPhotoPostUsesLargeImagesAndExpandsLinks() started.
+􀟈  Test instagramCarouselKeepsEveryChildInOrder() started.
+􀟈  Test apiErrorsSurface() started.
+􀟈  Test locateUsesInboxPathThenSearchesByURL() started.
+􁁛  Test xStatusIDIsReadFromEveryURLShape() passed after 0.001 seconds.
+􁁛  Test xTokenMatchesJavaScript() passed after 0.001 seconds.
+􁁛  Test instagramShortcodeIsReadFromEveryURLShape() passed after 0.001 seconds.
+􁁛  Test bodyIsNormalisedFromStringObjectOrBase64() passed after 0.001 seconds.
+􁁛  Test xPhotoPostUsesLargeImagesAndExpandsLinks() passed after 0.001 seconds.
+􁁛  Test xMissingPostIsUnreadable() passed after 0.001 seconds.
+􁁛  Test instagramLoginWallIsUnreadable() passed after 0.001 seconds.
+􁁛  Test blockQuotesTextListsMediaAndNestsQuotedPost() passed after 0.001 seconds.
+􁁛  Test instagramCarouselKeepsEveryChildInOrder() passed after 0.001 seconds.
+􁁛  Test apiErrorsSurface() passed after 0.002 seconds.
+􁁛  Test pullAndAckSendAuthenticatedRequests() passed after 0.002 seconds.
+􁁛  Suite CloudflareQueueClientTests passed after 0.003 seconds.
+􁁛  Test xVideoPostKeepsDisplayTextAndBestMP4() passed after 0.003 seconds.
+􁁛  Test xQuotePostCarriesQuotedVideo() passed after 0.003 seconds.
+􁁛  Test downloadNamesFilesStablyAndSkipsExistingFiles() passed after 0.005 seconds.
+􁁛  Test locateUsesInboxPathThenSearchesByURL() passed after 0.005 seconds.
+􁁛  Test appendAddsBlockOnceAfterABlankLine() passed after 0.006 seconds.
+􁁛  Test instagramVideoEmbedParses() passed after 0.007 seconds.
+􁁛  Test resolverRoutesByPlatform() passed after 0.007 seconds.
+􁁛  Suite ResolverTests passed after 0.007 seconds.
+􁁛  Test parkedBlockIsDroppedAfterSevenDays() passed after 0.025 seconds.
+􁁛  Test acceptParksUntilNoteAppearsThenAppends() passed after 0.028 seconds.
+􁁛  Test overwrittenBlockIsRestoredWithinVerifyWindowOnly() passed after 0.030 seconds.
+􁁛  Suite NoteAndProcessorTests passed after 0.030 seconds.
+􁁛  Test run with 21 tests in 3 suites passed after 0.030 seconds.

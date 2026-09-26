@@ -1,0 +1,314 @@
+Building for debugging...
+[0/2] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.11s)
+Test Suite 'All tests' started at 2026-09-25 23:44:56.250.
+Test Suite 'All tests' passed at 2026-09-25 23:44:56.251.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite VisionImageDescriberTests started.
+􀟈  Suite "SearchIndexCoordinator" started.
+􀟈  Suite KeywordORFallbackTests started.
+􀟈  Suite "MarkdownSearchIndexer" started.
+􀟈  Suite HybridSearchFusionTests started.
+􀟈  Suite "SearchTypes" started.
+􀟈  Suite "MarkdownSearchEngine" started.
+􀟈  Suite CachedRemoteImageFetcherTests started.
+􀟈  Suite "SearchIndexStore rebuild retention" started.
+􀟈  Suite "MarkdownSearchDocumentExtractor" started.
+􀟈  Suite ExtractiveSearchSummaryTests started.
+􀟈  Suite SemanticSearcherTests started.
+􀟈  Suite SemanticIndexStoreTests started.
+􀟈  Suite SearchFolderFilterTests started.
+􀟈  Suite HybridRelativeGapTests started.
+􀟈  Suite SemanticChunkerTests started.
+􀟈  Suite MarkdownImageExtractorTests started.
+􀟈  Suite SemanticIndexerTests started.
+􀟈  Suite HybridNoteSearchTests started.
+􀟈  Suite "PendingIndexQueue" started.
+􀟈  Suite SemanticImageIndexingTests started.
+􀟈  Test testEnglishTextIsRecognized() started.
+􀟈  Test testDescriberVersion() started.
+􀟈  Test testSingleTermQueryUnchanged() started.
+􀟈  Test testPartialTermMatchesSurfaceViaORFallback() started.
+􀟈  Test testQuotedPhraseQueriesStayStrict() started.
+􀟈  Test testFullMatchesStillRankAbovePartialMatches() started.
+􀟈  Test "Changed-file refresh updates edited notes and removes deleted notes" started.
+􀟈  Test testDateFilterAppliesToFallbackResults() started.
+􀟈  Test "Single-file removal deletes a stale note from the index" started.
+􀟈  Test "Single-file refresh indexes a new note immediately" started.
+􀟈  Suite "LiveVaultSearch" started.
+􀟈  Test "Rebuild after deleting search.sqlite restores equivalent counts" started.
+􀟈  Test testGarbageDataThrows() started.
+􀟈  Test testKeywordResultsForSameNoteStayTogether() started.
+􀟈  Test testLimitIsRespected() started.
+􀟈  Test testConsensusOutranksSingleListWins() started.
+􀟈  Test testPerNoteRowCapPreventsSlotStarvation() started.
+􀟈  Test "Search document carries heading-bounded sections" started.
+􀟈  Test testKeywordOnlyPassthroughWhenSemanticEmpty() started.
+􀟈  Test "Recently updated note ranks above older equivalent note match" started.
+􀟈  Test "Display policy keeps note matches when there is no section match" started.
+􀟈  Test testChineseTextIsRecognized() started.
+􀟈  Test "Indexer rebuilds fixture vault and ignores hidden .noto files" started.
+􀟈  Test "Changed-file refresh removes stale paths after note move" started.
+􀟈  Test "Title and content scope includes body and section matches" started.
+􀟈  Test "Recently updated section ranks above older equivalent section match" started.
+􀟈  Test "Section result uses note title and file path heading breadcrumb" started.
+􀟈  Test "Display policy hides note matches when a section from the same note matches" started.
+􀟈  Test "Search finds words that appear only in note body" started.
+􀟈  Test "Default index directory lives outside the vault" started.
+􀟈  Test "Search result distinguishes note and section matches" started.
+􀟈  Test "Heading matches rank sections highly" started.
+􀟈  Test "Title scope searches note titles only" started.
+􀟈  Test testSemanticOnlyNoteGetsSynthesizedResult() started.
+􀟈  Test "Drain replays queued entries from disk after a simulated crash" started.
+􀟈  Test "Scheduled refresh enqueues immediately even before the debounced run fires" started.
+􀟈  Test testBlankImageProducesEmptyOCRWithoutThrowing() started.
+􀟈  Test "Scheduled file refresh debounces repeated requests" started.
+􀟈  Test testValidPNGIsFetchedAndCached() started.
+􀟈  Test "Rebuild clears the queue and runs the rebuild client" started.
+􀟈  Test "Phrase search works" started.
+􀟈  Test testWholeNoteSemanticHitSynthesizesNoteKind() started.
+􀟈  Test coversDistinctSourcesBeforeRepeatingOne() started.
+􀟈  Test "Refresh uses a single in-flight task per vault" started.
+􀟈  Test "Unquoted multi-word search prefix matches all terms" started.
+􀟈  Test cleansMarkdownAndDeduplicatesVerbatimClaims() started.
+􀟈  Test queryRelevantSentencesWinAndRemainAttributed() started.
+􀟈  Test "Extractor strips frontmatter and creates heading-bounded sections" started.
+􀟈  Test "Rebuild with no retained paths replaces the whole index" started.
+􀟈  Test testVectorEncodeDecodeRoundTrip() started.
+􀟈  Test testMinScoreFiltersTail() started.
+􀟈  Test testDestroyRemovesDatabase() started.
+􀟈  Test testReplaceNoteRoundTripsChunksAndVectors() started.
+􀟈  Test "Rebuild keeps rows for retained relative paths and drops the rest" started.
+􀟈  Test "Local vault rebuild indexes every file and skips none" started.
+􀟈  Test testReplaceNoteHandlesPathReuseAfterRename() started.
+􀟈  Test testDeleteNoteCascadesChunks() started.
+􀟈  Test testTopKMatchesNaiveCosine() started.
+􀟈  Test "Search finds imported capture content" started.
+􀟈  Test testExistingVectorsKeyedByContentHash() started.
+􀟈  Test testNoFolderFilterBehaviorUnchanged() started.
+􀟈  Test "Query sanitizer supports prefix, phrase, punctuation, and unbalanced quotes" started.
+􀟈  Test "Replace removes old file then refreshes new file" started.
+􀟈  Test "Extractor uses path-derived fallback ID when frontmatter ID is absent" started.
+􀟈  Test testMissingDatabaseReturnsNoHits() started.
+􀟈  Test relativeGapKeepsHitsNearTheBest() started.
+􀟈  Test testHeadingMatchingTitleIsNotDuplicatedInHeader() started.
+􀟈  Test testOversizedSectionSplitsIntoParts() started.
+􀟈  Test testTinyNoteProducesNoChunks() started.
+􀟈  Test testEmptyIndexReturnsNoHits() started.
+􀟈  Test testCJKTokenEstimateCountsCharacters() started.
+􀟈  Test testStatsReportCountsAndModelVersion() started.
+􀟈  Test noTermOverlapFallsBackToSearchRankOrder() started.
+􀟈  Test testExtractsRemoteURL() started.
+􀟈  Test testSmallNoteBecomesSingleChunk() started.
+􀟈  Test testDimensionMismatchThrows() started.
+􀟈  Test peakTestSeparatesFlatFromPeaked() started.
+􀟈  Test testEmptyAltTextAllowed() started.
+􀟈  Test testModelVersionChangesContentHash() started.
+􀟈  Test "Per-URL refresh runs once even when a full vault refresh is in flight" started.
+􀟈  Test testModelVersionBumpReembedsEverything() started.
+􀟈  Test testEditedNoteReembedsOnlyChangedChunks() started.
+􀟈  Test "Exact title matches rank above body-only matches" started.
+􀟈  Test testDeletedNoteIsRemovedFromSemanticIndex() started.
+􀟈  Test testNormalizationAndMatching() started.
+􀟈  Test testGenerationBumpsOnEveryMutation() started.
+􀟈  Test testSingleNoteEmbedFailureIsSkipped() started.
+􀟈  Test testMissingSearchIndexIsGracefulNoop() started.
+􀟈  Test testLineNumbersAreFullFileOneBased() started.
+􀟈  Test testCreatedFilterExcludesOldNote() started.
+􀟈  Test testIgnoresDataURIsAndAbsolutePaths() started.
+􀟈  Test testInitialRefreshEmbedsAllNotes() started.
+􀟈  Test testDateFilterAppliesToSemanticLeg() started.
+􀟈  Test testKeywordSearchHonorsDateFilters() started.
+􀟈  Test testRunFusesKeywordAndSemanticLegs() started.
+􀟈  Test testConsecutiveEmbedFailuresAbortSweep() started.
+􀟈  Test testExtractsVaultAttachmentWithPercentEncoding() started.
+􀟈  Test testHandlesTitleSyntaxAndMultiplePerLine() started.
+􀟈  Test testLargeNoteSplitsPerSectionWithContextualHeaders() started.
+􀟈  Test "Concurrent enqueue keeps every entry on disk" started.
+􀟈  Test testLatinTokenEstimateScalesWithWords() started.
+􀟈  Test testCancellationStopsBetweenNotesAndResumes() started.
+􀟈  Test "Consume removes entry and persists empty state by removing file" started.
+􀟈  Test testExtractorParsesFrontmatterCreated() started.
+􀟈  Test testKeywordOnlyWhenEmbedderUnavailable() started.
+􀟈  Test "Enqueue persists and load round-trips" started.
+􀟈  Test "Crash simulation: enqueue, skip drain, re-init, drain replays" started.
+􀟈  Test relativeGapOnEmptyIsEmpty() started.
+􀟈  Test testKeywordSearchFiltersByFolder() started.
+􀟈  Test testChunkingIsDeterministic() started.
+􀟈  Test "Drain leaves failed entries in the queue and continues" started.
+􀟈  Test testHybridRunFiltersBothLegs() started.
+􀟈  Test "Drain runs handler for each entry and consumes successes" started.
+􀟈  Test testCacheReloadsWhenStoreChanges() started.
+􀟈  Test testIndexStoresCreatedAtWithFileFallback() started.
+􀟈  Test testAltTextChangeInvalidatesImageChunk() started.
+􀟈  Test testVaultImageBecomesImageChunk() started.
+􀟈  Test testChangedImageBytesRedescribe() started.
+􀟈  Test testUnchangedImageIsNotRedescribed() started.
+􀟈  Test testRemoteFetchFailureSkipsQuietly() started.
+􀟈  Test testRemoteImageGoesThroughFetcher() started.
+􀟈  Test testRemovedImageDropsChunk() started.
+􀟈  Test testImageHitSurfacesThroughSearchAndFusion() started.
+􁁛  Test testDescriberVersion() passed after 0.326 seconds.
+􀟈  Test "Live vault partial title query finds Ideas Inventory" started.
+􀟈  Test "Live vault indexes current Noto documents into a disposable temp index" started.
+􀟈  Test "Live vault search returns real capture/title matches" started.
+􁁛  Test testSingleTermQueryUnchanged() passed after 0.367 seconds.
+􁁛  Test testPerNoteRowCapPreventsSlotStarvation() passed after 0.387 seconds.
+􁁛  Test "Search document carries heading-bounded sections" passed after 0.387 seconds.
+􁁛  Test testKeywordOnlyPassthroughWhenSemanticEmpty() passed after 0.388 seconds.
+􁁛  Test testLimitIsRespected() passed after 0.388 seconds.
+􁁛  Test "Display policy keeps note matches when there is no section match" passed after 0.388 seconds.
+􁁛  Test testKeywordResultsForSameNoteStayTogether() passed after 0.388 seconds.
+􁁛  Test testConsensusOutranksSingleListWins() passed after 0.388 seconds.
+􁁛  Test "Recently updated note ranks above older equivalent note match" passed after 0.388 seconds.
+􁁛  Test "Recently updated section ranks above older equivalent section match" passed after 0.388 seconds.
+􁁛  Test testGarbageDataThrows() passed after 0.388 seconds.
+􁁛  Test "Indexer rebuilds fixture vault and ignores hidden .noto files" passed after 0.388 seconds.
+􁁛  Test "Search result distinguishes note and section matches" passed after 0.388 seconds.
+􁁛  Test "Display policy hides note matches when a section from the same note matches" passed after 0.388 seconds.
+􁁛  Test "Default index directory lives outside the vault" passed after 0.388 seconds.
+􁁛  Test "Section result uses note title and file path heading breadcrumb" passed after 0.388 seconds.
+􁁛  Test "Single-file removal deletes a stale note from the index" passed after 0.388 seconds.
+􁁛  Test "Single-file refresh indexes a new note immediately" passed after 0.388 seconds.
+􁁛  Test testSemanticOnlyNoteGetsSynthesizedResult() passed after 0.388 seconds.
+􁁛  Test "Drain replays queued entries from disk after a simulated crash" passed after 0.388 seconds.
+􁁛  Test "Changed-file refresh updates edited notes and removes deleted notes" passed after 0.388 seconds.
+􁁛  Test testFullMatchesStillRankAbovePartialMatches() passed after 0.388 seconds.
+􁁛  Test "Scheduled refresh enqueues immediately even before the debounced run fires" passed after 0.388 seconds.
+􁁛  Test "Changed-file refresh removes stale paths after note move" passed after 0.388 seconds.
+􁁛  Test testPartialTermMatchesSurfaceViaORFallback() passed after 0.388 seconds.
+􁁛  Test "Title and content scope includes body and section matches" passed after 0.388 seconds.
+􁁛  Test testWholeNoteSemanticHitSynthesizesNoteKind() passed after 0.388 seconds.
+􁁛  Test testQuotedPhraseQueriesStayStrict() passed after 0.388 seconds.
+􁁛  Test "Rebuild clears the queue and runs the rebuild client" passed after 0.388 seconds.
+􁁛  Test testDateFilterAppliesToFallbackResults() passed after 0.388 seconds.
+􁁛  Test testValidPNGIsFetchedAndCached() passed after 0.388 seconds.
+􁁛  Test coversDistinctSourcesBeforeRepeatingOne() passed after 0.388 seconds.
+􁁛  Test "Rebuild after deleting search.sqlite restores equivalent counts" passed after 0.388 seconds.
+􁁛  Test testVectorEncodeDecodeRoundTrip() passed after 0.388 seconds.
+􁁛  Test cleansMarkdownAndDeduplicatesVerbatimClaims() passed after 0.388 seconds.
+􁁛  Test queryRelevantSentencesWinAndRemainAttributed() passed after 0.388 seconds.
+􁁛  Test "Extractor strips frontmatter and creates heading-bounded sections" passed after 0.388 seconds.
+􁁛  Test "Rebuild with no retained paths replaces the whole index" passed after 0.388 seconds.
+􁁛  Test testDestroyRemovesDatabase() passed after 0.388 seconds.
+􁁛  Test testReplaceNoteRoundTripsChunksAndVectors() passed after 0.388 seconds.
+􁁛  Test testReplaceNoteHandlesPathReuseAfterRename() passed after 0.388 seconds.
+􁁛  Test "Heading matches rank sections highly" passed after 0.388 seconds.
+􁁛  Test "Rebuild keeps rows for retained relative paths and drops the rest" passed after 0.388 seconds.
+􁁛  Test "Search finds words that appear only in note body" passed after 0.389 seconds.
+􁁛  Test "Query sanitizer supports prefix, phrase, punctuation, and unbalanced quotes" passed after 0.389 seconds.
+􁁛  Test testDeleteNoteCascadesChunks() passed after 0.388 seconds.
+􁁛  Test "Replace removes old file then refreshes new file" passed after 0.388 seconds.
+􁁛  Test testMissingDatabaseReturnsNoHits() passed after 0.388 seconds.
+􁁛  Test relativeGapKeepsHitsNearTheBest() passed after 0.388 seconds.
+􁁛  Test "Title scope searches note titles only" passed after 0.389 seconds.
+􁁛  Test "Phrase search works" passed after 0.389 seconds.
+􁁛  Test testExistingVectorsKeyedByContentHash() passed after 0.388 seconds.
+􁁛  Test "Local vault rebuild indexes every file and skips none" passed after 0.389 seconds.
+􁁛  Test testCJKTokenEstimateCountsCharacters() passed after 0.388 seconds.
+􁁛  Test testTinyNoteProducesNoChunks() passed after 0.388 seconds.
+􁁛  Test testMinScoreFiltersTail() passed after 0.389 seconds.
+􁁛  Test testExtractsRemoteURL() passed after 0.388 seconds.
+􁁛  Test noTermOverlapFallsBackToSearchRankOrder() passed after 0.388 seconds.
+􁁛  Test testSmallNoteBecomesSingleChunk() passed after 0.388 seconds.
+􁁛  Test peakTestSeparatesFlatFromPeaked() passed after 0.388 seconds.
+􁁛  Test testModelVersionChangesContentHash() passed after 0.388 seconds.
+􁁛  Test testEmptyAltTextAllowed() passed after 0.388 seconds.
+􁁛  Test testHeadingMatchingTitleIsNotDuplicatedInHeader() passed after 0.388 seconds.
+􁁛  Test "Extractor uses path-derived fallback ID when frontmatter ID is absent" passed after 0.389 seconds.
+􁁛  Test "Unquoted multi-word search prefix matches all terms" passed after 0.389 seconds.
+􁁛  Test testNormalizationAndMatching() passed after 0.389 seconds.
+􁁛  Test testEmptyIndexReturnsNoHits() passed after 0.389 seconds.
+􁁛  Test testStatsReportCountsAndModelVersion() passed after 0.389 seconds.
+􁁛  Test testOversizedSectionSplitsIntoParts() passed after 0.389 seconds.
+􁁛  Test testDimensionMismatchThrows() passed after 0.389 seconds.
+􁁛  Test "Search finds imported capture content" passed after 0.389 seconds.
+􁁛  Test testIgnoresDataURIsAndAbsolutePaths() passed after 0.389 seconds.
+􁁛  Test testGenerationBumpsOnEveryMutation() passed after 0.388 seconds.
+􁁛  Test testLineNumbersAreFullFileOneBased() passed after 0.388 seconds.
+􁁛  Test "Exact title matches rank above body-only matches" passed after 0.389 seconds.
+􁁛  Test testNoFolderFilterBehaviorUnchanged() passed after 0.389 seconds.
+􁁛  Test testCreatedFilterExcludesOldNote() passed after 0.406 seconds.
+􁁛  Test testTopKMatchesNaiveCosine() passed after 0.519 seconds.
+􁁛  Test testExtractsVaultAttachmentWithPercentEncoding() passed after 0.519 seconds.
+􁁛  Test testHandlesTitleSyntaxAndMultiplePerLine() passed after 0.519 seconds.
+􁁛  Test testLargeNoteSplitsPerSectionWithContextualHeaders() passed after 0.519 seconds.
+􁁛  Test testLatinTokenEstimateScalesWithWords() passed after 0.531 seconds.
+􁁛  Test testMissingSearchIndexIsGracefulNoop() passed after 0.531 seconds.
+􁁛  Test "Consume removes entry and persists empty state by removing file" passed after 0.531 seconds.
+􁁛  Test testExtractorParsesFrontmatterCreated() passed after 0.531 seconds.
+􁁛  Test testEditedNoteReembedsOnlyChangedChunks() passed after 0.531 seconds.
+􁁛  Test "Enqueue persists and load round-trips" passed after 0.531 seconds.
+􁁛  Test "Crash simulation: enqueue, skip drain, re-init, drain replays" passed after 0.531 seconds.
+􁁛  Test relativeGapOnEmptyIsEmpty() passed after 0.531 seconds.
+􁁛  Test testInitialRefreshEmbedsAllNotes() passed after 0.531 seconds.
+􁁛  Test testDeletedNoteIsRemovedFromSemanticIndex() passed after 0.531 seconds.
+􁁛  Test "Drain leaves failed entries in the queue and continues" passed after 0.567 seconds.
+􁁛  Test testChunkingIsDeterministic() passed after 0.570 seconds.
+􁁛  Test "Drain runs handler for each entry and consumes successes" passed after 0.570 seconds.
+􁁛  Test testModelVersionBumpReembedsEverything() passed after 0.570 seconds.
+􁁛  Test testSingleNoteEmbedFailureIsSkipped() passed after 0.570 seconds.
+􁁛  Test testCacheReloadsWhenStoreChanges() passed after 0.569 seconds.
+􀢄  Test "Scheduled file refresh debounces repeated requests" recorded an issue at SearchIndexCoordinatorTests.swift:37:9: Expectation failed: (probe.refreshFileCalls → []) == ([file.standardizedFileURL.path] → ["/var/folders/cd/_rd32xx17dv8ltmf4ctm5wn40000gn/T/SearchIndexCoordinatorVault-689D176F-3FE3-4E54-B603-A7E10237ED3A/Scratch.md"])
+􀅺  removed ["/var/folders/cd/_rd32xx17dv8ltmf4ctm5wn40000gn/T/SearchIndexCoordinatorVault-689D176F-3FE3-4E54-B603-A7E10237ED3A/Scratch.md"]
+􁁛  Test testKeywordSearchHonorsDateFilters() passed after 0.574 seconds.
+􁁛  Test testDateFilterAppliesToSemanticLeg() passed after 0.574 seconds.
+􁁛  Test testRunFusesKeywordAndSemanticLegs() passed after 0.574 seconds.
+􁁛  Test testCancellationStopsBetweenNotesAndResumes() passed after 0.574 seconds.
+􁁛  Test testConsecutiveEmbedFailuresAbortSweep() passed after 0.574 seconds.
+􁁛  Test testKeywordOnlyWhenEmbedderUnavailable() passed after 0.574 seconds.
+􁁛  Test testKeywordSearchFiltersByFolder() passed after 0.574 seconds.
+􁁛  Test testAltTextChangeInvalidatesImageChunk() passed after 0.279 seconds.
+􁁛  Test testIndexStoresCreatedAtWithFileFallback() passed after 0.574 seconds.
+􁁛  Test testChangedImageBytesRedescribe() passed after 0.279 seconds.
+􁁛  Test testVaultImageBecomesImageChunk() passed after 0.279 seconds.
+􁁛  Suite KeywordORFallbackTests passed after 0.577 seconds.
+􁁛  Suite HybridSearchFusionTests passed after 0.577 seconds.
+􁁛  Suite "SearchTypes" passed after 0.577 seconds.
+􁁛  Suite "MarkdownSearchEngine" passed after 0.577 seconds.
+􁁛  Suite "MarkdownSearchIndexer" passed after 0.578 seconds.
+􁁛  Suite ExtractiveSearchSummaryTests passed after 0.578 seconds.
+􁁛  Suite SemanticIndexStoreTests passed after 0.578 seconds.
+􁁛  Suite "MarkdownSearchDocumentExtractor" passed after 0.578 seconds.
+􁁛  Suite "SearchIndexStore rebuild retention" passed after 0.578 seconds.
+􁁛  Suite SemanticSearcherTests passed after 0.578 seconds.
+􁁛  Suite HybridRelativeGapTests passed after 0.578 seconds.
+􁁛  Suite SemanticChunkerTests passed after 0.578 seconds.
+􁁛  Suite MarkdownImageExtractorTests passed after 0.578 seconds.
+􀢄  Test "Scheduled file refresh debounces repeated requests" failed after 0.577 seconds with 1 issue.
+􁁛  Suite SemanticIndexerTests passed after 0.578 seconds.
+􁁛  Suite HybridNoteSearchTests passed after 0.579 seconds.
+􁁛  Test "Refresh uses a single in-flight task per vault" passed after 0.579 seconds.
+􀟈  Test testSecondFetchIsServedFromCacheWhenNetworkFails() started.
+􁁛  Test testSecondFetchIsServedFromCacheWhenNetworkFails() passed after 0.007 seconds.
+􁁛  Test testHybridRunFiltersBothLegs() passed after 0.590 seconds.
+􀟈  Test test404ReturnsNilAndCachesNothing() started.
+􁁛  Suite SearchFolderFilterTests passed after 0.592 seconds.
+􁁛  Test test404ReturnsNilAndCachesNothing() passed after 0.001 seconds.
+􀟈  Test testNonImagePayloadReturnsNilAndCachesNothing() started.
+􁁛  Test testNonImagePayloadReturnsNilAndCachesNothing() passed after 0.001 seconds.
+􀟈  Test testTransportErrorReturnsNil() started.
+􁁛  Test testTransportErrorReturnsNil() passed after 0.002 seconds.
+􁁛  Suite CachedRemoteImageFetcherTests passed after 0.597 seconds.
+􁁛  Test testRemoteFetchFailureSkipsQuietly() passed after 0.325 seconds.
+􁁛  Test testUnchangedImageIsNotRedescribed() passed after 0.326 seconds.
+􁁛  Test "Concurrent enqueue keeps every entry on disk" passed after 0.624 seconds.
+􁁛  Suite "PendingIndexQueue" passed after 0.626 seconds.
+􁁛  Test testRemoteImageGoesThroughFetcher() passed after 0.337 seconds.
+􁁛  Test testImageHitSurfacesThroughSearchAndFusion() passed after 0.341 seconds.
+􁁛  Test testRemovedImageDropsChunk() passed after 0.350 seconds.
+􁁛  Suite SemanticImageIndexingTests passed after 0.648 seconds.
+􁁛  Test "Per-URL refresh runs once even when a full vault refresh is in flight" passed after 0.663 seconds.
+􀢄  Suite "SearchIndexCoordinator" failed after 0.664 seconds with 1 issue.
+􁁛  Test testChineseTextIsRecognized() passed after 1.101 seconds.
+􁁛  Test testBlankImageProducesEmptyOCRWithoutThrowing() passed after 1.107 seconds.
+􁁛  Test testEnglishTextIsRecognized() passed after 1.442 seconds.
+􁁛  Suite VisionImageDescriberTests passed after 1.443 seconds.
+􁁛  Test "Live vault indexes current Noto documents into a disposable temp index" passed after 27.560 seconds.
+􁁛  Test "Live vault partial title query finds Ideas Inventory" passed after 27.673 seconds.
+􁁛  Test "Live vault search returns real capture/title matches" passed after 27.726 seconds.
+􁁛  Suite "LiveVaultSearch" passed after 28.094 seconds.
+􀢄  Test run with 129 tests in 22 suites failed after 28.095 seconds with 1 issue.

@@ -1,0 +1,115 @@
+Building for debugging...
+[0/3] Write sources
+[1/3] Write swift-version--58304C5D6DBC2206.txt
+[3/5] Emitting module NotoLinkPreview
+[4/5] Compiling NotoLinkPreview LinkPreviewCache.swift
+[4/6] Write Objects.LinkFileList
+[5/6] Linking NotoLinkPreviewPackageTests
+Build complete! (0.92s)
+Test Suite 'All tests' started at 2026-09-25 23:45:29.037.
+Test Suite 'All tests' passed at 2026-09-25 23:45:29.038.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "LinkPreviewCardLayout" started.
+􀟈  Suite "LinkPreviewDetector" started.
+􀟈  Suite "LinkPreviewCardContent" started.
+􀟈  Suite "LinkPreviewService" started.
+􀟈  Suite "LinkPreviewCache" started.
+􀟈  Test "downsampler reports pixel size" started.
+􀟈  Test "angle-bracket autolink is unwrapped" started.
+􀟈  Test "bare https line is detected" started.
+􀟈  Test "image link is not detected" started.
+􀟈  Test "markdown link with surrounding text is not detected" started.
+􀟈  Test "non-web schemes are not detected" started.
+􀟈  Test "with image the thumbnail is a trailing square" started.
+􀟈  Test "empty and blank lines are not detected" started.
+􀟈  Test "surrounding whitespace is ignored" started.
+􀟈  Test "narrow card caps the thumbnail width" started.
+􀟈  Test "localhost is allowed" started.
+􀟈  Test "downsampler bounds the longest side" started.
+􀟈  Test "bare http line is detected" started.
+􀟈  Test "query and fragment survive" started.
+􀟈  Test "a line that is exactly a markdown link is detected" started.
+􀟈  Test "without image the text column spans the card" started.
+􀟈  Test "unfinished host is not detected" started.
+􀟈  Test "text around the URL is not detected" started.
+􀟈  Test "downsampler rejects garbage" started.
+􀟈  Test "fetched title wins over the fallback; a blank fallback is ignored" started.
+􀟈  Test "display host strips www" started.
+􀟈  Test "markdown link with percent-encoded parentheses in the URL is detected" started.
+􀟈  Test "loaded uses title, summary, host and image" started.
+􀟈  Test "display URL strips scheme and trailing slash" started.
+􀟈  Test "loaded without title falls back to URL" started.
+􀟈  Test "blank summary is dropped" started.
+􀟈  Test "first request starts one fetch and reports loading" started.
+􀟈  Test "success is cached and announced" started.
+􀟈  Test "failure is cached and reported as failed" started.
+􀟈  Test "key is stable per URL" started.
+􀟈  Test "fallback title shows while loading and after a failed fetch" started.
+􀟈  Test "concurrent requests share one fetch" started.
+􀟈  Test "failure is remembered until the retry window passes" started.
+􀟈  Test "corrupt file reads as missing" started.
+􀟈  Test "failed shows readable URL and unavailable line" started.
+􀟈  Test "remove forgets one URL" started.
+􀟈  Test "zero width is safe" started.
+􀟈  Test "search reads saved titles summaries hosts and URLs even after display expiry" started.
+􀟈  Test "cached metadata skips the fetcher" started.
+􀟈  Test "metadata round-trips through disk" started.
+􀟈  Test "markdown link to a non-web URL is not detected" started.
+􀟈  Test "cachedMetadata does not trigger a fetch" started.
+􀟈  Test "stale metadata reads as missing" started.
+􀟈  Test "updated metadata replaces old search words and failures without a prior success stay empty" started.
+􀟈  Test "loading shows host and loading line" started.
+􁁛  Test "image link is not detected" passed after 0.001 seconds.
+􁁛  Test "empty and blank lines are not detected" passed after 0.001 seconds.
+􁁛  Test "angle-bracket autolink is unwrapped" passed after 0.001 seconds.
+􁁛  Test "bare https line is detected" passed after 0.001 seconds.
+􁁛  Test "with image the thumbnail is a trailing square" passed after 0.001 seconds.
+􁁛  Test "markdown link with surrounding text is not detected" passed after 0.001 seconds.
+􁁛  Test "surrounding whitespace is ignored" passed after 0.001 seconds.
+􁁛  Test "query and fragment survive" passed after 0.001 seconds.
+􁁛  Test "localhost is allowed" passed after 0.001 seconds.
+􁁛  Test "a line that is exactly a markdown link is detected" passed after 0.001 seconds.
+􁁛  Test "without image the text column spans the card" passed after 0.001 seconds.
+􁁛  Test "text around the URL is not detected" passed after 0.001 seconds.
+􁁛  Test "unfinished host is not detected" passed after 0.001 seconds.
+􁁛  Test "narrow card caps the thumbnail width" passed after 0.001 seconds.
+􁁛  Test "bare http line is detected" passed after 0.001 seconds.
+􁁛  Test "non-web schemes are not detected" passed after 0.001 seconds.
+􁁛  Test "display host strips www" passed after 0.001 seconds.
+􁁛  Test "fetched title wins over the fallback; a blank fallback is ignored" passed after 0.001 seconds.
+􁁛  Test "markdown link with percent-encoded parentheses in the URL is detected" passed after 0.001 seconds.
+􁁛  Test "display URL strips scheme and trailing slash" passed after 0.001 seconds.
+􁁛  Test "loaded uses title, summary, host and image" passed after 0.001 seconds.
+􁁛  Test "failed shows readable URL and unavailable line" passed after 0.001 seconds.
+􁁛  Test "blank summary is dropped" passed after 0.001 seconds.
+􁁛  Test "loaded without title falls back to URL" passed after 0.001 seconds.
+􁁛  Test "zero width is safe" passed after 0.001 seconds.
+􁁛  Test "fallback title shows while loading and after a failed fetch" passed after 0.001 seconds.
+􁁛  Test "markdown link to a non-web URL is not detected" passed after 0.001 seconds.
+􁁛  Test "loading shows host and loading line" passed after 0.001 seconds.
+􁁛  Suite "LinkPreviewDetector" passed after 0.001 seconds.
+􁁛  Suite "LinkPreviewCardContent" passed after 0.001 seconds.
+􁁛  Test "key is stable per URL" passed after 0.001 seconds.
+􁁛  Test "downsampler rejects garbage" passed after 0.003 seconds.
+􁁛  Test "downsampler reports pixel size" passed after 0.004 seconds.
+􁁛  Test "corrupt file reads as missing" passed after 0.007 seconds.
+􁁛  Test "downsampler bounds the longest side" passed after 0.011 seconds.
+􁁛  Suite "LinkPreviewCardLayout" passed after 0.012 seconds.
+􁁛  Test "failure is remembered until the retry window passes" passed after 0.011 seconds.
+􁁛  Test "remove forgets one URL" passed after 0.011 seconds.
+􁁛  Test "metadata round-trips through disk" passed after 0.011 seconds.
+􁁛  Test "stale metadata reads as missing" passed after 0.011 seconds.
+􁁛  Test "updated metadata replaces old search words and failures without a prior success stay empty" passed after 0.011 seconds.
+􁁛  Test "search reads saved titles summaries hosts and URLs even after display expiry" passed after 0.012 seconds.
+􁁛  Suite "LinkPreviewCache" passed after 0.012 seconds.
+􁁛  Test "cached metadata skips the fetcher" passed after 0.012 seconds.
+􁁛  Test "first request starts one fetch and reports loading" passed after 0.015 seconds.
+􁁛  Test "failure is cached and reported as failed" passed after 0.016 seconds.
+􁁛  Test "concurrent requests share one fetch" passed after 0.016 seconds.
+􁁛  Test "cachedMetadata does not trigger a fetch" passed after 0.016 seconds.
+􁁛  Test "success is cached and announced" passed after 0.016 seconds.
+􁁛  Suite "LinkPreviewService" passed after 0.017 seconds.
+􁁛  Test run with 45 tests in 5 suites passed after 0.017 seconds.

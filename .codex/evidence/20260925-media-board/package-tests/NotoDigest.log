@@ -1,0 +1,198 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write sources
+[1/4] Write swift-version--58304C5D6DBC2206.txt
+[3/25] Compiling NotoVault SidebarTreeLoader.swift
+[4/25] Compiling NotoVault VaultDirectoryLoader.swift
+[5/26] Compiling NotoVault NotoDeepLink.swift
+[6/26] Compiling NotoVault RelativeDate.swift
+[7/26] Compiling NotoVault NoteFrontmatter.swift
+[8/26] Compiling NotoVault NoteProperty.swift
+[9/26] Compiling NotoVault NoteRepository.swift
+[10/26] Compiling NotoVault NoteTitleResolver.swift
+[11/26] Compiling NotoVault DailyNoteService.swift
+[12/26] Compiling NotoVault FolderRepository.swift
+[13/26] Compiling NotoVault Frontmatter.swift
+[14/26] Compiling NotoVault NoteFile.swift
+[15/26] Compiling NotoVault VaultFileSystem.swift
+[16/26] Compiling NotoVault VaultPathResolver.swift
+[17/26] Emitting module NotoVault
+/Users/eugenechan/dev/personal/Noto/Packages/NotoVault/Sources/NotoVault/VaultManager.swift:15:17: warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 13 | public final class VaultManager: Sendable {
+ 14 |     public let rootURL: URL
+ 15 |     private let fileManager = FileManager.default
+    |                 `- warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 16 |     private let logger = Logger(subsystem: "com.noto", category: "VaultManager")
+ 17 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSFileManager.h:96:12: note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 94 | extern NSNotificationName const NSUbiquityIdentityDidChangeNotification API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
+ 95 | 
+ 96 | @interface NSFileManager : NSObject
+    |            `- note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 97 | 
+ 98 | /* Returns the default singleton instance.
+[18/26] Compiling NotoVault AttachmentStore.swift
+[19/26] Compiling NotoVault BoundedFileRead.swift
+[20/26] Compiling NotoVault VaultListItem.swift
+[21/26] Compiling NotoVault VaultManager.swift
+/Users/eugenechan/dev/personal/Noto/Packages/NotoVault/Sources/NotoVault/VaultManager.swift:15:17: warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 13 | public final class VaultManager: Sendable {
+ 14 |     public let rootURL: URL
+ 15 |     private let fileManager = FileManager.default
+    |                 `- warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 16 |     private let logger = Logger(subsystem: "com.noto", category: "VaultManager")
+ 17 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSFileManager.h:96:12: note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 94 | extern NSNotificationName const NSUbiquityIdentityDidChangeNotification API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
+ 95 | 
+ 96 | @interface NSFileManager : NSObject
+    |            `- note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 97 | 
+ 98 | /* Returns the default singleton instance.
+[22/26] Compiling NotoVault VaultMediaLibrary.swift
+[23/26] Compiling NotoVault VaultMarkdown.swift
+[24/26] Compiling NotoVault WordCounter.swift
+[25/31] Compiling NotoDigest DigestFiling.swift
+/Users/eugenechan/dev/personal/Noto/Packages/NotoDigest/Sources/NotoDigest/DigestFiling.swift:47:52: warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 45 |         vaultURL: URL,
+ 46 |         fileSystem: any VaultFileSystem = CoordinatedVaultFileSystem(),
+ 47 |         now: @escaping @Sendable () -> Date = Date.init,
+    |                                                    `- warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 48 |         makeID: @escaping @Sendable () -> UUID = UUID.init
+ 49 |     ) {
+
+/Users/eugenechan/dev/personal/Noto/Packages/NotoDigest/Sources/NotoDigest/DigestFiling.swift:48:55: warning: converting non-Sendable function value to '@Sendable () -> UUID' may introduce data races
+ 46 |         fileSystem: any VaultFileSystem = CoordinatedVaultFileSystem(),
+ 47 |         now: @escaping @Sendable () -> Date = Date.init,
+ 48 |         makeID: @escaping @Sendable () -> UUID = UUID.init
+    |                                                       `- warning: converting non-Sendable function value to '@Sendable () -> UUID' may introduce data races
+ 49 |     ) {
+ 50 |         self.vaultURL = vaultURL.standardizedFileURL
+[26/31] Compiling NotoDigest DigestMarkdown.swift
+[27/31] Compiling NotoDigest DigestEntry.swift
+[28/31] Emitting module NotoDigest
+/Users/eugenechan/dev/personal/Noto/Packages/NotoDigest/Sources/NotoDigest/DigestFiling.swift:47:52: warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 45 |         vaultURL: URL,
+ 46 |         fileSystem: any VaultFileSystem = CoordinatedVaultFileSystem(),
+ 47 |         now: @escaping @Sendable () -> Date = Date.init,
+    |                                                    `- warning: converting non-Sendable function value to '@Sendable () -> Date' may introduce data races
+ 48 |         makeID: @escaping @Sendable () -> UUID = UUID.init
+ 49 |     ) {
+
+/Users/eugenechan/dev/personal/Noto/Packages/NotoDigest/Sources/NotoDigest/DigestFiling.swift:48:55: warning: converting non-Sendable function value to '@Sendable () -> UUID' may introduce data races
+ 46 |         fileSystem: any VaultFileSystem = CoordinatedVaultFileSystem(),
+ 47 |         now: @escaping @Sendable () -> Date = Date.init,
+ 48 |         makeID: @escaping @Sendable () -> UUID = UUID.init
+    |                                                       `- warning: converting non-Sendable function value to '@Sendable () -> UUID' may introduce data races
+ 49 |     ) {
+ 50 |         self.vaultURL = vaultURL.standardizedFileURL
+[29/31] Compiling NotoDigest DigestInbox.swift
+[30/36] Compiling NotoDigestTests TempVault.swift
+[31/36] Compiling NotoDigestTests DigestMarkdownTests.swift
+[32/36] Compiling NotoDigestTests DigestInboxTests.swift
+[33/36] Emitting module NotoDigestTests
+[34/36] Compiling NotoDigestTests DigestFilingTests.swift
+[35/38] Emitting module NotoDigestPackageTests
+[36/38] Compiling NotoDigestPackageTests runner.swift
+[36/38] Write Objects.LinkFileList
+[37/38] Linking NotoDigestPackageTests
+Build complete! (8.80s)
+Test Suite 'All tests' started at 2026-09-25 23:18:48.985.
+Test Suite 'All tests' passed at 2026-09-25 23:18:48.986.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "DigestMarkdown — filing text transforms" started.
+􀟈  Suite "DigestInbox — reading the inbox" started.
+􀟈  Suite "DigestFiling — snooze, add-to, create, discard" started.
+􀟈  Test "appending joins the capture after exactly one blank line" started.
+􀟈  Test "filename sanitizes reserved characters and adds the .md extension" started.
+􀟈  Test "filename is nil for a blank or unusable title" started.
+􀟈  Test "appending an empty capture returns the target unchanged" started.
+􀟈  Test "newNoteDocument with an empty body is just the heading" started.
+􀟈  Test "appending preserves the target's frontmatter and existing body verbatim" started.
+􀟈  Test "appending to a frontmatter-only note makes the capture the body" started.
+􀟈  Test "newNoteDocument writes frontmatter, an H1 title, then the capture" started.
+􀟈  Test "appending collapses ragged trailing whitespace to one blank line" started.
+􀟈  Test "shows captures whose snooze has elapsed" started.
+􀟈  Test "an unreadable capture is listed as unavailable rather than dropped" started.
+􀟈  Test "a missing inbox folder reads as empty, not an error" started.
+􀟈  Test "orders newest capture first" started.
+􀟈  Test "lists only top-level .md files" started.
+􀟈  Test "the entry body has frontmatter stripped and whitespace trimmed" started.
+􀟈  Test "allEntries still includes snoozed captures" started.
+􀟈  Test "an unparseable snoozed_until is treated as due" started.
+􀟈  Test "a lapsed snooze is ordered by its wake time among new captures" started.
+􀟈  Test "parses plain ISO, fractional-seconds ISO, and bare YYYY-MM-DD stamps" started.
+􀟈  Test "a capture with no frontmatter lists as due with a derived id" started.
+􀟈  Test "hides captures snoozed into the future" started.
+􀟈  Test "snooze stamps a week out and removes the capture from the digest" started.
+􀟈  Test "create rejects a blank title without writing or deleting anything" started.
+􀟈  Test "create resolves a filename collision instead of overwriting" started.
+􀟈  Test "restore refuses an empty document" started.
+􀟈  Test "snooze preserves every other frontmatter key and the body" started.
+􀟈  Test "restore recreates the inbox folder when it is gone" started.
+􀟈  Test "a failed add-to leaves the capture in the inbox" started.
+􀟈  Test "create writes a titled note in the chosen folder and clears the inbox" started.
+􀟈  Test "add-to appends to the target note and clears the capture from the inbox" started.
+􀟈  Test "add-to refreshes the target note's updated stamp" started.
+􀟈  Test "discard deletes the capture and touches nothing else" started.
+􀟈  Test "add-to re-reads the capture from disk instead of trusting a stale entry" started.
+􀟈  Test "re-snoozing overwrites the existing stamp instead of duplicating it" started.
+􀟈  Test "restore writes a discarded capture back unchanged" started.
+􀟈  Test "a failed create leaves the capture in the inbox" started.
+􀟈  Test "add-to refreshes a modified: stamp on notes written by the main app" started.
+􀟈  Test "discard returns the file's exact original bytes" started.
+􀟈  Test "snoozing a frontmatter-less capture reports failure rather than silently doing nothing" started.
+􀟈  Test "filing an unavailable capture fails instead of writing an empty body" started.
+􀟈  Test "add-to rejects a target that no longer exists" started.
+􀟈  Test "create makes the destination folder when it is missing" started.
+􁁛  Test "appending joins the capture after exactly one blank line" passed after 0.011 seconds.
+􁁛  Test "filename is nil for a blank or unusable title" passed after 0.011 seconds.
+􁁛  Test "appending an empty capture returns the target unchanged" passed after 0.011 seconds.
+􁁛  Test "filename sanitizes reserved characters and adds the .md extension" passed after 0.011 seconds.
+􁁛  Test "appending preserves the target's frontmatter and existing body verbatim" passed after 0.011 seconds.
+􁁛  Test "appending to a frontmatter-only note makes the capture the body" passed after 0.011 seconds.
+􁁛  Test "appending collapses ragged trailing whitespace to one blank line" passed after 0.011 seconds.
+􁁛  Test "newNoteDocument with an empty body is just the heading" passed after 0.012 seconds.
+􁁛  Test "newNoteDocument writes frontmatter, an H1 title, then the capture" passed after 0.079 seconds.
+􁁛  Test "a missing inbox folder reads as empty, not an error" passed after 0.079 seconds.
+􁁛  Test "an unreadable capture is listed as unavailable rather than dropped" passed after 0.079 seconds.
+􁁛  Test "restore refuses an empty document" passed after 0.073 seconds.
+􁁛  Test "parses plain ISO, fractional-seconds ISO, and bare YYYY-MM-DD stamps" passed after 0.079 seconds.
+􁁛  Test "an unparseable snoozed_until is treated as due" passed after 0.079 seconds.
+􁁛  Test "the entry body has frontmatter stripped and whitespace trimmed" passed after 0.079 seconds.
+􁁛  Test "lists only top-level .md files" passed after 0.079 seconds.
+􁁛  Test "a capture with no frontmatter lists as due with a derived id" passed after 0.079 seconds.
+􁁛  Test "create rejects a blank title without writing or deleting anything" passed after 0.074 seconds.
+􁁛  Test "shows captures whose snooze has elapsed" passed after 0.079 seconds.
+􁁛  Test "hides captures snoozed into the future" passed after 0.079 seconds.
+􁁛  Test "orders newest capture first" passed after 0.079 seconds.
+􁁛  Test "snooze preserves every other frontmatter key and the body" passed after 0.073 seconds.
+􁁛  Test "allEntries still includes snoozed captures" passed after 0.079 seconds.
+􁁛  Test "a failed add-to leaves the capture in the inbox" passed after 0.073 seconds.
+􁁛  Test "create resolves a filename collision instead of overwriting" passed after 0.073 seconds.
+􁁛  Test "a lapsed snooze is ordered by its wake time among new captures" passed after 0.079 seconds.
+􁁛  Test "snooze stamps a week out and removes the capture from the digest" passed after 0.076 seconds.
+􁁛  Test "filing an unavailable capture fails instead of writing an empty body" passed after 0.070 seconds.
+􁁛  Test "a failed create leaves the capture in the inbox" passed after 0.070 seconds.
+􁁛  Suite "DigestMarkdown — filing text transforms" passed after 0.080 seconds.
+􁁛  Suite "DigestInbox — reading the inbox" passed after 0.080 seconds.
+􁁛  Test "discard deletes the capture and touches nothing else" passed after 0.071 seconds.
+􁁛  Test "restore recreates the inbox folder when it is gone" passed after 0.081 seconds.
+􁁛  Test "re-snoozing overwrites the existing stamp instead of duplicating it" passed after 0.081 seconds.
+􁁛  Test "add-to rejects a target that no longer exists" passed after 0.082 seconds.
+􁁛  Test "add-to refreshes the target note's updated stamp" passed after 0.084 seconds.
+􁁛  Test "create writes a titled note in the chosen folder and clears the inbox" passed after 0.089 seconds.
+􁁛  Test "add-to appends to the target note and clears the capture from the inbox" passed after 0.090 seconds.
+􁁛  Test "discard returns the file's exact original bytes" passed after 0.090 seconds.
+􁁛  Test "snoozing a frontmatter-less capture reports failure rather than silently doing nothing" passed after 0.090 seconds.
+􁁛  Test "add-to re-reads the capture from disk instead of trusting a stale entry" passed after 0.091 seconds.
+􁁛  Test "restore writes a discarded capture back unchanged" passed after 0.104 seconds.
+􁁛  Test "add-to refreshes a modified: stamp on notes written by the main app" passed after 0.105 seconds.
+􁁛  Test "create makes the destination folder when it is missing" passed after 0.110 seconds.
+􁁛  Suite "DigestFiling — snooze, add-to, create, discard" passed after 0.120 seconds.
+􁁛  Test run with 42 tests in 3 suites passed after 0.121 seconds.

@@ -1,0 +1,98 @@
+[0/1] Planning build
+Building for debugging...
+[0/7] Write sources
+[1/7] Write swift-version--58304C5D6DBC2206.txt
+[3/48] Emitting module NotoVault
+/Users/eugenechan/dev/personal/Noto/Packages/NotoVault/Sources/NotoVault/VaultManager.swift:15:17: warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 13 | public final class VaultManager: Sendable {
+ 14 |     public let rootURL: URL
+ 15 |     private let fileManager = FileManager.default
+    |                 `- warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 16 |     private let logger = Logger(subsystem: "com.noto", category: "VaultManager")
+ 17 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSFileManager.h:96:12: note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 94 | extern NSNotificationName const NSUbiquityIdentityDidChangeNotification API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
+ 95 | 
+ 96 | @interface NSFileManager : NSObject
+    |            `- note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 97 | 
+ 98 | /* Returns the default singleton instance.
+[4/49] Compiling NotoSearch ExtractiveSearchSummary.swift
+[5/49] Compiling NotoSearch MarkdownSearchDocumentExtractor.swift
+[6/49] Compiling NotoVault VaultFileSystem.swift
+[7/49] Compiling NotoVault VaultListItem.swift
+[8/49] Compiling NotoVault VaultManager.swift
+/Users/eugenechan/dev/personal/Noto/Packages/NotoVault/Sources/NotoVault/VaultManager.swift:15:17: warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 13 | public final class VaultManager: Sendable {
+ 14 |     public let rootURL: URL
+ 15 |     private let fileManager = FileManager.default
+    |                 `- warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 16 |     private let logger = Logger(subsystem: "com.noto", category: "VaultManager")
+ 17 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSFileManager.h:96:12: note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 94 | extern NSNotificationName const NSUbiquityIdentityDidChangeNotification API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
+ 95 | 
+ 96 | @interface NSFileManager : NSObject
+    |            `- note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 97 | 
+ 98 | /* Returns the default singleton instance.
+[9/49] Compiling NotoSearch SearchIndexStore.swift
+[10/49] Compiling NotoSearch SearchTypes.swift
+[11/49] Compiling NotoVault NoteFrontmatter.swift
+[12/49] Compiling NotoVault NoteProperty.swift
+[13/49] Compiling NotoVault VaultPathResolver.swift
+[14/49] Compiling NotoSearch SearchUtilities.swift
+[15/49] Compiling NotoSearch CachedRemoteImageFetcher.swift
+[16/49] Compiling NotoSearch MarkdownSearchEngine.swift
+[17/49] Compiling NotoSearch MarkdownSearchIndexer.swift
+[18/49] Compiling NotoSearch HybridNoteSearch.swift
+[19/49] Compiling NotoSearch HybridSearchFusion.swift
+[20/49] Compiling NotoSearch PendingIndexQueue.swift
+[21/49] Compiling NotoSearch SearchIndexCoordinator.swift
+[22/49] Compiling NotoVault VaultMarkdown.swift
+[23/49] Compiling NotoVault VaultMediaLibrary.swift
+[24/49] Compiling NotoVault WordCounter.swift
+[25/49] Compiling NotoSearch SemanticTypes.swift
+[26/49] Compiling NotoSearch SemanticChunker.swift
+[27/50] Emitting module NotoSearch
+[28/50] Compiling NotoSearch SemanticIndexCoordinator.swift
+[29/50] Compiling NotoSearch ImageIndexingTypes.swift
+[38/50] Compiling NotoSearch SemanticIndexStore.swift
+[43/50] Compiling NotoSearch SemanticIndexer.swift
+[44/50] Compiling NotoSearch SemanticSearcher.swift
+[45/50] Compiling NotoSearch VisionImageDescriber.swift
+[46/52] Compiling NotoAgentCore NotoAgentService.swift
+[47/52] Emitting module NotoAgentCore
+[48/56] Emitting module noto_agent
+[49/56] Compiling noto_agent main.swift
+[49/56] Write Objects.LinkFileList
+[50/56] Linking noto-agent
+[51/56] Applying noto-agent
+[53/56] Emitting module NotoAgentCoreTests
+[54/56] Compiling NotoAgentCoreTests NotoAgentServiceTests.swift
+[55/58] Compiling NotoAgentCLIPackageTests runner.swift
+[56/58] Emitting module NotoAgentCLIPackageTests
+[56/58] Write Objects.LinkFileList
+[57/58] Linking NotoAgentCLIPackageTests
+Build complete! (9.54s)
+Test Suite 'All tests' started at 2026-09-25 23:17:58.952.
+Test Suite 'All tests' passed at 2026-09-25 23:17:58.953.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "Noto agent filesystem integration" started.
+􀟈  Test "daily append creates the templated note and deduplicates retries" started.
+􁁛  Test "daily append creates the templated note and deduplicates retries" passed after 0.028 seconds.
+􀟈  Test "append preserves frontmatter, stamps modified, and refreshes search" started.
+􁁛  Test "append preserves frontmatter, stamps modified, and refreshes search" passed after 0.011 seconds.
+􀟈  Test "read supports bounded line ranges" started.
+􁁛  Test "read supports bounded line ranges" passed after 0.001 seconds.
+􀟈  Test "append rejects traversal and symlinks that escape the vault" started.
+􁁛  Test "append rejects traversal and symlinks that escape the vault" passed after 0.001 seconds.
+􀟈  Test "health reports the temporary vault and note counts" started.
+􁁛  Test "health reports the temporary vault and note counts" passed after 0.001 seconds.
+􁁛  Suite "Noto agent filesystem integration" passed after 0.044 seconds.
+􁁛  Test run with 5 tests in 1 suite passed after 0.044 seconds.

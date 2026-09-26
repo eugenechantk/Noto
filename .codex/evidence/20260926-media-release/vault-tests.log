@@ -1,0 +1,344 @@
+Building for debugging...
+[0/7] /Users/eugenechan/dev/personal/Noto/worktrees/media-release-107a91d/Packages/NotoVault/.build/arm64-apple-macosx/debug/NotoVaultPackageTests.derived/runner.swift
+[1/7] Write sources
+[4/7] Write swift-version--58304C5D6DBC2206.txt
+[6/28] Compiling NotoVault VaultManager.swift
+/Users/eugenechan/dev/personal/Noto/worktrees/media-release-107a91d/Packages/NotoVault/Sources/NotoVault/VaultManager.swift:15:17: warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 13 | public final class VaultManager: Sendable {
+ 14 |     public let rootURL: URL
+ 15 |     private let fileManager = FileManager.default
+    |                 `- warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 16 |     private let logger = Logger(subsystem: "com.noto", category: "VaultManager")
+ 17 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSFileManager.h:96:12: note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 94 | extern NSNotificationName const NSUbiquityIdentityDidChangeNotification API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
+ 95 | 
+ 96 | @interface NSFileManager : NSObject
+    |            `- note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 97 | 
+ 98 | /* Returns the default singleton instance.
+[7/28] Compiling NotoVault VaultPathResolver.swift
+[8/28] Compiling NotoVault VaultMarkdown.swift
+[9/28] Compiling NotoVault VaultListItem.swift
+[10/28] Compiling NotoVault AttachmentStore.swift
+[11/28] Compiling NotoVault BoundedFileRead.swift
+[12/28] Compiling NotoVault SidebarTreeLoader.swift
+[13/28] Compiling NotoVault VaultDirectoryLoader.swift
+[14/28] Compiling NotoVault NoteRepository.swift
+[15/28] Compiling NotoVault NoteTitleResolver.swift
+[16/28] Compiling NotoVault NotoDeepLink.swift
+[17/28] Compiling NotoVault RelativeDate.swift
+[18/28] Compiling NotoVault DailyNoteService.swift
+[19/28] Compiling NotoVault FolderRepository.swift
+[20/28] Emitting module NotoVault
+/Users/eugenechan/dev/personal/Noto/worktrees/media-release-107a91d/Packages/NotoVault/Sources/NotoVault/VaultManager.swift:15:17: warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 13 | public final class VaultManager: Sendable {
+ 14 |     public let rootURL: URL
+ 15 |     private let fileManager = FileManager.default
+    |                 `- warning: stored property 'fileManager' of 'Sendable'-conforming class 'VaultManager' has non-Sendable type 'FileManager'; this is an error in the Swift 6 language mode
+ 16 |     private let logger = Logger(subsystem: "com.noto", category: "VaultManager")
+ 17 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSFileManager.h:96:12: note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 94 | extern NSNotificationName const NSUbiquityIdentityDidChangeNotification API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
+ 95 | 
+ 96 | @interface NSFileManager : NSObject
+    |            `- note: class 'FileManager' does not conform to the 'Sendable' protocol
+ 97 | 
+ 98 | /* Returns the default singleton instance.
+[21/28] Compiling NotoVault VaultMediaLibrary.swift
+[22/28] Compiling NotoVault VaultFileSystem.swift
+[23/28] Compiling NotoVault Frontmatter.swift
+[24/28] Compiling NotoVault NoteFile.swift
+[25/28] Compiling NotoVault NoteFrontmatter.swift
+[26/28] Compiling NotoVault NoteProperty.swift
+[27/29] Compiling NotoVault WordCounter.swift
+[28/44] Compiling NotoVaultTests VaultDirectoryLoaderTests.swift
+[29/45] Compiling NotoVaultTests VaultRepositoryServicesTests.swift
+[30/45] Compiling NotoVaultTests NoteTitleResolverTests.swift
+[31/45] Compiling NotoVaultTests NotePropertyTests.swift
+[32/45] Compiling NotoVaultTests RelativeDateTests.swift
+[33/45] Compiling NotoVaultTests BoundedFileReadTests.swift
+[34/45] Compiling NotoVaultTests FrontmatterTests.swift
+[35/45] Compiling NotoVaultTests SidebarTreeLoaderTests.swift
+[36/45] Compiling NotoVaultTests WordCounterTests.swift
+[37/45] Compiling NotoVaultTests NoteFileTests.swift
+[38/45] Compiling NotoVaultTests NotoDeepLinkTests.swift
+[39/45] Compiling NotoVaultTests VaultMediaLibraryTests.swift
+[40/45] Compiling NotoVaultTests VaultManagerTests.swift
+[41/45] Compiling NotoVaultTests NotoWebDeepLinkTests.swift
+[42/45] Emitting module NotoVaultTests
+[43/45] Compiling NotoVaultTests NoteFrontmatterTests.swift
+[44/47] Emitting module NotoVaultPackageTests
+[45/47] Compiling NotoVaultPackageTests runner.swift
+[45/47] Write Objects.LinkFileList
+[46/47] Linking NotoVaultPackageTests
+Build complete! (12.75s)
+Test Suite 'All tests' started at 2026-09-26 00:29:40.603.
+Test Suite 'All tests' passed at 2026-09-26 00:29:40.605.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.003) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "Noto web deep-link URL codec" started.
+􀟈  Suite "SidebarTreeLoader" started.
+􀟈  Suite "WordCounter" started.
+􀟈  Suite "NoteFile" started.
+􀟈  Suite "NoteFrontmatter — stamping whichever timestamp key exists" started.
+􀟈  Suite "VaultDirectoryLoader" started.
+􀟈  Suite "NotePropertyClassifier" started.
+􀟈  Suite "NotoRelativeDate.editedString" started.
+􀟈  Suite "Frontmatter" started.
+􀟈  Suite "NoteTitleResolver" started.
+􀟈  Suite "BoundedFileRead" started.
+􀟈  Suite VaultMediaLibraryTests started.
+􀟈  Suite "VaultManager" started.
+􀟈  Suite "Vault repository services" started.
+􀟈  Suite "Noto deep-link URL codec" started.
+􀟈  Suite "NoteFrontmatter — programmatic write stamping" started.
+􀟈  Test "Refuses to build web URLs for unsafe vault paths" started.
+􀟈  Test "Rejects foreign hosts, wrong paths, and unsafe decoded paths" started.
+􀟈  Test "Leaves the existing custom-scheme contract intact" started.
+􀟈  Test "Builds an https URL that carries the encoded path in the fragment" started.
+􀟈  Suite "NoteFrontmatter — generic key read/write" started.
+􀟈  Test loadRowsProducesExpandedDepthFirstRows() started.
+􀟈  Test searchRowsIgnoresCollapsedFolderExpansionState() started.
+􀟈  Test "Parses the query-encoded web form for robustness" started.
+􀟈  Test "Round-trips a nested markdown path through the web URL" started.
+􀟈  Test countsGraphemeClustersForCharacters() started.
+􀟈  Test noteRowsUseMarkdownTitleInsteadOfFilename() started.
+􀟈  Test "Tolerates a trailing slash and non-canonical host casing" started.
+􀟈  Test stripsFrontmatterBeforeCounting() started.
+􀟈  Test collapsedFoldersHideDescendantRows() started.
+􀟈  Test "Round-trips Unicode and URL-reserved characters" started.
+􀟈  Test "stamps both keys when both are present" started.
+􀟈  Test "Keeps the note path out of every server-visible URL component" started.
+􀟈  Test testTitleUntitledWhenOnlyWhitespace() started.
+􀟈  Test "does not invent a timestamp key" started.
+􀟈  Test filterKeepsAncestorFoldersForDescendantMatches() started.
+􀟈  Test uuidNoteWithoutTitleDisplaysUntitled() started.
+􀟈  Test foldersIncludeImmediateFolderAndItemCounts() started.
+􀟈  Test "stamps modified: when that is the note's key" started.
+􀟈  Test testTitleStripsHeadingMarkers() started.
+􀟈  Test uuidFilenameWithoutTitleDisplaysUntitled() started.
+􀟈  Test loadItemsUsesSharedMarkdownTitleResolution() started.
+􀟈  Test countsWordsAndUserVisibleCharacters() started.
+􀟈  Test "parseTags handles inline, bracket, and block lists" started.
+􀟈  Test testTitleUntitledWhenOnlyHashes() started.
+􀟈  Test testTitleFromFirstLine() started.
+􀟈  Test "text is the default" started.
+􀟈  Test "date round-trips date-only and datetime" started.
+􀟈  Test "serializeTags emits an inline flow list" started.
+􀟈  Test "url by value shape" started.
+􀟈  Test testParseMissingClosingDashes() started.
+􀟈  Test testBodyPreservedExactly() started.
+􀟈  Test loadItemsResolvesMetadataFromPrefixForLargeNotes() started.
+􀟈  Test testParseInvalidUUID() started.
+􀟈  Test "weeks" started.
+􀟈  Test "under a minute → just now" started.
+􀟈  Test fileTitleResolutionUsesEarlyMarkdownOnly() started.
+􀟈  Test emptyTitleUsesFallback() started.
+􀟈  Test "stamps updated: when that is the note's key" started.
+􀟈  Test emptyMarkdownHasZeroWordsAndCharacters() started.
+􀟈  Test "date by key or value" started.
+􀟈  Test fileOnlyMetadataUsesFilenameWithoutReadingNoteContent() started.
+􀟈  Test usesPlainFirstLineAsTitle() started.
+􀟈  Test legacyAttachmentsFolderIsHiddenFromSidebarItemsAndCounts() started.
+􀟈  Test "tags by key or list shape" started.
+􀟈  Test stripsFrontmatterAndHeadingMarker() started.
+􀟈  Test testParseNoFrontmatter() started.
+􀟈  Test "minutes" started.
+􀟈  Test testTitleUntitledWhenEmpty() started.
+􀟈  Test testDefaultValues() started.
+􀟈  Test testParseValidFrontmatter() started.
+􀟈  Test humanFilenameFallbackUsesStem() started.
+􀟈  Test returnsFailedWhenReadYieldsNil() started.
+􀟈  Test extractsKindsAndPreservesSource() started.
+􀟈  Test returnsValueWhenReadCompletesInTime() started.
+􀟈  Test deduplicatesWithinNoteButKeepsOtherSources() started.
+􀟈  Test rescanReplacesRemovedBodyAndUsesLatestLinkMetadata() started.
+􀟈  Test "future/equal clamps to just now" started.
+􀟈  Test testDeleteNoteNotFound() started.
+􀟈  Test testSerializeAndParse() started.
+􀟈  Test testCreateNoteWithContent() started.
+􀟈  Test scanReflectsEditsMovesAndDeletes() started.
+􀟈  Test abandonedReadResultIsDiscarded() started.
+􀟈  Test timesOutWhenReadBlocks() started.
+􀟈  Test "months" started.
+􀟈  Test testUpdateNote() started.
+􀟈  Test searchesLinkedPreviewMetadataWithoutLeakingToOtherNotes() started.
+􀟈  Test testReadNoteById() started.
+􀟈  Test "compactString drops the Edited prefix" started.
+􀟈  Test ignoresCodeFrontmatterAndUnsafePaths() started.
+􀟈  Test searchesFullBodySavedMetadataAndCombinedFields() started.
+􀟈  Test "preserves every other key and the body" started.
+􀟈  Test missingVaultThrowsAndSymlinksCannotEscape() started.
+􀟈  Test identitySurvivesNoteRenameAndUnavailableNotesAreReported() started.
+􀟈  Test filtersByKindAndAllSearchTerms() started.
+􀟈  Test concurrentBoundedReadsAllResolve() started.
+􀟈  Test sharedLinkTitlesBecomeReadableCaptions() started.
+􀟈  Test testDeleteNote() started.
+􀟈  Test testCreateMultipleNotes() started.
+􀟈  Test supportsAngleTargetsTitlesAndParentheses() started.
+􀟈  Test "days" started.
+􀟈  Test testUpdateNotePreservesCreatedAt() started.
+􀟈  Test uuidFilenameFallbackIsUntitled() started.
+􀟈  Test "NoteRepository creates, saves, renames, resolves, moves, and deletes notes" started.
+􀟈  Test "VaultPathResolver rejects path traversal and non-markdown paths" started.
+􀟈  Test testEnsureVaultExists() started.
+􀟈  Test testReadNoteNotFound() started.
+􀟈  Test "hours" started.
+􀟈  Test "FolderRepository creates, moves with conflict suffix, and deletes folders" started.
+􀟈  Test testUpdateNoteNotFound() started.
+􀟈  Test releasesCallerWhileReadIsStillBlocked() started.
+􀟈  Test testListNotesSortedByModifiedDate() started.
+􀟈  Test testCreateNote() started.
+􀟈  Test "AttachmentStore exposes deterministic markdown paths and filename cleanup" started.
+􀟈  Test "DailyNoteService creates daily note once and applies template retroactively" started.
+􀟈  Test testListNotesEmpty() started.
+􀟈  Test "Round-trips Unicode note paths" started.
+􀟈  Test "Builds and parses a canonical URL for a nested markdown note" started.
+􀟈  Test "Refuses to build URLs for invalid vault paths" started.
+􀟈  Test "Rejects unsupported or unsafe URL inputs" started.
+􀟈  Test "stampingModified is a no-op without frontmatter" started.
+􀟈  Test "stampingModified inserts a modified line when none exists" started.
+􀟈  Test "id(of:) reads the frontmatter UUID" started.
+􀟈  Test "stampingModified updates only the modified line, preserving id/created/body" started.
+􀟈  Test "setting(_:to:) rewrites an existing key in place without duplicating it" started.
+􀟈  Test "setting(_:to:) is a no-op without frontmatter" started.
+􀟈  Test "value(for:) is nil for an absent key or absent frontmatter" started.
+􀟈  Test "removing(_:) drops the key and leaves the rest intact" started.
+􀟈  Test "setting(_:to:) appends a missing key before the closing fence" started.
+􀟈  Test "value(for:) reads a key case-insensitively and keeps colons in the value" started.
+􁁛  Test "stamps both keys when both are present" passed after 0.027 seconds.
+􁁛  Test noteRowsUseMarkdownTitleInsteadOfFilename() passed after 0.027 seconds.
+􁁛  Test "Parses the query-encoded web form for robustness" passed after 0.027 seconds.
+􁁛  Test "Tolerates a trailing slash and non-canonical host casing" passed after 0.027 seconds.
+􁁛  Test "Builds an https URL that carries the encoded path in the fragment" passed after 0.027 seconds.
+􁁛  Test "Leaves the existing custom-scheme contract intact" passed after 0.027 seconds.
+􁁛  Test testTitleUntitledWhenOnlyWhitespace() passed after 0.027 seconds.
+􁁛  Test "Refuses to build web URLs for unsafe vault paths" passed after 0.027 seconds.
+􁁛  Test stripsFrontmatterBeforeCounting() passed after 0.027 seconds.
+􁁛  Test "Round-trips Unicode and URL-reserved characters" passed after 0.027 seconds.
+􁁛  Test testTitleStripsHeadingMarkers() passed after 0.027 seconds.
+􁁛  Test "Keeps the note path out of every server-visible URL component" passed after 0.027 seconds.
+􁁛  Test "Rejects foreign hosts, wrong paths, and unsafe decoded paths" passed after 0.028 seconds.
+􁁛  Test "Round-trips a nested markdown path through the web URL" passed after 0.027 seconds.
+􁁛  Test collapsedFoldersHideDescendantRows() passed after 0.027 seconds.
+􁁛  Test testTitleUntitledWhenOnlyHashes() passed after 0.027 seconds.
+􁁛  Test countsWordsAndUserVisibleCharacters() passed after 0.027 seconds.
+􁁛  Test "parseTags handles inline, bracket, and block lists" passed after 0.027 seconds.
+􁁛  Test "does not invent a timestamp key" passed after 0.028 seconds.
+􁁛  Test testParseMissingClosingDashes() passed after 0.027 seconds.
+􁁛  Test "serializeTags emits an inline flow list" passed after 0.027 seconds.
+􁁛  Test "url by value shape" passed after 0.027 seconds.
+􁁛  Test testTitleFromFirstLine() passed after 0.028 seconds.
+􁁛  Test testParseInvalidUUID() passed after 0.027 seconds.
+􁁛  Test testBodyPreservedExactly() passed after 0.027 seconds.
+􁁛  Test "weeks" passed after 0.027 seconds.
+􁁛  Test "under a minute → just now" passed after 0.027 seconds.
+􁁛  Test loadRowsProducesExpandedDepthFirstRows() passed after 0.028 seconds.
+􁁛  Test searchRowsIgnoresCollapsedFolderExpansionState() passed after 0.028 seconds.
+􁁛  Test emptyTitleUsesFallback() passed after 0.028 seconds.
+􁁛  Test emptyMarkdownHasZeroWordsAndCharacters() passed after 0.028 seconds.
+􁁛  Test usesPlainFirstLineAsTitle() passed after 0.028 seconds.
+􁁛  Test "stamps updated: when that is the note's key" passed after 0.028 seconds.
+􁁛  Test "text is the default" passed after 0.028 seconds.
+􁁛  Test "tags by key or list shape" passed after 0.028 seconds.
+􁁛  Test stripsFrontmatterAndHeadingMarker() passed after 0.028 seconds.
+􁁛  Test testParseNoFrontmatter() passed after 0.028 seconds.
+􁁛  Test "minutes" passed after 0.028 seconds.
+􁁛  Test testDefaultValues() passed after 0.028 seconds.
+􁁛  Test testParseValidFrontmatter() passed after 0.028 seconds.
+􁁛  Test "stamps modified: when that is the note's key" passed after 0.028 seconds.
+􁁛  Test humanFilenameFallbackUsesStem() passed after 0.028 seconds.
+􁁛  Test testTitleUntitledWhenEmpty() passed after 0.028 seconds.
+􁁛  Test uuidNoteWithoutTitleDisplaysUntitled() passed after 0.028 seconds.
+􁁛  Test countsGraphemeClustersForCharacters() passed after 0.029 seconds.
+􁁛  Test "future/equal clamps to just now" passed after 0.028 seconds.
+􁁛  Test "date by key or value" passed after 0.028 seconds.
+􁁛  Test uuidFilenameWithoutTitleDisplaysUntitled() passed after 0.029 seconds.
+􁁛  Test "date round-trips date-only and datetime" passed after 0.028 seconds.
+􁁛  Test testSerializeAndParse() passed after 0.028 seconds.
+􁁛  Test "months" passed after 0.028 seconds.
+􁁛  Test fileOnlyMetadataUsesFilenameWithoutReadingNoteContent() passed after 0.028 seconds.
+􁁛  Test loadItemsUsesSharedMarkdownTitleResolution() passed after 0.029 seconds.
+􁁛  Test legacyAttachmentsFolderIsHiddenFromSidebarItemsAndCounts() passed after 0.028 seconds.
+􁁛  Test "compactString drops the Edited prefix" passed after 0.028 seconds.
+􁁛  Test fileTitleResolutionUsesEarlyMarkdownOnly() passed after 0.028 seconds.
+􁁛  Test testCreateNoteWithContent() passed after 0.028 seconds.
+􁁛  Test "preserves every other key and the body" passed after 0.028 seconds.
+􁁛  Test loadItemsResolvesMetadataFromPrefixForLargeNotes() passed after 0.028 seconds.
+􁁛  Test testDeleteNoteNotFound() passed after 0.028 seconds.
+􁁛  Test foldersIncludeImmediateFolderAndItemCounts() passed after 0.029 seconds.
+􁁛  Test testReadNoteById() passed after 0.028 seconds.
+􁁛  Test testCreateMultipleNotes() passed after 0.028 seconds.
+􁁛  Test testDeleteNote() passed after 0.028 seconds.
+􁁛  Test missingVaultThrowsAndSymlinksCannotEscape() passed after 0.028 seconds.
+􁁛  Test "days" passed after 0.028 seconds.
+􁁛  Test "VaultPathResolver rejects path traversal and non-markdown paths" passed after 0.028 seconds.
+􁁛  Test uuidFilenameFallbackIsUntitled() passed after 0.028 seconds.
+􁁛  Test ignoresCodeFrontmatterAndUnsafePaths() passed after 0.028 seconds.
+􁁛  Test supportsAngleTargetsTitlesAndParentheses() passed after 0.028 seconds.
+􁁛  Test sharedLinkTitlesBecomeReadableCaptions() passed after 0.028 seconds.
+􁁛  Test deduplicatesWithinNoteButKeepsOtherSources() passed after 0.028 seconds.
+􁁛  Test "hours" passed after 0.028 seconds.
+􁁛  Test filterKeepsAncestorFoldersForDescendantMatches() passed after 0.029 seconds.
+􁁛  Test searchesLinkedPreviewMetadataWithoutLeakingToOtherNotes() passed after 0.028 seconds.
+􁁛  Test filtersByKindAndAllSearchTerms() passed after 0.028 seconds.
+􁁛  Test testReadNoteNotFound() passed after 0.028 seconds.
+􁁛  Test extractsKindsAndPreservesSource() passed after 0.029 seconds.
+􁁛  Test testUpdateNoteNotFound() passed after 0.028 seconds.
+􁁛  Test "AttachmentStore exposes deterministic markdown paths and filename cleanup" passed after 0.028 seconds.
+􁁛  Test testEnsureVaultExists() passed after 0.028 seconds.
+􁁛  Test "Builds and parses a canonical URL for a nested markdown note" passed after 0.024 seconds.
+􁁛  Test "Refuses to build URLs for invalid vault paths" passed after 0.024 seconds.
+􁁛  Test "Round-trips Unicode note paths" passed after 0.024 seconds.
+􁁛  Test testCreateNote() passed after 0.028 seconds.
+􁁛  Test "Rejects unsupported or unsafe URL inputs" passed after 0.024 seconds.
+􁁛  Test "stampingModified is a no-op without frontmatter" passed after 0.022 seconds.
+􁁛  Test testListNotesEmpty() passed after 0.028 seconds.
+􁁛  Test "id(of:) reads the frontmatter UUID" passed after 0.022 seconds.
+􁁛  Test returnsFailedWhenReadYieldsNil() passed after 0.029 seconds.
+􁁛  Test returnsValueWhenReadCompletesInTime() passed after 0.029 seconds.
+􁁛  Test searchesFullBodySavedMetadataAndCombinedFields() passed after 0.029 seconds.
+􁁛  Test testListNotesSortedByModifiedDate() passed after 0.029 seconds.
+􁁛  Test "setting(_:to:) rewrites an existing key in place without duplicating it" passed after 0.004 seconds.
+􁁛  Test "stampingModified inserts a modified line when none exists" passed after 0.022 seconds.
+􁁛  Test "setting(_:to:) is a no-op without frontmatter" passed after 0.004 seconds.
+􁁛  Test "value(for:) is nil for an absent key or absent frontmatter" passed after 0.004 seconds.
+􁁛  Test "setting(_:to:) appends a missing key before the closing fence" passed after 0.003 seconds.
+􁁛  Test "stampingModified updates only the modified line, preserving id/created/body" passed after 0.021 seconds.
+􁁛  Suite "NoteFrontmatter — stamping whichever timestamp key exists" passed after 0.030 seconds.
+􁁛  Suite "NoteFile" passed after 0.030 seconds.
+􁁛  Test "value(for:) reads a key case-insensitively and keeps colons in the value" passed after 0.003 seconds.
+􁁛  Suite "NotePropertyClassifier" passed after 0.030 seconds.
+􁁛  Suite "Frontmatter" passed after 0.030 seconds.
+􁁛  Suite "WordCounter" passed after 0.030 seconds.
+􁁛  Suite "NotoRelativeDate.editedString" passed after 0.030 seconds.
+􁁛  Suite "NoteTitleResolver" passed after 0.030 seconds.
+􁁛  Suite "VaultDirectoryLoader" passed after 0.030 seconds.
+􁁛  Test "removing(_:) drops the key and leaves the rest intact" passed after 0.004 seconds.
+􁁛  Suite "SidebarTreeLoader" passed after 0.030 seconds.
+􁁛  Suite "NoteFrontmatter — programmatic write stamping" passed after 0.030 seconds.
+􁁛  Suite "NoteFrontmatter — generic key read/write" passed after 0.030 seconds.
+􁁛  Suite "Noto deep-link URL codec" passed after 0.030 seconds.
+􁁛  Suite "Noto web deep-link URL codec" passed after 0.030 seconds.
+􁁛  Test rescanReplacesRemovedBodyAndUsesLatestLinkMetadata() passed after 0.037 seconds.
+􁁛  Test "FolderRepository creates, moves with conflict suffix, and deletes folders" passed after 0.043 seconds.
+􁁛  Test identitySurvivesNoteRenameAndUnavailableNotesAreReported() passed after 0.044 seconds.
+􁁛  Test scanReflectsEditsMovesAndDeletes() passed after 0.046 seconds.
+􁁛  Suite VaultMediaLibraryTests passed after 0.047 seconds.
+􁁛  Test "DailyNoteService creates daily note once and applies template retroactively" passed after 0.050 seconds.
+􁁛  Test "NoteRepository creates, saves, renames, resolves, moves, and deletes notes" passed after 0.057 seconds.
+􁁛  Suite "Vault repository services" passed after 0.058 seconds.
+􁁛  Test testUpdateNote() passed after 0.066 seconds.
+􁁛  Test testUpdateNotePreservesCreatedAt() passed after 0.072 seconds.
+􁁛  Suite "VaultManager" passed after 0.073 seconds.
+􁁛  Test timesOutWhenReadBlocks() passed after 0.220 seconds.
+􁁛  Test releasesCallerWhileReadIsStillBlocked() passed after 0.238 seconds.
+􁁛  Test concurrentBoundedReadsAllResolve() passed after 0.238 seconds.
+􁁛  Test abandonedReadResultIsDiscarded() passed after 0.857 seconds.
+􁁛  Suite "BoundedFileRead" passed after 0.859 seconds.
+􁁛  Test run with 113 tests in 17 suites passed after 0.859 seconds.

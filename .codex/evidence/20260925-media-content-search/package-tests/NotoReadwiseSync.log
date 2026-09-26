@@ -1,0 +1,72 @@
+Building for debugging...
+[0/4] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.10s)
+Test Suite 'All tests' started at 2026-09-25 23:44:55.637.
+Test Suite 'All tests' passed at 2026-09-25 23:44:55.638.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 1501
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀟈  Suite "Readwise Source Sync" started.
+􀟈  Test saveDocumentResponseDecodes() started.
+􀟈  Test syncUsesCapturesAsDefaultSourceDirectory() started.
+􀟈  Test incrementalSyncDoesNotDeleteReaderNoteWhenReaderReturnsNoDocuments() started.
+􀟈  Test decodeReaderFixture() started.
+􀟈  Test syncReportsWrittenURLsForEveryNonDeletedBook() started.
+􀟈  Test readerUpdateReplacesExistingMetadataBlock() started.
+􀟈  Test incrementalSyncUsesSavedTimestampsAndJoinsKnownReaderHighlights() started.
+􀟈  Test joinedReaderDocumentFallsBackToReaderURLFromDocumentID() started.
+􀟈  Test updateMigratesEmptyPlaceholdersToEmptyBlocks() started.
+􀟈  Test saveDocumentRequestEncodesOnlyURLWhenOptionalFieldsAreNil() started.
+􀟈  Test syncReaderDocumentCreatesFullContentSourceNote() started.
+􀟈  Test syncSkipsDeletedReadwiseSourceWithoutDeletingLocalNote() started.
+􀟈  Test saveDocumentRequestEncodesAllFieldsWithSnakeCaseKeys() started.
+􀟈  Test renderSourceNoteUsesUpdatedAndMinimalBodyMetadata() started.
+􀟈  Test readerUpdatePreservesManualFrontmatterFields() started.
+􀟈  Test syncRecoversWhenSourceMapPathIsStale() started.
+􀟈  Test syncCreatesFlatSourceNotesAndResolvesFilenameConflicts() started.
+􀟈  Test readerUpdatePreservesManualMarkdownBetweenMetadataAndGeneratedBlocks() started.
+􀟈  Test readerUpdatePreservesExistingFrontmatterTags() started.
+􀟈  Test decodeNumericNextPageCursor() started.
+􀟈  Test dryRunSyncReportsNoWrittenURLs() started.
+􀟈  Test readerDocumentTagMatchingRequiresAllRequestedTags() started.
+􀟈  Test syncReaderDocumentCanJoinMatchingReadwiseHighlights() started.
+􀟈  Test replaceGeneratedBlockPreservesManualMarkdown() started.
+􀟈  Test readwiseHighlightUpdatePreservesReaderContentBlock() started.
+􀟈  Test decodeFixture() started.
+􀟈  Test htmlToMarkdownConvertsImagesToImageSyntax() started.
+􀟈  Test readerUpdateMigratesEmptyHighlightsPlaceholder() started.
+􀟈  Test syncCanRunAgainstLimitedBookSet() started.
+􀟈  Test readerUpdateMigratesUnmarkedMetadataIntoGeneratedBlock() started.
+􁁛  Test saveDocumentResponseDecodes() passed after 0.008 seconds.
+􁁛  Test saveDocumentRequestEncodesOnlyURLWhenOptionalFieldsAreNil() passed after 0.008 seconds.
+􁁛  Test saveDocumentRequestEncodesAllFieldsWithSnakeCaseKeys() passed after 0.008 seconds.
+􁁛  Test updateMigratesEmptyPlaceholdersToEmptyBlocks() passed after 0.008 seconds.
+􁁛  Test renderSourceNoteUsesUpdatedAndMinimalBodyMetadata() passed after 0.008 seconds.
+􁁛  Test decodeReaderFixture() passed after 0.008 seconds.
+􁁛  Test decodeNumericNextPageCursor() passed after 0.008 seconds.
+􁁛  Test readerDocumentTagMatchingRequiresAllRequestedTags() passed after 0.008 seconds.
+􁁛  Test readerUpdatePreservesManualFrontmatterFields() passed after 0.008 seconds.
+􁁛  Test readerUpdateReplacesExistingMetadataBlock() passed after 0.008 seconds.
+􁁛  Test syncUsesCapturesAsDefaultSourceDirectory() passed after 0.008 seconds.
+􁁛  Test readerUpdatePreservesManualMarkdownBetweenMetadataAndGeneratedBlocks() passed after 0.008 seconds.
+􁁛  Test syncSkipsDeletedReadwiseSourceWithoutDeletingLocalNote() passed after 0.008 seconds.
+􁁛  Test decodeFixture() passed after 0.008 seconds.
+􁁛  Test htmlToMarkdownConvertsImagesToImageSyntax() passed after 0.008 seconds.
+􁁛  Test replaceGeneratedBlockPreservesManualMarkdown() passed after 0.008 seconds.
+􁁛  Test dryRunSyncReportsNoWrittenURLs() passed after 0.008 seconds.
+􁁛  Test readerUpdatePreservesExistingFrontmatterTags() passed after 0.009 seconds.
+􁁛  Test readwiseHighlightUpdatePreservesReaderContentBlock() passed after 0.009 seconds.
+􁁛  Test readerUpdateMigratesEmptyHighlightsPlaceholder() passed after 0.009 seconds.
+􁁛  Test readerUpdateMigratesUnmarkedMetadataIntoGeneratedBlock() passed after 0.010 seconds.
+􁁛  Test syncCreatesFlatSourceNotesAndResolvesFilenameConflicts() passed after 0.013 seconds.
+􁁛  Test syncReportsWrittenURLsForEveryNonDeletedBook() passed after 0.013 seconds.
+􁁛  Test joinedReaderDocumentFallsBackToReaderURLFromDocumentID() passed after 0.014 seconds.
+􁁛  Test incrementalSyncDoesNotDeleteReaderNoteWhenReaderReturnsNoDocuments() passed after 0.015 seconds.
+􁁛  Test syncReaderDocumentCreatesFullContentSourceNote() passed after 0.015 seconds.
+􁁛  Test syncCanRunAgainstLimitedBookSet() passed after 0.017 seconds.
+􁁛  Test syncRecoversWhenSourceMapPathIsStale() passed after 0.017 seconds.
+􁁛  Test syncReaderDocumentCanJoinMatchingReadwiseHighlights() passed after 0.017 seconds.
+􁁛  Test incrementalSyncUsesSavedTimestampsAndJoinsKnownReaderHighlights() passed after 0.018 seconds.
+􁁛  Suite "Readwise Source Sync" passed after 0.018 seconds.
+􁁛  Test run with 30 tests in 1 suite passed after 0.019 seconds.
