@@ -13,6 +13,7 @@ struct EditorNavigationChrome: ViewModifier {
     var onCreateRootNote: (() -> Void)?
     var onMoveRequested: () -> Void
     var onDeleteRequested: () -> Void
+    var onCopyPathRequested: () -> Void
     var onSearchRequested: () -> Void
     var onShowProperties: (() -> Void)?
     var propertyCount: Int = 0
@@ -133,6 +134,7 @@ struct EditorNavigationChrome: ViewModifier {
             onSearchRequested: onSearchRequested,
             onShowProperties: onShowProperties,
             propertyCount: propertyCount,
+            onCopyPathRequested: onCopyPathRequested,
             onMoveRequested: onMoveRequested,
             onDeleteRequested: onDeleteRequested
         )

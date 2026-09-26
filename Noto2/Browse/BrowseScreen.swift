@@ -170,17 +170,73 @@ struct FolderListView: View {
     }
 
     var body: some View {
-        directoryList
-        .sheet(isPresented: $showNewFolderPrompt, onDismiss: { newFolderName = "" }) {
-            NewFolderSheet(name: $newFolderName) {
-                _ = actions.createFolder(named: newFolderName)
-                newFolderName = ""
+        directorySurface
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(showsBackButton)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                if showsBackButton {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                        }
+                        .accessibilityLabel("Back")
+                        .accessibilityIdentifier("browse_back_button")
+                    }
+                }
+
+                ToolbarItem(placement: .principal) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(NotoTheme.head)
+                        .lineLimit(1)
+                        .accessibilityIdentifier("browse_directory_title")
+                }
+
+                if let onOpenSettings {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(action: onOpenSettings) {
+                            Image(systemName: "gearshape")
+                        }
+                        .accessibilityLabel("Settings")
+                        .accessibilityIdentifier("browseSettingsButton")
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    directoryActionsMenu
+                }
             }
+            .modifier(NoteEditorNavigationBarBackdropVisibility())
+            .sheet(isPresented: $showNewFolderPrompt, onDismiss: { newFolderName = "" }) {
+                NewFolderSheet(name: $newFolderName) {
+                    _ = actions.createFolder(named: newFolderName)
+                    newFolderName = ""
+                }
+            }
+            .onAppear {
+                store.loadItemsInBackground()
+            }
+    }
+
+    @ViewBuilder
+    private var directorySurface: some View {
+        if #available(iOS 26.0, *) {
+            GeometryReader { safeAreaProxy in
+                let chromeHeight = max(safeAreaProxy.frame(in: .global).minY, 0)
+
+                directoryList
+                    .overlay(alignment: .top) {
+                        Noto2TopChromeFade(chromeHeight: chromeHeight)
+                            .offset(y: -chromeHeight)
+                    }
+            }
+        } else {
+            directoryList
         }
-        .onAppear {
-            store.loadItemsInBackground()
-        }
-        .toolbar(.hidden, for: .navigationBar)
     }
 
     private var directoryList: some View {
@@ -229,140 +285,29 @@ struct FolderListView: View {
         .refreshable {
             store.loadItemsInBackground()
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            directoryTopBar
-                .background(alignment: .top) { directoryTopBarBackdrop }
-        }
-        .noto2TopScrollEdgeEffectHidden()
     }
 
-    private var directoryTopBar: some View {
-        ZStack {
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(NotoTheme.head)
-                .lineLimit(1)
-                .padding(.horizontal, 100)
-                .accessibilityIdentifier("browse_directory_title")
-
-            ExplorerTopBarGlassContainer(spacing: 10) {
-                HStack(spacing: 10) {
-                    if showsBackButton {
-                        Button {
-                            dismiss()
-                        } label: {
-                            topBarGlyph("chevron.left", size: 18, weight: .semibold)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Back")
-                        .accessibilityIdentifier("browse_back_button")
-                    }
-
-                    Spacer(minLength: 8)
-
-                    if let onOpenSettings {
-                        Button(action: onOpenSettings) {
-                            topBarGlyph("gearshape", size: 17)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Settings")
-                        .accessibilityIdentifier("browseSettingsButton")
-                    }
-
-                    Menu {
-                        Button {
-                            onOpen(actions.createNoteDestination())
-                        } label: {
-                            Label("New Note", systemImage: "doc.badge.plus")
-                        }
-                        .accessibilityIdentifier("browse_new_note_action")
-
-                        Button {
-                            newFolderName = ""
-                            showNewFolderPrompt = true
-                        } label: {
-                            Label("New Folder", systemImage: "folder.badge.plus")
-                        }
-                        .accessibilityIdentifier("browse_new_folder_action")
-                    } label: {
-                        topBarGlyph("ellipsis", size: 18)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("More actions")
-                    .accessibilityIdentifier("browse_more_actions_menu")
-                }
+    private var directoryActionsMenu: some View {
+        Menu {
+            Button {
+                onOpen(actions.createNoteDestination())
+            } label: {
+                Label("New Note", systemImage: "doc.badge.plus")
             }
-        }
-        .frame(height: 44)
-        .padding(.horizontal, 8)
-    }
+            .accessibilityIdentifier("browse_new_note_action")
 
-    private func topBarGlyph(
-        _ systemName: String,
-        size: CGFloat,
-        weight: Font.Weight = .regular
-    ) -> some View {
-        Image(systemName: systemName)
-            .font(.system(size: size, weight: weight))
-            .foregroundStyle(NotoTheme.head)
-            .frame(width: 38, height: 38)
-            .explorerTopBarGlass()
-            .frame(width: 44, height: 44)
-            .contentShape(Rectangle())
-    }
-
-    @ViewBuilder
-    private var directoryTopBarBackdrop: some View {
-        if #available(iOS 26.0, *) {
-            GeometryReader { proxy in
-                let frame = proxy.frame(in: .global)
-                Noto2TopChromeFade(
-                    chromeHeight: max(frame.maxY, 0),
-                    barRow: frame.height
-                )
-                .offset(y: -frame.minY)
+            Button {
+                newFolderName = ""
+                showNewFolderPrompt = true
+            } label: {
+                Label("New Folder", systemImage: "folder.badge.plus")
             }
-        } else {
-            Rectangle()
-                .fill(.bar)
-                .ignoresSafeArea(edges: .top)
+            .accessibilityIdentifier("browse_new_folder_action")
+        } label: {
+            Image(systemName: "ellipsis")
         }
-    }
-}
-
-private struct ExplorerTopBarGlassContainer<Content: View>: View {
-    let spacing: CGFloat
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: spacing) {
-                content()
-            }
-        } else {
-            content()
-        }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func explorerTopBarGlass() -> some View {
-        if #available(iOS 26.0, *) {
-            glassEffect(.regular.interactive(), in: .circle)
-        } else {
-            background(.ultraThinMaterial, in: Circle())
-                .overlay { Circle().stroke(NotoTheme.head.opacity(0.10), lineWidth: 0.5) }
-        }
-    }
-
-    @ViewBuilder
-    func noto2TopScrollEdgeEffectHidden() -> some View {
-        if #available(iOS 26.0, *) {
-            scrollEdgeEffectHidden(true, for: .top)
-        } else {
-            self
-        }
+        .accessibilityLabel("More actions")
+        .accessibilityIdentifier("browse_more_actions_menu")
     }
 }
 
