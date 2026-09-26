@@ -1,0 +1,129 @@
+{
+ "_type": "video",
+ "id": "DdlzZLuTe2A",
+ "title": "Video by ophelia.muuur",
+ "description": "I want to get married!😡",
+ "channel": "ophelia.muuur",
+ "uploader": "햇살",
+ "uploader_id": "24908579358",
+ "duration": 13.00100040435791,
+ "thumbnail": "https://cdn.example/reel-thumb.jpg",
+ "webpage_url": "https://www.instagram.com/reel/DdlzZLuTe2A/",
+ "extractor_key": "Instagram",
+ "formats": [
+  {
+   "format_id": "dash-28521859604119233a",
+   "ext": "m4a",
+   "width": null,
+   "height": null,
+   "vcodec": "none",
+   "acodec": "mp4a.40.5",
+   "protocol": "https",
+   "url": "https://cdn.example/dash-28521859604119233a.m4a"
+  },
+  {
+   "format_id": "dash-28521948097443717v",
+   "ext": "mp4",
+   "width": 360,
+   "height": 640,
+   "vcodec": "vp09.00.21.08.00.01.01.01.00",
+   "acodec": "none",
+   "protocol": "https",
+   "url": "https://cdn.example/dash-28521948097443717v.mp4"
+  },
+  {
+   "format_id": "dash-28521948094110384v",
+   "ext": "mp4",
+   "width": 540,
+   "height": 960,
+   "vcodec": "vp09.00.30.08.00.01.01.01.00",
+   "acodec": "none",
+   "protocol": "https",
+   "url": "https://cdn.example/dash-28521948094110384v.mp4"
+  },
+  {
+   "format_id": "dash-28521948080777052v",
+   "ext": "mp4",
+   "width": 540,
+   "height": 960,
+   "vcodec": "vp09.00.30.08.00.01.01.01.00",
+   "acodec": "none",
+   "protocol": "https",
+   "url": "https://cdn.example/dash-28521948080777052v.mp4"
+  },
+  {
+   "format_id": "dash-28521948090777051v",
+   "ext": "mp4",
+   "width": 540,
+   "height": 960,
+   "vcodec": "vp09.00.30.08.00.01.01.01.00",
+   "acodec": "none",
+   "protocol": "https",
+   "url": "https://cdn.example/dash-28521948090777051v.mp4"
+  },
+  {
+   "format_id": "dash-28521948087443718v",
+   "ext": "mp4",
+   "width": 540,
+   "height": 960,
+   "vcodec": "vp09.00.30.08.00.01.01.01.00",
+   "acodec": "none",
+   "protocol": "https",
+   "url": "https://cdn.example/dash-28521948087443718v.mp4"
+  },
+  {
+   "format_id": "dash-28521948100777050v",
+   "ext": "mp4",
+   "width": 540,
+   "height": 960,
+   "vcodec": "vp09.00.30.08.00.01.01.01.00",
+   "acodec": "none",
+   "protocol": "https",
+   "url": "https://cdn.example/dash-28521948100777050v.mp4"
+  },
+  {
+   "format_id": "28521861324119061v-0",
+   "ext": "mp4",
+   "width": 720,
+   "height": 1280,
+   "protocol": "https",
+   "url": "https://cdn.example/28521861324119061v-0.mp4"
+  },
+  {
+   "format_id": "28521861324119061v-1",
+   "ext": "mp4",
+   "width": 720,
+   "height": 1280,
+   "protocol": "https",
+   "url": "https://cdn.example/28521861324119061v-1.mp4"
+  },
+  {
+   "format_id": "28521861324119061v-2",
+   "ext": "mp4",
+   "width": 720,
+   "height": 1280,
+   "protocol": "https",
+   "url": "https://cdn.example/28521861324119061v-2.mp4"
+  },
+  {
+   "format_id": "dash-28521948077443719v",
+   "ext": "mp4",
+   "width": 720,
+   "height": 1280,
+   "vcodec": "vp09.00.31.08.00.01.01.01.00",
+   "acodec": "none",
+   "protocol": "https",
+   "url": "https://cdn.example/dash-28521948077443719v.mp4"
+  },
+  {
+   "format_id": "dash-28521948084110385v",
+   "ext": "mp4",
+   "width": 1080,
+   "height": 1920,
+   "vcodec": "vp09.00.40.08.00.01.01.01.00",
+   "acodec": "none",
+   "protocol": "https",
+   "url": "https://cdn.example/dash-28521948084110385v.mp4"
+  }
+ ]
+}

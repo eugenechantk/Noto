@@ -49,6 +49,20 @@ public enum SocialPostError: Error, Equatable {
     case unsupportedURL
     case badResponse(status: Int)
     case unreadable(String)
+    /// The login fallback (yt-dlp with browser cookies) could not fetch the post.
+    case loginFetchFailed(String)
+
+    /// Whether a job that failed this way should be acknowledged (never retried)
+    /// rather than handed back to the queue. A failed login fetch is retried:
+    /// the browser's session may simply need refreshing.
+    public static func isPermanent(_ error: Error) -> Bool {
+        switch error as? SocialPostError {
+        case .unsupportedURL, .unreadable: return true
+        case .badResponse(let status): return status == 404 || status == 410
+        case .loginFetchFailed: return false
+        case nil: return error is DecodingError
+        }
+    }
 }
 
 /// Minimal HTTP seam so resolvers and the downloader run against fixtures in tests.

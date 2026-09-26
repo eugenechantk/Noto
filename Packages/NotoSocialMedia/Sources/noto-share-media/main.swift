@@ -56,11 +56,19 @@ func describe(_ post: SocialPost) -> String {
 /// Permanent failures are acknowledged (retrying cannot help); anything else
 /// goes back to the queue, which dead-letters it after its retry limit.
 func isPermanent(_ error: Error) -> Bool {
-    switch error as? SocialPostError {
-    case .unsupportedURL, .unreadable: return true
-    case .badResponse(let status): return status == 404 || status == 410
-    case nil: return error is DecodingError
+    SocialPostError.isPermanent(error)
+}
+
+/// Login fallback for login-only Instagram posts, when configured:
+/// `NOTO_INSTAGRAM_COOKIES_BROWSER` (e.g. `chrome`) and optionally `NOTO_YTDLP_PATH`.
+func instagramLoginFallback(_ env: [String: String]) -> (any InstagramLoginFallback)? {
+    guard let browser = env["NOTO_INSTAGRAM_COOKIES_BROWSER"], !browser.isEmpty else { return nil }
+    let candidates = [env["NOTO_YTDLP_PATH"], "\(NSHomeDirectory())/.local/bin/yt-dlp", "/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp"]
+    guard let path = candidates.compactMap({ $0 }).first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
+        FileHandle.standardError.write(Data("NOTO_INSTAGRAM_COOKIES_BROWSER is set but yt-dlp was not found\n".utf8))
+        return nil
     }
+    return YtDlpInstagramFallback(runner: YtDlpRunner(executable: URL(fileURLWithPath: path), cookiesBrowser: browser))
 }
 
 @discardableResult
@@ -83,7 +91,8 @@ guard let options = parse(CommandLine.arguments), let vault = options.vault, let
 }
 guard FileManager.default.fileExists(atPath: vault.path) else { fail("vault not found: \(vault.path)") }
 try? FileManager.default.createDirectory(at: stateDir, withIntermediateDirectories: true)
-let processor = ShareMediaProcessor(vaultURL: vault, stateDirectory: stateDir)
+let processor = ShareMediaProcessor(vaultURL: vault, stateDirectory: stateDir,
+                                    instagramFallback: instagramLoginFallback(ProcessInfo.processInfo.environment))
 var healthy = true
 
 switch options.command {

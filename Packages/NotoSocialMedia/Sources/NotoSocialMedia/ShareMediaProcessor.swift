@@ -65,10 +65,11 @@ public struct ShareMediaProcessor: Sendable {
     let now: @Sendable () -> Date
 
     public init(vaultURL: URL, stateDirectory: URL, http: any HTTPFetching = URLSessionFetcher(),
+                instagramFallback: (any InstagramLoginFallback)? = nil,
                 now: @escaping @Sendable () -> Date = Date.init) {
         self.vaultURL = vaultURL
         self.store = PendingAppendStore(stateDirectory: stateDirectory)
-        self.resolver = SocialPostResolver(http: http)
+        self.resolver = SocialPostResolver(http: http, instagramFallback: instagramFallback)
         self.downloader = MediaDownloader(vaultURL: vaultURL, http: http)
         self.now = now
     }

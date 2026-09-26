@@ -92,3 +92,22 @@ Success criteria: SC1 ✔ SC2 ✔ SC3 ✔ SC4 ✔ SC5 ✔ SC6 ✔ SC7 ✔ SC8 �
 
 - **Stale overlay after an image loads under an open note** (found in the second E2E): `invalidateImageLayouts` placed image overlays immediately after invalidating layout, from stale line frames, so a video that finished loading under an open editor covered the lines above it. Fixed by laying out the viewport before placing and scheduling a full overlay refresh.
 - **Portrait images overflow their line** (found by the audit, pre-existing): the iOS overlay was full-width × aspect while TextKit reserves a fixed 300 pt line, so portrait media drew past the end of the note (unscrollable) or over following text. Fixed with `ImageFragmentGeometry.overlaySize` (capped to the reserved height, width follows the aspect ratio) + test `imageOverlaySizeCapsPortraitImages`.
+
+## Login-only Instagram posts (2026-09-25)
+
+**Bug:** an Instagram reel shared on 2026-09-25 (`DdlzZLuTe2A`, set to licensed music) got no video. Hermes logged `Skipped …: unreadable("embed page has no media graph — private post or login wall")` and acknowledged the job — a silent, permanent skip. The embed page returns `contextJSON: null` ("The link to this photo or video may be broken…"), the reel page serves no OG tags logged out, and `yt-dlp` without a login gets "Instagram sent an empty media response". The reel plays fine in Chrome when logged in.
+
+**Decision (Eugene):** fall back to his Instagram login, read **live from Chrome** on each use (`yt-dlp --cookies-from-browser chrome`) — no cookie file is stored, so nothing goes stale when Instagram refreshes the session. (A stored cookie file was considered and rejected for that reason.)
+
+**Implementation** (`Packages/NotoSocialMedia`):
+- `YtDlpInstagram.swift`: `InstagramLoginFallback` protocol; `YtDlpInstagramParser` (yt-dlp `-J` → `SocialPost`; video = best single-file MP4 — Instagram's `video_versions`, H.264/AAC — never the `dash-*` VP9 split streams; no single-file MP4 → the poster image; carousels = playlist entries in order); `YtDlpRunner` (`--cookies-from-browser <browser> -J --no-warnings <url>`, timeout, stderr drained); `YtDlpInstagramFallback`.
+- `SocialPostResolver`: on an Instagram `unreadable` embed, tries the fallback when configured.
+- `SocialPostError.loginFetchFailed` is **transient** (the queue retries, then dead-letters) — the first live attempt failed and succeeded after the session was refreshed in Chrome. `SocialPostError.isPermanent` moved into the package (the CLI calls it).
+- CLI: fallback enabled by `NOTO_INSTAGRAM_COOKIES_BROWSER` (+ optional `NOTO_YTDLP_PATH`); Hermes `.env` has `chrome` and `~/.local/bin/yt-dlp`; `noto_share_media.sh` passes both.
+
+**Tests:** `InstagramLoginFallbackTests` (8): real yt-dlp output (URLs replaced) picks the 720p single-file MP4; carousel order; DASH-only → poster; unusable output throws; arguments read cookies live (no `--cookies` file); resolver falls back on an unreadable embed; no fallback → unchanged error; retry rule. Package: 29/29.
+
+**Verified live:** the reel recovered into `inbox/2026-09-25-52e5c83a.md` (caption + 13 s 720×1280 H.264/AAC MP4); then re-enqueued through the Worker and processed by the Hermes job itself (background context reads Chrome's login) — "Saved 1 video", note still has one video line (idempotent).
+
+**Residual risk:** the fallback needs Chrome on the MacBook Pro to stay logged in to Instagram, and Instagram may flag heavy automated use of the account (volume here is one call per login-only share).
+

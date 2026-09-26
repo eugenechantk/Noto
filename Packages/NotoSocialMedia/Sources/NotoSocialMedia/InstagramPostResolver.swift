@@ -65,9 +65,12 @@ public enum InstagramPostResolver {
 /// Routes a shared URL to its platform resolver.
 public struct SocialPostResolver: Sendable {
     let http: any HTTPFetching
+    /// Tried when an Instagram embed has no media graph (login-only post).
+    let instagramFallback: (any InstagramLoginFallback)?
 
-    public init(http: any HTTPFetching = URLSessionFetcher()) {
+    public init(http: any HTTPFetching = URLSessionFetcher(), instagramFallback: (any InstagramLoginFallback)? = nil) {
         self.http = http
+        self.instagramFallback = instagramFallback
     }
 
     public func resolve(_ url: URL) async throws -> SocialPost {
@@ -78,7 +81,12 @@ public struct SocialPostResolver: Sendable {
         case .instagram:
             guard let code = InstagramPostResolver.shortcode(in: url) else { throw SocialPostError.unsupportedURL }
             let data = try await get(InstagramPostResolver.embedURL(for: code))
-            return try InstagramPostResolver.parse(html: String(decoding: data, as: UTF8.self), shortcode: code)
+            do {
+                return try InstagramPostResolver.parse(html: String(decoding: data, as: UTF8.self), shortcode: code)
+            } catch SocialPostError.unreadable(let reason) {
+                guard let instagramFallback else { throw SocialPostError.unreadable(reason) }
+                return try await instagramFallback.resolve(url, shortcode: code)
+            }
         case nil:
             throw SocialPostError.unsupportedURL
         }
