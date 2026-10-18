@@ -71,8 +71,10 @@ Swipe up from (200, 700) to (200, 300) → "Filed to Inbox" toast, Inbox badge 1
 ### Regression suite
 Full `Noto2Tests`: 203/204 on the first run. The one failure,
 `FilingKeyboardLayoutTests.addSearchStaysAboveKeyboardAfterDismissingFloatingEditor`,
-needs a software keyboard taller than 100 pt; HID typing during verification had put the
-simulator into hardware-keyboard mode. After a simulator reboot the class passed 8/8.
+passes on its own (8/8) but fails in every full-suite run. **Correction (later the same
+day):** it is not caused by hardware-keyboard mode, as first guessed. It fails the same way on
+commit 417a351, before any of this work, so it is a pre-existing test-order failure, unrelated
+to this fix.
 
 ## Investigation Log
 
