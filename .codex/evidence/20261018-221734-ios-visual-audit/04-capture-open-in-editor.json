@@ -1,0 +1,96 @@
+{
+  "accessibility" : {
+    "element_count" : 4,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 38,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 20,
+          "x" : 28,
+          "y" : 66
+        },
+        "id" : "libraryNoteBack",
+        "label" : "Back",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 364,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 28,
+          "x" : 350,
+          "y" : 66
+        },
+        "id" : "noteMoreMenu",
+        "label" : "Note actions",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "id" : "note_editor",
+        "role" : "TextArea",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-221734-ios-visual-audit\/04-capture-open-in-editor.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 28642,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T14:19:41Z",
+  "type" : "ui_snapshot"
+}

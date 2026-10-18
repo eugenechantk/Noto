@@ -40,8 +40,8 @@ final class SearchModel {
         isLoadingRecent = false
         switch loaded {
         case .success(let snapshot):
-            // The Library's Recent section omits pins. Search includes every page.
-            recentNotes = Array(snapshot.notes.prefix(7))
+            // The Library's Recent section omits pins. Search includes every filed page.
+            recentNotes = Array(snapshot.filedNotes.prefix(7))
             recentLoadError = nil
         case .failure:
             recentLoadError = "Recently edited notes could not be loaded."

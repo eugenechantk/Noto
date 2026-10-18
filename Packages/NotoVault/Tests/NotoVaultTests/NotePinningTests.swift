@@ -29,7 +29,7 @@ struct NotePinningTests {
         #expect(!NotePinning.isPinned(in: malformed))
     }
 
-    @Test func persistsAndListsByTitleWithoutInbox() throws {
+    @Test func persistsAndListsByTitleIncludingPinnedCaptures() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("inbox"), withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -42,10 +42,10 @@ struct NotePinningTests {
         let service = NotePinning(vaultRootURL: root)
         try service.setPinned(true, at: zebra)
         try service.setPinned(true, at: alpha)
-        #expect(service.pinnedNotes().map(\.title) == ["Alpha", "Zebra"])
+        #expect(service.pinnedNotes().map(\.title) == ["Alpha", "Capture", "Zebra"])
         #expect(try String(contentsOf: zebra, encoding: .utf8) == "---\nmodified: keep\npinned: true\n---\n# Zebra\n")
         try service.setPinned(false, at: zebra)
-        #expect(service.pinnedNotes().map(\.title) == ["Alpha"])
+        #expect(service.pinnedNotes().map(\.title) == ["Alpha", "Capture"])
         #expect(throws: NotePinning.PinError.self) { try service.setPinned(true, at: root.appendingPathComponent("missing.md")) }
     }
 }

@@ -1,0 +1,194 @@
+{
+  "accessibility" : {
+    "element_count" : 10,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 67,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 33,
+          "width" : 94,
+          "x" : 20,
+          "y" : 67
+        },
+        "id" : "inboxTitle",
+        "label" : "Inbox, 3",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 316,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 47,
+          "width" : 132,
+          "x" : 250,
+          "y" : 60
+        },
+        "id" : "inboxViewPicker",
+        "role" : "TabGroup",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 70,
+          "y" : 126
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 14,
+          "width" : 100,
+          "x" : 20,
+          "y" : 119
+        },
+        "id" : "inboxScreen",
+        "label" : "0 of 3 done today",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 322,
+          "y" : 126
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 3,
+          "width" : 120,
+          "x" : 262,
+          "y" : 124
+        },
+        "id" : "inboxScreen",
+        "role" : "GenericElement",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 599,
+          "width" : 342,
+          "x" : 30,
+          "y" : 137
+        },
+        "id" : "inboxScreen",
+        "role" : "GenericElement",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 82,
+          "y" : 176
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 14,
+          "width" : 92,
+          "x" : 36,
+          "y" : 169
+        },
+        "id" : "digestCardDate",
+        "label" : "Today, 10:00 AM",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 185,
+          "y" : 205
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 19,
+          "width" : 298,
+          "x" : 36,
+          "y" : 195
+        },
+        "label" : "Audit inbox capture three: call the dentist",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 211,
+          "y" : 765
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 14,
+          "width" : 222,
+          "x" : 99,
+          "y" : 758
+        },
+        "id" : "inboxScreen",
+        "label" : "Drag the card to file it · hold for a menu",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-221734-ios-visual-audit\/14-inbox-tab-still-has-captures.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 51573,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T14:22:40Z",
+  "type" : "ui_snapshot"
+}

@@ -1,0 +1,125 @@
+{
+  "accessibility" : {
+    "element_count" : 6,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 261,
+          "y" : 499
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 250,
+          "x" : 136,
+          "y" : 62
+        },
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 261,
+          "y" : 93
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 42,
+          "width" : 250,
+          "x" : 136,
+          "y" : 72
+        },
+        "label" : "Recent",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 261,
+          "y" : 135
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 42,
+          "width" : 250,
+          "x" : 136,
+          "y" : 114
+        },
+        "label" : "Name",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 261,
+          "y" : 177
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 42,
+          "width" : 250,
+          "x" : 136,
+          "y" : 156
+        },
+        "label" : "Oldest",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Dismiss context menu",
+        "role" : "Button",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-221734-ios-visual-audit\/08-sort-menu-name-checked.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 69858,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T14:20:27Z",
+  "type" : "ui_snapshot"
+}

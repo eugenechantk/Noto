@@ -9,6 +9,9 @@ public struct LibraryNote: Identifiable, Equatable, Sendable, Codable {
     /// it was offloaded to iCloud when scanned. The next scan reads it again.
     public var isStale = false
     public var id: UUID { note.id }
+    /// A raw capture in `inbox/`. Library lists it in the inbox folder, but the
+    /// Recent lists show filed notes; the Inbox tab is where captures are reviewed.
+    public var isCapture: Bool { folderPath.split(separator: "/").first?.lowercased() == "inbox" }
 }
 
 extension LibraryNote {
@@ -32,8 +35,10 @@ public struct LibrarySnapshot: Sendable, Equatable, Codable {
     public var pinned: [LibraryNote] {
         notes.filter(\.isPinned).sorted { LibraryCatalog.titleOrder($0.note, $1.note) }
     }
+    /// Every note except raw captures, newest first.
+    public var filedNotes: [LibraryNote] { notes.filter { !$0.isCapture } }
     /// Pinned notes already have their own section, so Recent avoids duplicates.
-    public func recent(limit: Int = 7) -> [LibraryNote] { Array(notes.filter { !$0.isPinned }.prefix(max(0, limit))) }
+    public func recent(limit: Int = 7) -> [LibraryNote] { Array(filedNotes.filter { !$0.isPinned }.prefix(max(0, limit))) }
     /// The notes directly inside `directoryURL` (not its subfolders), for a folder page.
     public func notes(inDirectory directoryURL: URL) -> [LibraryNote] {
         let directory = directoryURL.standardizedFileURL.path
@@ -160,10 +165,11 @@ public struct LibraryCatalog: Sendable {
         return groups.filter { !$0.notes.isEmpty }
     }
 
+    /// Library shows everything in the vault, `inbox/` included (Eugene, 2026-10-18).
+    /// Only hidden folders and media `Attachments` folders stay out: they hold no notes.
     public static func isVisible(_ url: URL, in vaultRootURL: URL) -> Bool {
         guard let path = VaultPathResolver(vaultRootURL: vaultRootURL).relativePath(for: url) else { return false }
-        let components = path.split(separator: "/")
-        return components.first?.lowercased() != "inbox" && !components.contains(where: { $0.hasPrefix(".") || $0 == "Attachments" })
+        return !path.split(separator: "/").contains(where: { $0.hasPrefix(".") || $0 == "Attachments" })
     }
 
     static func titleOrder(_ lhs: VaultNoteRecord, _ rhs: VaultNoteRecord) -> Bool {

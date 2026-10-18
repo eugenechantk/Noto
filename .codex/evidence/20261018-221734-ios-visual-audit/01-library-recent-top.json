@@ -1,0 +1,346 @@
+{
+  "accessibility" : {
+    "element_count" : 19,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 71,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 40,
+          "width" : 111,
+          "x" : 16,
+          "y" : 63
+        },
+        "label" : "Library",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 364,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 28,
+          "x" : 350,
+          "y" : 66
+        },
+        "id" : "browse_more_actions_menu",
+        "label" : "Library actions",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "id" : "libraryHome",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 133
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 116
+        },
+        "label" : "PINNED",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 180
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 150
+        },
+        "id" : "libraryNote_Bulk note 01234.md",
+        "label" : "Bulk note 1234, Bulk · 1h ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 239
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 222
+        },
+        "label" : "RECENT",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 286
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 256
+        },
+        "id" : "libraryNote_Written while closed v2.md",
+        "label" : "Written while closed v2, Library · 1h ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 346
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 316
+        },
+        "id" : "libraryNote_Audit Pull To Refresh.md",
+        "label" : "Audit Pull To Refresh, Library · 6h ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 406
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 376
+        },
+        "id" : "libraryNote_Audit Added While Closed.md",
+        "label" : "Audit Added While Closed, Library · 6h ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 466
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 436
+        },
+        "id" : "libraryNote_The $120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money.md",
+        "label" : "The $120K Blueprint: What 2 Years of\"Building in Public\" Won't Teach You About Actually Making Money, Captures · 6h ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 526
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 496
+        },
+        "id" : "libraryNote_The State of Consumer AI - Usage.md",
+        "label" : "The State of Consumer AI - Usage, Captures · 6h ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 586
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 556
+        },
+        "id" : "libraryNote_Long Scrolling Note.md",
+        "label" : "Long Scrolling Note, Library · 6h ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 646
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 616
+        },
+        "id" : "libraryNote_Project Plan.md",
+        "label" : "Project Plan, Library · 6h ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 705
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 688
+        },
+        "label" : "FOLDERS",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 749
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : 16,
+          "y" : 723
+        },
+        "id" : "libraryFolder_Archive",
+        "label" : "Archive, 0",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 801
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : 16,
+          "y" : 775
+        },
+        "id" : "libraryFolder_Bulk",
+        "label" : "Bulk, 8,001",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 853
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : 16,
+          "y" : 827
+        },
+        "id" : "libraryFolder_Captures",
+        "label" : "Captures, 2",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-221734-ios-visual-audit\/01-library-recent-top.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 121213,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T14:18:54Z",
+  "type" : "ui_snapshot"
+}

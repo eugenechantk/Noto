@@ -1,0 +1,295 @@
+{
+  "accessibility" : {
+    "element_count" : 16,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 124
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 125,
+          "width" : 402,
+          "x" : 0,
+          "y" : 62
+        },
+        "id" : "Bulk",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 204
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 187
+        },
+        "label" : "THIS WEEK",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 253
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 221
+        },
+        "id" : "libraryNote_Bulk note 01234.md",
+        "label" : "Bulk note 1234, Oct 18, Pinned from outside the app.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 314
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 297
+        },
+        "label" : "EARLIER",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 363
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 331
+        },
+        "id" : "libraryNote_Bulk Note 7999.md",
+        "label" : "Bulk Note 7999, Sep 18, Audit filler line number 7999.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 426
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 394
+        },
+        "id" : "libraryNote_Bulk Note 7998.md",
+        "label" : "Bulk Note 7998, Sep 18, Audit filler line number 7998.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 489
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 458
+        },
+        "id" : "libraryNote_Bulk Note 7997.md",
+        "label" : "Bulk Note 7997, Sep 18, Audit filler line number 7997.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 553
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 521
+        },
+        "id" : "libraryNote_Bulk Note 7996.md",
+        "label" : "Bulk Note 7996, Sep 18, Audit filler line number 7996.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 616
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 584
+        },
+        "id" : "libraryNote_Bulk Note 7995.md",
+        "label" : "Bulk Note 7995, Sep 18, Audit filler line number 7995.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 679
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 648
+        },
+        "id" : "libraryNote_Bulk Note 7994.md",
+        "label" : "Bulk Note 7994, Sep 18, Audit filler line number 7994.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 743
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 711
+        },
+        "id" : "libraryNote_Bulk Note 7993.md",
+        "label" : "Bulk Note 7993, Sep 18, Audit filler line number 7993.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 806
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 774
+        },
+        "id" : "libraryNote_Bulk Note 7992.md",
+        "label" : "Bulk Note 7992, Sep 18, Audit filler line number 7992.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 869
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 838
+        },
+        "id" : "libraryNote_Bulk Note 7991.md",
+        "label" : "Bulk Note 7991, Sep 18, Audit filler line number 7991.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-221734-ios-visual-audit\/11-bulk-folder-header-scrolled-to-top.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 127031,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T14:21:24Z",
+  "type" : "ui_snapshot"
+}

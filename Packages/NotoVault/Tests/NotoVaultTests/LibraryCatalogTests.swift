@@ -15,7 +15,7 @@ struct LibraryCatalogTests {
         }
     }
 
-    @Test func homeListsNestedRecentAndFoldersButHidesCaptures() throws {
+    @Test func homeListsEverythingInTheVaultIncludingInbox() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         for folder in ["Projects/Noto", "Daily Notes", "inbox", "Attachments", ".hidden"] {
@@ -34,11 +34,15 @@ struct LibraryCatalogTests {
             try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: date)], ofItemAtPath: url.path)
         }
         let snapshot = try LibraryCatalog(vaultRootURL: root).load()
-        #expect(snapshot.notes.map(\.note.title) == ["Roadmap", "Recent", "Older"])
+        // inbox/ is listed like any folder; only Attachments and hidden folders stay out.
+        // Recent keeps to filed notes: captures are reviewed in the Inbox tab.
+        #expect(snapshot.notes.map(\.note.title) == ["Capture", "Roadmap", "Recent", "Older"])
         #expect(snapshot.pinned.map(\.folderPath) == ["Projects/Noto"])
         #expect(snapshot.recent().map(\.note.title) == ["Recent", "Older"])
-        #expect(snapshot.recent(limit: 1).first?.preview == "A useful preview")
-        #expect(snapshot.folders.map(\.name) == ["Daily Notes", "Projects"])
+        #expect(snapshot.filedNotes.map(\.note.title) == ["Roadmap", "Recent", "Older"])
+        #expect(snapshot.notes.first { $0.note.title == "Recent" }?.preview == "A useful preview")
+        #expect(snapshot.folders.map(\.name) == ["Daily Notes", "inbox", "Projects"])
+        #expect(snapshot.notes(inDirectory: root.appendingPathComponent("inbox")).map(\.note.title) == ["Capture"])
         #expect(snapshot.folders.first(where: { $0.name == "Projects" })?.folderCount == 1)
     }
 

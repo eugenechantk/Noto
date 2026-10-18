@@ -67,7 +67,7 @@ public struct NotePinning: Sendable {
     }
 
     /// Natural title order, with the vault-relative path as the stable tie-breaker.
-    /// Captures in the root inbox are deliberately excluded from Library pinning.
+    /// Same visibility as Library: a capture in `inbox/` counts once it is pinned.
     public func pinnedNotes() -> [VaultNoteRecord] {
         (try? LibraryCatalog(vaultRootURL: vaultRootURL, fileSystem: fileSystem).load().pinned.map(\.note)) ?? []
     }

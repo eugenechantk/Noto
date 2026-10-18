@@ -230,23 +230,6 @@ struct FolderListView: View {
 
     var body: some View {
         List {
-            HStack {
-                Text(LibraryCatalog.directorySummary(folderCount: folders.count, noteCount: notes.count))
-                    .font(.caption).foregroundStyle(NotoTheme.muted)
-                Spacer()
-                Menu {
-                    Picker("Sort notes", selection: $sort) {
-                        ForEach(LibraryNoteSort.allCases, id: \.self) { option in Text(option.rawValue).tag(option) }
-                    }
-                } label: {
-                    HStack(spacing: 5) { Text(sort.rawValue); Image(systemName: "chevron.down").font(.caption2) }
-                        .font(.caption).foregroundStyle(NotoTheme.muted)
-                }
-                .accessibilityIdentifier("libraryFolderSort")
-            }
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
             if !folders.isEmpty {
                 Section {
                     ForEach(folders) { folder in
@@ -282,9 +265,21 @@ struct FolderListView: View {
         }
         .modifier(LibraryListStyle())
         .navigationTitle(title)
+        // Counts sit under the folder name and sorting lives in the title bar,
+        // so the list starts with content (Eugene, 2026-10-18).
+        .navigationSubtitle(Text(LibraryCatalog.directorySummary(folderCount: folders.count, noteCount: notes.count)))
         .toolbarTitleDisplayMode(.inlineLarge)
         .navigationBarBackButtonHidden(!showsBackButton)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Picker("Sort notes", selection: $sort) {
+                        ForEach(LibraryNoteSort.allCases, id: \.self) { option in Text(option.rawValue).tag(option) }
+                    }
+                } label: { Image(systemName: "arrow.up.arrow.down") }
+                .accessibilityLabel("Sort notes")
+                .accessibilityIdentifier("libraryFolderSort")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { onOpen(actions.createNoteDestination()) } label: { Image(systemName: "square.and.pencil") }
                     .accessibilityLabel("New note").accessibilityIdentifier("browse_new_note_action")

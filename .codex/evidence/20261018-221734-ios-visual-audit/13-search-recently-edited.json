@@ -1,0 +1,264 @@
+{
+  "accessibility" : {
+    "element_count" : 14,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 71,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 40,
+          "width" : 111,
+          "x" : 16,
+          "y" : 63
+        },
+        "label" : "Search",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 140
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 48,
+          "width" : 370,
+          "x" : 16,
+          "y" : 116
+        },
+        "id" : "searchQueryField",
+        "label" : "Search notes",
+        "role" : "TextField",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 523
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 702,
+          "width" : 402,
+          "x" : 0,
+          "y" : 172
+        },
+        "id" : "searchRecentlyEdited",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 189
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 172
+        },
+        "id" : "searchRecentHeading",
+        "label" : "RECENTLY EDITED",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 237
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 206
+        },
+        "id" : "searchRecentNote_Bulk note 01234.md",
+        "label" : "Bulk note 1234, Bulk, 8:54 PM",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 301
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 269
+        },
+        "id" : "searchRecentNote_Written while closed v2.md",
+        "label" : "Written while closed v2, Vault, 8:53 PM",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 364
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 333
+        },
+        "id" : "searchRecentNote_Audit Pull To Refresh.md",
+        "label" : "Audit Pull To Refresh, Vault, 3:43 PM",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 428
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 396
+        },
+        "id" : "searchRecentNote_Audit Added While Closed.md",
+        "label" : "Audit Added While Closed, Vault, 3:38 PM",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 491
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 459
+        },
+        "id" : "searchRecentNote_The $120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money.md",
+        "label" : "The $120K Blueprint: What 2 Years of\"Building in Public\" Won't Teach You About Actually Making Money, Captures, 3:31 PM",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 554
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 523
+        },
+        "id" : "searchRecentNote_The State of Consumer AI - Usage.md",
+        "label" : "The State of Consumer AI - Usage, Captures, 3:31 PM",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 618
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 586
+        },
+        "id" : "searchRecentNote_Long Scrolling Note.md",
+        "label" : "Long Scrolling Note, Vault, 3:31 PM",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 689
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : 16,
+          "y" : 663
+        },
+        "id" : "searchIndexStatus",
+        "label" : "8013 notes indexed · building semantic index…",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-221734-ios-visual-audit\/13-search-recently-edited.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 100729,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T14:22:22Z",
+  "type" : "ui_snapshot"
+}
