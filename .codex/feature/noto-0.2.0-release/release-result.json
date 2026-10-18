@@ -22,7 +22,17 @@
   "desktop": {
     "build": "202610181301",
     "pro": "Installed and independently verified at /Applications/Noto.app",
-    "air": "Not installed: established SSH route fails before login"
+    "air": "Installed and verified at /Applications/Noto.app",
+    "airVerification": {
+      "checkedAt": "2026-10-18T05:26:47.710541+00:00",
+      "host": "Eugenes-MacBook-Air.local",
+      "bundleFilesVerified": 23,
+      "signatureVerified": true,
+      "executableSha256": "b6f4ee4cce092c059373ca362b50ba97989b21a982630990423394ca4971aedb",
+      "processPath": "/Applications/Noto.app/Contents/MacOS/Noto",
+      "backupVersion": "1.0",
+      "backupBuild": "202606110016"
+    }
   },
   "verification": {
     "finalNotoVaultTests": 152,

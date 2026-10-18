@@ -20,7 +20,7 @@ The desktop session passed 32 relevant Mac tests. Its final visual audit reports
 
 The iOS Inbox drag cue can clip during a slow upward drag. The native Daily calendar is taller than the reference. Exact Mac font and colour identity, some native menu pixels, and production iCloud sync behavior remain outside the visual proof. Independent verification of the final installed Pro build confirms that the real library and restored editor load without the timeout.
 
-The release request authorizes commits, installation on both desktops, and a Noto 2 TestFlight build. No push was requested. TestFlight upload and the canonical availability verification pass. Apple reports VALID on the highest train, 0.2.0, with internal state IN_BETA_TESTING. The IPA, app, and both extensions pass identity, version, build, distribution-signature, and model-weight checks. External beta submission was not requested. The MacBook Air installation is blocked by the established SSH route returning HTTP 403 before login.
+The release request authorizes commits, installation on both desktops, and a Noto 2 TestFlight build. No push was requested. TestFlight upload and the canonical availability verification pass. Apple reports VALID on the highest train, 0.2.0, with internal state IN_BETA_TESTING. The IPA, app, and both extensions pass identity, version, build, distribution-signature, and model-weight checks. External beta submission was not requested. Both desktops now run the identical signed Mac bundle. The Air verification confirms all 23 bundle file hashes, the signature, the running application path, and the preserved 1.0 backup.
 
 ## Launch correction
 
