@@ -1,6 +1,6 @@
 import Foundation
 
-public struct VaultNoteRecord: Identifiable, Sendable, Equatable, Hashable {
+public struct VaultNoteRecord: Identifiable, Sendable, Equatable, Hashable, Codable {
     public let id: UUID
     public let fileURL: URL
     public let title: String

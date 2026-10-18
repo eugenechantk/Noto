@@ -1,0 +1,330 @@
+{
+  "accessibility" : {
+    "element_count" : 18,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 71,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 40,
+          "width" : 111,
+          "x" : 16,
+          "y" : 63
+        },
+        "label" : "Library",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 364,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 28,
+          "x" : 350,
+          "y" : 66
+        },
+        "id" : "browse_more_actions_menu",
+        "label" : "Library actions",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "id" : "libraryHome",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 133
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 116
+        },
+        "label" : "RECENT",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 180
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 150
+        },
+        "id" : "libraryNote_The $120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money.md",
+        "label" : "The $120K Blueprint: What 2 Years of\"Building in Public\" Won't Teach You About Actually Making Money, Captures · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 240
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 210
+        },
+        "id" : "libraryNote_The State of Consumer AI - Usage.md",
+        "label" : "The State of Consumer AI - Usage, Captures · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 300
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 270
+        },
+        "id" : "libraryNote_Long Scrolling Note.md",
+        "label" : "Long Scrolling Note, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 360
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 330
+        },
+        "id" : "libraryNote_Project Plan.md",
+        "label" : "Project Plan, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 420
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 390
+        },
+        "id" : "libraryNote_Shopping List.md",
+        "label" : "Shopping List, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 480
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : 16,
+          "y" : 450
+        },
+        "id" : "libraryNote_Meeting Notes.md",
+        "label" : "Meeting Notes, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 540
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 59,
+          "width" : 370,
+          "x" : 16,
+          "y" : 510
+        },
+        "id" : "libraryNote_Bulk Note 7999.md",
+        "label" : "Bulk Note 7999, Bulk · 4w ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 599
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 582
+        },
+        "label" : "FOLDERS",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 642
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : 16,
+          "y" : 616
+        },
+        "id" : "libraryFolder_Archive",
+        "label" : "Archive, 0",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 694
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : 16,
+          "y" : 668
+        },
+        "id" : "libraryFolder_Bulk",
+        "label" : "Bulk, 8,000",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 746
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : 16,
+          "y" : 720
+        },
+        "id" : "libraryFolder_Captures",
+        "label" : "Captures, 2",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 798
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : 16,
+          "y" : 772
+        },
+        "id" : "libraryFolder_Projects",
+        "label" : "Projects, 0",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-153051-ios-visual-audit\/08-L3-relaunch-instant-without-new-note.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 111957,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T07:38:34Z",
+  "type" : "ui_snapshot"
+}

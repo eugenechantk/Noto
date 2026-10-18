@@ -1,4 +1,5 @@
 import NotoShareCapture
+import NotoVault
 import SwiftUI
 import os.log
 
@@ -27,6 +28,8 @@ struct RootTabView: View {
     let launchRouter: Noto2LaunchRouter
 
     @State private var vaultController: VaultController?
+    /// Library's cache-first data, shared by its home and folder pages.
+    @State private var library: LibraryModel?
     @State private var fileWatcher = VaultFileWatcher()
     @State private var selectedTab: Noto2Tab = .capture
     @State private var todayReselectRevision = 0
@@ -63,6 +66,9 @@ struct RootTabView: View {
         _selectedTab = State(wrappedValue: initialTab)
         _vaultController = State(wrappedValue: Noto2StartupPolicy.requiresWorkspace(initialTab)
             ? vaultURL.map { VaultController(vaultURL: $0, autoloadRoot: false) }
+            : nil)
+        _library = State(wrappedValue: Noto2StartupPolicy.requiresWorkspace(initialTab)
+            ? vaultURL.map { LibraryModel(vaultRootURL: $0) }
             : nil)
     }
 
@@ -116,6 +122,7 @@ struct RootTabView: View {
         // Open notes reload when their file changes on disk (iCloud edits from
         // another device, or Hermes adding share-sheet media).
         .environment(fileWatcher)
+        .environment(library)
         .background(NotoTheme.background.ignoresSafeArea())
         .task(id: vaultURL) {
             guard vaultURL != nil else { return }
@@ -143,6 +150,7 @@ struct RootTabView: View {
             refreshInboxBadge()
             if selectedTab == .browse {
                 vaultController?.refreshRootForForegroundActivation()
+                Task { await library?.refresh() }
             }
             startSearchMaintenance()
         }
@@ -287,6 +295,12 @@ struct RootTabView: View {
         // Search resolves notes by path and Browse loads its visible directory
         // on demand, so creating this controller must not enumerate the root.
         vaultController = VaultController(vaultURL: vaultURL, autoloadRoot: false)
+        if library == nil {
+            // Read the saved snapshot now, so Library is ready before it is opened.
+            let model = LibraryModel(vaultRootURL: vaultURL)
+            library = model
+            Task { await model.loadCache() }
+        }
     }
 
     private func startDeferredServicesIfNeeded() {

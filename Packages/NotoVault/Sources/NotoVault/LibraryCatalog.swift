@@ -1,14 +1,32 @@
 import Foundation
 
-public struct LibraryNote: Identifiable, Equatable, Sendable {
+public struct LibraryNote: Identifiable, Equatable, Sendable, Codable {
     public let note: VaultNoteRecord
     public let folderPath: String
     public let preview: String
     public let isPinned: Bool
+    /// The title, preview and pin come from an older version of the file, because
+    /// it was offloaded to iCloud when scanned. The next scan reads it again.
+    public var isStale = false
     public var id: UUID { note.id }
 }
 
-public struct LibrarySnapshot: Sendable {
+extension LibraryNote {
+    /// The saved details of a note that changed while offloaded: sorted by its new
+    /// date, but marked stale so the next scan reads it once it is downloaded.
+    func offloaded(modifiedDate: Date) -> LibraryNote {
+        var copy = LibraryNote(
+            note: VaultNoteRecord(id: note.id, fileURL: note.fileURL, title: note.title, modifiedDate: modifiedDate),
+            folderPath: folderPath,
+            preview: preview,
+            isPinned: isPinned
+        )
+        copy.isStale = true
+        return copy
+    }
+}
+
+public struct LibrarySnapshot: Sendable, Equatable, Codable {
     public let notes: [LibraryNote]
     public let folders: [FolderSummary]
     public var pinned: [LibraryNote] {
@@ -16,6 +34,11 @@ public struct LibrarySnapshot: Sendable {
     }
     /// Pinned notes already have their own section, so Recent avoids duplicates.
     public func recent(limit: Int = 7) -> [LibraryNote] { Array(notes.filter { !$0.isPinned }.prefix(max(0, limit))) }
+    /// The notes directly inside `directoryURL` (not its subfolders), for a folder page.
+    public func notes(inDirectory directoryURL: URL) -> [LibraryNote] {
+        let directory = directoryURL.standardizedFileURL.path
+        return notes.filter { $0.note.fileURL.deletingLastPathComponent().standardizedFileURL.path == directory }
+    }
 }
 
 public enum LibraryNoteSort: String, CaseIterable, Sendable {
@@ -47,31 +70,47 @@ public struct LibraryCatalog: Sendable {
         return "\(folders) · \(notes)"
     }
 
-    public func load() throws -> LibrarySnapshot {
+    /// Lists every visible note with its modified date, and reads only the notes that
+    /// are new or changed since `previous` (all of them when there is none). Reads use
+    /// the plain local reader: an offloaded iCloud note is never downloaded just to be
+    /// listed; it keeps what `previous` knew, or shows its filename.
+    public func load(previous: LibrarySnapshot? = nil) throws -> LibrarySnapshot {
         let loader = VaultDirectoryLoader(noteMetadataStrategy: .fileOnly)
         let rootItems = try loader.loadItems(in: vaultRootURL)
+        let saved = Dictionary((previous?.notes ?? []).map { ($0.note.fileURL.standardizedFileURL.path, $0) }, uniquingKeysWith: { first, _ in first })
         var notes: [LibraryNote] = []
+        // A raw listing with prefetched dates: an unchanged note costs one lookup, so
+        // full details (stable id, title, preview) are built only for notes read now.
+        // Hidden, inbox and Attachments folders are skipped whole, so their notes
+        // never need a per-note visibility check.
+        // Never prefetch `ubiquitousItemDownloadingStatusKey` here: it costs a
+        // file-provider round trip per file. The reader checks offloading itself.
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .isDirectoryKey, .isSymbolicLinkKey]
         func visit(_ directory: URL) throws {
-            for item in try loader.loadItems(in: directory) {
-                switch item {
-                case .folder(let folder):
-                    guard Self.isVisible(folder.folderURL, in: vaultRootURL) else { continue }
-                    let isSymbolicLink = (try? folder.folderURL.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true
-                    if !isSymbolicLink { try visit(folder.folderURL) }
-                case .note(let summary):
-                    guard Self.isVisible(summary.fileURL, in: vaultRootURL) else { continue }
-                    let markdown = fileSystem.readPrefix(from: summary.fileURL, maxBytes: 64 * 1024)
-                        .map { String(decoding: $0, as: UTF8.self) } ?? ""
-                    let record = VaultNoteRecord(
-                        id: VaultMarkdown.idFromFrontmatter(markdown) ?? summary.id,
-                        fileURL: summary.fileURL,
-                        title: VaultMarkdown.displayTitle(for: summary.fileURL, content: markdown),
-                        modifiedDate: summary.modifiedDate
-                    )
-                    let relative = VaultPathResolver(vaultRootURL: vaultRootURL).relativePath(for: summary.fileURL) ?? summary.fileURL.lastPathComponent
-                    let folder = (relative as NSString).deletingLastPathComponent
-                    let bodyLines = VaultMarkdown.stripFrontmatter(markdown).split(whereSeparator: \.isNewline)
-                    notes.append(LibraryNote(note: record, folderPath: folder, preview: bodyLines.dropFirst().first.map(String.init) ?? "", isPinned: NotePinning.isPinned(in: markdown)))
+            for child in try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]) {
+                let values = try? child.resourceValues(forKeys: Set(keys))
+                let url = child.standardizedFileURL
+                if values?.isDirectory == true {
+                    guard Self.isVisible(url, in: vaultRootURL), values?.isSymbolicLink != true else { continue }
+                    try visit(url)
+                    continue
+                }
+                guard url.pathExtension == "md" else { continue }
+                let modifiedDate = values?.contentModificationDate ?? .distantPast
+                let earlier = saved[url.path]
+                if let earlier, !earlier.isStale, Self.sameDate(earlier.note.modifiedDate, modifiedDate) {
+                    notes.append(earlier)
+                    continue
+                }
+                let summary = NoteSummary(id: VaultDirectoryLoader.stableID(for: url), fileURL: url, title: "", modifiedDate: modifiedDate)
+                if let data = fileSystem.readLocalPreview(from: url, maxBytes: 64 * 1024) {
+                    notes.append(entry(for: summary, markdown: String(decoding: data, as: UTF8.self)))
+                } else if let earlier {
+                    notes.append(earlier.offloaded(modifiedDate: modifiedDate))
+                } else {
+                    var placeholder = entry(for: summary, markdown: "")
+                    placeholder.isStale = true
+                    notes.append(placeholder)
                 }
             }
         }
@@ -84,6 +123,26 @@ public struct LibraryCatalog: Sendable {
             return folder
         }
         return LibrarySnapshot(notes: notes, folders: folders)
+    }
+
+    private func entry(for summary: NoteSummary, markdown: String) -> LibraryNote {
+        let record = VaultNoteRecord(
+            id: VaultMarkdown.idFromFrontmatter(markdown) ?? summary.id,
+            fileURL: summary.fileURL,
+            title: VaultMarkdown.displayTitle(for: summary.fileURL, content: markdown),
+            modifiedDate: summary.modifiedDate
+        )
+        let relative = VaultPathResolver(vaultRootURL: vaultRootURL).relativePath(for: summary.fileURL) ?? summary.fileURL.lastPathComponent
+        let folder = (relative as NSString).deletingLastPathComponent
+        // Only the title line and the preview line are needed; splitting the whole
+        // 64 KB prefix into lines took half the first scan on a real vault.
+        let bodyLines = VaultMarkdown.stripFrontmatter(markdown).split(maxSplits: 2, whereSeparator: \.isNewline)
+        return LibraryNote(note: record, folderPath: folder, preview: bodyLines.dropFirst().first.map(String.init) ?? "", isPinned: NotePinning.isPinned(in: markdown))
+    }
+
+    /// Dates survive the cache as Doubles; allow for rounding.
+    private static func sameDate(_ lhs: Date, _ rhs: Date) -> Bool {
+        abs(lhs.timeIntervalSince(rhs)) < 0.001
     }
 
     public static func groups(_ notes: [LibraryNote], sort: LibraryNoteSort = .recent, now: Date = Date(), calendar: Calendar = .current) -> [LibraryNoteGroup] {

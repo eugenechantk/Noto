@@ -111,18 +111,18 @@ struct LibraryHome: View {
     let vaultController: VaultController
     let onOpen: (BrowseDestination) -> Void
     let onOpenSettings: () -> Void
-    @State private var snapshot: LibrarySnapshot?
     @State private var showNewFolder = false
     @State private var folderName = ""
-    @State private var errorMessage: String?
     @State private var revision = 0
     @Environment(VaultFileWatcher.self) private var fileWatcher: VaultFileWatcher?
+    /// Cache-first: the last saved snapshot shows at once; scans refresh it silently.
+    @Environment(LibraryModel.self) private var library: LibraryModel?
 
     private var actions: ExplorerDirectoryActions { .init(vaultController: vaultController, store: vaultController.rootStore) }
 
     var body: some View {
         List {
-            if let snapshot {
+            if let snapshot = library?.snapshot {
                 if !snapshot.pinned.isEmpty {
                     Section {
                         ForEach(snapshot.pinned) { entry in noteRow(entry, pinned: true) }
@@ -152,9 +152,11 @@ struct LibraryHome: View {
                         .accessibilityIdentifier("libraryEmptyState")
                         .listRowBackground(Color.clear)
                 }
-            } else if let errorMessage {
+            } else if let errorMessage = library?.errorMessage {
                 Text(errorMessage).foregroundStyle(NotoTheme.muted).accessibilityIdentifier("libraryLoadError")
-            } else {
+            } else if library?.isFirstLoad ?? true {
+                // Only before the first scan on this device; afterwards the saved
+                // snapshot shows while scans run silently.
                 ProgressView().accessibilityIdentifier("libraryLoading")
             }
         }
@@ -182,10 +184,10 @@ struct LibraryHome: View {
                 revision += 1
             }
         }
-        .task(id: revision) { await load() }
+        .task(id: revision) { await library?.refresh() }
         .onChange(of: fileWatcher?.changeCount) { _, _ in revision += 1 }
         .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { _ in revision += 1 }
-        .refreshable { await load() }
+        .refreshable { await library?.refresh() }
         .accessibilityIdentifier("libraryHome")
     }
 
@@ -198,16 +200,6 @@ struct LibraryHome: View {
         .accessibilityIdentifier("libraryNote_\(entry.note.fileURL.lastPathComponent)")
         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
     }
-
-    private func load() async {
-        let root = vaultController.vaultURL
-        let result = await Task.detached(priority: .userInitiated) { Result { try LibraryCatalog(vaultRootURL: root).load() } }.value
-        guard !Task.isCancelled else { return }
-        switch result {
-        case .success(let value): snapshot = value; errorMessage = nil
-        case .failure(let error): errorMessage = error.localizedDescription
-        }
-    }
 }
 
 struct FolderListView: View {
@@ -217,12 +209,16 @@ struct FolderListView: View {
     var onOpen: (BrowseDestination) -> Void
     var showsBackButton = false
     var onOpenSettings: (() -> Void)?
-    @State private var notes: [LibraryNote] = []
     @State private var sort: LibraryNoteSort = .recent
     @State private var revision = 0
     @State private var showNewFolder = false
     @State private var folderName = ""
     @Environment(VaultFileWatcher.self) private var fileWatcher: VaultFileWatcher?
+    @Environment(LibraryModel.self) private var library: LibraryModel?
+
+    /// This folder's notes from the shared Library snapshot, so a folder opens
+    /// without its own vault scan.
+    private var notes: [LibraryNote] { library?.snapshot?.notes(inDirectory: store.directoryURL) ?? [] }
 
     private var folders: [NotoFolder] {
         store.items.compactMap { item in
@@ -275,8 +271,13 @@ struct FolderListView: View {
                 .listRowBackground(NotoTheme.card)
             }
             if notes.isEmpty && folders.isEmpty {
-                Text("Nothing here yet.").foregroundStyle(NotoTheme.muted).accessibilityIdentifier("browseEmptyState")
-                    .listRowBackground(Color.clear)
+                if library?.snapshot == nil {
+                    ProgressView().accessibilityIdentifier("libraryLoading")
+                        .listRowBackground(Color.clear)
+                } else {
+                    Text("Nothing here yet.").foregroundStyle(NotoTheme.muted).accessibilityIdentifier("browseEmptyState")
+                        .listRowBackground(Color.clear)
+                }
             }
         }
         .modifier(LibraryListStyle())
@@ -307,12 +308,7 @@ struct FolderListView: View {
 
     private func load() async {
         store.loadItemsInBackground()
-        let root = vaultController.vaultURL
-        let directory = store.directoryURL.standardizedFileURL
-        let loaded = await Task.detached(priority: .userInitiated) {
-            (try? LibraryCatalog(vaultRootURL: root).load().notes.filter { $0.note.fileURL.deletingLastPathComponent().standardizedFileURL == directory }) ?? []
-        }.value
-        if !Task.isCancelled { notes = loaded }
+        await library?.refresh()
     }
 }
 

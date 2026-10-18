@@ -71,11 +71,17 @@ public struct CoordinatedVaultFileSystem: VaultFileSystem {
     public func readLocalPreview(from url: URL, maxBytes: Int) -> Data? {
         // A list scan must not coordinate and materialize every cloud note.
         // Keep unavailable notes visible through their filename fallback.
-        if let values = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
-           values.ubiquitousItemDownloadingStatus == .notDownloaded {
-            return nil
-        }
+        guard !Self.isOffloaded(url) else { return nil }
         return MarkdownPrefixReader.readData(from: url, maxBytes: maxBytes)
+    }
+
+    /// An offloaded iCloud file is "dataless": reading it blocks on a download.
+    /// The flag costs one `lstat` (5 ms for 1,182 notes); asking for
+    /// `ubiquitousItemDownloadingStatus` instead costs a file-provider round trip
+    /// per file (about 2 s for the same vault, measured 2026-10-18).
+    static func isOffloaded(_ url: URL) -> Bool {
+        var info = stat()
+        return lstat(url.path, &info) == 0 && info.st_flags & UInt32(SF_DATALESS) != 0
     }
 
     @discardableResult

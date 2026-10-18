@@ -1,0 +1,178 @@
+{
+  "accessibility" : {
+    "element_count" : 9,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 67,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 33,
+          "width" : 94,
+          "x" : 20,
+          "y" : 67
+        },
+        "id" : "inboxTitle",
+        "label" : "Inbox, 3",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 316,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 47,
+          "width" : 132,
+          "x" : 250,
+          "y" : 60
+        },
+        "id" : "inboxViewPicker",
+        "role" : "TabGroup",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "id" : "inboxScreen",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 133
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 116
+        },
+        "label" : "TODAY",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 178
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 56,
+          "width" : 370,
+          "x" : 16,
+          "y" : 150
+        },
+        "id" : "inboxRow_2026-10-18-audit002.md",
+        "label" : "Audit inbox capture three: call the dentist, 10:00 AM",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 234
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 56,
+          "width" : 370,
+          "x" : 16,
+          "y" : 206
+        },
+        "id" : "inboxRow_2026-10-18-audit001.md",
+        "label" : "Audit inbox capture two: read the Liquid Glass HIG, 9:00 AM",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 291
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 56,
+          "width" : 370,
+          "x" : 16,
+          "y" : 263
+        },
+        "id" : "inboxRow_2026-10-18-audit000.md",
+        "label" : "Audit inbox capture one: buy oat milk, 8:00 AM",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-153051-ios-visual-audit\/18-I2-inbox-list.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 61709,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T07:47:44Z",
+  "type" : "ui_snapshot"
+}

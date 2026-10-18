@@ -1,0 +1,4 @@
+total 5904
+drwxr-xr-x  3 eugenechan  staff       96 Oct 18 15:33 .
+drwxr-xr-x  4 eugenechan  staff      128 Oct 18 15:34 ..
+-rw-r--r--  1 eugenechan  staff  3019252 Oct 18 15:33 library-snapshot.plist

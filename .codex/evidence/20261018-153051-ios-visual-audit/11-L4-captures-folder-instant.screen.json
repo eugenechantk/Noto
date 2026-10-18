@@ -1,0 +1,411 @@
+{
+  "accessibility" : {
+    "element_count" : 23,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 89
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 54,
+          "width" : 402,
+          "x" : 0,
+          "y" : 62
+        },
+        "id" : "Captures",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : -121,
+          "y" : 0
+        },
+        "id" : "libraryHome",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 133
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : -105,
+          "y" : 116
+        },
+        "label" : "RECENT",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 180
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 150
+        },
+        "id" : "libraryNote_Audit Added While Closed.md",
+        "label" : "Audit Added While Closed, Library · just now",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 240
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 210
+        },
+        "id" : "libraryNote_The $120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money.md",
+        "label" : "The $120K Blueprint: What 2 Years of\"Building in Public\" Won't Teach You About Actually Making Money, Captures · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 300
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 270
+        },
+        "id" : "libraryNote_The State of Consumer AI - Usage.md",
+        "label" : "The State of Consumer AI - Usage, Captures · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 360
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 330
+        },
+        "id" : "libraryNote_Long Scrolling Note.md",
+        "label" : "Long Scrolling Note, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 420
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 390
+        },
+        "id" : "libraryNote_Project Plan.md",
+        "label" : "Project Plan, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 480
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 450
+        },
+        "id" : "libraryNote_Shopping List.md",
+        "label" : "Shopping List, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 540
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 59,
+          "width" : 370,
+          "x" : -105,
+          "y" : 510
+        },
+        "id" : "libraryNote_Meeting Notes.md",
+        "label" : "Meeting Notes, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 599
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : -105,
+          "y" : 582
+        },
+        "label" : "FOLDERS",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 642
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : -105,
+          "y" : 616
+        },
+        "id" : "libraryFolder_Archive",
+        "label" : "Archive, 0",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 694
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : -105,
+          "y" : 668
+        },
+        "id" : "libraryFolder_Bulk",
+        "label" : "Bulk, 8,000",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 746
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : -105,
+          "y" : 720
+        },
+        "id" : "libraryFolder_Captures",
+        "label" : "Captures, 2",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 798
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : -105,
+          "y" : 772
+        },
+        "id" : "libraryFolder_Projects",
+        "label" : "Projects, 0",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 71,
+          "y" : 142
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 14,
+          "width" : 102,
+          "x" : 20,
+          "y" : 134
+        },
+        "label" : "0 folders · 2 notes",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 353,
+          "y" : 142
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 14,
+          "width" : 56,
+          "x" : 325,
+          "y" : 135
+        },
+        "id" : "libraryFolderSort",
+        "label" : "Recent",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 197
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 180
+        },
+        "label" : "THIS WEEK",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 245
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 214
+        },
+        "id" : "libraryNote_The $120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money.md",
+        "label" : "The $120K Blueprint: What 2 Years of\"Building in Public\" Won't Teach You About Actually Making Money, Oct 18, <!-- readwise:metadata:start -->",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 309
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 277
+        },
+        "id" : "libraryNote_The State of Consumer AI - Usage.md",
+        "label" : "The State of Consumer AI - Usage, Oct 18, Source: [The State of Consumer AI - Usage](https:\/\/example.com\/consumer-ai-usage)",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-153051-ios-visual-audit\/11-L4-captures-folder-instant.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 69723,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T07:42:25Z",
+  "type" : "ui_snapshot"
+}

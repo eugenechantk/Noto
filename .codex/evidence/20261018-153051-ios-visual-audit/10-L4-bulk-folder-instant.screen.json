@@ -1,0 +1,564 @@
+{
+  "accessibility" : {
+    "element_count" : 32,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 89
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 54,
+          "width" : 402,
+          "x" : 0,
+          "y" : 62
+        },
+        "id" : "Bulk",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : -121,
+          "y" : 0
+        },
+        "id" : "libraryHome",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 133
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : -105,
+          "y" : 116
+        },
+        "label" : "RECENT",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 180
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 150
+        },
+        "id" : "libraryNote_Audit Added While Closed.md",
+        "label" : "Audit Added While Closed, Library · just now",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 240
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 210
+        },
+        "id" : "libraryNote_The $120K Blueprint What 2 Years ofBuilding in Public Won't Teach You About Actually Making Money.md",
+        "label" : "The $120K Blueprint: What 2 Years of\"Building in Public\" Won't Teach You About Actually Making Money, Captures · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 300
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 270
+        },
+        "id" : "libraryNote_The State of Consumer AI - Usage.md",
+        "label" : "The State of Consumer AI - Usage, Captures · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 360
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 330
+        },
+        "id" : "libraryNote_Long Scrolling Note.md",
+        "label" : "Long Scrolling Note, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 420
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 390
+        },
+        "id" : "libraryNote_Project Plan.md",
+        "label" : "Project Plan, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 480
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 60,
+          "width" : 370,
+          "x" : -105,
+          "y" : 450
+        },
+        "id" : "libraryNote_Shopping List.md",
+        "label" : "Shopping List, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 540
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 59,
+          "width" : 370,
+          "x" : -105,
+          "y" : 510
+        },
+        "id" : "libraryNote_Meeting Notes.md",
+        "label" : "Meeting Notes, Library · 6m ago",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 599
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : -105,
+          "y" : 582
+        },
+        "label" : "FOLDERS",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 642
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : -105,
+          "y" : 616
+        },
+        "id" : "libraryFolder_Archive",
+        "label" : "Archive, 0",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 694
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : -105,
+          "y" : 668
+        },
+        "id" : "libraryFolder_Bulk",
+        "label" : "Bulk, 8,000",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 746
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : -105,
+          "y" : 720
+        },
+        "id" : "libraryFolder_Captures",
+        "label" : "Captures, 2",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 80,
+          "y" : 798
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : -105,
+          "y" : 772
+        },
+        "id" : "libraryFolder_Projects",
+        "label" : "Projects, 0",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 82,
+          "y" : 142
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 14,
+          "width" : 125,
+          "x" : 20,
+          "y" : 134
+        },
+        "label" : "0 folders · 8000 notes",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 353,
+          "y" : 142
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 14,
+          "width" : 56,
+          "x" : 325,
+          "y" : 135
+        },
+        "id" : "libraryFolderSort",
+        "label" : "Recent",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 197
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 34,
+          "width" : 370,
+          "x" : 16,
+          "y" : 180
+        },
+        "label" : "EARLIER",
+        "role" : "Heading",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 245
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 214
+        },
+        "id" : "libraryNote_Bulk Note 7999.md",
+        "label" : "Bulk Note 7999, Sep 18, Audit filler line number 7999.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 309
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 277
+        },
+        "id" : "libraryNote_Bulk Note 7998.md",
+        "label" : "Bulk Note 7998, Sep 18, Audit filler line number 7998.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 372
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 341
+        },
+        "id" : "libraryNote_Bulk Note 7997.md",
+        "label" : "Bulk Note 7997, Sep 18, Audit filler line number 7997.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 436
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 404
+        },
+        "id" : "libraryNote_Bulk Note 7996.md",
+        "label" : "Bulk Note 7996, Sep 18, Audit filler line number 7996.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 499
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 467
+        },
+        "id" : "libraryNote_Bulk Note 7995.md",
+        "label" : "Bulk Note 7995, Sep 18, Audit filler line number 7995.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 562
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 531
+        },
+        "id" : "libraryNote_Bulk Note 7994.md",
+        "label" : "Bulk Note 7994, Sep 18, Audit filler line number 7994.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 626
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 594
+        },
+        "id" : "libraryNote_Bulk Note 7993.md",
+        "label" : "Bulk Note 7993, Sep 18, Audit filler line number 7993.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 689
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 657
+        },
+        "id" : "libraryNote_Bulk Note 7992.md",
+        "label" : "Bulk Note 7992, Sep 18, Audit filler line number 7992.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 752
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 721
+        },
+        "id" : "libraryNote_Bulk Note 7991.md",
+        "label" : "Bulk Note 7991, Sep 18, Audit filler line number 7991.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 816
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 784
+        },
+        "id" : "libraryNote_Bulk Note 7990.md",
+        "label" : "Bulk Note 7990, Sep 18, Audit filler line number 7990.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 879
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 63,
+          "width" : 370,
+          "x" : 16,
+          "y" : 847
+        },
+        "id" : "libraryNote_Bulk Note 7989.md",
+        "label" : "Bulk Note 7989, Sep 18, Audit filler line number 7989.",
+        "role" : "Button",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-153051-ios-visual-audit\/10-L4-bulk-folder-instant.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 137671,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T07:40:41Z",
+  "type" : "ui_snapshot"
+}

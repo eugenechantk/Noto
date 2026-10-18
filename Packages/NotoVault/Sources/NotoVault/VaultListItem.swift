@@ -14,7 +14,7 @@ public struct NoteSummary: Identifiable, Equatable, Hashable, Sendable {
     }
 }
 
-public struct FolderSummary: Identifiable, Equatable, Hashable, Sendable {
+public struct FolderSummary: Identifiable, Equatable, Hashable, Sendable, Codable {
     public let id: UUID
     public let folderURL: URL
     public let name: String

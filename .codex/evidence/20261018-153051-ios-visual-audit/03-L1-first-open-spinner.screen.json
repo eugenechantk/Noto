@@ -1,0 +1,127 @@
+{
+  "accessibility" : {
+    "element_count" : 6,
+    "frame_space" : "points",
+    "tree" : [
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "label" : "Noto 2",
+        "role" : "Application",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 71,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 40,
+          "width" : 111,
+          "x" : 16,
+          "y" : 63
+        },
+        "label" : "Library",
+        "role" : "StaticText",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 364,
+          "y" : 84
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 36,
+          "width" : 28,
+          "x" : 350,
+          "y" : 66
+        },
+        "id" : "browse_more_actions_menu",
+        "label" : "Library actions",
+        "role" : "PopUpButton",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 437
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 874,
+          "width" : 402,
+          "x" : 0,
+          "y" : 0
+        },
+        "id" : "libraryHome",
+        "role" : "Group",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 142
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 52,
+          "width" : 370,
+          "x" : 16,
+          "y" : 116
+        },
+        "id" : "libraryLoading",
+        "role" : "GenericElement",
+        "visible" : true
+      },
+      {
+        "center" : {
+          "x" : 201,
+          "y" : 832
+        },
+        "enabled" : true,
+        "frame" : {
+          "height" : 83,
+          "width" : 402,
+          "x" : 0,
+          "y" : 791
+        },
+        "label" : "Tab Bar",
+        "role" : "Group",
+        "visible" : true
+      }
+    ]
+  },
+  "schemaVersion" : "1.0.0",
+  "screenshot" : {
+    "captured" : true,
+    "height" : 874,
+    "optimized" : false,
+    "path" : ".codex\/evidence\/20261018-153051-ios-visual-audit\/03-L1-first-open-spinner.png",
+    "pixel_height" : 874,
+    "pixel_width" : 402,
+    "point_height" : 874,
+    "point_width" : 402,
+    "size_bytes" : 31935,
+    "unit" : "points",
+    "width" : 402
+  },
+  "simulator" : {
+    "name" : "Simulator",
+    "runtime" : "iOS",
+    "udid" : "FA1047D4-3B58-4A9E-983E-8571E43BB15B"
+  },
+  "success" : true,
+  "timestamp" : "2026-10-18T07:33:49Z",
+  "type" : "ui_snapshot"
+}
