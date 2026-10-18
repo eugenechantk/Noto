@@ -1,0 +1,39 @@
+{
+  "sourceCommit": "24e5f7dc32cafafb6cd24e6fa49e3eb31bf99b4c",
+  "version": "0.2.0",
+  "testflight": {
+    "checkedAt": "2026-10-18T05:19:12Z",
+    "appId": "6804900143",
+    "bundleId": "com.eugenechan.Noto2",
+    "buildId": "4f79621d-e8bd-435d-8d7b-a23c5be9614b",
+    "build": "202610181312",
+    "version": "0.2.0",
+    "highestVersionTrain": "0.2.0",
+    "processingState": "VALID",
+    "internalBuildState": "IN_BETA_TESTING",
+    "externalBuildState": "READY_FOR_BETA_SUBMISSION"
+  },
+  "ipa": {
+    "sha256": "b7ec60263fcb6d7dc828b0a93fe022dc823ea444e7fa57c071d61cb30cb0a1b5",
+    "bytes": 102125418,
+    "verifiedBundles": 3,
+    "modelWeightsMatchVerifiedSource": true
+  },
+  "desktop": {
+    "build": "202610181301",
+    "pro": "Installed and independently verified at /Applications/Noto.app",
+    "air": "Not installed: established SSH route fails before login"
+  },
+  "verification": {
+    "finalNotoVaultTests": 152,
+    "finalMacAppTests": 32,
+    "qualifiedMobileAppTests": 204,
+    "qualifiedMobilePackageTests": 374,
+    "frozenSourceFilesMatched": 443
+  },
+  "knownVisualGaps": [
+    "Inbox upper-New cue clipping during a slow upward drag",
+    "Daily calendar height differs from the reference"
+  ],
+  "pushed": false
+}
