@@ -404,7 +404,6 @@ Readwise is split across the app target and package:
 - `Packages/NotoReadwiseSync/Sources/NotoReadwiseSyncCore` owns API models, the Readwise client, Reader/Readwise sync engines, source-note rendering, and sync state.
 - `Packages/NotoReadwiseSync/Sources/noto-readwise-sync` contains the CLI wrapper around the same core package.
 - `noto-readwise-sync --incremental` runs the same checkpointed Reader + Readwise library sync headlessly. On Eugene's MacBook Pro, Hermes job `5cb9aa45d9be` runs it every 15 minutes before the existing Readwise digest worker, so Noto 2 does not need to be opened for imports to reach the shared iCloud vault.
-- Scheduled sync coordinates iCloud reads and replacements so evicted checkpoints and notes download before use. New sources go into iCloud Drive's `Noto/Captures`; existing mappings keep their paths. The digest worker retries transient cloud reads through the same CLI and retains its polling checkpoint when any item fails.
 
 ### Deep Link Lifecycle
 

@@ -4,6 +4,40 @@ import Testing
 
 @Suite("Vault library projections")
 struct VaultLibraryTests {
+    @Test func libraryUsesLocalPreviewsWhenCoordinatedReadsAreUnavailable() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let id = UUID()
+        let markdown = "---\nid: \(id)\n---\n# A readable title\n\nA local preview."
+        try markdown.write(to: root.appendingPathComponent("Fallback.md"), atomically: true, encoding: .utf8)
+        let snapshot = try VaultLibrarySnapshot.load(vaultURL: root, fileSystem: PreviewOnlyFileSystem())
+        let note = try #require(snapshot.notes.first)
+        #expect(note.id == id)
+        #expect(note.title == "A readable title")
+        #expect(note.isAvailable)
+        #expect(note.content == markdown)
+    }
+
+    @Test func unavailablePreviewsKeepNotesVisibleByFilename() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "# Hidden body".write(to: root.appendingPathComponent("Kept.md"), atomically: true, encoding: .utf8)
+        let snapshot = try VaultLibrarySnapshot.load(vaultURL: root, fileSystem: PreviewOnlyFileSystem(previewAvailable: false))
+        #expect(snapshot.notes.count == 1)
+        #expect(snapshot.notes.first?.title == "Kept")
+        #expect(snapshot.notes.first?.isAvailable == false)
+    }
+
+    @Test func localPreviewsKeepTheByteLimitAndOriginalBytes() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let bytes = Data((0..<128).map(UInt8.init))
+        try bytes.write(to: url)
+        #expect(CoordinatedVaultFileSystem().readLocalPreview(from: url, maxBytes: 17) == Data(bytes.prefix(17)))
+    }
+
     @Test func snippetsShowVisibleMarkdownInsteadOfSourceSyntax() {
         let markdown = "# Title\n\n## Tests\n\n- [x] Read [[Desktop redesign|desktop plan]] and [notes](https://example.com)\n\n**Finish** review"
         #expect(VaultLibraryNote.plainTextSnippet(from: markdown) == "Title Tests Read desktop plan and notes Finish review")
@@ -79,4 +113,30 @@ struct VaultLibraryTests {
         #expect(VaultLibraryNote.dateSection(for: now.addingTimeInterval(-86_400), now: now, calendar: calendar) == "Yesterday")
         #expect(VaultLibraryNote.dateSection(for: now.addingTimeInterval(-3 * 86_400), now: now, calendar: calendar) == "Previous 7 Days")
     }
+}
+
+/// Models a file provider whose coordinated reads cannot answer promptly, while
+/// the already-downloaded local bytes remain readable for a transient list preview.
+private struct PreviewOnlyFileSystem: VaultFileSystem {
+    private let base = CoordinatedVaultFileSystem()
+    let previewAvailable: Bool
+    init(previewAvailable: Bool = true) { self.previewAvailable = previewAvailable }
+    func readLocalPreview(from url: URL, maxBytes: Int) -> Data? {
+        guard previewAvailable else { return nil }
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        return try? handle.read(upToCount: maxBytes)
+    }
+    func readPrefix(from url: URL, maxBytes: Int) -> Data? { nil }
+    func fileExists(at url: URL) -> Bool { base.fileExists(at: url) }
+    func isReadableFile(at url: URL) -> Bool { base.isReadableFile(at: url) }
+    func readString(from url: URL) -> String? { nil }
+    func readData(from url: URL) -> Data? { nil }
+    func writeString(_ content: String, to url: URL) -> Bool { false }
+    func writeData(_ data: Data, to url: URL) -> Bool { false }
+    func delete(at url: URL) -> Bool { false }
+    func move(from sourceURL: URL, to destinationURL: URL) -> Bool { false }
+    func createDirectory(at url: URL) -> Bool { false }
+    func isDownloaded(at url: URL) -> Bool { true }
+    func startDownloading(at url: URL) {}
 }

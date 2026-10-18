@@ -1,8 +1,8 @@
 # Noto 0.2.0
 
-Build 202610181247 combines the completed Noto macOS redesign and the five Noto 2 flows: Capture, Inbox, Library, Daily, and Search.
+Build 202610181301 combines the completed Noto macOS redesign and the five Noto 2 flows: Capture, Inbox, Library, Daily, and Search.
 
-The desktop app remains Noto. Noto 2 remains the iOS app. Both apps and Noto 2 extensions use version 0.2.0.
+The desktop app remains Noto. Noto 2 remains the iOS app. The Mac app, Noto 2, and Noto 2 extensions use version 0.2.0. The separate original Noto iOS app retains version 1.0.
 
 ## Changes
 
@@ -18,6 +18,12 @@ The desktop session passed 32 relevant Mac tests. Its final visual audit reports
 
 ## Known limits
 
-The iOS Inbox drag cue can clip during a slow upward drag. The native Daily calendar is taller than the reference. Exact Mac font and colour identity, some native menu pixels, and production iCloud behavior remain outside the visual proof.
+The iOS Inbox drag cue can clip during a slow upward drag. The native Daily calendar is taller than the reference. Exact Mac font and colour identity, some native menu pixels, and production iCloud sync behavior remain outside the visual proof. Independent verification of the final installed Pro build confirms that the real library and restored editor load without the timeout.
 
-The release request authorizes commits and installation on the two desktops. It does not request a push or TestFlight upload.
+The release request authorizes commits, installation on both desktops, and a Noto 2 TestFlight build. No push was requested. TestFlight packaging and availability verification are in progress. The MacBook Air installation is blocked by the established SSH route returning HTTP 403 before login.
+
+## Launch correction
+
+The first production launch found a library timeout on the real 1,181-note vault. The final build uses local list previews and preserves coordinated document operations. The corrected package scan takes 3.078 seconds. Bug 043 and the performance note retain the failing launch and the regression evidence.
+
+The Mac version uses an SDK-specific setting. The separate original Noto iOS version remains 1.0. The final 32 Mac checks and 152 NotoVault tests pass.

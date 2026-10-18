@@ -33,6 +33,10 @@ public struct NoteTitleResolver: Sendable {
 
 enum MarkdownPrefixReader {
     static func readPrefix(from url: URL, maxBytes: Int) -> String? {
+        readData(from: url, maxBytes: maxBytes).map { String(decoding: $0, as: UTF8.self) }
+    }
+
+    static func readData(from url: URL, maxBytes: Int) -> Data? {
         guard FileManager.default.isReadableFile(atPath: url.path) else { return nil }
 
         do {
@@ -41,8 +45,7 @@ enum MarkdownPrefixReader {
                 try? handle.close()
             }
 
-            let data = try handle.read(upToCount: maxBytes) ?? Data()
-            return String(decoding: data, as: UTF8.self)
+            return try handle.read(upToCount: maxBytes) ?? Data()
         } catch {
             return nil
         }

@@ -6,6 +6,9 @@ public protocol VaultFileSystem: Sendable {
     func readString(from url: URL) -> String?
     func readData(from url: URL) -> Data?
     func readPrefix(from url: URL, maxBytes: Int) -> Data?
+    /// Best-effort downloaded bytes for transient list previews. Document
+    /// loading and mutation still use the coordinated read/write methods.
+    func readLocalPreview(from url: URL, maxBytes: Int) -> Data?
     @discardableResult func writeString(_ content: String, to url: URL) -> Bool
     @discardableResult func writeData(_ data: Data, to url: URL) -> Bool
     @discardableResult func delete(at url: URL) -> Bool
@@ -20,6 +23,9 @@ public protocol VaultFileSystem: Sendable {
 
 public extension VaultFileSystem {
     func batchingReads(of urls: [URL], _ body: () -> Void) { body() }
+    func readLocalPreview(from url: URL, maxBytes: Int) -> Data? {
+        readPrefix(from: url, maxBytes: maxBytes)
+    }
 }
 
 public struct CoordinatedVaultFileSystem: VaultFileSystem {
@@ -60,6 +66,16 @@ public struct CoordinatedVaultFileSystem: VaultFileSystem {
             try? handle.close()
         }
         return result
+    }
+
+    public func readLocalPreview(from url: URL, maxBytes: Int) -> Data? {
+        // A list scan must not coordinate and materialize every cloud note.
+        // Keep unavailable notes visible through their filename fallback.
+        if let values = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+           values.ubiquitousItemDownloadingStatus == .notDownloaded {
+            return nil
+        }
+        return MarkdownPrefixReader.readData(from: url, maxBytes: maxBytes)
     }
 
     @discardableResult

@@ -129,8 +129,9 @@ public struct VaultLibrarySnapshot: Sendable {
         let root = vaultURL.standardizedFileURL.path + "/"
         for row in rows {
             if case .folder = row.kind { folders.append(row); continue }
-            // A bounded prefix keeps list scans from loading large note bodies.
-            let prefix = fileSystem.readPrefix(from: row.url, maxBytes: 64 * 1024)
+            // Previews can refresh after a write. Avoid a coordinated document
+            // read for every row before the library can display any notes.
+            let prefix = fileSystem.readLocalPreview(from: row.url, maxBytes: 64 * 1024)
             let content = prefix.map { String(decoding: $0, as: UTF8.self) } ?? ""
             let record = VaultNoteRecord(id: VaultMarkdown.idFromFrontmatter(content) ?? row.noteID ?? VaultDirectoryLoader.stableID(for: row.url), fileURL: row.url,
                 title: resolver.title(from: content, fallbackTitle: row.name), modifiedDate: row.modifiedAt)
