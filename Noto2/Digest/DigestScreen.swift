@@ -95,6 +95,9 @@ struct DigestScreen: View {
                         .pickerStyle(.segmented).frame(width: 132)
                         .accessibilityIdentifier("inboxViewPicker")
                     }
+                    // The segmented control draws its own glass track; the
+                    // toolbar's shared capsule would wrap it in a second one.
+                    .sharedBackgroundVisibility(.hidden)
                 } else if showingDetail && !isCueDragActive {
                     ToolbarItem(placement: .topBarTrailing) {
                         if keyboardVisible {
