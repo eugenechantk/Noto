@@ -499,98 +499,14 @@ struct VaultWorkspaceView: View {
             }
         }
         #elseif os(macOS)
-            NotoSplitView(
-                store: store,
-                isSearchPresented: $isSearchPresented,
-                noteStackPath: .constant([]),
-                onSearchResult: { result in
-                    handleWorkspaceIntent(.openNote(result.note, store: result.store, isNew: false))
-                },
-                onOpenTodayNote: {
-                    handleWorkspaceIntent(.openToday)
-                },
-                onToggleSidebarCommand: {},
-                onShowSearchCommand: {
-                    handleWorkspaceIntent(.openSearch)
-                },
-                sidebar: { searchText, onToggleSidebar in
-                    NotoSidebarView(
-                        rootStore: store,
-                        fileWatcher: fileWatcher,
-                        selectedNote: selectedNote,
-                        searchText: searchText,
-                        onIntent: handleWorkspaceIntent,
-                        onToggleSidebar: onToggleSidebar
-                    )
-                    .toolbar(removing: .sidebarToggle)
-                },
-                detail: { onToggleSidebar in
-                    splitDetailView(onToggleSidebar: onToggleSidebar)
-                        // Chat toggle on the DETAIL toolbar so it sits on the RIGHT of
-                        // the editor's top bar (a split-level toolbar lands on the left).
-                        // Native Liquid Glass toolbar button (HIG inspector toggle).
-                        .toolbar {
-                            ToolbarItem(placement: .primaryAction) {
-                                Button {
-                                    toggleChat()
-                                } label: {
-                                    Image(systemName: "bubble.left")
-                                }
-                                .help("AI Chat")
-                                .accessibilityIdentifier("macos_chat_toggle")
-                            }
-                        }
-                },
-                iosDetailRoot: { _ in
-                    EmptyView()
-                },
-                iosDestination: { _, _ in
-                    EmptyView()
-                }
-            )
-        // macOS: dock the AI chat as a native trailing inspector next to the editor.
-        // The inspector + native toolbar keep the full-height sidebar, traffic lights,
-        // and Liquid Glass toolbar buttons; chat controls live in the inspector toolbar.
-        .inspector(isPresented: $showChat) {
-            chatInspectorContent
-        }
-        .background {
-            WindowCommandReader(window: $hostingWindow)
-                .frame(width: 0, height: 0)
-        }
-        .sheet(isPresented: $showSettings) {
-            if let locationManager {
-                SettingsView(locationManager: locationManager, readwiseSyncController: readwiseSyncController)
-                    .frame(minWidth: 460, minHeight: 600)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openToday)) { notification in
-            guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
-            openTodayNote()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.createNote)) { notification in
-            guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
-            handleWorkspaceIntent(.createNote(in: store))
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openSettings)) { notification in
-            guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
-            if locationManager != nil {
-                showSettings = true
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NotoAppCommands.openChat)) { notification in
-            guard NotoCommandTarget.matches(notification, window: hostingWindow) else { return }
-            toggleChat()
-        }
-        .onChange(of: selectedNote?.fileURL) { _, newURL in
-            persistLastOpenedNoteURL(newURL)
-        }
-        .onAppear {
-            restoreInitialSelectionIfNeeded()
-        }
-        .onChange(of: deepLinkRouter.pendingDocumentPath) { _, _ in
-            openPendingDocumentLinkIfNeeded()
-        }
+        MacDesktopWorkspace(
+            store: store,
+            locationManager: locationManager,
+            fileWatcher: fileWatcher,
+            readwiseSyncController: readwiseSyncController,
+            deepLinkRouter: deepLinkRouter,
+            initialDocumentLink: initialDocumentLink
+        )
         #endif
     }
 

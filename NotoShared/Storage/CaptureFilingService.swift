@@ -8,7 +8,7 @@ import NotoVault
 ///
 /// Pure filesystem logic, no UI. The caller schedules search indexing.
 struct CaptureFilingService {
-    struct Filed: Equatable {
+    struct Filed: Equatable, Sendable {
         let fileURL: URL
         /// Vault-relative path, e.g. `inbox/2026-08-23-a1b2c3d4.md`.
         let relativePath: String
@@ -35,6 +35,7 @@ struct CaptureFilingService {
     /// coordinated writer Noto uses for iCloud vaults.
     var writeString: (String, URL) -> Bool = { CoordinatedFileManager.writeString($0, to: $1) }
     var createDirectory: (URL) -> Bool = { CoordinatedFileManager.createDirectory(at: $0) }
+    var deleteFile: (URL) -> Bool = { CoordinatedFileManager.delete(at: $0) }
 
     init(vaultURL: URL) {
         self.vaultURL = vaultURL
@@ -121,5 +122,24 @@ struct CaptureFilingService {
             throw FilingError.writeFailed("could not write \(relativePath)")
         }
         return Filed(fileURL: fileURL, relativePath: relativePath, id: id, didCreate: true)
+    }
+
+    // MARK: - Undo
+
+    /// Takes back a capture this service just filed (the toast's Undo).
+    ///
+    /// Only a file this filing **created** is removed, and only while it is
+    /// still that capture (same frontmatter id). An identical capture filed
+    /// earlier — `didCreate == false` — is someone else's thought and stays.
+    /// Direct-filing Undo also supplies the restored document, so cleanup never
+    /// removes an edited copy merely because its identity is unchanged.
+    /// Returns whether a file was removed.
+    @discardableResult
+    func undo(_ filed: Filed, matchingDocument expectedDocument: String? = nil) -> Bool {
+        guard filed.didCreate,
+              let content = CoordinatedFileManager.readString(from: filed.fileURL),
+              VaultMarkdown.idFromFrontmatter(content) == filed.id,
+              expectedDocument == nil || content == expectedDocument else { return false }
+        return deleteFile(filed.fileURL)
     }
 }

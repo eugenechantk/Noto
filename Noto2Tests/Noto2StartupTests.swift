@@ -11,7 +11,6 @@ struct Noto2StartupTests {
         #expect(Noto2StartupPolicy.requiresWorkspace(.digest))
         #expect(Noto2StartupPolicy.requiresWorkspace(.search))
         #expect(Noto2StartupPolicy.requiresWorkspace(.browse))
-        #expect(Noto2StartupPolicy.requiresWorkspace(.media))
     }
 
     @Test func pendingExternalVaultCanPresentCaptureBeforeResolutionFinishes() {

@@ -88,21 +88,64 @@ enum MediaBoardThumbnail {
         return cache
     }()
 
+    /// Thumbnails on disk across launches (see `MediaThumbnailStore`).
+    private static let diskStore: MediaThumbnailStore = {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return MediaThumbnailStore(directoryURL: caches.appendingPathComponent("MediaThumbnails", isDirectory: true))
+    }()
+
     static func image(for item: VaultMediaItem) async -> UIImage? {
         guard item.kind != .audio else { return nil }
-        let key = "\(item.mediaURL.absoluteString)|\(item.modifiedAt.timeIntervalSince1970)" as NSString
-        if let cached = cache.object(forKey: key) { return cached }
-        let work = Task.detached(priority: .utility) { await render(item) }
-        let image = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
-        guard !Task.isCancelled else { return nil }
-        if let image {
-            cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * 4))
+        let memoryKey = "\(item.mediaURL.absoluteString)|\(item.modifiedAt.timeIntervalSince1970)" as NSString
+        if let cached = cache.object(forKey: memoryKey) { return cached }
+        let store = diskStore
+        let work = Task.detached(priority: .utility) { () -> (key: String?, image: UIImage?) in
+            // Metadata only — available even while iCloud has the file evicted.
+            let key = diskKey(for: item)
+            if let key, let data = store.data(for: key), let image = UIImage(data: data) {
+                return (key, image)
+            }
+            let image = await render(item)
+            if let key, let image, let data = image.jpegData(compressionQuality: 0.8) {
+                store.store(data, for: key)
+            }
+            return (key, image)
         }
-        return image
+        let result = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
+        guard !Task.isCancelled else { return nil }
+        if let image = result.image {
+            cache.setObject(image, forKey: memoryKey, cost: Int(image.size.width * image.size.height * 4))
+        }
+        return result.image
+    }
+
+    /// Disk key: a local file's path + modified date + size, a remote image's URL.
+    nonisolated private static func diskKey(for item: VaultMediaItem) -> String? {
+        guard item.mediaURL.isFileURL else {
+            return item.kind == .image ? MediaThumbnailStore.key(forRemote: item.mediaURL) : nil
+        }
+        guard let values = try? item.mediaURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+              let modified = values.contentModificationDate else { return nil }
+        // Keyed on the stable path, so a moved app data folder keeps its thumbnails.
+        return MediaThumbnailStore.key(forFilePath: MediaBoardIndex.stablePath(item.mediaURL),
+                                       modified: modified, size: values.fileSize ?? -1)
     }
 
     nonisolated private static func render(_ item: VaultMediaItem) async -> UIImage? {
         guard !Task.isCancelled else { return nil }
+        // The media mirror first: a vault file's copy (a video's poster) or a web image's backup.
+        if let mirrored = MediaSource.mirrorURL(for: item.mediaURL, poster: item.kind == .video),
+           let data = await MediaSource.remoteData(from: mirrored) {
+            let image = item.kind == .pdf
+                ? PDFDocument(data: data)?.page(at: 0)?.thumbnail(of: CGSize(width: 480, height: 640), for: .mediaBox)
+                : CGImageSourceCreateWithData(data as CFData, nil).flatMap(thumbnail(source:))
+            if let image { return image }
+        }
+        // Then the device — only a downloaded file, never a blocking read — or the web image's site.
+        if item.mediaURL.isFileURL, MediaSource.localFileIfAvailable(item.mediaURL) == nil {
+            return nil
+        }
         if item.kind == .video {
             // Remote videos remain lightweight placeholders until opened in their note.
             guard item.mediaURL.isFileURL else { return nil }

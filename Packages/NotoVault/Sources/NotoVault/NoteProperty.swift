@@ -47,6 +47,7 @@ public enum NotePropertyClassifier {
         let trimmed = value.trimmingCharacters(in: CharacterSet(charactersIn: " \"'"))
         guard !trimmed.isEmpty else { return nil }
         if let iso = isoFormatter.date(from: trimmed) { return iso }
+        if let iso = fractionalISOFormatter.date(from: trimmed) { return iso }
         if let day = dayFormatter.date(from: trimmed) { return day }
         return nil
     }
@@ -81,6 +82,12 @@ public enum NotePropertyClassifier {
             .filter { !$0.isEmpty }
         return "[" + cleaned.joined(separator: ", ") + "]"
     }
+
+    private static let fractionalISOFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
 
     private static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()

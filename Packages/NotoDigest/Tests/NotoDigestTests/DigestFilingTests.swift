@@ -19,6 +19,9 @@ import NotoVault
 /// | `createResolvesFilenameCollisions` | SC4 — second note becomes `Title(2).md` |
 /// | `createIntoAMissingFolderMakesIt` | SC4 — destination folder is created on demand |
 /// | `createRejectsABlankTitle` | SC4 — `invalidTitle`, nothing written, nothing deleted |
+/// | `createAsWrittenNamesFromFirstLine` | Capture C8 — filename from the first line, Markdown unchanged, inbox cleared |
+/// | `createAsWrittenResolvesCollisions` | Capture C8 — a second note with the same first line becomes `Title(2).md` |
+/// | `createAsWrittenRejectsBlankCapture` | Capture C8 — nothing to name it with: `invalidTitle`, nothing written |
 /// | `discardDeletesOnlyTheCapture` | SC5 — no other file is touched |
 /// | `failedAppendLeavesTheCaptureInTheInbox` | SC6 — ordering guarantee on add-to |
 /// | `failedCreateLeavesTheCaptureInTheInbox` | SC6 — ordering guarantee on create |
@@ -232,6 +235,45 @@ struct DigestFilingTests {
 
         #expect(throws: DigestFiling.FilingError.invalidTitle) {
             try filing(vault).createNote(from: firstEntry(vault), title: "   ", inFolderAt: vault.rootURL)
+        }
+        #expect(vault.exists("inbox/one.md"))
+    }
+
+    // MARK: - Create a note as written (Capture C8)
+
+    @Test("create-as-written names the note from its first line and keeps the Markdown")
+    func createAsWrittenNamesFromFirstLine() throws {
+        let vault = TempVault()
+        vault.writeCapture(named: "one.md", body: "# Calm UI worth copying\n\nOne quiet accent.")
+        let folder = vault.rootURL.appendingPathComponent("Ideas", isDirectory: true)
+
+        let written = try filing(vault).createNoteAsWritten(from: firstEntry(vault), inFolderAt: folder)
+
+        #expect(written.lastPathComponent == "Calm UI worth copying.md")
+        let note = vault.read("Ideas/Calm UI worth copying.md")!
+        #expect(note.hasSuffix("---\n# Calm UI worth copying\n\nOne quiet accent.\n"))
+        #expect(note.components(separatedBy: "# Calm UI").count == 2)   // no second, injected heading
+        #expect(!vault.exists("inbox/one.md"))
+    }
+
+    @Test("create-as-written resolves a filename collision instead of overwriting")
+    func createAsWrittenResolvesCollisions() throws {
+        let vault = TempVault()
+        vault.writeCapture(named: "one.md", body: "Dentist\nMonday 9am")
+        vault.write("---\nid: t\n---\nDentist\n\nAlready here\n", at: "Dentist.md")
+
+        let written = try filing(vault).createNoteAsWritten(from: firstEntry(vault), inFolderAt: vault.rootURL)
+        #expect(written.lastPathComponent == "Dentist(2).md")
+        #expect(vault.read("Dentist.md")!.contains("Already here"))
+    }
+
+    @Test("create-as-written rejects a capture with no text to name it")
+    func createAsWrittenRejectsBlankCapture() {
+        let vault = TempVault()
+        vault.writeCapture(named: "one.md", body: "   ")
+
+        #expect(throws: DigestFiling.FilingError.invalidTitle) {
+            try filing(vault).createNoteAsWritten(from: firstEntry(vault), inFolderAt: vault.rootURL)
         }
         #expect(vault.exists("inbox/one.md"))
     }

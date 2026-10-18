@@ -116,6 +116,9 @@ private struct NotoCommands: Commands {
     #endif
 
     var body: some Commands {
+        #if os(macOS)
+        MacDesktopCommands()
+        #else
         CommandMenu("Noto") {
             #if os(macOS)
             Button("New Note") {
@@ -192,13 +195,14 @@ private struct NotoCommands: Commands {
             .keyboardShortcut(",", modifiers: [.command])
             #endif
         }
+        #endif
     }
 }
 
 @main
 struct NotoApp: App {
-    @State private var locationManager = VaultLocationManager()
-    @State private var readwiseSyncController = ReadwiseSyncController()
+    @State private var locationManager = VaultLocationManager(resolveExternalVaultOnInit: !NotoApp.isRunningTests)
+    @State private var readwiseSyncController = ReadwiseSyncController(refreshOnInit: !NotoApp.isRunningTests)
     @StateObject private var deepLinkRouter = NotoDeepLinkRouter()
     #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -230,7 +234,7 @@ struct NotoApp: App {
         .commands {
             NotoCommands()
         }
-        .defaultSize(width: 800, height: 600)
+        .defaultSize(width: 1200, height: 800)
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified)
 
@@ -486,8 +490,10 @@ struct MainAppView: View {
                 tagController.load()
                 tagController.rebuildMembership()
                 dailyNotePrewarmer.start(vaultURL: vaultURL)
-                readwiseSyncController.refreshSavedTokenState()
-                readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
+                if !NotoPreviewConfiguration.isEnabled {
+                    readwiseSyncController.refreshSavedTokenState()
+                    readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
+                }
                 await refreshSearchIndex()
             }
             .onAppear {
@@ -497,7 +503,9 @@ struct MainAppView: View {
                 if newPhase == .active {
                     store.refreshForForegroundActivation()
                     dailyNotePrewarmer.start(vaultURL: vaultURL)
-                    readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
+                    if !NotoPreviewConfiguration.isEnabled {
+                        readwiseSyncController.startAutomaticSync(vaultURL: vaultURL)
+                    }
                     Task {
                         await SearchIndexController.shared.drainPendingQueue(vaultURL: vaultURL)
                         await refreshSearchIndex()

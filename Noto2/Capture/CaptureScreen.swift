@@ -1,15 +1,18 @@
 import SwiftUI
+import NotoDigest
+import NotoVault
 import UIKit
 import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto2", category: "CaptureScreen")
 
 /// The start screen: a Tinder-style card stack over the vault.
-/// Swipe **right or up** to file the draft to `inbox/<date>-<sha8>.md`
-/// (see `CaptureFilingService`); swipe **left** to discard it. The card pins
-/// to the finger, tilts, detaches mid-flick, and the next empty card rises
-/// from behind. The outcome line lives in a fixed slot ABOVE the card so
-/// nothing shifts. No buttons.
+/// Swipe **right or up** (or tap ✓) to file the draft to `inbox/<date>-<sha8>.md`
+/// (see `CaptureFilingService`); swipe **left** to discard it. Long-press the
+/// card for the context menu (file, add to a note, new note, copy, discard).
+/// The card pins to the finger, tilts, detaches mid-flick, and the next empty
+/// card rises from behind. Chrome is all system Liquid Glass — navigation bar,
+/// ✓, context menu, sheets — plus one custom glass toast (`GlassToastView`).
 struct CaptureScreen: View {
     let vaultURL: URL?
     /// Opens a just-filed capture in the editor. Capture stays free of the vault
@@ -19,13 +22,16 @@ struct CaptureScreen: View {
     /// The draft survives app kills — a thought typed on the train should not
     /// vanish because iOS reclaimed the process.
     @AppStorage("noto2.capture.draft") private var draft: String = ""
+    @AppStorage("noto2.capture.startedAt") private var draftStartedAt: Double = 0
     /// Bumping the document id forces the editor to reload `draft` even while
     /// the text view is first responder (the editor's update guard otherwise
     /// refuses to replace text under an active keyboard).
     @State private var editorDocumentID = UUID().uuidString
     @State private var isSending = false
-    @State private var status: CaptureStatus?
+    @State private var toast: CaptureToast?
+    @State private var sheet: CaptureSheet?
     @State private var errorMessage: String?
+    @State private var errorTitle = "Couldn't file the capture"
 
     // Card gesture state.
     @State private var cardDrag: CGFloat = 0          // vertical finger travel (≤ 0 upward)
@@ -39,6 +45,11 @@ struct CaptureScreen: View {
         case up, right, left
     }
 
+    private enum CaptureSheet: String, Identifiable {
+        case addTo, newNote
+        var id: String { rawValue }
+    }
+
     /// Drag distance at which release commits.
     private static let commitThreshold: CGFloat = 90
     /// Predicted (flick) distance that commits even on a short fast swipe.
@@ -47,10 +58,10 @@ struct CaptureScreen: View {
     private static let commitVelocity: CGFloat = 700
     /// Drag distance past which a still-moving flick detaches mid-gesture.
     private static let autoCommitDistance: CGFloat = 150
-    private static let cardCornerRadius: CGFloat = 24
+    private static let cardCornerRadius: CGFloat = 28
 
     private var normalizedDraft: String { CaptureFilingService.normalizedBody(draft) }
-    private var canSend: Bool { vaultURL != nil && !isSending && !normalizedDraft.isEmpty }
+    private var canSend: Bool { CaptureActions.canFile(draft: draft, hasVault: vaultURL != nil, isBusy: isSending) }
 
     /// 0→1 toward the file commit (up or right).
     private var sendProgress: CGFloat {
@@ -72,32 +83,48 @@ struct CaptureScreen: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 0) {
-                statusSlot
-                Spacer(minLength: 8)
-                ZStack {
-                    backCard
-                    card(in: geometry)
+        NavigationStack {
+            content
+                .navigationTitle("Capture")
+                .toolbarTitleDisplayMode(.inlineLarge)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            perform(.fileToInbox)
+                        } label: {
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(NotoTheme.accent)
+                        .disabled(!canSend)
+                        .accessibilityLabel("File to Inbox")
+                        .accessibilityIdentifier("captureFileButton")
+                    }
                 }
-                .frame(height: Self.cardHeight(available: geometry.size.height, keyboardVisible: keyboardVisible))
-                Spacer(minLength: 0)
+        }
+        .sheet(item: $sheet) { kind in
+            if let vaultURL {
+                switch kind {
+                case .addTo:
+                    AddToNoteSheet(vaultURL: vaultURL, draft: draft) { candidate in
+                        let text = draft
+                        let target = candidate.url
+                        fileDirect(toast: { .added(noteTitle: candidate.title, receipt: $0) }) {
+                            try CaptureDirectFiling(vaultURL: vaultURL).add(text, toNoteAt: target)
+                        }
+                    }
+                case .newNote:
+                    NewNoteSheet(vaultURL: vaultURL, draft: draft, onCreateWithBody: { folder, text in
+                        let folderURL = folder.url
+                        fileDirect(body: text, toast: { .created(folderName: folder.name, receipt: $0) }) {
+                            try CaptureDirectFiling(vaultURL: vaultURL).createNote(text, inFolderAt: folderURL)
+                        }
+                    })
+                }
             }
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // The swipe works from the gaps too — matters when a long note
-            // makes the editor consume in-card pans for scrolling.
-            .contentShape(Rectangle())
-            .simultaneousGesture(dragGesture)
         }
-        .background(NotoTheme.background.ignoresSafeArea())
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            withAnimation(.easeOut(duration: 0.25)) { keyboardVisible = true }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            withAnimation(.easeOut(duration: 0.25)) { keyboardVisible = false }
-        }
-        .alert("Couldn't file the capture", isPresented: Binding(
+        .alert(errorTitle, isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
         )) {
@@ -107,60 +134,67 @@ struct CaptureScreen: View {
         }
     }
 
-    // MARK: - Fixed slots (no layout shift)
-
-    /// Always-reserved line above the card. A filed capture's line is a button
-    /// that opens the note it just wrote; a discard is inert text.
-    private var statusSlot: some View {
-        Group {
-            if let status, let fileURL = status.fileURL {
-                Button {
-                    onOpenFiledNote?(fileURL)
-                } label: {
-                    statusContent(status, showsChevron: true)
+    private var content: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                ZStack {
+                    backCard
+                    card(in: geometry)
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("captureStatusOpenButton")
-                .accessibilityHint("Opens the note you just filed")
-            } else {
-                statusContent(status, showsChevron: false)
+                .frame(height: Self.cardHeight(available: geometry.size.height, keyboardVisible: keyboardVisible))
+                Spacer(minLength: 0)
             }
+            .padding(.top, 8)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // The swipe works from the gaps too — matters when a long note
+            // makes the editor consume in-card pans for scrolling.
+            .contentShape(Rectangle())
+            .simultaneousGesture(dragGesture)
         }
-        .font(.footnote)
-        .foregroundStyle(status?.isDiscard == true ? AppTheme.mutedText : AppTheme.secondaryText)
-        .frame(maxWidth: .infinity, alignment: .center)
-        .frame(height: 22)
-        .padding(.top, 12)
-        .animation(.easeInOut(duration: 0.2), value: status)
-        .accessibilityIdentifier("captureStatusLine")
+        .overlay(alignment: .bottom) { toastSlot }
+        .background(NotoTheme.background.ignoresSafeArea())
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            withAnimation(.easeOut(duration: 0.25)) { keyboardVisible = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            withAnimation(.easeOut(duration: 0.25)) { keyboardVisible = false }
+        }
     }
 
-    private func statusContent(_ status: CaptureStatus?, showsChevron: Bool) -> some View {
-        HStack(spacing: 6) {
-            if let status {
-                Image(systemName: status.glyph)
-                Text(status.text)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                if showsChevron {
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                }
-            }
+    // MARK: - Toast
+
+    /// Floats above the bottom navigation or keyboard without moving the card.
+    @ViewBuilder
+    private var toastSlot: some View {
+        if let toast {
+            GlassToastView(
+                message: toast.message,
+                systemImage: toast.systemImage,
+                iconColor: toast.isSuccessfulFiling ? NotoTheme.inboxNewNote : NotoTheme.ink,
+                onUndo: toast.canUndo ? { undo(toast) } : nil,
+                onOpen: toast.openURL.map { url in
+                    {
+                        onOpenFiledNote?(url)
+                        self.toast = nil
+                    }
+                },
+                identifier: "captureToast"
+            )
+            .disabled(isSending)
+            .padding(.bottom, 16)
+            .padding(.horizontal, 16)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .zIndex(10)
         }
-        .contentShape(Rectangle())
     }
 
     // MARK: - Card
 
-    /// Roomy but never full-height at rest; with the keyboard up the card grows
-    /// into (almost all of) the remaining space, keeping just the status slot
-    /// and a small swipe margin.
+    /// The canvas uses a 314-point writing card and a 500-point resting card.
+    /// Bound those heights on compact screens while keeping the stack at the top.
     private static func cardHeight(available: CGFloat, keyboardVisible: Bool) -> CGFloat {
-        if keyboardVisible {
-            return max(220, available - 58)
-        }
-        return min(560, max(280, available * 0.82))
+        min(keyboardVisible ? 314 : 500, max(220, available - 24))
     }
 
     private func card(in geometry: GeometryProxy) -> some View {
@@ -168,23 +202,31 @@ struct CaptureScreen: View {
         return ZStack {
             shape.fill(NotoTheme.card)
 
-            TextKit2EditorView(
+            VStack(spacing: 0) {
+                cardMetadata
+
+                TextKit2EditorView(
                 text: $draft,
                 documentID: editorDocumentID,
                 autoFocus: true,
                 // The iOS editor publishes edits through this callback (the
                 // binding is only flushed on resign), so mirror them here or
                 // the swipe never has anything to send.
-                onTextChange: { newText in draft = newText },
+                onTextChange: { newText in
+                    if normalizedDraft.isEmpty, !CaptureFilingService.normalizedBody(newText).isEmpty {
+                        draftStartedAt = Date().timeIntervalSince1970
+                    }
+                    draft = newText
+                },
                 vaultRootURL: vaultURL,
-                keyboardToolbarStyle: .floating,
+                keyboardToolbarStyle: .hidden,
                 backgroundColorOverride: NotoTheme.uiCard,
                 // With bounce off, a swipe over a short draft passes through the
                 // text view to the container's drag gesture.
                 disablesScrollBounce: true,
                 // Document insets instead of outer padding, so overflowing text
                 // scrolls through the edge zones and the mask below fades it.
-                topTextInsetOverride: 28,
+                topTextInsetOverride: 14,
                 bottomTextInsetOverride: 22,
                 // Placeholder lives inside the editor (a UILabel toggled in
                 // textViewDidChange) so it vanishes on the first keystroke —
@@ -199,13 +241,22 @@ struct CaptureScreen: View {
             .mask(
                 VStack(spacing: 0) {
                     LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 26)
+                        .frame(height: 12)
                     Rectangle().fill(Color.black)
                     LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
                         .frame(height: 20)
                 }
             )
             .clipShape(shape)
+
+                if !keyboardVisible {
+                    Label("Swipe up to file · left to discard", systemImage: "arrow.up")
+                        .font(.caption)
+                        .foregroundStyle(NotoTheme.faint)
+                        .padding(.bottom, 18)
+                        .accessibilityIdentifier("captureSwipeHint")
+                }
+            }
 
             // File overlay (orange) — fades in dragging up/right, floods on commit.
             commitOverlay(shape: shape, fill: NotoTheme.accent.opacity(0.92),
@@ -217,12 +268,96 @@ struct CaptureScreen: View {
                 .accessibilityIdentifier("captureDiscardOverlay")
         }
         .clipShape(shape)
-        .overlay(shape.strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
+        .shadow(color: .black.opacity(0.4), radius: 15, x: 0, y: 10)
         .offset(cardOffset(in: geometry))
         .rotationEffect(.degrees(cardRotation), anchor: .bottom)
         .scaleEffect(cardArriving ? 0.94 : 1)
         .opacity(cardArriving ? 0 : 1)
+        .contextMenu {
+            cardMenu
+        } preview: {
+            cardMenuPreview(width: geometry.size.width - 32)
+        }
+        // The native menu inherits this surface's tint. The editor keeps its
+        // explicit orange caret, while ordinary menu symbols remain neutral.
+        .tint(NotoTheme.ink)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("captureCard")
+    }
+
+    private var cardMetadata: some View {
+        let words = WordCounter().count(in: draft).words
+        return HStack(spacing: 8) {
+            if normalizedDraft.isEmpty {
+                Text("New capture")
+            } else {
+                HStack(spacing: 4) {
+                    Text(Date(timeIntervalSince1970: draftStartedAt == 0 ? Date().timeIntervalSince1970 : draftStartedAt), style: .time)
+                    Text("· \(words) \(words == 1 ? "word" : "words")")
+                }
+            }
+            Spacer(minLength: 8)
+            Label("Goes to Inbox", systemImage: "tray")
+        }
+        .font(.footnote)
+        .foregroundStyle(NotoTheme.muted)
+        .lineLimit(1)
+        .frame(minHeight: 18)
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("captureMetadata")
+    }
+
+    /// An explicit native context preview keeps the metadata together with
+    /// the existing TextKit rendering instead of previewing its UIKit child.
+    private func cardMenuPreview(width: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            cardMetadata
+                .accessibilityIdentifier("captureMenuPreviewMetadata")
+            TextKit2EditorView(
+                text: .constant(draft),
+                documentID: "capture-preview-" + editorDocumentID,
+                autoFocus: false,
+                vaultRootURL: vaultURL,
+                keyboardToolbarStyle: .hidden,
+                backgroundColorOverride: NotoTheme.uiCard,
+                disablesScrollBounce: true,
+                topTextInsetOverride: 10,
+                bottomTextInsetOverride: 18
+            )
+            .padding(.horizontal, 6)
+            .allowsHitTesting(false)
+        }
+        .frame(width: max(280, min(540, width)), height: 300)
+        .background(NotoTheme.card)
+        .clipShape(RoundedRectangle(cornerRadius: Self.cardCornerRadius, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("captureMenuPreview")
+    }
+
+    /// The card's long-press menu: the system context menu, so iOS 26 draws
+    /// the glass and the preview.
+    @ViewBuilder
+    private var cardMenu: some View {
+        ForEach(CaptureMenuAction.allCases.filter { !$0.isDestructive }, id: \.self) { action in
+            menuButton(action)
+        }
+        Divider()
+        ForEach(CaptureMenuAction.allCases.filter(\.isDestructive), id: \.self) { action in
+            menuButton(action)
+        }
+    }
+
+    private func menuButton(_ action: CaptureMenuAction) -> some View {
+        Button(role: action.isDestructive ? .destructive : nil) {
+            perform(action)
+        } label: {
+            Label(action.title, systemImage: action.systemImage)
+        }
+        .tint(action.isDestructive ? NotoTheme.destructive : NotoTheme.ink)
+        .disabled(!action.isEnabled(draft: draft, hasVault: vaultURL != nil) || isSending)
+        .accessibilityIdentifier(action.accessibilityIdentifier)
     }
 
     private func commitOverlay(shape: RoundedRectangle, fill: Color, glyph: String, label: String, progress: CGFloat) -> some View {
@@ -268,23 +403,17 @@ struct CaptureScreen: View {
         }
     }
 
-    /// The next card in the stack: same shell, empty, slightly shrunk, peeking
-    /// below the front card; rises to identity as the front card travels away.
+    /// The next card peeks ten points above the front at rest, inset sixteen
+    /// points on each side. It expands into place as the front card leaves.
     private var backCard: some View {
         let shape = RoundedRectangle(cornerRadius: Self.cardCornerRadius, style: .continuous)
         let p: CGFloat = swapProgress
-        let scale: CGFloat = 0.94 + 0.06 * p
-        let drop: CGFloat = 30 * (1 - p)
-        // Hidden at rest; fades in with the swipe (eased so it stays invisible
-        // on tiny accidental drags) and is fully there by the commit point.
-        let fade = Double(min(1, p * 1.4))
-        let visibility: Double = cardArriving ? 0 : fade * fade
         return shape
-            .fill(NotoTheme.card)
-            .overlay(shape.strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
-            .scaleEffect(scale)
-            .offset(y: drop)
-            .opacity(visibility)
+            .fill(NotoTheme.peek)
+            .overlay(shape.fill(NotoTheme.card).opacity(Double(p)))
+            .padding(.horizontal, 16 * (1 - p))
+            .offset(y: -10 * (1 - p))
+            .opacity(cardArriving ? 0 : 1)
             .allowsHitTesting(false)
             .accessibilityIdentifier("captureBackCard")
     }
@@ -389,11 +518,7 @@ struct CaptureScreen: View {
                 clearEditor()
                 resetCard()
                 isSending = false
-                show(CaptureStatus.filed(
-                    relativePath: filed.relativePath,
-                    fileURL: filed.fileURL,
-                    didCreate: filed.didCreate
-                ))
+                show(.filed(filed, draft: body))
             case .failure(let error):
                 logger.error("capture failed: \(error.localizedDescription, privacy: .public)")
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -403,6 +528,7 @@ struct CaptureScreen: View {
                     cardDrag = 0
                     cardDragX = 0
                 }
+                errorTitle = "Couldn't file the capture"
                 errorMessage = (error as? CaptureFilingService.FilingError).map { "\($0)" } ?? error.localizedDescription
                 isSending = false
             }
@@ -413,6 +539,7 @@ struct CaptureScreen: View {
     private func discardDraft() {
         guard !normalizedDraft.isEmpty, !isSending else { return }
         isSending = true
+        let discarded = draft
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
         withAnimation(.easeOut(duration: flyDuration)) {
             flyDirection = .left
@@ -422,15 +549,128 @@ struct CaptureScreen: View {
             clearEditor()
             resetCard()
             isSending = false
-            show(CaptureStatus.discarded())
+            show(.discarded(draft: discarded))
         }
     }
 
-    private func show(_ line: CaptureStatus) {
-        status = line
+    // MARK: - Actions
+
+    private func perform(_ action: CaptureMenuAction) {
+        guard action.isEnabled(draft: draft, hasVault: vaultURL != nil), !isSending else { return }
+        let screen = UIScreen.main.bounds
+        switch action {
+        case .fileToInbox:
+            commit(.up, remaining: screen.height + 320, speed: 1400)
+        case .discard:
+            commit(.left, remaining: screen.width + 320, speed: 1400)
+        case .addToNote:
+            sheet = .addTo
+        case .newNote:
+            sheet = .newNote
+        case .copyText:
+            UIPasteboard.general.string = normalizedDraft
+            show(.copied())
+        }
+    }
+
+    /// Add to note / New note: write, then clear the card. A failure after the
+    /// capture reached the Inbox still clears the card — the thought is safe in
+    /// the Inbox — and says so; a failure before that keeps the draft.
+    private func fileDirect(body editedBody: String? = nil, toast makeToast: @escaping (CaptureDirectFiling.Receipt) -> CaptureToast, _ write: @escaping @Sendable () throws -> CaptureDirectFiling.Receipt) {
+        let body = editedBody ?? draft
+        guard let vaultURL, CaptureActions.canFile(draft: body, hasVault: true, isBusy: isSending) else { return }
+        isSending = true
+        let planned = CaptureFilingService(vaultURL: vaultURL).plannedURL(for: body)
         Task {
-            try? await Task.sleep(for: line.dwell)
-            if status == line { status = nil }
+            let outcome: Result<CaptureDirectFiling.Receipt, Error> = await Task.detached(priority: .userInitiated) {
+                Result { try write() }
+            }.value
+            for url in [planned, try? outcome.get().noteURL].compactMap({ $0 }) {
+                await SearchIndexController.shared.scheduleRefreshFile(vaultURL: vaultURL, fileURL: url)
+            }
+            switch outcome {
+            case .success(let receipt):
+                logger.info("capture filed directly to \(receipt.noteURL.lastPathComponent, privacy: .public)")
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                clearEditor()
+                resetCard()
+                show(makeToast(receipt))
+            case .failure(let error):
+                logger.error("direct filing failed: \(String(describing: error), privacy: .public)")
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                if case CaptureDirectFiling.Failure.leftInInbox = error {
+                    clearEditor()
+                    resetCard()
+                } else if let editedBody {
+                    draft = editedBody
+                    editorDocumentID = UUID().uuidString
+                }
+                errorTitle = "Couldn't file the capture"
+                errorMessage = String(describing: error)
+            }
+            isSending = false
+        }
+    }
+
+    /// Undo from the toast: a filed capture is taken back out of the Inbox; a
+    /// discard just comes back. Either way the text returns to the card.
+    private func undo(_ toast: CaptureToast) {
+        guard toast.canUndo, !isSending else { return }
+        if let receipt = toast.directFilingReceipt {
+            undoDirectFiling(receipt, toast: toast)
+            return
+        }
+        if case .filed(let filed, _) = toast.kind, let vaultURL {
+            if CaptureFilingService(vaultURL: vaultURL).undo(filed) {
+                Task { await SearchIndexController.shared.scheduleRefreshFile(vaultURL: vaultURL, fileURL: filed.fileURL) }
+            }
+        }
+        restoreDraft(from: toast)
+    }
+
+    private func undoDirectFiling(_ receipt: CaptureDirectFiling.Receipt, toast: CaptureToast) {
+        guard let vaultURL else { return }
+        isSending = true
+        Task {
+            let outcome: Result<Void, Error> = await Task.detached(priority: .userInitiated) {
+                Result { try CaptureDirectFiling(vaultURL: vaultURL).undo(receipt) }
+            }.value
+            for url in [receipt.noteURL, receipt.stagedCapture.fileURL] {
+                await SearchIndexController.shared.scheduleRefreshFile(vaultURL: vaultURL, fileURL: url)
+            }
+            switch outcome {
+            case .success:
+                restoreDraft(from: toast)
+            case .failure(let error):
+                // A conflicting destination must remain untouched, but the
+                // capture still returns to the durable draft rather than
+                // disappearing when this receipt's toast expires.
+                restoreDraft(from: toast)
+                errorTitle = "Couldn't undo the capture"
+                let reason = (error as? DigestFiling.FilingError)?.message ?? String(describing: error)
+                errorMessage = reason + "\n\nThe capture was restored so you can keep editing it."
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+            isSending = false
+        }
+    }
+
+    private func restoreDraft(from toast: CaptureToast) {
+        guard let restored = toast.restoringDraft(alongside: draft) else { return }
+        withAnimation(.easeOut(duration: 0.2)) { self.toast = nil }
+        draft = restored
+        editorDocumentID = UUID().uuidString
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func show(_ next: CaptureToast) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { toast = next }
+        AccessibilityNotification.Announcement(next.message).post()
+        Task {
+            try? await Task.sleep(for: next.dwell)
+            if toast?.id == next.id {
+                withAnimation(.easeOut(duration: 0.25)) { toast = nil }
+            }
         }
     }
 

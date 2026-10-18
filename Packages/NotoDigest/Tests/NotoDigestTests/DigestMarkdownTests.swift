@@ -15,8 +15,39 @@ import Testing
 /// | `newNoteWithEmptyBodyIsJustAHeading` | SC4 — no trailing blank paragraph |
 /// | `filenameSanitizesAndAppendsExtension` | SC4 — reserved characters survive as look-alikes |
 /// | `filenameIsNilWhenTitleIsBlankOrUnusable` | SC4 — a title that sanitizes to nothing is rejected |
+/// | `titleFromFirstLineIgnoresFormatting` | Capture C8 — the first line names the note, with or without Markdown |
+/// | `titleFromFirstLineSkipsLeadingBlankLines` | Capture C8 — blank lines above the text don't name it |
+/// | `titleFromFirstLineIsNilForBlankBody` | Capture C8 — nothing to name a blank capture with |
+/// | `titleFromFirstLineIsCappedForFilenames` | Capture C8 — a long first sentence still makes a usable filename |
+/// | `asWrittenDocumentKeepsMarkdownUnchanged` | Capture C8 — no injected heading; body byte-identical after frontmatter |
+/// | `snippetDropsOnlyTheLeadingTitle` | Add-to preview omits the title already shown above it |
+/// | `snippetKeepsBodyText` | Title words and later repeated title lines remain useful body text |
+/// | `snippetCanBeEmpty` | Title-only search hits leave room for a content-hit fallback |
 @Suite("DigestMarkdown — filing text transforms")
 struct DigestMarkdownTests {
+    @Test("search preview removes an exact leading title line", arguments: [
+        ("Ideas\nCapture the body keyword\nKeep the next line", "Capture the body keyword Keep the next line"),
+        ("  ideas  \r\n  Body text  ", "Body text"),
+        ("\n \t\nIdeas\n\nBody text\n", "Body text"),
+    ])
+    func snippetDropsOnlyTheLeadingTitle(snippet: String, expected: String) {
+        #expect(DigestMarkdown.contentSnippet(snippet, title: "Ideas") == expected)
+    }
+
+    @Test("search preview keeps real body text even when it contains the title", arguments: [
+        ("Ideas for the next release\nKeep this sentence", "Ideas for the next release Keep this sentence"),
+        ("Collect Ideas here\nIdeas", "Collect Ideas here Ideas"),
+        ("Ideas\nIdeas\nA repeated line belongs to the body", "Ideas A repeated line belongs to the body"),
+    ])
+    func snippetKeepsBodyText(snippet: String, expected: String) {
+        #expect(DigestMarkdown.contentSnippet(snippet, title: "Ideas") == expected)
+    }
+
+    @Test("empty and title-only hits produce no duplicated preview", arguments: ["", " \n\t", "Ideas", "\n ideas \n"])
+    func snippetCanBeEmpty(snippet: String) {
+        #expect(DigestMarkdown.contentSnippet(snippet, title: "Ideas").isEmpty)
+    }
+
     private let note = """
     ---
     id: a1b2c3d4-e5f6-7890-abcd-000000000001
@@ -108,5 +139,62 @@ struct DigestMarkdownTests {
     func filenameIsNilWhenTitleIsBlankOrUnusable() {
         #expect(DigestMarkdown.filename(forTitle: "") == nil)
         #expect(DigestMarkdown.filename(forTitle: "   \n ") == nil)
+    }
+
+    // MARK: - New note as written (Capture C8)
+
+    /// "Treat the first line as the title regardless of formatting": a heading,
+    /// a list item, a todo, a quote or a link all name the note by their text.
+    @Test("the first line names the note whatever its Markdown", arguments: [
+        ("Calm UI worth copying", "Calm UI worth copying"),
+        ("# Calm UI worth copying", "Calm UI worth copying"),
+        ("### Calm UI", "Calm UI"),
+        ("- Calm UI", "Calm UI"),
+        ("* Calm UI", "Calm UI"),
+        ("1. Calm UI", "Calm UI"),
+        ("- [ ] Call the dentist", "Call the dentist"),
+        ("- [x] Call the dentist", "Call the dentist"),
+        ("> Quote worth keeping", "Quote worth keeping"),
+        ("**Bold** idea", "Bold idea"),
+        ("[Designing calm software](https://uxdesign.cc/calm)", "Designing calm software"),
+        ("  Indented line  ", "Indented line"),
+    ])
+    func titleFromFirstLineIgnoresFormatting(line: String, expected: String) {
+        let body = line + "\nSecond line stays in the body"
+        #expect(DigestMarkdown.noteTitle(fromFirstLineOf: body) == expected)
+    }
+
+    @Test("blank lines above the text don't name the note")
+    func titleFromFirstLineSkipsLeadingBlankLines() {
+        #expect(DigestMarkdown.noteTitle(fromFirstLineOf: "\n\n  \nReal first line\nmore") == "Real first line")
+    }
+
+    @Test("a blank capture has no title", arguments: ["", "   ", "\n\n", "#  ", "- "])
+    func titleFromFirstLineIsNilForBlankBody(body: String) {
+        #expect(DigestMarkdown.noteTitle(fromFirstLineOf: body) == nil)
+    }
+
+    /// A one-paragraph capture is often a single long sentence; the filename
+    /// keeps the first 80 characters, cut at a word boundary.
+    @Test("a long first line is capped to a usable filename length")
+    func titleFromFirstLineIsCappedForFilenames() {
+        let long = String(repeating: "word ", count: 40)
+        let title = DigestMarkdown.noteTitle(fromFirstLineOf: long)!
+        #expect(title.count <= 80)
+        #expect(!title.hasSuffix(" "))
+        #expect(title.hasPrefix("word word"))
+    }
+
+    /// Direction C: "the Markdown stays as written" — the body that follows the
+    /// frontmatter is exactly the capture, with no `# Title` added.
+    @Test("an as-written note is frontmatter plus the unchanged Markdown")
+    func asWrittenDocumentKeepsMarkdownUnchanged() {
+        let body = "- [ ] Call the dentist\n\nAsk about **Monday**."
+        let id = UUID(uuidString: "a1b2c3d4-e5f6-7890-abcd-000000000099")!
+        let doc = DigestMarkdown.newNoteDocument(body: body, id: id, date: Date(timeIntervalSince1970: 0))
+        #expect(doc.hasPrefix("---\n"))
+        #expect(doc.contains("id: A1B2C3D4-E5F6-7890-ABCD-000000000099"))
+        #expect(doc.hasSuffix("---\n" + body + "\n"))
+        #expect(!doc.contains("# Call"))
     }
 }

@@ -1,134 +1,113 @@
 import SwiftUI
 
-/// The only settings Noto 2 has: the OpenRouter key (for summaries), an
-/// optional base-URL override, and the vault location. A sheet, not a screen.
+/// Compatibility entry point for presentations outside Library.
 struct OpenRouterSettingsSheet: View {
     var locationManager: VaultLocationManager
     @Environment(\.dismiss) private var dismiss
-
-    @State private var apiKey: String = OpenRouterKeyStore.load() ?? ""
-    @State private var baseURL: String = OpenRouterBaseURLStore.load() ?? ""
-    @State private var confirmVaultReset = false
-    @State private var savedFlash = false
-
-    private var hasBundledKey: Bool { OpenRouterKeyStore.bundledKey()?.isEmpty == false }
-
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    SecureField("sk-or-…", text: $apiKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .accessibilityIdentifier("openRouterKeyField")
-                    HStack {
-                        Button("Save key") { saveKey() }
-                            .disabled(apiKey.trimmingCharacters(in: .whitespaces).isEmpty)
-                            .accessibilityIdentifier("openRouterSaveKeyButton")
-                        Spacer()
-                        if OpenRouterKeyStore.hasKey {
-                            Button("Remove", role: .destructive) {
-                                OpenRouterKeyStore.delete()
-                                apiKey = ""
-                            }
-                            .accessibilityIdentifier("openRouterRemoveKeyButton")
-                        }
-                    }
-                } header: {
-                    Text("OpenRouter API key")
-                } footer: {
-                    if OpenRouterKeyStore.hasKey {
-                        Text("Saved in the Keychain. Used only for search summaries.")
-                    } else if hasBundledKey {
-                        Text("Using the key bundled with this build. Paste your own to override it.")
-                    } else {
-                        Text("Summaries need an OpenRouter key. Get one at openrouter.ai/keys.")
+            LibrarySettingsScreen(locationManager: locationManager)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }.accessibilityIdentifier("settingsDoneButton")
                     }
                 }
-
-                Section {
-                    TextField(OpenRouterBaseURLStore.defaultBaseURL.absoluteString, text: $baseURL)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .accessibilityIdentifier("openRouterBaseURLField")
-                    Button("Save base URL") {
-                        let trimmed = baseURL.trimmingCharacters(in: .whitespaces)
-                        if trimmed.isEmpty { OpenRouterBaseURLStore.clear() } else { OpenRouterBaseURLStore.save(trimmed) }
-                        flashSaved()
-                    }
-                    .accessibilityIdentifier("openRouterSaveBaseURLButton")
-                } header: {
-                    Text("Base URL override")
-                } footer: {
-                    Text("Leave empty for openrouter.ai. Model: \(SummaryPromptBuilder.model).")
-                }
-
-                Section {
-                    if let vaultURL = locationManager.vaultURL {
-                        Text(vaultURL.lastPathComponent)
-                            .foregroundStyle(AppTheme.primaryText)
-                        Text(vaultURL.path)
-                            .font(.caption.monospaced())
-                            .foregroundStyle(AppTheme.mutedText)
-                            .lineLimit(2)
-                            .truncationMode(.middle)
-                    }
-                    Button("Choose a different vault…", role: .destructive) {
-                        confirmVaultReset = true
-                    }
-                    .accessibilityIdentifier("settingsChangeVaultButton")
-                } header: {
-                    Text("Vault")
-                } footer: {
-                    Text("Noto 2 keeps its own index of this folder; changing the vault rebuilds it.")
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(NotoTheme.background)
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .accessibilityIdentifier("settingsDoneButton")
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if savedFlash {
-                    Text("Saved")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 16).padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(.bottom, 24)
-                        .transition(.opacity)
-                }
-            }
-            .confirmationDialog("Choose a different vault?", isPresented: $confirmVaultReset, titleVisibility: .visible) {
-                Button("Choose new vault", role: .destructive) {
-                    dismiss()
-                    locationManager.resetVault()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Your notes stay where they are; only Noto 2's bookmark and index are reset.")
-            }
         }
         .presentationDetents([.large])
     }
+}
 
-    private func saveKey() {
-        let trimmed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        OpenRouterKeyStore.save(trimmed)
-        flashSaved()
+/// Library pushes Settings, keeping the native back path and glass toolbar.
+struct LibrarySettingsScreen: View {
+    var locationManager: VaultLocationManager
+    @ObservedObject private var indexStatus = SearchIndexStatusModel.shared
+    @State private var confirmVaultReset = false
+    @State private var confirmRebuild = false
+    @State private var rebuilding = false
+    @State private var errorMessage: String?
+
+    private var isCloudVault: Bool { locationManager.vaultURL?.path.contains("Mobile Documents") == true }
+    private var version: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        return "\(info["CFBundleShortVersionString"] as? String ?? "—") (\(info["CFBundleVersion"] as? String ?? "—"))"
+    }
+    private var indexSummary: String {
+        guard let count = indexStatus.keywordNotes else { return "Indexing…" }
+        return "\(count.formatted()) notes · \(indexStatus.isKeywordPartial ? "indexing" : "up to date")"
     }
 
-    private func flashSaved() {
-        withAnimation { savedFlash = true }
+    var body: some View {
+        List {
+            Section {
+                HStack(spacing: 12) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(NotoTheme.ink)
+                        .frame(width: 34, height: 34)
+                        .background(NotoTheme.secondaryFill, in: RoundedRectangle(cornerRadius: 10))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(locationManager.vaultURL?.lastPathComponent ?? "No vault").font(.body.weight(.semibold)).foregroundStyle(NotoTheme.ink)
+                        Text(isCloudVault ? "iCloud Drive › \(locationManager.vaultURL?.lastPathComponent ?? "")" : "On this device")
+                            .font(.caption).foregroundStyle(NotoTheme.muted)
+                    }
+                    Spacer()
+                }
+                Button("Choose a different vault") { confirmVaultReset = true }
+                    .foregroundStyle(NotoTheme.accentText).accessibilityIdentifier("settingsChangeVaultButton")
+            } header: { LibrarySectionHeading("Vault") } footer: {
+                Text("Changing the vault rebuilds Noto 2's index. Your notes stay where they are.")
+            }.listRowBackground(NotoTheme.card)
+            Section {
+                HStack {
+                    Text("Index").foregroundStyle(NotoTheme.ink)
+                    Spacer()
+                    Text(indexSummary).font(.caption).foregroundStyle(NotoTheme.muted)
+                }.accessibilityIdentifier("settingsIndexStatus")
+                Button { confirmRebuild = true } label: {
+                    HStack(spacing: 10) {
+                        if rebuilding { ProgressView() } else { Image(systemName: "arrow.clockwise").foregroundStyle(NotoTheme.muted) }
+                        Text(rebuilding ? "Rebuilding index…" : "Rebuild index").foregroundStyle(NotoTheme.ink)
+                    }
+                }.disabled(rebuilding).accessibilityIdentifier("settingsRebuildIndex")
+            } header: { LibrarySectionHeading("Search") }
+            .listRowBackground(NotoTheme.card)
+            Section {
+                HStack {
+                    Text("Version").foregroundStyle(NotoTheme.ink)
+                    Spacer()
+                    Text(version).font(.caption).foregroundStyle(NotoTheme.muted)
+                }
+            } header: { LibrarySectionHeading("About") }
+            .listRowBackground(NotoTheme.card)
+        }
+        .modifier(LibraryListStyle())
+        .navigationTitle("Settings").toolbarTitleDisplayMode(.inlineLarge)
+        .toolbar(.hidden, for: .tabBar)
+        .accessibilityIdentifier("librarySettings")
+        .task {
+            if let root = locationManager.vaultURL { indexStatus.start(vaultURL: root) }
+        }
+        .onDisappear { indexStatus.stop() }
+        .confirmationDialog("Choose a different vault?", isPresented: $confirmVaultReset, titleVisibility: .visible) {
+            Button("Choose new vault", role: .destructive) { locationManager.resetVault() }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("Your notes stay where they are. Noto 2 asks you to choose the next vault.") }
+        .confirmationDialog("Rebuild the search index?", isPresented: $confirmRebuild, titleVisibility: .visible) {
+            Button("Rebuild index") { rebuild() }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("Your notes are unchanged. Search may be incomplete while the index rebuilds.") }
+        .alert("Could not rebuild index", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(errorMessage ?? "") }
+    }
+
+    private func rebuild() {
+        guard let root = locationManager.vaultURL else { return }
+        rebuilding = true
         Task {
-            try? await Task.sleep(for: .seconds(1.2))
-            withAnimation { savedFlash = false }
+            do { _ = try await SearchIndexController.shared.rebuildIndex(vaultURL: root) }
+            catch { errorMessage = error.localizedDescription }
+            rebuilding = false
         }
     }
 }

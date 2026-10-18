@@ -27,9 +27,10 @@ final class InlineVideoPlayer: NSObject, AVPlayerViewControllerDelegate {
     /// replacing whatever was playing.
     func play(_ url: URL, frame: CGRect, in container: UIView, parent: UIViewController) {
         stop()
-        guard VideoPlayback.prepare(url) else { return }
+        guard let source = VideoPlayback.prepare(url) else { return }
 
-        let controller = VideoPlayback.makeController(for: url)
+        // `url` (the vault file) stays the identity the editor matches thumbnails by.
+        let controller = VideoPlayback.makeController(for: source)
         controller.delegate = self
         controller.showsPlaybackControls = true
         controller.allowsPictureInPicturePlayback = true

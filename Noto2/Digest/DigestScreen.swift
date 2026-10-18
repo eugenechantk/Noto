@@ -2,535 +2,536 @@ import NotoDigest
 import NotoLinkPreview
 import SwiftUI
 import UIKit
-import os.log
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto2", category: "DigestScreen")
-
-/// Digest tab: works the `inbox/` backlog down to zero, one capture at a time.
-///
-/// Four directions, four outcomes. The two axes speak different visual languages
-/// on purpose:
-///
-/// - **Horizontal** is a decision the swipe makes by itself, so the *card* answers:
-///   left floods yellow ("Snooze"), right floods blue ("Add to").
-/// - **Vertical** is aimed at something, so a *target* answers: the plus above
-///   fills green as you drag up ("Create"), the trash below fills red as you drag
-///   down ("Discard"). The card stays untinted and simply travels toward the icon.
-///
-/// Discard commits on release with no confirmation dialog — the red target is the
-/// warning, and an alert after the card has already flown off reads as a bug. The
-/// safety net is Undo in the status line for as long as the banner is up.
+/// Inbox has two presentations of one file-backed queue. Native list swipes
+/// intentionally follow Mail; card swipes keep the capture-specific mapping.
 struct DigestScreen: View {
     let vaultController: VaultController
+    var onOpenFiledNote: ((URL) -> Void)?
+    var onCapture: (() -> Void)?
 
     @State private var model: DigestModel
+    @State private var presentation: Presentation = .stack
     @State private var fileMode: DigestFileMode?
-    /// Bumped on every appearance so the load task re-runs when the tab is
-    /// re-selected (a plain `.task` fires once per view lifetime).
-    @State private var appearCount = 0
-    @Environment(\.scenePhase) private var scenePhase
-
-    // Card gesture state.
+    @State private var showingDetail = false
+    @State private var detailText = ""
+    @State private var detailOriginal = ""
+    @State private var detailEntry: DigestEntry?
     @State private var drag: CGSize = .zero
     @State private var flyDirection: DigestSwipe?
-    /// Which way to fly once an open sheet reports a successful file.
-    @State private var pendingFly: DigestSwipe?
-    @State private var cardArriving = false
-    @State private var flyDuration: Double = 0.25
-    /// A video tapped on the card, playing full screen.
+    @State private var hapticDirection: DigestSwipe?
     @State private var playingVideo: PlayingVideo?
+    @State private var appearCount = 0
+    @State private var isCommitting = false
+    @State private var keyboardVisible = false
+    @State private var restingStackHeight: CGFloat = 0
+    @ScaledMetric(relativeTo: .title) private var zeroTitleSize: CGFloat = 30
+    @ScaledMetric(relativeTo: .subheadline) private var zeroDescriptionSize: CGFloat = 15
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(vaultController: VaultController) {
+    private enum Presentation: String, CaseIterable { case stack = "Stack", list = "List" }
+    private var isCueDragActive: Bool { drag != .zero && flyDirection == nil }
+    private var isCardInMotion: Bool { drag != .zero || flyDirection != nil || isCommitting }
+
+    init(vaultController: VaultController, onOpenFiledNote: ((URL) -> Void)? = nil, onCapture: (() -> Void)? = nil) {
         self.vaultController = vaultController
+        self.onOpenFiledNote = onOpenFiledNote
+        self.onCapture = onCapture
         _model = State(wrappedValue: DigestModel(vaultURL: vaultController.vaultURL))
     }
 
-    private static let cardCornerRadius: CGFloat = 24
-    private static let targetSize: CGFloat = 46
-
-    /// Left — a week from now. Amber, matching the app's "waiting" status colour.
-    private static let snoozeTint = NotoTheme.statusAmber
-    /// Right — into a note that already exists. Blue reads as "filed", distinct
-    /// from the orange the app spends on primary actions.
-    private static let addToTint = Color(red: 0.29, green: 0.56, blue: 0.96)
-    /// Up — something new. Green is the universal "add".
-    private static let createTint = Color(red: 0.30, green: 0.76, blue: 0.44)
-    /// Down — gone.
-    private static let discardTint = NotoTheme.destructive
-
     var body: some View {
-        GeometryReader { geometry in
+        NavigationStack {
             VStack(spacing: 0) {
-                statusSlot
-                if model.isClear {
-                    emptyState
-                } else {
-                    Spacer(minLength: 4)
-                    target(
-                        glyph: "plus",
-                        tint: Self.createTint,
-                        strength: strength(.create),
-                        id: "digestCreateTarget",
-                        label: "Create a new note"
-                    )
-                    // Above the card in z-order: the card is dragged *toward* the
-                    // target and must slide underneath it. Without this the card
-                    // covers the icon exactly when its highlight matters most.
-                    .zIndex(1)
-                    Spacer(minLength: 6)
-                    ZStack {
-                        backCard
-                        if let entry = model.current {
-                            card(for: entry, in: geometry)
-                        }
-                    }
-                    .frame(height: Self.cardHeight(available: geometry.size.height))
-                    Spacer(minLength: 6)
-                    target(
-                        glyph: "trash",
-                        tint: Self.discardTint,
-                        strength: strength(.discard),
-                        id: "digestDiscardTarget",
-                        label: "Discard this capture"
-                    )
-                    .zIndex(1)
-                    Spacer(minLength: 12)
+                if presentation == .stack && !showingDetail && !model.isClear {
+                    progressLine.opacity(isCueDragActive ? 0 : 1).accessibilityHidden(isCueDragActive)
+                }
+                if showingDetail || presentation == .stack {
+                    if model.isClear && !showingDetail { emptyState }
+                    else if let entry = model.current { stack(entry) }
+                    else if !model.hasLoaded { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+                } else { inboxList }
+            }
+            .background(NotoTheme.background.ignoresSafeArea())
+            .overlay {
+                // Keep every target above the moving card from the first drag
+                // frame, including native scroll/editor content in the card.
+                if isCueDragActive { cues.zIndex(1) }
+            }
+            .contextMenu {
+                if presentation == .stack && !showingDetail, let entry = model.current {
+                    actionMenu(entry)
                 }
             }
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .simultaneousGesture(dragGesture)
+            .toolbar {
+                if showingDetail && !isCueDragActive {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { Task { if await persistDetail() { closeDetail() } } } label: {
+                            Image(systemName: "chevron.left")
+                        }
+                        .accessibilityLabel("Back to Inbox list")
+                        .accessibilityIdentifier("inboxBackToList")
+                    }
+                }
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        Text("Inbox").fontWeight(.bold).foregroundStyle(NotoTheme.ink)
+                        if model.remaining > 0 { Text("\(model.remaining)").foregroundStyle(NotoTheme.muted) }
+                    }
+                    .font(.system(size: showingDetail ? 26 : 28))
+                    .fixedSize(horizontal: true, vertical: false)
+                    .opacity(isCueDragActive ? 0.3 : 1)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("inboxTitle")
+                }
+                .sharedBackgroundVisibility(.hidden)
+                if !showingDetail && !isCueDragActive {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Picker("View", selection: $presentation) {
+                            Text("Stack").tag(Presentation.stack).accessibilityIdentifier("inboxStackMode")
+                            Text("List").tag(Presentation.list).accessibilityIdentifier("inboxListMode")
+                        }
+                        .pickerStyle(.segmented).frame(width: 132)
+                        .accessibilityIdentifier("inboxViewPicker")
+                    }
+                } else if showingDetail && !isCueDragActive {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        if keyboardVisible {
+                            Button("Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
+                                .accessibilityIdentifier("inboxDismissKeyboard")
+                        } else if let entry = model.current {
+                            Text(Self.capturedStamp(entry.capturedAt)).font(.caption).foregroundStyle(NotoTheme.muted)
+                        }
+                    }
+                }
+            }
+            .toolbar(isCueDragActive ? .hidden : .visible, for: .tabBar)
+            .safeAreaInset(edge: .bottom) { toast }
+            .accessibilityIdentifier(showingDetail ? "inboxCaptureDetail" : "inboxScreen")
         }
-        .background(NotoTheme.background.ignoresSafeArea())
-        // Re-read on every appearance, not just the first: Capture writes to
-        // `inbox/` in another tab, and a one-shot load left the Digest showing
-        // "Inbox clear" over a folder that had captures in it.
         .task(id: appearCount) { await model.refresh() }
+        .task(id: detailText) {
+            guard showingDetail else { return }
+            do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+            _ = await persistDetail()
+        }
+        .onDisappear { Task { _ = await persistDetail() } }
         .onAppear { appearCount &+= 1 }
-        // A share-sheet capture just landed in inbox/ — show it without
-        // waiting for the next scene activation or file-watcher tick.
-        .onReceive(NotificationCenter.default.publisher(for: SharedCaptureDrain.didFileNotification)) { _ in
-            Task { await model.refresh() }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            // Captures can also arrive while the app is backgrounded — from the
-            // Lock Screen quick-capture widget, or iCloud syncing another device.
-            guard phase == .active else { return }
-            Task { await model.refresh() }
-        }
-        .fullScreenCover(item: $playingVideo) { video in
-            VideoPlayerScreen(url: video.url)
-                .ignoresSafeArea()
-        }
-        .sheet(item: $fileMode) { mode in
+        .onReceive(NotificationCenter.default.publisher(for: SharedCaptureDrain.didFileNotification)) { _ in Task { await model.refresh() } }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await model.refresh() } } }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardVisible = true }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardVisible = false }
+        .onChange(of: presentation) { _, _ in model.selectedEntryID = nil }
+        .sheet(item: $fileMode, onDismiss: {
+            if !showingDetail && !isCommitting { model.selectedEntryID = nil }
+            springBack()
+        }) { mode in
             if let entry = model.current {
-                DigestFileSheet(
-                    vaultController: vaultController,
-                    capture: entry,
-                    mode: mode,
-                    onFile: { destination in file(destination) }
-                )
+                switch mode {
+                case .addTo:
+                    AddToNoteSheet(vaultURL: model.vaultURL, draft: entry.body) { candidate in
+                        file(.addTo, entry: entry) { await model.addCurrent(toNoteAt: candidate.url, titled: candidate.title) }
+                    }
+                case .create:
+                    NewNoteSheet(vaultURL: model.vaultURL, draft: entry.body, onCreateWithBody: { folder, body in
+                        file(.create, entry: entry) { await model.createNoteFromCurrent(inFolderAt: folder.url, body: body) }
+                    })
+                }
             }
         }
-        .onChange(of: fileMode) { _, newValue in
-            // Sheet dismissed without filing: bring the card back.
-            if newValue == nil, flyDirection == nil { springBack() }
-        }
-        .alert("Couldn't file this capture", isPresented: Binding(
-            get: { model.errorMessage != nil },
-            set: { if !$0 { model.errorMessage = nil } }
-        )) {
+        .fullScreenCover(item: $playingVideo) { video in VideoPlayerScreen(source: video.source).ignoresSafeArea() }
+        .alert("Couldn't finish this action", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(model.errorMessage ?? "")
+        } message: { Text(model.errorMessage ?? "") }
+    }
+
+    private var progressLine: some View {
+        HStack(spacing: 18) {
+            Text("\(model.counts.total) of \(model.counts.total + model.remaining) done today")
+                .font(.caption).foregroundStyle(NotoTheme.muted)
+            Spacer()
+            ProgressView(value: Double(model.counts.total), total: Double(max(1, model.counts.total + model.remaining)))
+                .tint(NotoTheme.accent).frame(width: 120)
+        }
+        .padding(.horizontal, 20).padding(.top, 3).padding(.bottom, 14)
+        .accessibilityIdentifier("inboxTodayProgress")
+    }
+
+    private func stack(_ entry: DigestEntry) -> some View {
+        GeometryReader { geometry in
+            let canvasHeight = isCardInMotion && restingStackHeight > 0 ? restingStackHeight : geometry.size.height
+            ZStack {
+                if model.next != nil && !showingDetail {
+                    RoundedRectangle(cornerRadius: 28).fill(NotoTheme.peek)
+                        .padding(.horizontal, 30).padding(.bottom, 44)
+                        .offset(y: -10)
+                        .accessibilityIdentifier("digestBackCard")
+                }
+                Group {
+                    if showingDetail {
+                        card(entry)
+                            .contextMenu { actionMenu(entry) }
+                            .padding(.horizontal, 16).padding(.bottom, 44)
+                            .offset(cardOffset(size: geometry.size))
+                            .rotationEffect(.degrees(reduceMotion ? 0 : min(9, max(-9, Double(drag.width) / 22))), anchor: .bottom)
+                    } else {
+                        card(entry)
+                            .padding(.horizontal, 16).padding(.bottom, 44)
+                            .offset(cardOffset(size: geometry.size))
+                            .rotationEffect(.degrees(reduceMotion ? 0 : min(9, max(-9, Double(drag.width) / 22))), anchor: .bottom)
+                    }
+                }
+                .simultaneousGesture(dragGesture)
+                if !keyboardVisible && !isCueDragActive {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+                                .font(.system(size: 12, weight: .medium)).frame(width: 14, height: 14)
+                                .accessibilityHidden(true)
+                            Text(showingDetail ? "Drag to file it, or tap the text to edit" : "Drag the card to file it · hold for a menu")
+                        }
+                        .font(.caption).foregroundStyle(NotoTheme.faint).padding(.bottom, 18)
+                    }
+                    .allowsHitTesting(false)
+                }
+            }
+            // Native tab hiding expands the available region. Preserve the
+            // card's size through the drag and commit while cues use the full
+            // screen area. Do not record the expanded region during fly-out.
+            .frame(height: canvasHeight, alignment: .top)
+            .onChange(of: geometry.size.height, initial: true) { _, height in
+                if !isCardInMotion { restingStackHeight = height }
+            }
         }
     }
 
-    // MARK: - Fixed slots (no layout shift)
-
-    /// One reserved line, exactly like Capture's: the last outcome while it is
-    /// fresh, otherwise how much is left. A discard's banner carries Undo.
-    private var statusSlot: some View {
-        Group {
-            if let outcome = model.outcome {
-                HStack(spacing: 6) {
-                    Image(systemName: outcome.glyph)
-                    Text(outcome.text)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    if outcome.isUndoable {
-                        Button("Undo") {
-                            Task { await model.undoDiscard() }
-                        }
-                        .buttonStyle(.plain)
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(NotoTheme.accent)
-                        .accessibilityIdentifier("digestUndoButton")
-                    }
-                }
-                .foregroundStyle(AppTheme.secondaryText)
-                .accessibilityIdentifier("digestOutcomeLine")
-                .task(id: outcome) {
-                    // Long enough to notice and reach for Undo, short enough that
-                    // the count comes back on its own.
-                    try? await Task.sleep(for: .seconds(outcome.isUndoable ? 6 : 2.5))
-                    model.clearOutcome(outcome)
-                }
-            } else if model.remaining > 0 {
-                Text("\(model.remaining) to process")
-                    .foregroundStyle(AppTheme.mutedText)
-                    .accessibilityIdentifier("digestRemainingCount")
+    private func card(_ entry: DigestEntry) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !showingDetail {
+                Text(Self.capturedStamp(entry.capturedAt)).font(.caption).foregroundStyle(NotoTheme.muted)
+                    .padding(.horizontal, 20).padding(.top, 22).accessibilityIdentifier("digestCardDate")
+            }
+            if !entry.isAvailable {
+                VStack(spacing: 8) { ProgressView(); Text("Downloading from iCloud…").font(.footnote).foregroundStyle(.secondary) }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity).accessibilityIdentifier("digestCardDownloading")
+            } else if showingDetail {
+                TextKit2EditorView(text: $detailText, documentID: entry.id.uuidString,
+                                   autoFocus: false, onTextChange: { detailText = $0 },
+                                   vaultRootURL: model.vaultURL, keyboardToolbarStyle: .floating,
+                                   backgroundColorOverride: NotoTheme.uiCard, disablesScrollBounce: true,
+                                   topTextInsetOverride: 22, bottomTextInsetOverride: 20)
+                    .padding(.horizontal, 6).accessibilityIdentifier("inboxCaptureEditor")
+            } else {
+                readOnlyContent(entry).padding(.horizontal, 20).padding(.bottom, 20)
             }
         }
-        .font(.footnote)
-        .frame(maxWidth: .infinity, alignment: .center)
-        .frame(height: 22)
-        .padding(.top, 12)
-        .animation(.easeInOut(duration: 0.2), value: model.outcome)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(NotoTheme.card, in: RoundedRectangle(cornerRadius: 28))
+        .clipShape(RoundedRectangle(cornerRadius: 28))
+        .overlay {
+            if let direction = activeDirection {
+                RoundedRectangle(cornerRadius: 28).stroke(Self.tint(direction).opacity(0.7), lineWidth: 1.5).allowsHitTesting(false)
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 28))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("digestCard")
+        .accessibilityAction(named: "Add to note") { choose(.addTo, entry: entry) }
+        .accessibilityAction(named: "New note") { choose(.create, entry: entry) }
+        .accessibilityAction(named: "Later") { choose(.snooze, entry: entry) }
+        .accessibilityAction(named: "Discard") { choose(.discard, entry: entry) }
+    }
+
+    private func readOnlyContent(_ entry: DigestEntry) -> some View {
+        let link = DigestLinkCardSplit.split(body: entry.body)
+        let media = DigestMediaSplit.split(link.map { $0.remainder ?? "" } ?? entry.body, vaultURL: model.vaultURL)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if let prose = media.text {
+                    Text(DigestCardText.attributed(prose)).font(.system(size: NotoTheme.FontSize.body))
+                        .foregroundStyle(NotoTheme.ink).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if let link { DigestLinkCard(url: link.url).frame(height: LinkPreviewCardLayout.defaultHeight) }
+                if !media.media.isEmpty {
+                    DigestMediaStrip(items: media.media) { url in
+                        if let source = VideoPlayback.prepare(url) { playingVideo = PlayingVideo(source: source) }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .accessibilityIdentifier("digestCardBody")
+    }
+
+    private var inboxList: some View {
+        List {
+            ForEach(model.sections) { section in
+                Section {
+                    ForEach(section.entries) { entry in
+                        Button { openDetail(entry) } label: { listRow(entry) }
+                            .buttonStyle(.plain)
+                            .listRowBackground(NotoTheme.card)
+                            .accessibilityIdentifier("inboxRow_" + entry.fileURL.lastPathComponent)
+                            .contextMenu { actionMenu(entry) }
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                Button { choose(.snooze, entry: entry) } label: { Label("Snooze", systemImage: "clock") }
+                                    .tint(NotoTheme.inboxLater).accessibilityIdentifier("inboxRowSnooze")
+                                Button { choose(.discard, entry: entry) } label: { Label("Delete", systemImage: "trash") }
+                                    .tint(NotoTheme.inboxDiscard).accessibilityIdentifier("inboxRowDelete")
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button { choose(.addTo, entry: entry) } label: { Label("Add to", systemImage: "text.append") }
+                                    .tint(NotoTheme.inboxAddTo).accessibilityIdentifier("inboxRowAddTo")
+                                Button { choose(.create, entry: entry) } label: { Label("New note", systemImage: "doc.badge.plus") }
+                                    .tint(NotoTheme.inboxNewNote).accessibilityIdentifier("inboxRowNewNote")
+                            }
+                    }
+                } header: {
+                    HStack(spacing: 5) {
+                        if section.kind == .snoozed {
+                            Image(systemName: "clock").font(.caption).foregroundStyle(NotoTheme.muted)
+                                .accessibilityHidden(true)
+                        }
+                        FilingSectionCaption(section.kind.rawValue)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped).contentMargins(.top, 0, for: .scrollContent)
+        .scrollContentBackground(.hidden)
+        .overlay { if model.allEntries.isEmpty && model.hasLoaded { emptyState } }
+        .accessibilityIdentifier("inboxList")
+    }
+
+    private func listRow(_ entry: DigestEntry) -> some View {
+        let lines = entry.body.split(separator: "\n", omittingEmptySubsequences: true)
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(DigestMarkdown.noteTitle(fromFirstLineOf: entry.body) ?? "Downloading…")
+                    .font(.body.weight(.semibold)).foregroundStyle(NotoTheme.ink).lineLimit(1)
+                Spacer(minLength: 0)
+                Text(rowStamp(entry)).font(.caption).foregroundStyle(NotoTheme.muted).fixedSize()
+            }
+            if lines.count > 1 { Text(String(lines[1])).font(.subheadline).foregroundStyle(NotoTheme.muted).lineLimit(1) }
+        }
+        .padding(.vertical, 3).frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(entry.isDue(at: Date()) ? 1 : 0.45)
+        .contentShape(Rectangle())
+    }
+
+    private func actionMenu(_ entry: DigestEntry) -> some View {
+        Group {
+            Button("Add to note…", systemImage: "text.append") { choose(.addTo, entry: entry) }.accessibilityIdentifier("inboxMenuAddTo")
+            Button("New note…", systemImage: "doc.badge.plus") { choose(.create, entry: entry) }.accessibilityIdentifier("inboxMenuNewNote")
+            Button("Later", systemImage: "clock") { choose(.snooze, entry: entry) }.accessibilityIdentifier("inboxMenuLater")
+            Button("Discard", systemImage: "trash", role: .destructive) { choose(.discard, entry: entry) }.accessibilityIdentifier("inboxMenuDiscard")
+        }
+        .disabled(model.isBusy || !entry.isAvailable)
     }
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "tray")
-                .font(.system(size: 36, weight: .light))
-                .foregroundStyle(NotoTheme.faint)
-            Text("Inbox clear")
-                .font(.system(size: NotoTheme.FontSize.h2, weight: .semibold))
-                .foregroundStyle(NotoTheme.head)
-            Text("Everything you captured has been filed or snoozed.")
-                .font(.footnote)
-                .foregroundStyle(AppTheme.mutedText)
-                .multilineTextAlignment(.center)
+        ScrollView {
+            VStack(spacing: 26) {
+                VStack(spacing: 18) {
+                    Image(systemName: "tray").font(.system(size: 34, weight: .light))
+                        .foregroundStyle(NotoTheme.ink)
+                        .overlay {
+                            Image(systemName: "checkmark").font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(NotoTheme.accent).offset(y: -7)
+                        }
+                        .frame(width: 112, height: 112)
+                        .background(NotoTheme.card, in: Circle())
+                        .accessibilityHidden(true)
+                    VStack(spacing: 6) {
+                        Text("Inbox zero").font(.system(size: zeroTitleSize, weight: .bold)).foregroundStyle(NotoTheme.ink)
+                        Text("Everything you captured is filed or\nsnoozed.")
+                            .font(.system(size: zeroDescriptionSize)).foregroundStyle(NotoTheme.muted)
+                            .lineSpacing(2).multilineTextAlignment(.center)
+                            .frame(maxWidth: 280).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                HStack(spacing: 0) {
+                    countCell(model.counts.filed, label: "Filed today")
+                    Divider().frame(height: 52)
+                    countCell(model.counts.discarded, label: "Discarded")
+                    Divider().frame(height: 52)
+                    countCell(model.counts.snoozed, label: "Snoozed")
+                }
+                .padding(.vertical, 18).background(NotoTheme.card, in: RoundedRectangle(cornerRadius: 22))
+                .accessibilityIdentifier("inboxTodayCounts")
+                if let wake = model.futureSnoozed.compactMap(\.snoozedUntil).min() {
+                    Button { presentation = .list } label: {
+                        HStack {
+                            Image(systemName: "clock").foregroundStyle(NotoTheme.inboxLater)
+                            Text("\(model.futureSnoozed.count) snoozed").foregroundStyle(NotoTheme.ink)
+                            Spacer()
+                            Text("Back \(wake.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))").font(.caption).foregroundStyle(NotoTheme.muted)
+                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(NotoTheme.muted)
+                        }
+                        .padding(16).background(NotoTheme.card, in: RoundedRectangle(cornerRadius: 20))
+                    }
+                    .buttonStyle(.plain).accessibilityIdentifier("inboxSnoozedRow")
+                }
+                Button { onCapture?() } label: { Label("Capture something", systemImage: "square.and.pencil") }
+                    .buttonStyle(.glass).controlSize(.large).padding(.top, 16).accessibilityIdentifier("inboxCaptureButton")
+            }
+            .padding(.horizontal, 20).padding(.top, 64).padding(.bottom, 24)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("digestEmptyState")
     }
 
-    // MARK: - Drop targets
-
-    /// A vertical swipe's destination. At rest it is a bare, faint glyph — an
-    /// affordance, not a button. As the card travels toward it, a tinted circle
-    /// grows in behind and the glyph turns white: "let go here and this happens".
-    private func target(glyph: String, tint: Color, strength: CGFloat, id: String, label: String) -> some View {
-        let p = Double(strength)
-        return Image(systemName: glyph)
-            .font(.system(size: 19, weight: .semibold))
-            .foregroundStyle(Color.white.opacity(0.45 + 0.55 * p))
-            .frame(width: Self.targetSize, height: Self.targetSize)
-            .background {
-                Circle()
-                    .fill(tint.opacity(0.95 * p))
-                    .overlay(Circle().strokeBorder(tint.opacity(0.25 + 0.55 * p), lineWidth: 1.5))
-            }
-            .scaleEffect(1 + 0.18 * p)
-            .animation(.easeOut(duration: 0.12), value: strength)
-            .allowsHitTesting(false)
-            .accessibilityIdentifier(id)
-            .accessibilityLabel(label)
+    private func countCell(_ count: Int, label: String) -> some View {
+        VStack(spacing: 4) { Text("\(count)").font(.title.bold()); Text(label).font(.caption).foregroundStyle(NotoTheme.muted) }
+            .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Card
-
-    private static func cardHeight(available: CGFloat) -> CGFloat {
-        min(430, max(220, available * 0.52))
-    }
-
-    private func card(for entry: DigestEntry, in geometry: GeometryProxy) -> some View {
-        let shape = RoundedRectangle(cornerRadius: Self.cardCornerRadius, style: .continuous)
-        return ZStack {
-            shape.fill(NotoTheme.card)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(Self.capturedStamp(entry.capturedAt))
-                    .font(.system(size: NotoTheme.FontSize.subtitle))
-                    .foregroundStyle(NotoTheme.muted)
-                    .accessibilityIdentifier("digestCardDate")
-
-                if entry.isAvailable {
-                    let link = DigestLinkCardSplit.split(body: entry.body)
-                    let media = DigestMediaSplit.split(link.map { $0.remainder ?? "" } ?? entry.body, vaultURL: model.vaultURL)
-                    VStack(alignment: .leading, spacing: 12) {
-                        ScrollView {
-                            // A capture that is a link (share sheet, or a typed URL)
-                            // gets the editor's preview card; the prose follows.
-                            VStack(alignment: .leading, spacing: 12) {
-                                if let link {
-                                    DigestLinkCard(url: link.url)
-                                        .frame(height: LinkPreviewCardLayout.defaultHeight)
-                                }
-                                if let prose = media.text {
-                                    Text(DigestCardText.attributed(prose))
-                                        .font(.system(size: NotoTheme.FontSize.body))
-                                        .foregroundStyle(NotoTheme.ink)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .textSelection(.enabled)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .scrollBounceBehavior(.basedOnSize)
-                        // Soft bottom edge (as on the Capture card) so text that
-                        // continues under the media row reads as scrollable.
-                        .mask(
-                            VStack(spacing: 0) {
-                                Rectangle().fill(Color.black)
-                                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
-                                    .frame(height: 18)
-                            }
-                        )
-                        .accessibilityIdentifier("digestCardBody")
-
-                        // Pinned below the scrolling text so the media is always
-                        // fully visible, however long the post is.
-                        if !media.media.isEmpty {
-                            DigestMediaStrip(items: media.media) { url in
-                                if VideoPlayback.prepare(url) { playingVideo = PlayingVideo(url: url) }
-                            }
-                        }
-                    }
-                } else {
-                    // Dataless iCloud stub — say so rather than showing a blank card.
-                    VStack(spacing: 8) {
-                        ProgressView()
-                        Text("Downloading from iCloud…")
-                            .font(.footnote)
-                            .foregroundStyle(AppTheme.mutedText)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityIdentifier("digestCardDownloading")
+    @ViewBuilder private var toast: some View {
+        if let outcome = model.outcome {
+            let icon = toastIcon(for: outcome)
+            GlassToastView(message: outcome.text, systemImage: icon.symbol, iconColor: icon.color,
+                           onUndo: outcome.isUndoable ? { Task { _ = await model.undoLastAction() } } : nil,
+                           onOpen: outcome.fileURL.map { url in { onOpenFiledNote?(url) } }, identifier: "inboxToast")
+                .padding(.horizontal, 12).padding(.bottom, 8)
+                .task(id: outcome.id) {
+                    do { try await Task.sleep(for: .seconds(6)) } catch { return }
+                    model.clearOutcome(outcome)
                 }
-            }
-            .padding(20)
-
-            // Horizontal commits colour the card itself; the vertical ones are
-            // announced by their target icon instead.
-            tintOverlay(shape: shape, tint: Self.snoozeTint, glyph: "clock",
-                        label: "Snooze", strength: strength(.snooze))
-                .accessibilityIdentifier("digestSnoozeOverlay")
-            tintOverlay(shape: shape, tint: Self.addToTint, glyph: "text.append",
-                        label: "Add to", strength: strength(.addTo))
-                .accessibilityIdentifier("digestAddToOverlay")
         }
-        .clipShape(shape)
-        .overlay(shape.strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
-        .offset(cardOffset(in: geometry))
-        .rotationEffect(.degrees(cardRotation), anchor: .bottom)
-        .scaleEffect(cardArriving ? 0.94 : 1)
-        .opacity(cardArriving ? 0 : 1)
-        // `.contain`, not a bare identifier: a plain `.accessibilityIdentifier`
-        // here collapses the subtree and the date/body lose their own.
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("digestCard")
     }
 
-    private func tintOverlay(shape: RoundedRectangle, tint: Color, glyph: String, label: String, strength: CGFloat) -> some View {
-        shape
-            .fill(tint.opacity(0.92))
-            // Centred, not top-aligned like Capture's: Capture's card is an empty
-            // editor, but a digest card already has a date and body text at the
-            // top, and a label there lands right on them mid-drag.
-            .overlay {
-                VStack(spacing: 8) {
-                    Image(systemName: glyph)
-                        .font(.system(size: 30, weight: .bold))
-                    Text(label)
-                        .font(.title3.weight(.semibold))
+    private func toastIcon(for outcome: DigestModel.Outcome) -> (symbol: String, color: Color) {
+        switch outcome.glyph {
+        case "text.append", "doc.badge.plus": ("checkmark", NotoTheme.inboxNewNote)
+        case "clock": ("clock", NotoTheme.inboxLater)
+        case "trash": ("trash", NotoTheme.inboxDiscard)
+        default: (outcome.glyph, NotoTheme.ink)
+        }
+    }
+
+    private var cues: some View {
+        ZStack {
+            VStack { cue(.create); Spacer(); cue(.discard) }.padding(.vertical, 0).padding(.bottom, 42)
+            HStack { cue(.snooze); Spacer(); cue(.addTo) }.padding(.leading, 12).padding(.trailing, 18)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func cue(_ direction: DigestSwipe) -> some View {
+        let active = activeDirection == direction
+        return VStack(spacing: 6) {
+            Image(systemName: Self.glyph(direction)).font(.system(size: active ? 28 : 22, weight: .medium))
+                .foregroundStyle(active ? NotoTheme.onAction : Self.tint(direction))
+                .frame(width: active ? 80 : 56, height: active ? 80 : 56)
+                .background(active ? Self.tint(direction) : NotoTheme.card, in: Circle())
+                .background {
+                    if active { Circle().fill(Self.tint(direction).opacity(0.25)).padding(-10) }
                 }
-                .foregroundStyle(.white)
-            }
-            .opacity(Double(strength) * 0.95)
-            .allowsHitTesting(false)
-    }
-
-    /// The next capture, sitting behind the current one.
-    ///
-    /// Visible **at rest** whenever there is a next card — the stack is how you
-    /// see there's more to do — and absent entirely on the last one, so the final
-    /// card reads as final. It rises to full size as the front card leaves.
-    private var backCard: some View {
-        let shape = RoundedRectangle(cornerRadius: Self.cardCornerRadius, style: .continuous)
-        let p = DigestSwipeResolver.stackProgress(translation: drag)
-        let hasNext = model.next != nil
-        return shape
-            // Slightly lighter than the front card so the peeking rim separates
-            // instead of blending into one taller card.
-            .fill(NotoTheme.card.opacity(0.75))
-            .overlay(shape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1))
-            .scaleEffect(0.93 + 0.07 * p)
-            .offset(y: 22 * (1 - p))
-            .opacity(hasNext && !cardArriving ? 1 : 0)
-            .allowsHitTesting(false)
-            .accessibilityIdentifier("digestBackCard")
-    }
-
-    private func cardOffset(in geometry: GeometryProxy) -> CGSize {
-        let escapeX = geometry.size.width + 320
-        let escapeY = geometry.size.height + 320
-        switch flyDirection {
-        case .snooze:  return CGSize(width: -escapeX, height: drag.height)
-        case .addTo:   return CGSize(width: escapeX, height: drag.height)
-        case .create:  return CGSize(width: drag.width, height: -escapeY)
-        case .discard: return CGSize(width: drag.width, height: escapeY)
-        case nil:      return CGSize(width: drag.width, height: drag.height + (cardArriving ? 44 : 0))
+            Text(Self.label(direction)).font(.system(size: 13, weight: .bold)).foregroundStyle(active ? Self.tint(direction) : NotoTheme.muted)
         }
+        .opacity(active ? 1 : 0.6)
+        .accessibilityIdentifier("inboxCueTarget_" + direction.rawValue)
     }
 
-    /// Tilt comes from lateral travel only — a vertical swipe should read as the
-    /// card lifting toward a target, not toppling.
-    private var cardRotation: Double {
-        switch flyDirection {
-        case .snooze: return -9
-        case .addTo: return 9
-        case .create, .discard: return 0
-        case nil: return min(10, max(-10, Double(drag.width) / 18))
-        }
+    private var activeDirection: DigestSwipe? { DigestSwipe.allCases.max(by: { strength($0) < strength($1) }).flatMap { strength($0) > 0.15 ? $0 : nil } }
+    private func strength(_ direction: DigestSwipe) -> CGFloat { DigestSwipeResolver.signalStrength(for: direction, translation: drag) }
+    private static func tint(_ direction: DigestSwipe) -> Color {
+        switch direction { case .addTo: NotoTheme.inboxAddTo; case .create: NotoTheme.inboxNewNote; case .snooze: NotoTheme.inboxLater; case .discard: NotoTheme.inboxDiscard }
     }
-
-    // MARK: - Gesture
-
-    private func strength(_ swipe: DigestSwipe) -> CGFloat {
-        if let flyDirection { return flyDirection == swipe ? 1 : 0 }
-        return DigestSwipeResolver.signalStrength(for: swipe, translation: drag)
+    private static func glyph(_ direction: DigestSwipe) -> String {
+        switch direction { case .addTo: "text.append"; case .create: "doc.badge.plus"; case .snooze: "clock"; case .discard: "trash" }
+    }
+    private static func label(_ direction: DigestSwipe) -> String {
+        switch direction { case .addTo: "Add to note"; case .create: "New note"; case .snooze: "Later"; case .discard: "Discard" }
     }
 
     private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 10)
-            .onChanged { value in
-                guard canAct, flyDirection == nil, fileMode == nil else { return }
-                // Full follow in every direction now that all four commit.
-                drag = value.translation
-                if let swipe = DigestSwipeResolver.resolveInFlight(
-                    translation: value.translation,
-                    velocity: CGSize(width: value.velocity.width, height: value.velocity.height)
-                ) {
-                    commit(swipe, translation: value.translation, velocity: value.velocity)
+        DragGesture(minimumDistance: 12).onChanged { value in
+            guard !model.isBusy, !isCommitting, fileMode == nil, !keyboardVisible else { return }
+            if drag == .zero { InboxDragDiagnostics.record("begin", value: value) }
+            drag = value.translation
+            let thresholdDirection = DigestSwipeResolver.resolveRelease(translation: value.translation, predicted: value.translation, velocity: .zero)
+            if let thresholdDirection, thresholdDirection != hapticDirection {
+                InboxDragDiagnostics.record("threshold-" + thresholdDirection.rawValue, value: value)
+                UISelectionFeedbackGenerator().selectionChanged()
+                hapticDirection = thresholdDirection
+            } else if thresholdDirection == nil { hapticDirection = nil }
+        }.onEnded { value in
+            InboxDragDiagnostics.record("end", value: value)
+            guard !model.isBusy, !isCommitting, fileMode == nil, !keyboardVisible, let entry = model.current else { springBack(); return }
+            if let direction = DigestSwipeResolver.resolveRelease(translation: value.translation, predicted: value.predictedEndTranslation,
+                                                                  velocity: CGSize(width: value.velocity.width, height: value.velocity.height)) {
+                choose(direction, entry: entry)
+            } else { springBack() }
+        }
+    }
+
+    private func choose(_ direction: DigestSwipe, entry: DigestEntry) {
+        guard !isCommitting, !model.isBusy, entry.isAvailable else { return }
+        Task {
+            guard await persistDetail() else { return }
+            model.selectedEntryID = entry.id
+            if direction.opensSheet {
+                fileMode = direction == .addTo ? .addTo : .create
+                springBack()
+            } else {
+                file(direction, entry: entry) {
+                    direction == .snooze ? await model.snoozeCurrent() : await model.discardCurrent()
                 }
             }
-            .onEnded { value in
-                guard canAct, flyDirection == nil, fileMode == nil else { return }
-                guard let swipe = DigestSwipeResolver.resolveRelease(
-                    translation: value.translation,
-                    predicted: value.predictedEndTranslation,
-                    velocity: CGSize(width: value.velocity.width, height: value.velocity.height)
-                ) else {
-                    springBack()
-                    return
-                }
-                commit(swipe, translation: value.translation, velocity: value.velocity)
-            }
-    }
-
-    /// Actions need a card, an idle model, and a capture whose body has actually
-    /// downloaded — filing a dataless stub would fail on the read.
-    private var canAct: Bool {
-        model.current?.isAvailable == true && !model.isBusy
-    }
-
-    // MARK: - Commits
-
-    private func commit(_ swipe: DigestSwipe, translation: CGSize, velocity: CGSize) {
-        guard canAct else { return }
-
-        if swipe.opensSheet {
-            // The filing needs input, so hold the card where it is and let the
-            // sheet decide; it flies this way only once the write succeeds.
-            pendingFly = swipe
-            present(swipe == .create ? .create : .addTo)
-            return
         }
+    }
 
-        flyDuration = Self.flyDuration(translation: translation, velocity: velocity, swipe: swipe)
-        UIImpactFeedbackGenerator(style: swipe == .discard ? .rigid : .medium).impactOccurred()
-        withAnimation(.easeOut(duration: flyDuration)) { flyDirection = swipe }
-
+    private func file(_ direction: DigestSwipe, entry: DigestEntry, action: @escaping @MainActor () async -> Bool) {
+        isCommitting = true
+        model.selectedEntryID = entry.id
+        fileMode = nil
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) { flyDirection = direction }
         Task {
-            let ok: Bool
-            switch swipe {
-            case .snooze: ok = await model.snoozeCurrent()
-            case .discard: ok = await model.discardCurrent()
-            case .addTo, .create: ok = false   // handled above
-            }
-            await settle(succeeded: ok)
-        }
-    }
-
-    /// Matches the fly-off to the flick that caused it, so a hard swipe leaves
-    /// fast and a slow drag glides.
-    private static func flyDuration(translation: CGSize, velocity: CGSize, swipe: DigestSwipe) -> Double {
-        let bounds = UIScreen.main.bounds
-        let horizontal = swipe == .snooze || swipe == .addTo
-        let total = (horizontal ? bounds.width : bounds.height) + 320
-        let travelled = horizontal ? abs(translation.width) : abs(translation.height)
-        let speed = max(900, horizontal ? abs(velocity.width) : abs(velocity.height))
-        return min(0.35, max(0.1, Double(max(60, total - travelled) / speed)))
-    }
-
-    private func file(_ destination: DigestDestination) {
-        flyDuration = 0.25
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let direction = pendingFly ?? .addTo
-        withAnimation(.easeOut(duration: flyDuration)) { flyDirection = direction }
-
-        Task {
-            let ok: Bool
-            switch destination {
-            case .existingNote(let url, let title):
-                ok = await model.addCurrent(toNoteAt: url, titled: title)
-            case .newNote(let title, let folderURL):
-                ok = await model.createNoteFromCurrent(title: title, inFolderAt: folderURL)
-            }
-            await settle(succeeded: ok)
-        }
-    }
-
-    private func present(_ mode: DigestFileMode) {
-        guard canAct else { return }
-        fileMode = mode
-    }
-
-    /// Let the fly-off finish, then either swap in the next card (the model has
-    /// already popped the queue) or bring this one back.
-    private func settle(succeeded: Bool) async {
-        try? await Task.sleep(for: .milliseconds(Int(flyDuration * 1000) + 60))
-        pendingFly = nil
-        if succeeded {
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            swapInNextCard()
-        } else {
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                flyDirection = nil
-                drag = .zero
-            }
-        }
-    }
-
-    private func springBack() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
-            drag = .zero
-        }
-    }
-
-    /// The back card has animated into the front slot during the fly-off, so the
-    /// swap has to be instant — animating it would show the same content twice.
-    private func swapInNextCard() {
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            drag = .zero
+            let started = ContinuousClock.now
+            let ok = await action()
+            if !reduceMotion { try? await Task.sleep(until: started.advanced(by: .milliseconds(220)), clock: .continuous) }
+            if ok { showingDetail = false; detailEntry = nil; detailOriginal = ""; detailText = "" }
             flyDirection = nil
-            cardArriving = true
-        }
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-            cardArriving = false
+            drag = .zero
+            isCommitting = false
+            if !showingDetail { model.selectedEntryID = nil }
         }
     }
 
+    private func openDetail(_ entry: DigestEntry) {
+        model.selectedEntryID = entry.id
+        detailEntry = entry
+        detailText = entry.body
+        detailOriginal = entry.body
+        showingDetail = true
+    }
+    private func closeDetail() { showingDetail = false; model.selectedEntryID = nil; detailEntry = nil; detailOriginal = ""; detailText = "" }
+    private func persistDetail() async -> Bool {
+        guard showingDetail, let entry = detailEntry, detailText != detailOriginal else { return true }
+        let text = detailText
+        if await model.saveBody(text, for: entry) { detailOriginal = text; return true }
+        return false
+    }
+    private func springBack() { withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) { drag = .zero; flyDirection = nil }; hapticDirection = nil }
+    private func cardOffset(size: CGSize) -> CGSize {
+        guard let direction = flyDirection else { return drag }
+        switch direction {
+        case .addTo: return CGSize(width: size.width + 200, height: 0)
+        case .snooze: return CGSize(width: -size.width - 200, height: 0)
+        case .create: return CGSize(width: 0, height: -size.height - 200)
+        case .discard: return CGSize(width: 0, height: size.height + 200)
+        }
+    }
     private static func capturedStamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        let calendar = Calendar.current
+        let day = calendar.isDateInToday(date) ? "Today" : calendar.isDateInYesterday(date) ? "Yesterday" : date.formatted(.dateTime.month(.abbreviated).day())
+        return day + ", " + date.formatted(.dateTime.hour().minute())
+    }
+    private func rowStamp(_ entry: DigestEntry) -> String {
+        guard let wake = entry.snoozedUntil else { return entry.capturedAt.formatted(.dateTime.hour().minute()) }
+        return entry.isDue(at: Date()) ? "Back today" : "Back " + wake.formatted(.dateTime.weekday(.abbreviated))
     }
 }

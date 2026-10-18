@@ -1,8 +1,8 @@
 import Foundation
 import SwiftUI
 
-/// Emphasizes the query's terms inside a snippet (weight + colour, never a
-/// highlight box). Pure, so the tokenization and match ranges are testable.
+/// Emphasizes the query's terms inside a snippet. The optional highlight tint
+/// supports Search's marked matches without changing other callers.
 enum SnippetEmphasis {
     /// Query words worth emphasizing: 2+ characters, deduplicated, longest first
     /// so overlapping tokens ("note", "notes") resolve to the longer match.
@@ -82,13 +82,14 @@ enum SnippetEmphasis {
         return out
     }
 
-    static func attributed(_ text: String, query: String, base: Color, emphasis: Color) -> AttributedString {
+    static func attributed(_ text: String, query: String, base: Color, emphasis: Color, highlight: Color? = nil) -> AttributedString {
         var result = AttributedString()
         for segment in segments(of: text, query: query) {
             var piece = AttributedString(segment.text)
             if segment.emphasized {
                 piece.font = .subheadline.weight(.semibold)
                 piece.foregroundColor = emphasis
+                piece.backgroundColor = highlight
             } else {
                 piece.font = .subheadline
                 piece.foregroundColor = base

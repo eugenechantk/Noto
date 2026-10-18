@@ -1,6 +1,7 @@
 import SwiftUI
 import os.log
 import NotoLinkPreview
+import NotoVault
 import UniformTypeIdentifiers
 
 #if os(iOS)
@@ -761,26 +762,41 @@ enum MarkdownVisualSpec {
     // base body size, and every other font and spacing metric scales by the same
     // body-size ratio so the whole type ramp stays proportional.
     #if os(macOS)
-    static let baseBodyPointSize: CGFloat = 16
+    static let baseBodyPointSize: CGFloat = 15
     #else
     static let baseBodyPointSize: CGFloat = 17
     #endif
     private static let platformScale: CGFloat = baseBodyPointSize / 17
 
     static let bodyFont = Font(pointSize: baseBodyPointSize, weight: .regular)
+    #if os(macOS)
+    static let h1Font = Font(pointSize: 30, weight: .bold)
+    static let h2Font = Font(pointSize: 18, weight: .semibold)
+    #else
     static let h1Font = Font(pointSize: 28 * platformScale, weight: .bold)
     static let h2Font = Font(pointSize: 22 * platformScale, weight: .bold)
+    #endif
     static let h3Font = Font(pointSize: 18 * platformScale, weight: .semibold)
     static let codeFont = Font(pointSize: 16 * platformScale, weight: .regular, isMonospaced: true)
 
     // Trailing spacing for legibility, shared by the editor and the AI chat renderer.
+    #if os(macOS)
+    static let paragraphSpacing: CGFloat = 0
+    static let listItemSpacing: CGFloat = 0
+    #else
     static let paragraphSpacing: CGFloat = 12 * platformScale  // after a body paragraph
     static let listItemSpacing: CGFloat = 10 * platformScale   // after a list item (bullet/ordered/todo)
+    #endif
     // Negative leading space pulls each list item up toward the block above it, so the
     // first item hugs its preceding paragraph and items sit tighter together. Net gaps:
     // paragraph→item = paragraphSpacing + listItemSpacingBefore; item→item = listItemSpacing + listItemSpacingBefore.
+    #if os(macOS)
+    static let listItemSpacingBefore: CGFloat = 0
+    static let lineSpacing: CGFloat = 6
+    #else
     static let listItemSpacingBefore: CGFloat = -4 * platformScale
     static let lineSpacing: CGFloat = 4 * platformScale        // between wrapped lines within a paragraph
+    #endif
 
     // Legacy list indent values kept for inactive block-editor compatibility.
     static let listBaseIndent: CGFloat = 12
@@ -790,12 +806,28 @@ enum MarkdownVisualSpec {
     static let todoPrefixVisualWidth: CGFloat = 2
     static let hyperlinkSyntaxVisualWidth: CGFloat = 0.01
     static let todoControlSize: CGFloat = 28
+    #if os(macOS)
+    static let todoSymbolSize: CGFloat = 14
+    #else
     static let todoSymbolSize: CGFloat = 20
+    #endif
+    #if os(macOS)
+    static let todoTextStartOffset: CGFloat = 28
+    #else
     static let todoTextStartOffset: CGFloat = todoSymbolSize + listMarkerTextGap
+    #endif
     static let todoMarkerHitInset: CGFloat = max(0, (todoControlSize - todoSymbolSize) / 2)
     static let todoVisibleInset: CGFloat = 1
+    #if os(macOS)
+    static let todoCheckedVisibleInset: CGFloat = 0
+    #else
     static let todoCheckedVisibleInset: CGFloat = 2
+    #endif
+    #if os(macOS)
+    static let todoOutlineWidth: CGFloat = 1.5
+    #else
     static let todoOutlineWidth: CGFloat = 2
+    #endif
     static let todoCheckmarkWidth: CGFloat = 2
     static let imagePreviewReservedHeight: CGFloat = 300
     static let imagePreviewVerticalPadding: CGFloat = 8
@@ -858,11 +890,11 @@ private enum MarkdownTheme {
     static let prefixColor: PlatformColor = AppTheme.nsMutedText
     static let checkedTextColor: PlatformColor = AppTheme.nsSecondaryText
     static let todoUncheckedColor: PlatformColor = .tertiaryLabelColor
-    static let todoCheckedFillColor: PlatformColor = .systemGreen
+    static let todoCheckedFillColor = PlatformColor(srgbRed: 1, green: 106 / 255, blue: 46 / 255, alpha: 1)
     static let todoCheckmarkColor: PlatformColor = .white
     static let codeColor: PlatformColor = AppTheme.nsSecondaryText
     static let codeBgColor: PlatformColor = AppTheme.nsCodeBackground
-    static let linkColor: PlatformColor = .linkColor
+    static let linkColor = PlatformColor(srgbRed: 1, green: 138 / 255, blue: 87 / 255, alpha: 1)
     #endif
 
     static func font(for kind: MarkdownBlockKind) -> PlatformFont {
@@ -920,10 +952,16 @@ enum MarkdownParagraphStyler {
 
         switch kind {
         case .heading(let level):
+            #if os(macOS)
+            paraStyle.paragraphSpacingBefore = level == 1 ? 0 : 8
+            // Move section headings toward their body without moving the body column.
+            paraStyle.paragraphSpacing = level == 1 ? 35 : -8
+            #else
             let spacing: CGFloat = level == 1 ? 16 : level == 2 ? 12 : 8
             let afterSpacing: CGFloat = level == 1 ? 12 : level == 2 ? 10 : 8
             paraStyle.paragraphSpacingBefore = spacing
             paraStyle.paragraphSpacing = afterSpacing
+            #endif
 
         case .todo(_, let indent):
             let indentPt = sourceIndentWidth(for: kind, text: text, indentLevel: indent)
@@ -934,6 +972,9 @@ enum MarkdownParagraphStyler {
             paraStyle.headIndent = indentPt + contentIndent
             paraStyle.paragraphSpacingBefore = MarkdownVisualSpec.listItemSpacingBefore
             paraStyle.paragraphSpacing = MarkdownVisualSpec.listItemSpacing
+            #if os(macOS)
+            paraStyle.paragraphSpacing = 4
+            #endif
 
         case .bullet(let indent):
             let indentPt = sourceIndentWidth(for: kind, text: text, indentLevel: indent)
@@ -995,6 +1036,13 @@ enum MarkdownParagraphStyler {
         case .paragraph:
             paraStyle.paragraphSpacingBefore = paragraphUsesListSpacingWhileTyping(text) ? MarkdownVisualSpec.listItemSpacingBefore : 0
             paraStyle.paragraphSpacing = MarkdownVisualSpec.paragraphSpacing
+            #if os(macOS)
+            // Blank Markdown separators keep a body-font insertion boundary.
+            if text.isEmpty {
+                paraStyle.lineSpacing = 0
+                paraStyle.maximumLineHeight = 16
+            }
+            #endif
         }
 
         return paraStyle
@@ -1021,7 +1069,11 @@ enum MarkdownParagraphStyler {
         let prefix = String(text.prefix(prefixLength))
         let font = MarkdownTheme.font(for: kind)
         let prefixWidth = ceil((prefix as NSString).size(withAttributes: [.font: font]).width)
+        #if os(macOS)
+        return prefixWidth + 7
+        #else
         return prefixWidth
+        #endif
     }
 
     static func todoHiddenPrefixWidth(for kind: MarkdownBlockKind, text: String) -> CGFloat {
@@ -1198,10 +1250,23 @@ enum MarkdownParagraphStyler {
                     range: NSRange(location: 0, length: hiddenPrefixLength)
                 )
             } else {
+                #if os(macOS)
+                if case .heading(1) = kind {
+                    prefixColor = .clear
+                    let hiddenLength = todoHiddenPrefixLength(prefixLength: pfxLen, fullLength: fullRange.length)
+                    attributed.addAttribute(.font, value: PlatformFont.systemFont(ofSize: 0.01), range: NSRange(location: 0, length: hiddenLength))
+                } else { prefixColor = MarkdownTheme.prefixColor }
+                #else
                 prefixColor = MarkdownTheme.prefixColor
+                #endif
             }
             attributed.addAttribute(.foregroundColor, value: prefixColor,
                                     range: NSRange(location: 0, length: pfxLen))
+            #if os(macOS)
+            if case .heading(let level) = kind, level > 1 {
+                attributed.addAttribute(.kern, value: 3, range: NSRange(location: pfxLen - 1, length: 1))
+            }
+            #endif
             applyListPrefixStyling(to: attributed, kind: kind, prefixLength: pfxLen)
         }
 
@@ -1269,6 +1334,15 @@ enum MarkdownParagraphStyler {
                 ], range: markerRange)
             }
         }
+
+        #if os(macOS)
+        if case .todo = kind { return }
+        // Keep the source marker editable while reserving the same gap on
+        // first and wrapped lines.
+        if prefixLength > 0, prefixLength < attributed.length {
+            attributed.addAttribute(.kern, value: 7, range: NSRange(location: prefixLength - 1, length: 1))
+        }
+        #endif
 
     }
 
@@ -1618,7 +1692,16 @@ final class TodoLayoutFragment: NSTextLayoutFragment {
     var localMarkerRect: CGRect {
         let lineMidY = textLineFragments.first?.typographicBounds.midY
             ?? (layoutFragmentFrame.height / 2)
+        #if os(macOS)
+        let contentX: CGFloat
+        if let paragraph = textElement as? MarkdownParagraph, let line = textLineFragments.first {
+            let prefixLength = paragraph.blockKind.prefixLength(in: paragraph.attributedString.string)
+            contentX = line.locationForCharacter(at: min(prefixLength, paragraph.attributedString.length)).x
+        } else { contentX = 0 }
+        return TodoMarkerGeometry.markerRect(contentLeadingX: contentX + 4, lineMidY: lineMidY)
+        #else
         return TodoMarkerGeometry.markerRect(contentLeadingX: 0, lineMidY: lineMidY)
+        #endif
     }
 
     /// TextKit clips a fragment's drawing to this rect. The marker extends left of the text
@@ -2034,38 +2117,50 @@ fileprivate enum MarkdownImageLoader {
             return
         }
 
-        if url.isFileURL, VideoPosterRenderer.isVideo(url) {
-            guard CoordinatedFileManager.isDownloaded(at: url) else {
-                CoordinatedFileManager.startDownloading(at: url)
-                completion(nil)
-                return
-            }
-            VideoPosterRenderer.poster(for: url) { frame in
-                DispatchQueue.main.async {
-                    #if os(iOS)
-                    let image = frame.map { PlatformImage(cgImage: $0) }
-                    #elseif os(macOS)
-                    let image = frame.map { PlatformImage(cgImage: $0, size: CGSize(width: $0.width, height: $0.height)) }
-                    #endif
-                    if let image { store(image: image, for: url) }
+        let isVideo = url.isFileURL && VideoPosterRenderer.isVideo(url)
+        // The media mirror first (a vault file's copy, a video's poster, or a
+        // web image's backup); the device or the original site if it has none.
+        if let mirrored = MediaSource.mirrorURL(for: url, poster: isVideo) {
+            loadRemote(mirrored, standingFor: url, badged: isVideo) { image in
+                if let image {
                     completion(image)
+                } else {
+                    loadWithoutMirror(url: url, isVideo: isVideo, completion: completion)
                 }
             }
             return
         }
+        loadWithoutMirror(url: url, isVideo: isVideo, completion: completion)
+    }
 
+    /// The local file (only if downloaded — a coordinated read of an evicted
+    /// file blocks until iCloud fetches it), or the web image's own site.
+    private static func loadWithoutMirror(url: URL, isVideo: Bool, completion: @escaping (PlatformImage?) -> Void) {
         if url.isFileURL {
-            if let data = CoordinatedFileManager.readData(from: url),
-               let image = PlatformImage(data: data) {
-                store(image: image, for: url)
-                completion(image)
+            guard MediaSource.localFileIfAvailable(url) != nil else {
+                completion(nil)
                 return
             }
-
-            if !CoordinatedFileManager.isDownloaded(at: url) {
-                CoordinatedFileManager.startDownloading(at: url)
+            if isVideo {
+                VideoPosterRenderer.poster(for: url) { frame in
+                    DispatchQueue.main.async {
+                        #if os(iOS)
+                        let image = frame.map { PlatformImage(cgImage: $0) }
+                        #elseif os(macOS)
+                        let image = frame.map { PlatformImage(cgImage: $0, size: CGSize(width: $0.width, height: $0.height)) }
+                        #endif
+                        if let image { store(image: image, for: url) }
+                        completion(image)
+                    }
+                }
+                return
             }
-            completion(nil)
+            if let data = CoordinatedFileManager.readData(from: url), let image = PlatformImage(data: data) {
+                store(image: image, for: url)
+                completion(image)
+            } else {
+                completion(nil)
+            }
             return
         }
 
@@ -2079,6 +2174,26 @@ fileprivate enum MarkdownImageLoader {
             }
         }.resume()
     }
+
+    /// Media drawn from the mirror's copy (`remote`) but cached under the URL
+    /// it stands for; completes with nil when the mirror has no copy.
+    private static func loadRemote(_ remote: URL, standingFor url: URL, badged: Bool,
+                                   completion: @escaping (PlatformImage?) -> Void) {
+        Task.detached(priority: .utility) {
+            let data = await MediaSource.remoteData(from: remote)
+            var image = data.flatMap { PlatformImage(data: $0) }
+            #if os(iOS)
+            if badged, let frame = image?.cgImage, let withBadge = VideoPosterRenderer.withPlayBadge(frame) {
+                image = PlatformImage(cgImage: withBadge)
+            }
+            #endif
+            let result = image
+            DispatchQueue.main.async {
+                if let result { store(image: result, for: url) }
+                completion(result)
+            }
+        }
+    }
 }
 
 // MARK: - MarkdownTextDelegate
@@ -2090,6 +2205,13 @@ fileprivate enum MarkdownImageLoader {
 /// `MarkdownParagraph` with the correct fonts, colors, and indentation.
 /// Only the *changed* paragraph is re-styled — not the whole document.
 final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSTextLayoutManagerDelegate {
+    #if os(macOS)
+    var usesFocusLayout = false
+    var documentTitleSize: CGFloat = 30
+    var isInspectorLayout = false
+    var focusLocation = 0
+    var isDailyNote = false
+    #endif
     var revealedHyperlinkRanges: [NSRange] = []
     var revealedBlockRanges: [NSRange] = []
     var collapsedXMLTagRanges: [NSRange] = []
@@ -2130,6 +2252,20 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
             kind = MarkdownBlockKind.detect(from: text, vaultRootURL: vaultRootURL)
         }
 
+        #if os(macOS)
+        // A separator after frontmatter belongs to the hidden metadata block.
+        // Keep its backing characters so document offsets and edits round-trip.
+        if text.isEmpty, let frontmatterRange,
+           range.location >= NSMaxRange(frontmatterRange),
+           textStorage.string.utf16.count >= range.location {
+            let gap = (textStorage.string as NSString).substring(with: NSRange(location: NSMaxRange(frontmatterRange), length: range.location - NSMaxRange(frontmatterRange)))
+            if gap.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let hidden = MarkdownParagraphStyler.style(text: original, kind: .frontmatter)
+                return MarkdownParagraph(attributedString: hidden, blockKind: .frontmatter)
+            }
+        }
+        #endif
+
         // Position-dependent styling (hyperlinks, dividers, images) bypasses the cache
         // because the styler's output for the same text varies by paragraphLocation.
         let cacheKey = paragraphCacheKey(text: text, kind: kind, range: range)
@@ -2160,6 +2296,53 @@ final class MarkdownTextDelegate: NSObject, NSTextContentStorageDelegate, NSText
             ))
         }
 
+        #if os(macOS)
+        if !usesFocusLayout, text.isEmpty, range.location > 0,
+           NSMaxRange(range) < textStorage.length {
+            let nextRange = (textStorage.string as NSString).lineRange(for: NSRange(location: NSMaxRange(range), length: 0))
+            let next = (textStorage.string as NSString).substring(with: nextRange)
+            let nextKind = MarkdownBlockKind.detect(from: next)
+            let previousRange = (textStorage.string as NSString).lineRange(for: NSRange(location: range.location - 1, length: 0))
+            let previousKind = MarkdownBlockKind.detect(from: (textStorage.string as NSString).substring(with: previousRange))
+            let separatorHeight: CGFloat?
+            if case .heading = nextKind { separatorHeight = 12 }
+            else if case .todo = nextKind, case .heading = previousKind { separatorHeight = 19 }
+            else { separatorHeight = nil }
+            if let separatorHeight,
+               let style = (result.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle {
+                style.maximumLineHeight = separatorHeight
+                result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
+            }
+        }
+        #endif
+
+        #if os(macOS)
+        if isDailyNote, !usesFocusLayout, case .heading(1) = kind,
+           let style = (result.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle {
+            style.paragraphSpacing = 4
+            result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
+        }
+        if isInspectorLayout, !isDailyNote, !usesFocusLayout, case .heading(1) = kind,
+           let style = (result.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle {
+            style.paragraphSpacing = 28
+            result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
+        }
+        if usesFocusLayout {
+            return MarkdownParagraph(attributedString: MacMarkdownFocusStyle.applying(to: result, kind: kind,
+                isActive: NSLocationInRange(focusLocation, range)), blockKind: kind)
+        }
+        if case .heading(1) = kind {
+            if documentTitleSize != 30, let style = (result.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle {
+                style.paragraphSpacing = 26
+                result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
+            } else if !isDailyNote, let style = (result.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle {
+                // The title starts two points earlier; keep the first section fixed.
+                style.paragraphSpacing += 2
+                result.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: result.length))
+            }
+            return MarkdownParagraph(attributedString: MacMarkdownFocusStyle.applyingTitleSize(documentTitleSize, to: result), blockKind: kind)
+        }
+        #endif
         return MarkdownParagraph(attributedString: result, blockKind: kind)
     }
 
@@ -2411,10 +2594,12 @@ private enum FrontmatterEditingTarget: Equatable {
 /// How the keyboard accessory toolbar renders.
 /// `.docked` — Noto's v2 full-width #1A1C22 bar (default, unchanged).
 /// `.floating` — iOS 26 Liquid Glass pill floating above the keyboard (Noto 2).
+/// `.hidden` — Markdown-only capture input with no keyboard accessory.
 /// Declared outside the platform sections because `EditorContentView` (shared) carries it.
 enum EditorKeyboardToolbarStyle {
     case docked
     case floating
+    case hidden
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -3070,6 +3255,8 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
     var scrollRestorationID: String?
     var initialContentOffsetY: CGFloat?
     var onContentOffsetYChange: ((CGFloat) -> Void)?
+    /// Native editor focus, including when a hardware keyboard hides software keys.
+    var onFocusChange: ((Bool) -> Void)?
     var keyboardToolbarStyle: EditorKeyboardToolbarStyle = .docked
     /// Paints the editor surface a custom color (e.g. a card) instead of
     /// `NotoTheme.uiBackground`. iOS only; nil keeps the default.
@@ -3108,6 +3295,7 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
         vc.isFindVisible = isFindVisible
         vc.onCloseFind = onCloseFind
         vc.onContentOffsetYChange = onContentOffsetYChange
+        vc.onFocusChange = onFocusChange
         vc.updateFind(
             query: findQuery,
             navigationRequest: findNavigationRequest,
@@ -3127,6 +3315,7 @@ struct TextKit2EditorView: UIViewControllerRepresentable {
         vc.isFindVisible = isFindVisible
         vc.onCloseFind = onCloseFind
         vc.onContentOffsetYChange = onContentOffsetYChange
+        vc.onFocusChange = onFocusChange
         vc.updateFind(
             query: findQuery,
             navigationRequest: findNavigationRequest,
@@ -3190,6 +3379,8 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     var isFindVisible = false
     var onCloseFind: (() -> Void)?
     var onContentOffsetYChange: ((CGFloat) -> Void)?
+    var onFocusChange: ((Bool) -> Void)?
+    private var lastReportedFocus = false
     private var lastContentOffsetPublishTime: Date = .distantPast
     private(set) var textView: UITextView!
     private let minimumHorizontalTextInset: CGFloat = 16
@@ -3291,7 +3482,7 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         textView.keyboardDismissMode = .interactive
         textView.alwaysBounceVertical = !disablesScrollBounce
         textView.bounces = !disablesScrollBounce
-        textView.inputAccessoryView = makeInputAccessoryView()
+        textView.inputAccessoryView = keyboardToolbarStyle == .hidden ? nil : makeInputAccessoryView()
         installPlaceholderIfNeeded()
         textView.accessibilityIdentifier = "note_editor"
         textView.delegate = self
@@ -3324,8 +3515,14 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         startAppLifecycleObservation()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        publishFocusChange(textView.isFirstResponder)
+    }
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        publishFocusChange(false)
         stopKeyboardObservation()
         rememberCurrentContentOffset()
         stopAppLifecycleObservation()
@@ -4574,8 +4771,19 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
         updatePageMentionSuggestions()
     }
 
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        publishFocusChange(true)
+    }
+
     func textViewDidEndEditing(_ textView: UITextView) {
         flushEditorTextToSession(updateBinding: true)
+        publishFocusChange(false)
+    }
+
+    private func publishFocusChange(_ focused: Bool) {
+        guard focused != lastReportedFocus else { return }
+        lastReportedFocus = focused
+        onFocusChange?(focused)
     }
 
     private func revealHyperlinkMarkdownForDeletionIfNeeded(changeRange: NSRange) -> Bool {
@@ -4813,10 +5021,17 @@ final class TextKit2EditorViewController: UIViewController, UITextViewDelegate, 
     }
 
     private func scrollSelectionAboveKeyboard() {
-        guard textView.isFirstResponder else { return }
+        guard textView.isFirstResponder || isFindVisible else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self, self.textView != nil else { return }
-            self.scrollSelectionToKeyboardReadingBoundary()
+            if self.isFindVisible {
+                // Find's separate field owns keyboard focus. Its initial match
+                // may have scrolled before the keyboard finished changing the
+                // viewport, so reveal the same match using the settled insets.
+                self.scrollToSelectedFindMatch()
+            } else if self.textView.isFirstResponder {
+                self.scrollSelectionToKeyboardReadingBoundary()
+            }
         }
     }
 
@@ -6417,6 +6632,13 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     @Binding var text: String
     var documentID: String = ""
     var autoFocus: Bool = false
+    var usesFocusLayout = false
+    var dailyNoteDate: Date?
+    var textColumnWidth: CGFloat?
+    var minimumTextInset: CGFloat = 32
+    var showsMetadataProperties = true
+    var documentBreadcrumb: String?
+    var documentTitleSize: CGFloat = 30
     var onTextChange: ((String) -> Void)?
     var vaultRootURL: URL?
     var onImportImageFile: ((URL) throws -> VaultImageAttachment)?
@@ -6436,6 +6658,11 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
 
     func makeNSViewController(context: Context) -> TextKit2EditorViewController {
         let vc = TextKit2EditorViewController()
+        vc.usesFocusLayout = usesFocusLayout
+        vc.dailyNoteDate = dailyNoteDate
+        vc.textColumnWidth = textColumnWidth; vc.minimumTextInset = minimumTextInset; vc.showsMetadataProperties = showsMetadataProperties
+        vc.documentBreadcrumb = documentBreadcrumb
+        vc.documentTitleSize = documentTitleSize
         vc.coordinator = context.coordinator
         vc.vaultRootURL = vaultRootURL
         vc.onImportImageFile = onImportImageFile
@@ -6456,6 +6683,11 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
     }
 
     func updateNSViewController(_ vc: TextKit2EditorViewController, context: Context) {
+        vc.usesFocusLayout = usesFocusLayout
+        vc.dailyNoteDate = dailyNoteDate
+        vc.textColumnWidth = textColumnWidth; vc.minimumTextInset = minimumTextInset; vc.showsMetadataProperties = showsMetadataProperties
+        vc.documentBreadcrumb = documentBreadcrumb
+        vc.documentTitleSize = documentTitleSize
         vc.pageMentionProvider = pageMentionProvider
         vc.vaultRootURL = vaultRootURL
         vc.onImportImageFile = onImportImageFile
@@ -6498,6 +6730,36 @@ struct TextKit2EditorView: NSViewControllerRepresentable {
 }
 
 final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, NSTextStorageDelegate, NSTextFieldDelegate, NSPopoverDelegate, MarkdownRevealRenderingHost {
+    var textColumnWidth: CGFloat? {
+        didSet {
+            markdownDelegate.isInspectorLayout = textColumnWidth == 440 || textColumnWidth == 540
+            if textColumnWidth != oldValue { refreshFocusLayout() }
+        }
+    }
+    var minimumTextInset: CGFloat = 32 { didSet { if minimumTextInset != oldValue { refreshFocusLayout() } } }
+    var showsMetadataProperties = true { didSet { if showsMetadataProperties != oldValue, isViewLoaded { scheduleEditorOverlayRefresh() } } }
+    var documentBreadcrumb: String? { didSet { if documentBreadcrumb != oldValue { refreshFocusLayout() } } }
+    var documentTitleSize: CGFloat = 30 {
+        didSet {
+            guard documentTitleSize != oldValue else { return }
+            markdownDelegate.documentTitleSize = documentTitleSize
+            refreshFocusLayout()
+        }
+    }
+    var dailyNoteDate: Date? {
+        didSet {
+            guard dailyNoteDate != oldValue else { return }
+            markdownDelegate.isDailyNote = dailyNoteDate != nil
+            refreshFocusLayout()
+        }
+    }
+    var usesFocusLayout = false {
+        didSet {
+            guard usesFocusLayout != oldValue else { return }
+            markdownDelegate.usesFocusLayout = usesFocusLayout
+            refreshFocusLayout()
+        }
+    }
     // MARK: MarkdownRevealRenderingHost primitives
     var renderTextStorage: NSTextStorage? { textView.textStorage }
     var renderSelectedRange: NSRange { textView.selectedRange() }
@@ -6514,7 +6776,16 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     var pageMentionProvider: ((String) -> [PageMentionDocument])?
     var onOpenDocumentLink: ((String) -> Void)?
     var onOpenDocumentLinkInNewWindow: ((String) -> Void)?
-    var isFindVisible = false
+    var isFindVisible = false {
+        didSet {
+            if isViewLoaded, oldValue != isFindVisible { scheduleEditorOverlayRefresh() }
+            guard oldValue, !isFindVisible, isViewLoaded else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let window = self.textView?.window, window.isKeyWindow else { return }
+                window.makeFirstResponder(self.textView)
+            }
+        }
+    }
     var onCloseFind: (() -> Void)?
     var onContentOffsetYChange: ((CGFloat) -> Void)?
     private var lastContentOffsetPublishTime: Date = .distantPast
@@ -6543,9 +6814,15 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     var cachedRenderableBlocksText = ""
     var cachedCollapsedXMLTagRanges: [NSRange] = []
     private var lastOverlayLayoutSize: NSSize = .zero
-    private let minimumHorizontalTextInset: CGFloat = 48
-    private let maximumTextWidth: CGFloat = 600
-    private let verticalTextInset: CGFloat = 16
+    private var minimumHorizontalTextInset: CGFloat { minimumTextInset }
+    private var activeFocusParagraphStart = 0
+    private var maximumTextWidth: CGFloat { usesFocusLayout ? 680 : textColumnWidth ?? 640 }
+    private var verticalTextInset: CGFloat {
+        if usesFocusLayout { return 47 }
+        if dailyNoteDate != nil { return (view.window?.contentView?.bounds.width ?? view.bounds.width) >= 760 ? 44 : 42 }
+        if documentBreadcrumb?.isEmpty == false { return 41 }
+        return documentTitleSize == 28 ? 23 : 24
+    }
     static let bottomScrollPadding: CGFloat = 48
     private var loadingImageURLs: Set<URL> = []
     private var findQuery = ""
@@ -6563,6 +6840,8 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     // v2 redesign: the inline "Metadata" frontmatter block is removed — properties
     // live in the More menu / form sheet, matching iOS. Suppress draw + reserved inset.
     private let rendersInlineFrontmatterBlock = false
+    private var desktopMetadataView: NSHostingView<MacMarkdownMetadataStrip>?
+    private var desktopBreadcrumbView: NSHostingView<MacMarkdownDocumentBreadcrumb>?
     private var frontmatterBlockView: FrontmatterBlockView?
     private weak var frontmatterEditingKeyField: NSTextField?
     private weak var frontmatterEditingField: NSTextField?
@@ -6622,6 +6901,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
+        textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.heightTracksTextView = false
         textView.delegate = self
@@ -6789,6 +7069,22 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         verticalTextInset + frontmatterReservedHeight
     }
 
+    private func refreshFocusLayout() {
+        guard isViewLoaded, let textView, let storage = textView.textStorage else { return }
+        markdownDelegate.focusLocation = textView.selectedRange().location
+        let document = textView.string as NSString
+        activeFocusParagraphStart = document.lineRange(for: NSRange(location: min(markdownDelegate.focusLocation, document.length), length: 0)).location
+        markdownDelegate.invalidateStyledParagraphCache()
+        storage.beginEditing()
+        storage.edited(.editedAttributes, range: NSRange(location: 0, length: storage.length), changeInLength: 0)
+        storage.endEditing()
+        _ = syncTextContainerInsets()
+        if let manager = textView.textLayoutManager, let storage = manager.textContentManager {
+            manager.invalidateLayout(for: storage.documentRange)
+        }
+        scheduleEditorOverlayRefresh()
+    }
+
     private func publishContentOffsetY() {
         let y = scrollView.contentView.bounds.origin.y
         let now = Date()
@@ -6954,6 +7250,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         if scrollToSelection {
             scrollToSelectedFindMatch()
         }
+        refreshDesktopMetadata()
     }
 
     private func navigateFind(to direction: EditorFindNavigationDirection) {
@@ -7088,6 +7385,12 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
         }
         updateTypingAttributes()
         updatePageMentionSuggestions()
+        if usesFocusLayout {
+            let document = textView.string as NSString
+            let position = min(textView.selectedRange().location, document.length)
+            markdownDelegate.focusLocation = position
+            if document.lineRange(for: NSRange(location: position, length: 0)).location != activeFocusParagraphStart { refreshFocusLayout() }
+        }
     }
 
     func textDidEndEditing(_ notification: Notification) {
@@ -7114,6 +7417,22 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
             for: textView.string,
             selectionLocation: textView.selectedRange().location
         )
+        if usesFocusLayout {
+            let document = textView.string as NSString
+            let position = min(textView.selectedRange().location, document.length)
+            let line = document.substring(with: document.lineRange(for: NSRange(location: position, length: 0)))
+            let styled = MacMarkdownFocusStyle.applying(to: NSAttributedString(string: " ", attributes: textView.typingAttributes),
+                kind: MarkdownBlockKind.detect(from: line), isActive: true)
+            textView.typingAttributes = styled.attributes(at: 0, effectiveRange: nil)
+        } else if documentTitleSize != 30 {
+            let document = textView.string as NSString
+            let position = min(textView.selectedRange().location, document.length)
+            let line = document.substring(with: document.lineRange(for: NSRange(location: position, length: 0)))
+            if case .heading(1) = MarkdownBlockKind.detect(from: line) {
+                let styled = MacMarkdownFocusStyle.applyingTitleSize(documentTitleSize, to: NSAttributedString(string: " ", attributes: textView.typingAttributes))
+                textView.typingAttributes = styled.attributes(at: 0, effectiveRange: nil)
+            }
+        }
     }
 
     private func flushTextToBinding(updateBinding: Bool = false) {
@@ -7718,6 +8037,7 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private func refreshEditorOverlays() {
         syncCollapsedXMLTagState()
         refreshFrontmatterBlockView()
+        refreshDesktopMetadata()
         refreshFrontmatterEditingFieldFrame()
         refreshDividerLineViews()
         refreshImageOverlayViews()
@@ -7820,6 +8140,36 @@ final class TextKit2EditorViewController: NSViewController, NSTextViewDelegate, 
     private func toggleFrontmatterBlockExpansion() {
         isFrontmatterBlockExpanded.toggle()
         invalidateFrontmatterLayout()
+    }
+
+    private func refreshDesktopMetadata() {
+        if !usesFocusLayout, let text = documentBreadcrumb, !text.isEmpty {
+            let breadcrumb = MacMarkdownDocumentBreadcrumb(text: text)
+            let host = desktopBreadcrumbView ?? NSHostingView(rootView: breadcrumb)
+            host.rootView = breadcrumb
+            host.frame = NSRect(x: textView.textContainerInset.width + (textView.textContainer?.lineFragmentPadding ?? 0),
+                                y: verticalTextInset - 13, width: max(0, textView.bounds.width - 2 * textView.textContainerInset.width), height: 15)
+            if host.superview !== textView { textView.addSubview(host) }
+            desktopBreadcrumbView = host
+        } else {
+            desktopBreadcrumbView?.removeFromSuperview(); desktopBreadcrumbView = nil
+        }
+        guard !usesFocusLayout, let document = markdownDelegate.frontmatterDocument,
+              let title = try? NSRegularExpression(pattern: "(?m)^# .+$"),
+              let match = title.firstMatch(in: textView.string, range: NSRange(location: 0, length: (textView.string as NSString).length)),
+              let rect = textViewRectForFindRange(match.range) else {
+            desktopMetadataView?.removeFromSuperview(); desktopMetadataView = nil; return
+        }
+        let metadata = MacMarkdownMetadataStrip(document: document, dailyDate: dailyNoteDate, showsProperties: showsMetadataProperties,
+            matchCount: isFindVisible ? findMatches.count : nil)
+        let host = desktopMetadataView ?? NSHostingView(rootView: metadata)
+        host.rootView = metadata
+        let titleMetadataGap: CGFloat = documentTitleSize == 30 ? (markdownDelegate.isInspectorLayout ? 5 : 9) : 7
+        host.frame = NSRect(x: textView.textContainerInset.width + (textView.textContainer?.lineFragmentPadding ?? 0),
+                            y: dailyNoteDate != nil ? rect.minY - 24 : rect.maxY + titleMetadataGap,
+                            width: max(0, textView.bounds.width - 2 * textView.textContainerInset.width), height: 24)
+        if host.superview !== textView { textView.addSubview(host) }
+        desktopMetadataView = host
     }
 
     private func refreshFrontmatterBlockView() {

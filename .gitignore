@@ -43,3 +43,6 @@ scripts/appium_mac_*.sh
 scripts/appium_mac_*.mjs
 .claude/spikes/artifacts/
 .DS_Store
+
+# Local desktop verification builds
+.codex/build/

@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto2", category: "Noto2App")
@@ -12,6 +13,8 @@ struct Noto2App: App {
     @State private var launchRouter = Noto2LaunchRouter.shared
 
     init() {
+        // Before launch finishes, so a notification tap that launches the app is delivered.
+        UNUserNotificationCenter.current().delegate = Noto2NotificationDelegate.shared
         DebugTrace.reset()
         DebugTrace.record("noto2 init bundle=\(Bundle.main.bundleIdentifier ?? "unknown")")
         NSSetUncaughtExceptionHandler { exception in
@@ -49,7 +52,13 @@ struct Noto2App: App {
             .environment(\.colorScheme, .dark)
             .preferredColorScheme(.dark)
             .onOpenURL { url in
-                _ = launchRouter.handle(url)
+                _ = launchRouter.handle(url, stageText: CaptureTextStager.stageInAppGroup)
+            }
+            // "Save Quick Capture" can confirm with a notification ("Notify When Done"). Ask once,
+            // here — a background Shortcut can't show the permission prompt.
+            .task {
+                guard !Self.isRunningTests else { return }
+                _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
             }
         }
     }

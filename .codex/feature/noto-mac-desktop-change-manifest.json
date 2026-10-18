@@ -1,0 +1,61 @@
+{
+  "task": "Implement selected Noto Mac desktop design",
+  "created": [
+    "Packages/NotoVault/Sources/NotoVault/VaultLibrary.swift",
+    "Packages/NotoVault/Sources/NotoVault/NoteFileCommands.swift",
+    "Packages/NotoVault/Sources/NotoVault/VaultDailyActivity.swift",
+    "Packages/NotoVault/Tests/NotoVaultTests/VaultLibraryTests.swift",
+    "Packages/NotoVault/Tests/NotoVaultTests/NoteFileCommandsTests.swift",
+    "Packages/NotoVault/Tests/NotoVaultTests/VaultDailyActivityTests.swift",
+    "Noto/Views/macOS/MacDesktopModel.swift",
+    "Noto/Views/macOS/MacDesktopWorkspace.swift",
+    "Noto/Views/macOS/MacDesktopLibraryViews.swift",
+    "Noto/Views/macOS/MacDesktopEditor.swift",
+    "Noto/Views/macOS/MacDesktopCapture.swift",
+    "Noto/Views/macOS/MacDesktopPalette.swift",
+    "Noto/Views/macOS/MacDesktopQueryField.swift",
+    "Noto/Views/macOS/MacDesktopCommands.swift",
+    "NotoShared/Support/NotoPreviewConfiguration.swift",
+    "NotoShared/Views/MacMarkdownMetadataStrip.swift",
+    "NotoShared/Views/MacMarkdownFocusStyle.swift",
+    "NotoTests/MacDesktopModelTests.swift",
+    "NotoTests/MacDesktopRenderingTests.swift",
+    "NotoTests/MacDesktopKeyboardTests.swift",
+    "bug-reports/039-mac-palette-keyboard.md",
+    "bug-reports/040-mac-stale-list-rows.md",
+    "bug-reports/041-mac-find-return-focus.md",
+    ".codex/feature/noto-mac-desktop-design.md",
+    ".codex/feature/noto-mac-desktop-change-manifest.json",
+    "bug-reports/042-mac-inbox-selection-after-undo.md"
+  ],
+  "edited": [
+    ".gitignore",
+    "Noto.xcodeproj/project.pbxproj",
+    "Noto/NotoApp.swift",
+    "Noto/Sync/ReadwiseSyncController.swift",
+    "Noto/Views/NoteListView.swift",
+    "Noto/Views/SettingsView.swift",
+    "NotoShared/Editor/TextKit2EditorView.swift",
+    "NotoShared/Storage/VaultLocationManager.swift",
+    "NotoShared/Views/EditorContentView.swift",
+    "Packages/NotoVault/Sources/NotoVault/NoteProperty.swift",
+    "Packages/NotoVault/Tests/NotoVaultTests/NotePropertyTests.swift",
+    "NotoTests/NoteEditorSessionTests.swift",
+    "README.md"
+  ],
+  "deleted": [],
+  "artifact_directories": [
+    ".codex/design/noto-mac-20261018",
+    ".codex/evidence/noto-mac-20261018",
+    ".codex/evidence/noto-mac-20261018-visual-design-verify"
+  ],
+  "concurrent_edits_preserved": [
+    "NotoShared/Editor/TextKit2EditorView.swift",
+    "README.md"
+  ],
+  "release_actions": {
+    "commit": false,
+    "push": false,
+    "install_to_Applications": false
+  }
+}

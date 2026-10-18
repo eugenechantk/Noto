@@ -32,7 +32,15 @@ struct SearchIndexCoordinatorTests {
 
         await coordinator.scheduleRefreshFile(vaultURL: vault, fileURL: file)
         await coordinator.scheduleRefreshFile(vaultURL: vault, fileURL: file)
-        try await Task.sleep(for: .milliseconds(120))
+        // The whole suite also runs OCR and index rebuilds. Wait for completion
+        // rather than assuming its executor gets a turn within 120 ms.
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(2))
+        while probe.refreshFileCalls.isEmpty, clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        // Keep observing after the first call so two scheduled runs still fail.
+        try await Task.sleep(for: .milliseconds(200))
 
         #expect(probe.refreshFileCalls == [file.standardizedFileURL.path])
     }

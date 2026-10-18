@@ -4,12 +4,13 @@ import Testing
 struct NoteEditorOptionsTests {
     @Test func exposesEveryRequestedEditorOption() {
         #expect(Noto2NoteEditorOption.allCases == [
-            .searchInNote,
+            .pin,
             .properties,
             .moveNote,
-            .deleteNote,
-            .wordCount,
-            .characterCount
+            .searchInNote,
+            .copyLink,
+            .share,
+            .deleteNote
         ])
     }
 }

@@ -122,7 +122,7 @@ struct NoteEditorSessionTests {
 
     @Test("Load note content reads existing file into session")
     @MainActor
-    func loadNoteContentReadsExistingFileIntoSession() async {
+    func loadNoteContentReadsExistingFileIntoSession() async throws {
         let vault = makeTempVault()
         defer { cleanupVault(vault) }
         let store = MarkdownNoteStore(vaultURL: vault)
@@ -130,6 +130,7 @@ struct NoteEditorSessionTests {
         var note = store.createNote()
         let content = MarkdownNote.makeFrontmatter(id: note.id) + "# Loaded Title\nBody"
         note = store.saveContent(content, for: note).note
+        let persisted = try #require(CoordinatedFileManager.readString(from: note.fileURL))
         let session = NoteEditorSession(store: store, note: note)
 
         await session.loadNoteContent()
@@ -137,15 +138,16 @@ struct NoteEditorSessionTests {
         #expect(session.hasLoaded)
         #expect(!session.isDownloading)
         #expect(!session.downloadFailed)
-        #expect(session.content == content)
-        #expect(session.latestEditorText == content)
-        #expect(session.lastPersistedText == content)
+        #expect(session.content == persisted)
+        #expect(session.latestEditorText == persisted)
+        #expect(session.lastPersistedText == persisted)
+        #expect(MarkdownNote.stripFrontmatter(session.content) == MarkdownNote.stripFrontmatter(content))
         #expect(session.note.title == "Loaded Title")
     }
 
     @Test("Editor task ordering: switch-then-load shows incoming note even when the load task runs before onChange")
     @MainActor
-    func switchThenLoadShowsIncomingNoteRegardlessOfCallbackOrder() async {
+    func switchThenLoadShowsIncomingNoteRegardlessOfCallbackOrder() async throws {
         // Regression for bug 024: on macOS, NoteEditorScreen's `.task(id:)`
         // restarts BEFORE `.onChange(of: note)` performs `switchTo`. The task
         // must therefore switch the session itself before deciding whether to
@@ -160,6 +162,9 @@ struct NoteEditorSessionTests {
         var noteB = store.createNote()
         let contentB = MarkdownNote.makeFrontmatter(id: noteB.id) + "# Note B\nBravo"
         noteB = store.saveContent(contentB, for: noteB).note
+        // Saving stamps `updated:`. Crossing a wall-clock second must not make
+        // this lifecycle assertion depend on the input's older timestamp.
+        let persistedContentB = try #require(CoordinatedFileManager.readString(from: noteB.fileURL))
 
         let session = NoteEditorSession(store: store, note: noteA)
         await session.loadNoteContent()
@@ -174,12 +179,13 @@ struct NoteEditorSessionTests {
 
         #expect(session.note.id == noteB.id)
         #expect(session.hasLoaded)
-        #expect(session.content == contentB)
+        #expect(session.content == persistedContentB)
+        #expect(MarkdownNote.stripFrontmatter(session.content) == MarkdownNote.stripFrontmatter(contentB))
     }
 
     @Test("Switching to the same note id preserves loaded content")
     @MainActor
-    func switchToSameNoteIDPreservesLoadedContent() async {
+    func switchToSameNoteIDPreservesLoadedContent() async throws {
         // The fixed `.task(id:)` calls switchTo unconditionally on first
         // appear; a same-id switch must not clear the already-loaded content.
         let vault = makeTempVault()
@@ -189,6 +195,7 @@ struct NoteEditorSessionTests {
         var note = store.createNote()
         let content = MarkdownNote.makeFrontmatter(id: note.id) + "# Same\nBody"
         note = store.saveContent(content, for: note).note
+        let persisted = try #require(CoordinatedFileManager.readString(from: note.fileURL))
 
         let session = NoteEditorSession(store: store, note: note)
         await session.loadNoteContent()
@@ -197,7 +204,7 @@ struct NoteEditorSessionTests {
         session.switchTo(note: note, store: store, isNew: false)
 
         #expect(session.hasLoaded)
-        #expect(session.content == content)
+        #expect(session.content == persisted)
     }
 
     @Test("Load note content marks unreadable current files as failed")

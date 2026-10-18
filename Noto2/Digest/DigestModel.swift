@@ -5,67 +5,57 @@ import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto2", category: "DigestModel")
 
-/// One file the search index needs to hear about after a digest action.
 struct DigestIndexRequest: Sendable, Equatable {
     let vaultURL: URL
     let fileURL: URL
-    /// True when the file is gone (a filed or discarded capture), false when it
-    /// was written (the note the capture landed in).
     let isRemoval: Bool
 }
 
-/// The Digest tab's queue: due captures from `inbox/`, newest first (a lapsed
-/// snooze counts from its wake time), with the
-/// front of the queue on the card.
-///
-/// Every action follows the same shape — do the filesystem work off the main
-/// actor, and pop the card only if it succeeded. A failed action leaves the same
-/// capture in front so the retry is obvious.
 @MainActor
 @Observable
 final class DigestModel {
-    /// A one-line result banner, mirroring Capture's status slot.
     struct Outcome: Equatable {
+        let id = UUID()
         let glyph: String
         let text: String
-        /// Where the capture ended up, when there is somewhere to go look.
         let fileURL: URL?
-        /// True when this outcome can be taken back — set for a discard, whose
-        /// swipe commits with no confirmation dialog.
         var isUndoable = false
     }
 
     let vaultURL: URL
     private let inbox: DigestInbox
     private let filing: DigestFiling
-    /// Injected so tests can run without touching the app's search index.
     private let index: @Sendable (DigestIndexRequest) async -> Void
+    private let now: @Sendable () -> Date
+    private let defaults: UserDefaults
+    private let tallyKey: String
+    private var tally: DigestDailyTally
+    private var undoEvent: UUID?
+    private var undoReceipt: DigestFiling.UndoReceipt?
+    private var snoozeReceipt: DigestFiling.SnoozedCapture?
 
+    private(set) var allEntries: [DigestEntry] = []
     private(set) var entries: [DigestEntry] = []
-    /// False until the first load finishes, so the empty state doesn't flash
-    /// "inbox clear" before the folder has been read.
     private(set) var hasLoaded = false
     private(set) var isBusy = false
     private(set) var outcome: Outcome?
-    /// The last discard, held for as long as its banner is on screen so the swipe
-    /// can be taken back. Cleared when the banner clears.
     private(set) var lastDiscarded: DigestFiling.DiscardedCapture?
+    var selectedEntryID: UUID?
     var errorMessage: String?
 
-    init(
-        vaultURL: URL,
-        inbox: DigestInbox? = nil,
-        filing: DigestFiling? = nil,
-        index: @escaping @Sendable (DigestIndexRequest) async -> Void = DigestModel.updateSearchIndex
-    ) {
+    init(vaultURL: URL, inbox: DigestInbox? = nil, filing: DigestFiling? = nil,
+         now: @escaping @Sendable () -> Date = Date.init, defaults: UserDefaults = .standard,
+         index: @escaping @Sendable (DigestIndexRequest) async -> Void = DigestModel.updateSearchIndex) {
         self.vaultURL = vaultURL
         self.inbox = inbox ?? DigestInbox(vaultURL: vaultURL)
-        self.filing = filing ?? DigestFiling(vaultURL: vaultURL)
+        self.filing = filing ?? DigestFiling(vaultURL: vaultURL, now: now)
+        self.now = now
+        self.defaults = defaults
         self.index = index
+        tallyKey = "noto2.inbox.tally." + vaultURL.standardizedFileURL.path
+        tally = defaults.data(forKey: tallyKey).flatMap { try? JSONDecoder().decode(DigestDailyTally.self, from: $0) } ?? DigestDailyTally()
     }
 
-    /// Default index hook: keep Noto 2's own FTS index in step with the vault, so
-    /// a filed capture is searchable and a discarded one stops matching.
     static let updateSearchIndex: @Sendable (DigestIndexRequest) async -> Void = { request in
         if request.isRemoval {
             _ = try? await SearchIndexController.shared.removeFile(vaultURL: request.vaultURL, fileURL: request.fileURL)
@@ -74,195 +64,166 @@ final class DigestModel {
         }
     }
 
-    // MARK: - Queue
-
-    var current: DigestEntry? { entries.first }
-    /// The card behind the current one, so the stack looks deep while one remains.
-    var next: DigestEntry? { entries.dropFirst().first }
+    var current: DigestEntry? {
+        if let selectedEntryID { return allEntries.first { $0.id == selectedEntryID } }
+        return entries.first
+    }
+    var next: DigestEntry? { selectedEntryID == nil ? entries.dropFirst().first : nil }
     var remaining: Int { entries.count }
-    /// True only once a load has completed and found nothing — the empty state.
     var isClear: Bool { hasLoaded && entries.isEmpty }
+    var counts: DigestDailyTally.Counts { tally.counts(at: now()) }
+    var sections: [DigestSection] { DigestPresentation.sections(allEntries, now: now()) }
+    var futureSnoozed: [DigestEntry] { allEntries.filter { !$0.isDue(at: now()) } }
 
     func load() async {
         let inbox = self.inbox
-        let now = Date()
-        let loaded = await Task.detached(priority: .userInitiated) {
-            inbox.dueEntries(now: now)
-        }.value
-        entries = loaded
+        let date = now()
+        let loaded = await Task.detached(priority: .userInitiated) { inbox.allEntries() }.value
+        allEntries = DigestPresentation.ordered(loaded, now: date)
+        entries = allEntries.filter { $0.isDue(at: date) }
         hasLoaded = true
-        logger.info("digest loaded \(loaded.count) due captures")
     }
 
-    /// Re-reads `inbox/` unless an action is in flight.
-    ///
-    /// The Digest tab is the back half of Capture's loop — you file a thought, then
-    /// switch tabs to process it — so the queue must not be a one-shot load. Skipped
-    /// while busy so a reload can't yank the card out from under a running action.
-    func refresh() async {
-        guard !isBusy else { return }
-        await load()
+    func refresh() async { guard !isBusy else { return }; await load() }
+
+    @discardableResult func snoozeCurrent() async -> Bool {
+        let box = ReceiptBox()
+        return await perform(.snoozed, action: { filing, entry in
+            let receipt = try filing.snoozeWithUndo(entry)
+            box.snoozed = receipt
+            return Outcome(glyph: "clock", text: "Snoozed until \(receipt.wakeDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))", fileURL: nil, isUndoable: true)
+        }, receipt: box)
     }
 
-    // MARK: - Actions
-
-    /// Pushes the current capture a week out. The file stays in `inbox/`, so the
-    /// search index is untouched.
-    @discardableResult
-    func snoozeCurrent() async -> Bool {
-        await perform(
-            action: { filing, entry in
-                let wake = try filing.snooze(entry)
-                return Outcome(
-                    glyph: "clock",
-                    text: "Snoozed until \(Self.wakeFormatter.string(from: wake))",
-                    fileURL: nil
-                )
-            },
-            indexRequests: { _, _ in [] }
-        )
+    @discardableResult func addCurrent(toNoteAt url: URL, titled title: String) async -> Bool {
+        let box = ReceiptBox()
+        return await perform(.filed, action: { filing, entry in
+            let receipt = try filing.appendWithUndo(entry, toNoteAt: url)
+            box.filed = receipt
+            return Outcome(glyph: "text.append", text: "Added to \(title)", fileURL: receipt.destinationURL, isUndoable: true)
+        }, receipt: box)
     }
 
-    /// Appends the current capture to an existing note, then clears it from the inbox.
-    @discardableResult
-    func addCurrent(toNoteAt targetURL: URL, titled title: String) async -> Bool {
-        await perform(
-            action: { filing, entry in
-                let written = try filing.append(entry, toNoteAt: targetURL)
-                return Outcome(glyph: "text.append", text: "Added to \(title)", fileURL: written)
-            },
-            indexRequests: { entry, outcome in
-                [outcome.fileURL.map { ($0, false) }, (entry.fileURL, true)].compactMap { $0 }
-            }
-        )
+    /// Legacy caller compatibility; new flows use the as-written variant below.
+    @discardableResult func createNoteFromCurrent(title: String, inFolderAt folderURL: URL) async -> Bool {
+        await perform(.filed, action: { filing, entry in
+            let written = try filing.createNote(from: entry, title: title, inFolderAt: folderURL)
+            return Outcome(glyph: "doc.badge.plus", text: "Created \(written.deletingPathExtension().lastPathComponent)", fileURL: written)
+        })
     }
 
-    /// Turns the current capture into a new note, then clears it from the inbox.
-    @discardableResult
-    func createNoteFromCurrent(title: String, inFolderAt folderURL: URL) async -> Bool {
-        await perform(
-            action: { filing, entry in
-                let written = try filing.createNote(from: entry, title: title, inFolderAt: folderURL)
-                return Outcome(
-                    glyph: "doc.badge.plus",
-                    text: "Created \(written.deletingPathExtension().lastPathComponent)",
-                    fileURL: written
-                )
-            },
-            indexRequests: { entry, outcome in
-                [outcome.fileURL.map { ($0, false) }, (entry.fileURL, true)].compactMap { $0 }
-            }
-        )
+    @discardableResult func createNoteFromCurrent(inFolderAt folder: URL, body: String? = nil) async -> Bool {
+        let box = ReceiptBox()
+        let name = folder.standardizedFileURL == vaultURL.standardizedFileURL ? "Library" : folder.lastPathComponent
+        return await perform(.filed, action: { filing, entry in
+            let receipt = try filing.createWithUndo(entry, inFolderAt: folder, body: body)
+            box.filed = receipt
+            return Outcome(glyph: "doc.badge.plus", text: "Created in \(name)", fileURL: receipt.destinationURL, isUndoable: true)
+        }, receipt: box)
     }
 
-    /// Deletes the current capture, keeping its bytes so the swipe can be undone.
-    @discardableResult
-    func discardCurrent() async -> Bool {
-        let box = DiscardBox()
-        let ok = await perform(
-            action: { filing, entry in
-                box.value = try filing.discard(entry)
-                return Outcome(glyph: "trash", text: "Discarded", fileURL: nil, isUndoable: true)
-            },
-            indexRequests: { entry, _ in [(entry.fileURL, true)] }
-        )
-        if ok { lastDiscarded = box.value }
-        return ok
+    @discardableResult func discardCurrent() async -> Bool {
+        let box = ReceiptBox()
+        return await perform(.discarded, action: { filing, entry in
+            let discarded = try filing.discard(entry)
+            box.discarded = discarded
+            return Outcome(glyph: "trash", text: "Discarded", fileURL: nil, isUndoable: !discarded.document.isEmpty)
+        }, receipt: box)
     }
 
-    /// Puts the last discarded capture back and returns it to the queue.
-    ///
-    /// Swipe-down deletes with no confirmation — the red trash target is the
-    /// warning — so this is the only recourse for a mis-swipe.
-    @discardableResult
-    func undoDiscard() async -> Bool {
-        guard !isBusy, let discarded = lastDiscarded else { return false }
+    @discardableResult func saveBody(_ body: String, for entry: DigestEntry) async -> Bool {
+        guard !isBusy else { return false }
         isBusy = true
-        defer { isBusy = false }
-
         let filing = self.filing
-        let restored: Result<Void, Error> = await Task.detached(priority: .userInitiated) {
-            Result { try filing.restore(discarded) }
-        }.value
-
-        switch restored {
+        let result = await Task.detached(priority: .userInitiated) { Result { try filing.updateBody(body, of: entry) } }.value
+        isBusy = false
+        switch result {
         case .success:
-            lastDiscarded = nil
-            outcome = nil
-            let index = self.index
-            let request = DigestIndexRequest(vaultURL: vaultURL, fileURL: discarded.entry.fileURL, isRemoval: false)
-            Task.detached(priority: .utility) { await index(request) }
-            isBusy = false
             await load()
-            DebugTrace.record("digest restored \(discarded.entry.relativePath)")
+            await index(.init(vaultURL: vaultURL, fileURL: entry.fileURL, isRemoval: false))
             return true
-        case .failure(let error):
-            let message = (error as? DigestFiling.FilingError)?.message ?? error.localizedDescription
-            logger.error("digest undo failed: \(message, privacy: .public)")
-            errorMessage = message
-            return false
+        case .failure(let error): report(error); return false
         }
     }
 
-    /// Clears the outcome banner after it has had its moment on screen. The undo
-    /// window closes with it — an undo you can no longer see is not an undo.
+    @discardableResult func undoDiscard() async -> Bool { await undoLastAction() }
+
+    @discardableResult func undoLastAction() async -> Bool {
+        guard !isBusy, outcome?.isUndoable == true else { return false }
+        isBusy = true
+        defer { isBusy = false }
+        let filing = self.filing
+        let filed = undoReceipt, snoozed = snoozeReceipt, discarded = lastDiscarded
+        let result = await Task.detached(priority: .userInitiated) {
+            Result {
+                if let filed { try filing.undo(filed) }
+                else if let snoozed { try filing.undoSnooze(snoozed) }
+                else if let discarded { try filing.restore(discarded) }
+            }
+        }.value
+        switch result {
+        case .success:
+            if let undoEvent { tally.undo(undoEvent); persistTally() }
+            if let capture = filed?.capture.entry ?? discarded?.entry ?? snoozed?.entry {
+                await index(.init(vaultURL: vaultURL, fileURL: capture.fileURL, isRemoval: false))
+            }
+            if let target = filed?.destinationURL {
+                await index(.init(vaultURL: vaultURL, fileURL: target, isRemoval: filed?.destinationBefore == nil))
+            }
+            clearUndo()
+            outcome = nil
+            await load()
+            return true
+        case .failure(let error): report(error); return false
+        }
+    }
+
     func clearOutcome(_ shown: Outcome) {
         guard outcome == shown else { return }
         outcome = nil
-        lastDiscarded = nil
+        clearUndo()
     }
 
-    /// Escape hatch for handing a value out of the `@Sendable` action closure.
-    private final class DiscardBox: @unchecked Sendable {
-        var value: DigestFiling.DiscardedCapture?
+    private func clearUndo() {
+        lastDiscarded = nil; undoReceipt = nil; snoozeReceipt = nil; undoEvent = nil
     }
 
-    // MARK: - Plumbing
+    private final class ReceiptBox: @unchecked Sendable {
+        var filed: DigestFiling.UndoReceipt?
+        var snoozed: DigestFiling.SnoozedCapture?
+        var discarded: DigestFiling.DiscardedCapture?
+    }
 
-    /// Runs `action` off the main actor against the front of the queue, pops the
-    /// card on success, and reports the failure without popping otherwise.
-    private func perform(
-        action: @escaping @Sendable (DigestFiling, DigestEntry) throws -> Outcome,
-        indexRequests: (DigestEntry, Outcome) -> [(URL, Bool)]
-    ) async -> Bool {
+    private func perform(_ kind: DigestDailyTally.Action,
+                         action: @escaping @Sendable (DigestFiling, DigestEntry) throws -> Outcome,
+                         receipt: ReceiptBox? = nil) async -> Bool {
         guard !isBusy, let entry = current else { return false }
         isBusy = true
         defer { isBusy = false }
-
         let filing = self.filing
-        let result: Result<Outcome, Error> = await Task.detached(priority: .userInitiated) {
-            Result { try action(filing, entry) }
-        }.value
-
+        let result = await Task.detached(priority: .userInitiated) { Result { try action(filing, entry) } }.value
         switch result {
-        case .success(let outcome):
-            entries.removeFirst()
-            self.outcome = outcome
-            DebugTrace.record("digest \(outcome.text) — \(entry.relativePath)")
-
-            let requests = indexRequests(entry, outcome).map {
-                DigestIndexRequest(vaultURL: vaultURL, fileURL: $0.0, isRemoval: $0.1)
-            }
-            if !requests.isEmpty {
-                let index = self.index
-                Task.detached(priority: .utility) {
-                    for request in requests { await index(request) }
-                }
-            }
+        case .success(let result):
+            clearUndo()
+            outcome = result
+            undoReceipt = receipt?.filed
+            snoozeReceipt = receipt?.snoozed
+            lastDiscarded = receipt?.discarded
+            undoEvent = tally.record(kind, at: now())
+            persistTally()
+            selectedEntryID = nil
+            await load()
+            if let target = result.fileURL { await index(.init(vaultURL: vaultURL, fileURL: target, isRemoval: false)) }
+            await index(.init(vaultURL: vaultURL, fileURL: entry.fileURL, isRemoval: kind != .snoozed))
             return true
-
-        case .failure(let error):
-            let message = (error as? DigestFiling.FilingError)?.message ?? error.localizedDescription
-            logger.error("digest action failed: \(message, privacy: .public)")
-            errorMessage = message
-            return false
+        case .failure(let error): report(error); return false
         }
     }
 
-    private static let wakeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
+    private func persistTally() { if let data = try? JSONEncoder().encode(tally) { defaults.set(data, forKey: tallyKey) } }
+    private func report(_ error: Error) {
+        let message = (error as? DigestFiling.FilingError)?.message ?? error.localizedDescription
+        logger.error("Inbox operation failed: \(message, privacy: .public)")
+        errorMessage = message
+    }
 }

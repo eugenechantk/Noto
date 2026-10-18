@@ -6,6 +6,10 @@
 	<string>https://cloudflare.eugenechantk.me/noto/share-media</string>
 	<key>NotoShareMediaToken</key>
 	<string>$(NOTO_SHARE_MEDIA_TOKEN)</string>
+	<key>NotoMediaMirrorURL</key>
+	<string>https://cloudflare.eugenechantk.me/noto/media</string>
+	<key>NotoMediaMirrorKey</key>
+	<string>$(NOTO_MEDIA_SIGNING_KEY)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

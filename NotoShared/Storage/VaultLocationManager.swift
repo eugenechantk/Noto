@@ -21,6 +21,14 @@ final class VaultLocationManager {
     private static let resetStateArgument = "-notoResetState"
 
     init(resolveExternalVaultOnInit: Bool = true) {
+        #if DEBUG
+        // Preview launches must never replace the user's saved vault bookmark.
+        if let path = NotoPreviewConfiguration.vaultPath, !path.isEmpty {
+            vaultURL = URL(fileURLWithPath: path, isDirectory: true)
+            isVaultConfigured = true
+            return
+        }
+        #endif
         if Self.shouldResetStateFromLaunchArguments {
             resetStateForUITesting()
         }

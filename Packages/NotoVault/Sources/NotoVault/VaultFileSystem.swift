@@ -13,6 +13,13 @@ public protocol VaultFileSystem: Sendable {
     @discardableResult func createDirectory(at url: URL) -> Bool
     func isDownloaded(at url: URL) -> Bool
     func startDownloading(at url: URL)
+    /// Runs `body`, which reads many of `urls`, as one batch where the file
+    /// system can make that cheaper. Default: just runs it.
+    func batchingReads(of urls: [URL], _ body: () -> Void)
+}
+
+public extension VaultFileSystem {
+    func batchingReads(of urls: [URL], _ body: () -> Void) { body() }
 }
 
 public struct CoordinatedVaultFileSystem: VaultFileSystem {
@@ -149,5 +156,18 @@ public struct CoordinatedVaultFileSystem: VaultFileSystem {
     public func startDownloading(at url: URL) {
         guard !isDownloaded(at: url) else { return }
         try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+    }
+
+    /// `NSFileCoordinator.prepare(forReadingItemsAt:…)` lets the per-file
+    /// coordinated reads inside share one coordination setup.
+    public func batchingReads(of urls: [URL], _ body: () -> Void) {
+        var error: NSError?
+        var ran = false
+        NSFileCoordinator().prepare(forReadingItemsAt: urls, options: [], writingItemsAt: [], options: [], error: &error) { completion in
+            ran = true
+            body()
+            completion()
+        }
+        if !ran { body() }
     }
 }

@@ -16,7 +16,8 @@ NotoApp
       owns workspace navigation and presentation
       handles VaultWorkspaceIntent from lists, sidebar, search, and editor
       owns compact iPhone NavigationStack routes
-      owns iPad/macOS split selection and note history
+      owns iPad split selection and note history
+      delegates macOS to MacDesktopWorkspace / MacDesktopModel
       owns Today, search, settings, document-link routing, and restore-last-note
 
       NotoSplitView
@@ -68,7 +69,7 @@ Since 2026-08-23 the project builds two apps from the same code:
 | Target | Scheme | Bundle id | What it is |
 | --- | --- | --- | --- |
 | `Noto` | `Noto-iOS`, `Noto-macOS`, `Noto` | `com.eugenechan.Noto` | the full iOS/iPadOS/macOS app |
-| `Noto2` | `Noto2` | `com.eugenechan.Noto2` | a separate, iOS-only five-tab app — Capture (editor + send to `inbox/`), Digest (process `inbox/` to zero), Search (hybrid hits + streamed summary), Media (visual board of note attachments), Browse — over the same vault |
+| `Noto2` | `Noto2` | `com.eugenechan.Noto2` | a separate iOS app over the same vault, with Capture, Daily Notes, Inbox, Library, and Search tabs |
 | `Noto2QuickCaptureControl` | embedded by `Noto2` | `com.eugenechan.Noto2.QuickCaptureControl` | WidgetKit accessory widget for opening Noto 2 Quick Capture from the Lock Screen widget area; the existing target name is retained for bundle/signing stability |
 | `Noto2ShareExtension` | embedded by `Noto2` | `com.eugenechan.Noto2.ShareExtension` | Share-sheet extension ("Noto 2" in the app row): stages a shared link as `[title](url)` in the App Group; Noto 2 files it into `inbox/` on its next activation |
 
@@ -91,7 +92,8 @@ Noto2ControlShared/
 Noto2QuickCaptureControl/
   Noto2QuickCaptureControl    WidgetKit accessory widget extension embedded by Noto 2
 Noto2ShareExtension/
-  ShareViewController         Share-sheet extension: item-provider loading + confirmation pill
+  ShareViewController         Item-provider loading and staged capture lifecycle
+  ShareCaptureSheet           Compose and saved states in the native extension sheet
   NotoShareTitle.js           Safari preprocessing script (document.title + URL)
 ```
 
@@ -107,11 +109,38 @@ is to promote `NotoShared/Storage` (no UI) and `NotoShared/Editor` into packages
 The launch-route file in `Noto2ControlShared/` is intentionally compiled into both
 Noto 2 and its widget extension; extension-only UI stays in `Noto2QuickCaptureControl/`.
 
+
+### Noto 2 flow ownership
+
+`RootTabView` owns tab selection, the due-capture badge, cross-tab note opening, and Daily Notes reselection.
+During a Capture-first launch, it delays background workspace work for three seconds.
+
+| Flow | UI ownership | Shared logic |
+| --- | --- | --- |
+| Capture | `Noto2/Capture/` | `CaptureFilingService` and conflict-safe direct-filing receipts |
+| Daily Notes | `Noto2/Today/` | `NotoVault.DailyNoteService` and the shared `NoteEditorSession` |
+| Inbox | `Noto2/Digest/` | `NotoDigest` queue, filing, snooze, counts, and undo |
+| Library | `Noto2/Browse/` | `NotoVault.LibraryCatalog`, `NotePinning`, and shared note editing |
+| Search | `Noto2/Search/` | `NotoSearch` local keyword/semantic matching and display-title resolution |
+
+Capture and Inbox both use `Noto2/Filing/` for Add to and New note.
+Undo compares the destination with its post-filing snapshot before restoring it, preserving later edits.
+Capture hides the formatting toolbar; ordinary and Daily Notes editors retain it.
+`NotoTheme` scopes the new palette to Noto 2 and its extensions, preserving Noto 1 colors.
+
+Daily Notes creates today when first opened. Missing past dates require Start.
+Switching tabs preserves the selected date; retapping Daily Notes returns to today and the top.
+Search results open the shared note screen with Find positioned on the first match.
+Search shows result rows only. It has no generated-answer request or API-key entry.
+Settings contains Vault, Search and About. Shared Noto 1 summary services remain separate.
+Debug-only `--search-preview-state` routes cover loading, error and partial-index presentation; they do not change stored index data.
+
 ### Ownership Rules
 
 - `MainAppView` owns app runtime lifecycle, not workspace routing.
 - `VaultWorkspaceView` owns navigation and presentation, not low-level filesystem logic.
-- UI surfaces emit `VaultWorkspaceIntent`; they do not mutate selection, `NavigationPath`, or vault files directly.
+- iOS and iPad UI surfaces emit `VaultWorkspaceIntent`; the workspace owns their navigation state.
+- macOS uses `MacDesktopWorkspace` and its window-local `MacDesktopModel` for source selection, history, Capture, Inbox, palettes, and pane visibility.
 - `NotoSplitView` is a layout shell. It does not construct editors, create notes, or resolve document links.
 - `VaultController` is the app-facing vault interface. It currently delegates through `MarkdownNoteStore` while package services continue to absorb non-UI behavior.
 - `SearchIndexController` owns app-side search-index notifications and lifecycle triggers. `NotoSearch.SearchIndexCoordinator` owns package-level refresh mechanics.
@@ -196,24 +225,29 @@ The launch path is:
 
 ### Workspace and Navigation Lifecycle
 
-`VaultWorkspaceView` is the single owner of workspace routing.
+`VaultWorkspaceView` owns iOS/iPadOS routing and selects the macOS workspace adapter.
 
 - Compact iPhone uses a root `NavigationStack` with `NoteRoute`.
-- iPad and macOS use `NotoSplitView` as a shell around `NavigationSplitView`.
+- iPad uses `NotoSplitView` as a shell around `NavigationSplitView`.
+- macOS uses `MacDesktopWorkspace`, adapting three panes to two panes and single-pane overlays.
 - The split detail selection, note history, search sheet, settings sheet, Today routing, last-opened-note restore, and document-link routing all live in `VaultWorkspaceView`.
 - `FolderContentView`, `NotoSidebarView`, search results, and editor callbacks all report `VaultWorkspaceIntent`.
 - `VaultWorkspaceView` translates each intent into either route changes or vault operations.
 
-Opening a note is now:
+Opening a note on iOS or iPadOS is:
 
 1. A list row, sidebar row, search result, Today button, or document link emits an intent.
 2. `VaultWorkspaceView` resolves the target note/store and updates compact or split navigation state.
 3. `NoteEditorScreen` is created only by the workspace route/detail mapping.
 4. `NoteEditorScreen` creates `NoteEditorSession` for that note.
 
+On macOS, `MacDesktopModel` resolves the selected note and `MacDesktopEditor` creates its `NoteEditorSession`. The editor flushes pending edits before moving or trashing a note. `NotoVault.VaultLibrarySnapshot` supplies list previews, dates, folder counts, outlines, and backlinks. Filing delegates to the existing capture and digest services. Package file commands preserve identity during Rename and assign a new UUID during Duplicate. Daily activity totals live in NotoVault; the Mac adapter persists them per vault. The native query field owns palette keyboard events only while its window and field editor are active.
+
+The desktop reference and verification criteria are in `.codex/feature/noto-mac-desktop-design.md`. Debug previews use `NOTO_PREVIEW_VAULT` without replacing the saved vault or reading saved service keys. Mock token stores remain available to tests. Mac unit-test hosts receive that value through `TEST_RUNNER_NOTO_PREVIEW_VAULT`.
+
 ### Editor Lifecycle
 
-The live editor is `TextKit2EditorView`, composed by `NoteEditorScreen`.
+The live editor is `TextKit2EditorView`, composed by `NoteEditorScreen` or the Mac desktop adapter.
 
 The open path is:
 
@@ -247,10 +281,16 @@ Search is split between app lifecycle and package mechanics.
 - `NotoSearch.SearchIndexCoordinator` owns package-level single-flight full refreshes, debounced file refreshes, remove/replace behavior, and follow-up work after overlapping refreshes.
 - `NoteSearchSheet` asks the search index for results and emits selected results back to `VaultWorkspaceView` as workspace navigation.
 
+Semantic search and Similar notes use the local Granite model from `NotoEmbedding`.
+Git ignores `Packages/NotoEmbedding/Sources/NotoEmbedding/Resources/GraniteEmbed_int8.mlpackage`, so a fresh worktree does not inherit it.
+Copy this resource from the existing checkout before building those flows.
+Verify semantic indexing finishes; keyword fallback alone does not prove the model is available.
+
 ### Inbox / Digest Lifecycle
 
 Noto 2's Capture tab writes `inbox/<YYYY-MM-DD>-<sha8>.md` (`CaptureFilingService`); the
-Digest tab is the other half of that loop — it works the folder down to zero.
+Inbox tab is the other half of that loop — it works the folder down to zero.
+The source folder and model retain their `Digest` names.
 
 - `NotoDigest.DigestInbox` enumerates top-level `.md` files in `inbox/` and parses each into
   a `DigestEntry`. It does not recurse — the inbox is flat by construction.
@@ -298,14 +338,10 @@ Digest tab is the other half of that loop — it works the folder down to zero.
   link was shared, not when the app was opened), removes the staged file **only after** the
   vault write succeeded, schedules search indexing, and posts
   `SharedCaptureDrain.didFileNotification` so an on-screen Digest reloads.
-- After staging, the extension shows a **Link captured** sheet (SwiftUI hosted directly in the
-  extension's view — iOS already wraps the extension in a sheet container). **Keep editing** opens `noto2://capture?shared=<id>` (`Noto2LaunchRoute.openSharedCaptureURL`),
-  which `RootTabView` handles by draining and opening the note that capture was filed to
-  (`sharedCaptureNotes` ledger → `openFiledNote`), falling back to Digest for an id it did not
-  file this session. There is no public "open my app" API for share extensions: the code walks
-  the responder chain to `UIApplication` and calls `open(_:options:completionHandler:)` via its
-  IMP — `extensionContext.open` returns false and the legacy `openURL:` is refused by UIKit;
-  `UIWindowScene` answers the selector but crashes, so it is skipped.
+- The extension first presents `ShareCaptureSheet` with the resolved link and an optional thought.
+  Save stages the composed capture synchronously, then shows the saved state in the same native sheet.
+  Done dismisses immediately; the saved state also dismisses after a short delay. Cancel stages nothing.
+  The existing `noto2://capture?shared=<id>` route remains supported by `RootTabView` for staged-capture links.
 - Both `Noto2/Noto2.entitlements` and the extension's entitlements carry the App Group.
 - **Share-sheet media (X / Instagram) via Cloudflare Queue + Hermes.** For an X status or
   Instagram post/reel URL the extension also sends a `ShareMediaJob` (capture id, URL, the
@@ -332,7 +368,7 @@ Digest tab is the other half of that loop — it works the folder down to zero.
 
 ### Media Board Lifecycle
 
-Noto 2's Media tab projects media references from vault markdown into a lazy,
+Noto 2's retained Media screen projects media references from vault markdown into a lazy,
 adaptive masonry board. `NotoVault.VaultMediaLibrary` owns recursive read-only
 discovery, type classification, safe vault-relative URLs, source-note association,
 deduplication within each note, newest-note ordering, and text/type filtering.
@@ -368,6 +404,7 @@ Readwise is split across the app target and package:
 - `Packages/NotoReadwiseSync/Sources/NotoReadwiseSyncCore` owns API models, the Readwise client, Reader/Readwise sync engines, source-note rendering, and sync state.
 - `Packages/NotoReadwiseSync/Sources/noto-readwise-sync` contains the CLI wrapper around the same core package.
 - `noto-readwise-sync --incremental` runs the same checkpointed Reader + Readwise library sync headlessly. On Eugene's MacBook Pro, Hermes job `5cb9aa45d9be` runs it every 15 minutes before the existing Readwise digest worker, so Noto 2 does not need to be opened for imports to reach the shared iCloud vault.
+- Scheduled sync coordinates iCloud reads and replacements so evicted checkpoints and notes download before use. New sources go into iCloud Drive's `Noto/Captures`; existing mappings keep their paths. The digest worker retries transient cloud reads through the same CLI and retains its polling checkpoint when any item fails.
 
 ### Deep Link Lifecycle
 

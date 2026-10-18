@@ -37,17 +37,39 @@ public struct VaultMediaSnapshot: Sendable {
 public struct VaultMediaLibrary: Sendable {
     public let vaultURL: URL
     private let fileSystem: any VaultFileSystem
+    /// Where the last scan is remembered (see `VaultMediaIndex`); nil scans everything every time.
+    private let indexURL: URL?
     private let linkSearchText: @Sendable (URL) -> String?
 
     public init(vaultURL: URL, fileSystem: any VaultFileSystem = CoordinatedVaultFileSystem(),
+                indexURL: URL? = nil,
                 linkSearchText: @escaping @Sendable (URL) -> String? = { _ in nil }) {
         self.vaultURL = vaultURL.standardizedFileURL
         self.fileSystem = fileSystem
+        self.indexURL = indexURL
         self.linkSearchText = linkSearchText
     }
 
+    /// The last scan's media, straight from the index — no enumeration, no note
+    /// reads — so the board can render before `scan()` refreshes it.
+    public func cachedSnapshot() -> VaultMediaSnapshot {
+        guard let indexURL, let index = VaultMediaIndex.load(from: indexURL) else {
+            return VaultMediaSnapshot(items: [], unavailableNoteCount: 0)
+        }
+        let items = index.notes.flatMap { relative, entry in
+            entry.mediaItems(noteRelativePath: relative, vaultURL: vaultURL, linkSearchText: linkSearchText)
+        }
+        return VaultMediaSnapshot(items: Self.sorted(items), unavailableNoteCount: 0)
+    }
+
+    /// Finds media across every note. With an index, a note whose modified date
+    /// and size are unchanged is not read again. A note iCloud has evicted is
+    /// never read (a coordinated read would block until it downloads): its
+    /// download starts and its last known media stand in until it arrives.
     public func scan() throws -> VaultMediaSnapshot {
-        let keys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey, .contentModificationDateKey]
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey, .contentModificationDateKey, .fileSizeKey]
+        let previous = indexURL.flatMap(VaultMediaIndex.load(from:)) ?? VaultMediaIndex()
+        var next = VaultMediaIndex()
         // Surface an inaccessible root rather than misreporting an empty library.
         _ = try FileManager.default.contentsOfDirectory(at: vaultURL, includingPropertiesForKeys: nil)
         var enumerationError: Error?
@@ -58,28 +80,91 @@ public struct VaultMediaLibrary: Sendable {
         ) else { throw CocoaError(.fileReadUnknown) }
         var result: [VaultMediaItem] = []
         var unavailable = 0
+        let prefix = vaultURL.path + "/"
+        var toRead: [PendingRead] = []
         for case let url as URL in files {
             try Task.checkCancellation()
             guard url.pathExtension.lowercased() == "md" else { continue }
             let values = try? url.resourceValues(forKeys: Set(keys))
             guard values?.isSymbolicLink != true, values?.isRegularFile == true else { continue }
-            // Coordinated reads are authoritative; iCloud metadata can be stale.
-            guard let markdown = fileSystem.readString(from: url) else {
-                unavailable += 1
-                fileSystem.startDownloading(at: url)
+            let path = url.standardizedFileURL.path
+            guard path.hasPrefix(prefix) else { continue }
+            let relative = String(path.dropFirst(prefix.count))
+            let modifiedAt = values?.contentModificationDate ?? .distantPast
+            let size = values?.fileSize ?? -1
+            let known = previous.notes[relative]
+
+            if let known, known.matches(modifiedAt: modifiedAt, size: size) {
+                next.notes[relative] = known
+                result += known.mediaItems(noteRelativePath: relative, vaultURL: vaultURL, linkSearchText: linkSearchText)
                 continue
             }
-            result += Self.items(in: markdown, noteURL: url, vaultURL: vaultURL,
-                                 modifiedAt: values?.contentModificationDate ?? .distantPast,
-                                 linkSearchText: linkSearchText)
+            guard fileSystem.isDownloaded(at: url) else {
+                fileSystem.startDownloading(at: url)
+                if let known {
+                    next.notes[relative] = known
+                    result += known.mediaItems(noteRelativePath: relative, vaultURL: vaultURL, linkSearchText: linkSearchText)
+                } else {
+                    unavailable += 1
+                }
+                continue
+            }
+            toRead.append(PendingRead(url: url, relative: relative, modifiedAt: modifiedAt, size: size))
         }
         if let enumerationError { throw enumerationError }
-        result.sort {
+
+        // Each coordinated read costs ~20 ms of coordination round trip, mostly
+        // waiting, so changed notes are read in parallel (a first scan of
+        // ~1,200 notes took 24 s one at a time).
+        let parsedNotes = readConcurrently(toRead)
+        try Task.checkCancellation()
+        for (pending, parsed) in zip(toRead, parsedNotes) {
+            guard let parsed else {
+                unavailable += 1
+                fileSystem.startDownloading(at: pending.url)
+                continue
+            }
+            next.notes[pending.relative] = VaultMediaIndex.Entry(parsed, modifiedAt: pending.modifiedAt, size: pending.size, vaultURL: vaultURL)
+            result += parsed.items
+        }
+        if let indexURL { next.save(to: indexURL) }
+        return VaultMediaSnapshot(items: Self.sorted(result), unavailableNoteCount: unavailable)
+    }
+
+    private struct PendingRead {
+        let url: URL
+        let relative: String
+        let modifiedAt: Date
+        let size: Int
+    }
+
+    /// Reads and parses notes on several threads; nil for a note that could not be read.
+    private func readConcurrently(_ notes: [PendingRead]) -> [ParsedNote?] {
+        guard !notes.isEmpty else { return [] }
+        var results = [ParsedNote?](repeating: nil, count: notes.count)
+        let lock = NSLock()
+        fileSystem.batchingReads(of: notes.map(\.url)) {
+            // Worker threads are outside the calling task, so a cancelled scan
+            // finishes this batch; the caller checks cancellation right after.
+            DispatchQueue.concurrentPerform(iterations: notes.count) { index in
+                let note = notes[index]
+                guard let markdown = fileSystem.readString(from: note.url) else { return }
+                let parsed = Self.parse(markdown, noteURL: note.url, vaultURL: vaultURL, modifiedAt: note.modifiedAt,
+                                        linkSearchText: linkSearchText)
+                lock.lock()
+                results[index] = parsed
+                lock.unlock()
+            }
+        }
+        return results
+    }
+
+    static func sorted(_ items: [VaultMediaItem]) -> [VaultMediaItem] {
+        items.sorted {
             if $0.modifiedAt != $1.modifiedAt { return $0.modifiedAt > $1.modifiedAt }
             if $0.noteRelativePath != $1.noteRelativePath { return $0.noteRelativePath < $1.noteRelativePath }
             return $0.id < $1.id
         }
-        return VaultMediaSnapshot(items: result, unavailableNoteCount: unavailable)
     }
 
     public static func filtered(_ items: [VaultMediaItem], query: String, kind: VaultMediaKind? = nil) -> [VaultMediaItem] {
@@ -92,17 +177,34 @@ public struct VaultMediaLibrary: Sendable {
         }
     }
 
+    // The destination alternates single characters with one `(…)` group — never
+    // a repeat inside a repeat. `(?:[^\s()]+|…)+` backtracked exponentially on a
+    // destination containing spaces (a real Readwise capture hung the scan).
     private static let links = try! NSRegularExpression(
-        pattern: #"(?<![\\!])(!?)\[([^\]]*)\]\((<[^>]+>|(?:[^\s()]+|\([^)]*\))+)(?:\s+["'][^"']*["'])?\)"#
+        pattern: #"(?<![\\!])(!?)\[([^\]]*)\]\((<[^>]+>|(?:[^\s()]|\([^)]*\))+)(?:\s+["'][^"']*["'])?\)"#
     )
     private static let inlineCode = try! NSRegularExpression(pattern: #"(`+).*?\1"#)
     private static let webLinks = try! NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
 
     public static func items(in markdown: String, noteURL: URL, vaultURL: URL, modifiedAt: Date = .distantPast,
                              linkSearchText: @Sendable (URL) -> String? = { _ in nil }) -> [VaultMediaItem] {
+        parse(markdown, noteURL: noteURL, vaultURL: vaultURL, modifiedAt: modifiedAt, linkSearchText: linkSearchText).items
+    }
+
+    /// One note's media plus what the index keeps to rebuild them without the
+    /// note: the search text of the note itself, and the web links whose
+    /// preview metadata joins the search text fresh on every scan.
+    struct ParsedNote {
+        var items: [VaultMediaItem]
+        var baseSearchText: String?
+        var linkedURLs: [URL]
+    }
+
+    static func parse(_ markdown: String, noteURL: URL, vaultURL: URL, modifiedAt: Date,
+                      linkSearchText: @Sendable (URL) -> String?) -> ParsedNote {
         let root = vaultURL.standardizedFileURL
         let prefix = root.path + "/"
-        guard noteURL.standardizedFileURL.path.hasPrefix(prefix) else { return [] }
+        guard noteURL.standardizedFileURL.path.hasPrefix(prefix) else { return ParsedNote(items: [], baseSearchText: nil, linkedURLs: []) }
         let relative = String(noteURL.standardizedFileURL.path.dropFirst(prefix.count))
         let rawTitle = VaultMarkdown.displayTitle(for: noteURL, content: markdown)
         // Share-sheet notes often start with `[post title](url)`. Captions are
@@ -111,6 +213,8 @@ public struct VaultMediaLibrary: Sendable {
         let title = attributedTitle.map { String($0.characters) } ?? rawTitle
         let identity = VaultMarkdown.idFromFrontmatter(markdown)?.uuidString ?? relative
         var sharedSearchText: String?
+        var baseSearchText: String?
+        var linkedURLs: [URL] = []
         var seen = Set<URL>()
         var result: [VaultMediaItem] = []
         var fence: (character: Character, count: Int)?
@@ -137,17 +241,28 @@ public struct VaultMediaLibrary: Sendable {
                       seen.insert(url).inserted else { continue }
                 // Normalize once for a note containing media. Notes with no
                 // media need no cache reads; each keystroke reuses this text.
-                let noteSearchText = sharedSearchText ?? normalized(
-                    ([title, relative, markdown] + linkedWebURLs(in: markdown).compactMap(linkSearchText)).joined(separator: "\n")
-                )
-                sharedSearchText = noteSearchText
+                if sharedSearchText == nil {
+                    let base = normalized([title, relative, markdown].joined(separator: "\n"))
+                    linkedURLs = linkedWebURLs(in: markdown)
+                    baseSearchText = base
+                    sharedSearchText = searchText(base: base, linkedURLs: linkedURLs, linkSearchText: linkSearchText)
+                }
+                let noteSearchText = sharedSearchText ?? ""
                 result.append(VaultMediaItem(id: identity + "|" + url.absoluteString, mediaURL: url, kind: kind,
                                             caption: String(line[captionRange]), noteURL: noteURL,
                                             noteRelativePath: relative, noteTitle: title, modifiedAt: modifiedAt,
                                             noteSearchText: noteSearchText))
             }
         }
-        return result
+        return ParsedNote(items: result, baseSearchText: baseSearchText, linkedURLs: linkedURLs)
+    }
+
+    /// The note's own text plus the current preview metadata of its links —
+    /// the same string as normalizing everything joined, since folding is per character.
+    static func searchText(base: String, linkedURLs: [URL], linkSearchText: @Sendable (URL) -> String?) -> String {
+        let linked = linkedURLs.compactMap(linkSearchText)
+        guard !linked.isEmpty else { return base }
+        return base + "\n" + normalized(linked.joined(separator: "\n"))
     }
 
     private static func normalized(_ text: String) -> String {

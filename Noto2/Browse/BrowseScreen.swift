@@ -48,24 +48,15 @@ struct ExplorerDirectoryActions {
     }
 }
 
-/// Browse tab: the vault's folders and notes, drill-down, tap to open —
-/// styled to match Noto 1's file explorer (icon + title/subtitle rows, own
-/// chevrons, plain list on `NotoTheme.background`).
-/// The root also carries the app's settings button.
+/// Library owns its navigation stack; Search and Capture reuse the destination contract.
 struct BrowseScreen: View {
     let vaultController: VaultController
     var locationManager: VaultLocationManager
-    /// Set by another tab (a filed capture) to ask Browse to open that note.
-    /// Cleared once consumed so the same note is not re-pushed on every appear.
     @Binding var pendingNoteURL: URL?
     @State private var path: [BrowseDestination] = []
     @State private var showSettings = false
 
-    init(
-        vaultController: VaultController,
-        locationManager: VaultLocationManager,
-        pendingNoteURL: Binding<URL?> = .constant(nil)
-    ) {
+    init(vaultController: VaultController, locationManager: VaultLocationManager, pendingNoteURL: Binding<URL?> = .constant(nil)) {
         self.vaultController = vaultController
         self.locationManager = locationManager
         _pendingNoteURL = pendingNoteURL
@@ -73,39 +64,19 @@ struct BrowseScreen: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            FolderListView(
-                store: vaultController.rootStore,
-                title: "Browse",
-                vaultController: vaultController,
-                onOpen: { path.append($0) },
-                onOpenSettings: { showSettings = true }
-            )
-            .sheet(isPresented: $showSettings) {
-                OpenRouterSettingsSheet(locationManager: locationManager)
-            }
-            .navigationDestination(for: BrowseDestination.self) { destination in
-                BrowseDestinationView(
-                    destination: destination,
-                    vaultController: vaultController,
-                    onOpen: { path.append($0) }
-                )
-                    // A pending note replaces the stack with `[note]`. When a
-                    // note is already pushed, that keeps the same stack position,
-                    // and without explicit identity SwiftUI reuses the existing
-                    // editor (whose session was built from the old note). Keying
-                    // by destination makes the new note get its own screen.
-                    .id(destination)
-            }
+            LibraryHome(vaultController: vaultController, onOpen: { path.append($0) }, onOpenSettings: { showSettings = true })
+                .navigationDestination(isPresented: $showSettings) {
+                    LibrarySettingsScreen(locationManager: locationManager)
+                }
+                .navigationDestination(for: BrowseDestination.self) { destination in
+                    BrowseDestinationView(destination: destination, vaultController: vaultController, onOpen: { path.append($0) })
+                        .id(destination)
+                }
         }
-        // Both hooks are needed: `onAppear` covers the first hand-off, when the
-        // request is set in the same turn that creates this view, and `onChange`
-        // covers every later one while Browse is already on screen.
         .onAppear { consumePendingNote() }
         .onChange(of: pendingNoteURL) { _, _ in consumePendingNote() }
     }
 
-    /// Replaces the stack with just this note, so Back lands on the Browse root
-    /// rather than wherever the user happened to be browsing before.
     private func consumePendingNote() {
         guard let url = pendingNoteURL else { return }
         pendingNoteURL = nil
@@ -117,37 +88,125 @@ struct BrowseScreen: View {
     }
 }
 
-/// Resolves a destination to its screen. A folder gets a fresh store for its
-/// directory; a note gets the editor.
 struct BrowseDestinationView: View {
     let destination: BrowseDestination
     let vaultController: VaultController
     var onOpen: (BrowseDestination) -> Void
+    var initialFindQuery: String? = nil
 
     var body: some View {
         switch destination {
         case .folder(let folder):
-            FolderListView(
-                store: vaultController.store(for: folder),
-                title: folder.name,
-                vaultController: vaultController,
-                onOpen: onOpen,
-                showsBackButton: true
-            )
+            FolderListView(store: vaultController.store(for: folder), title: folder.name, vaultController: vaultController, onOpen: onOpen, showsBackButton: true)
         case .note(let note, let directoryURL, let isNew):
-            NoteScreen(
-                store: vaultController.store(for: directoryURL),
-                note: note,
-                isNew: isNew,
-                vaultController: vaultController,
-                onNoteDeleted: refreshAfterEditorMutation
-            )
+            NoteScreen(store: vaultController.store(for: directoryURL), note: note, isNew: isNew, vaultController: vaultController, onNoteDeleted: {
+                vaultController.refreshRootForForegroundActivation()
+            }, initialFindQuery: initialFindQuery)
             .toolbar(.visible, for: .navigationBar)
         }
     }
+}
 
-    private func refreshAfterEditorMutation() {
-        vaultController.refreshRootForForegroundActivation()
+struct LibraryHome: View {
+    let vaultController: VaultController
+    let onOpen: (BrowseDestination) -> Void
+    let onOpenSettings: () -> Void
+    @State private var snapshot: LibrarySnapshot?
+    @State private var showNewFolder = false
+    @State private var folderName = ""
+    @State private var errorMessage: String?
+    @State private var revision = 0
+    @Environment(VaultFileWatcher.self) private var fileWatcher: VaultFileWatcher?
+
+    private var actions: ExplorerDirectoryActions { .init(vaultController: vaultController, store: vaultController.rootStore) }
+
+    var body: some View {
+        List {
+            if let snapshot {
+                if !snapshot.pinned.isEmpty {
+                    Section {
+                        ForEach(snapshot.pinned) { entry in noteRow(entry, pinned: true) }
+                    } header: { LibrarySectionHeading("Pinned") }
+                    .listRowBackground(NotoTheme.card)
+                }
+                if !snapshot.recent().isEmpty {
+                    Section {
+                        ForEach(snapshot.recent()) { entry in noteRow(entry, pinned: false) }
+                    } header: { LibrarySectionHeading("Recent") }
+                    .listRowBackground(NotoTheme.card)
+                }
+                if !snapshot.folders.isEmpty {
+                    Section {
+                        ForEach(snapshot.folders) { folder in
+                            Button { onOpen(.folder(NotoFolder(summary: folder))) } label: {
+                                LibraryFolderRow(name: folder.name, count: folder.itemCount + folder.folderCount)
+                            }
+                            .accessibilityIdentifier("libraryFolder_\(folder.name)")
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        }
+                    } header: { LibrarySectionHeading("Folders") }
+                    .listRowBackground(NotoTheme.card)
+                }
+                if snapshot.notes.isEmpty && snapshot.folders.isEmpty {
+                    ContentUnavailableView("Your Library is empty", systemImage: "books.vertical", description: Text("Create a note or file a capture to get started."))
+                        .accessibilityIdentifier("libraryEmptyState")
+                        .listRowBackground(Color.clear)
+                }
+            } else if let errorMessage {
+                Text(errorMessage).foregroundStyle(NotoTheme.muted).accessibilityIdentifier("libraryLoadError")
+            } else {
+                ProgressView().accessibilityIdentifier("libraryLoading")
+            }
+        }
+        .modifier(LibraryListStyle())
+        .navigationTitle("Library")
+        .toolbarTitleDisplayMode(.inlineLarge)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("New note", systemImage: "square.and.pencil") { onOpen(actions.createNoteDestination()) }
+                        .accessibilityIdentifier("browse_new_note_action")
+                    Button("New folder", systemImage: "folder.badge.plus") { showNewFolder = true }
+                        .accessibilityIdentifier("browse_new_folder_action")
+                    Button("Settings", systemImage: "gearshape") { onOpenSettings() }
+                        .accessibilityIdentifier("browseSettingsButton")
+                } label: { Image(systemName: "ellipsis") }
+                .accessibilityLabel("Library actions")
+                .accessibilityIdentifier("browse_more_actions_menu")
+            }
+        }
+        .sheet(isPresented: $showNewFolder) {
+            LibraryNewFolderSheet(name: $folderName) {
+                _ = actions.createFolder(named: folderName)
+                folderName = ""
+                revision += 1
+            }
+        }
+        .task(id: revision) { await load() }
+        .onChange(of: fileWatcher?.changeCount) { _, _ in revision += 1 }
+        .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { _ in revision += 1 }
+        .refreshable { await load() }
+        .accessibilityIdentifier("libraryHome")
+    }
+
+    private func noteRow(_ entry: LibraryNote, pinned: Bool) -> some View {
+        Button {
+            onOpen(.note(MarkdownNote(record: entry.note), directoryURL: entry.note.fileURL.deletingLastPathComponent(), isNew: false))
+        } label: {
+            LibraryNoteRow(entry: entry, pinned: pinned)
+        }
+        .accessibilityIdentifier("libraryNote_\(entry.note.fileURL.lastPathComponent)")
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+    }
+
+    private func load() async {
+        let root = vaultController.vaultURL
+        let result = await Task.detached(priority: .userInitiated) { Result { try LibraryCatalog(vaultRootURL: root).load() } }.value
+        guard !Task.isCancelled else { return }
+        switch result {
+        case .success(let value): snapshot = value; errorMessage = nil
+        case .failure(let error): errorMessage = error.localizedDescription
+        }
     }
 }
 
@@ -158,279 +217,249 @@ struct FolderListView: View {
     var onOpen: (BrowseDestination) -> Void
     var showsBackButton = false
     var onOpenSettings: (() -> Void)?
+    @State private var notes: [LibraryNote] = []
+    @State private var sort: LibraryNoteSort = .recent
+    @State private var revision = 0
+    @State private var showNewFolder = false
+    @State private var folderName = ""
+    @Environment(VaultFileWatcher.self) private var fileWatcher: VaultFileWatcher?
 
-    @State private var newFolderName = ""
-    @State private var showNewFolderPrompt = false
-    @Environment(\.dismiss) private var dismiss
-
-    private var items: [DirectoryItem] { ExplorerSorting.sorted(store.items) }
-
-    private var actions: ExplorerDirectoryActions {
-        ExplorerDirectoryActions(vaultController: vaultController, store: store)
+    private var folders: [NotoFolder] {
+        store.items.compactMap { item in
+            guard case .folder(let folder) = item, LibraryCatalog.isVisible(folder.folderURL, in: vaultController.vaultURL) else { return nil }
+            return folder
+        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
+    private var actions: ExplorerDirectoryActions { .init(vaultController: vaultController, store: store) }
 
     var body: some View {
-        directorySurface
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(showsBackButton)
-            .toolbar(.visible, for: .navigationBar)
-            .toolbar {
-                if showsBackButton {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "chevron.left")
-                        }
-                        .accessibilityLabel("Back")
-                        .accessibilityIdentifier("browse_back_button")
-                    }
-                }
-
-                ToolbarItem(placement: .principal) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(NotoTheme.head)
-                        .lineLimit(1)
-                        .accessibilityIdentifier("browse_directory_title")
-                }
-
-                if let onOpenSettings {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(action: onOpenSettings) {
-                            Image(systemName: "gearshape")
-                        }
-                        .accessibilityLabel("Settings")
-                        .accessibilityIdentifier("browseSettingsButton")
-                    }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    directoryActionsMenu
-                }
-            }
-            .modifier(NoteEditorNavigationBarBackdropVisibility())
-            .sheet(isPresented: $showNewFolderPrompt, onDismiss: { newFolderName = "" }) {
-                NewFolderSheet(name: $newFolderName) {
-                    _ = actions.createFolder(named: newFolderName)
-                    newFolderName = ""
-                }
-            }
-            .onAppear {
-                store.loadItemsInBackground()
-            }
-    }
-
-    @ViewBuilder
-    private var directorySurface: some View {
-        if #available(iOS 26.0, *) {
-            GeometryReader { safeAreaProxy in
-                let chromeHeight = max(safeAreaProxy.frame(in: .global).minY, 0)
-
-                directoryList
-                    .overlay(alignment: .top) {
-                        Noto2TopChromeFade(chromeHeight: chromeHeight)
-                            .offset(y: -chromeHeight)
-                    }
-            }
-        } else {
-            directoryList
-        }
-    }
-
-    private var directoryList: some View {
         List {
-            if items.isEmpty {
-                if store.isLoadingItems {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                        Text("Loading…").foregroundStyle(AppTheme.secondaryText)
-                    }
-                    .listRowBackground(NotoTheme.background)
-                    .listRowSeparator(.hidden)
-                    .accessibilityIdentifier("browseLoading")
-                } else {
-                    Text("Nothing here yet.")
-                        .foregroundStyle(AppTheme.secondaryText)
-                        .listRowBackground(NotoTheme.background)
-                        .listRowSeparator(.hidden)
-                        .accessibilityIdentifier("browseEmptyState")
-                }
-            }
-            ForEach(items) { item in
-                Button {
-                    switch item {
-                    case .folder(let folder): onOpen(.folder(folder))
-                    case .note(let note): onOpen(.note(note, directoryURL: store.directoryURL, isNew: false))
+            HStack {
+                Text(LibraryCatalog.directorySummary(folderCount: folders.count, noteCount: notes.count))
+                    .font(.caption).foregroundStyle(NotoTheme.muted)
+                Spacer()
+                Menu {
+                    Picker("Sort notes", selection: $sort) {
+                        ForEach(LibraryNoteSort.allCases, id: \.self) { option in Text(option.rawValue).tag(option) }
                     }
                 } label: {
-                    switch item {
-                    case .folder(let folder):
-                        BrowseFolderRow(folder: folder)
-                    case .note(let note):
-                        BrowseNoteRow(note: note)
-                    }
+                    HStack(spacing: 5) { Text(sort.rawValue); Image(systemName: "chevron.down").font(.caption2) }
+                        .font(.caption).foregroundStyle(NotoTheme.muted)
                 }
-                .buttonStyle(.plain)
-                .listRowBackground(NotoTheme.background)
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                .listRowSeparator(.hidden, edges: .top)
-                .listRowSeparator(.automatic, edges: .bottom)
+                .accessibilityIdentifier("libraryFolderSort")
+            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
+            if !folders.isEmpty {
+                Section {
+                    ForEach(folders) { folder in
+                        Button { onOpen(.folder(folder)) } label: {
+                            LibraryFolderRow(name: folder.name, count: folder.itemCount + folder.folderCount)
+                        }
+                        .accessibilityIdentifier("libraryFolder_\(folder.name)")
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    }
+                }.listRowBackground(NotoTheme.card)
+            }
+            ForEach(LibraryCatalog.groups(notes, sort: sort)) { group in
+                Section {
+                    ForEach(group.notes) { entry in
+                        Button { onOpen(.note(MarkdownNote(record: entry.note), directoryURL: store.directoryURL, isNew: false)) } label: {
+                            LibraryFolderNoteRow(entry: entry)
+                        }
+                        .accessibilityIdentifier("libraryNote_\(entry.note.fileURL.lastPathComponent)")
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    }
+                } header: { LibrarySectionHeading(group.title) }
+                .listRowBackground(NotoTheme.card)
+            }
+            if notes.isEmpty && folders.isEmpty {
+                Text("Nothing here yet.").foregroundStyle(NotoTheme.muted).accessibilityIdentifier("browseEmptyState")
+                    .listRowBackground(Color.clear)
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(NotoTheme.background.ignoresSafeArea())
-        .refreshable {
-            store.loadItemsInBackground()
+        .modifier(LibraryListStyle())
+        .navigationTitle(title)
+        .toolbarTitleDisplayMode(.inlineLarge)
+        .navigationBarBackButtonHidden(!showsBackButton)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { onOpen(actions.createNoteDestination()) } label: { Image(systemName: "square.and.pencil") }
+                    .accessibilityLabel("New note").accessibilityIdentifier("browse_new_note_action")
+                    .contextMenu {
+                        Button("New folder", systemImage: "folder.badge.plus") { showNewFolder = true }
+                    }
+            }
+        }
+        .task(id: revision) { await load() }
+        .onChange(of: fileWatcher?.changeCount) { _, _ in revision += 1 }
+        .onReceive(NotificationCenter.default.publisher(for: NoteSyncCenter.notificationName)) { _ in revision += 1 }
+        .refreshable { await load() }
+        .sheet(isPresented: $showNewFolder) {
+            LibraryNewFolderSheet(name: $folderName) {
+                _ = actions.createFolder(named: folderName)
+                folderName = ""
+                revision += 1
+            }
         }
     }
 
-    private var directoryActionsMenu: some View {
-        Menu {
-            Button {
-                onOpen(actions.createNoteDestination())
-            } label: {
-                Label("New Note", systemImage: "doc.badge.plus")
-            }
-            .accessibilityIdentifier("browse_new_note_action")
-
-            Button {
-                newFolderName = ""
-                showNewFolderPrompt = true
-            } label: {
-                Label("New Folder", systemImage: "folder.badge.plus")
-            }
-            .accessibilityIdentifier("browse_new_folder_action")
-        } label: {
-            Image(systemName: "ellipsis")
-        }
-        .accessibilityLabel("More actions")
-        .accessibilityIdentifier("browse_more_actions_menu")
+    private func load() async {
+        store.loadItemsInBackground()
+        let root = vaultController.vaultURL
+        let directory = store.directoryURL.standardizedFileURL
+        let loaded = await Task.detached(priority: .userInitiated) {
+            (try? LibraryCatalog(vaultRootURL: root).load().notes.filter { $0.note.fileURL.deletingLastPathComponent().standardizedFileURL == directory }) ?? []
+        }.value
+        if !Task.isCancelled { notes = loaded }
     }
 }
 
-private struct NewFolderSheet: View {
-    @Binding var name: String
-    let onCreate: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @FocusState private var isNameFocused: Bool
-
-    private var canCreate: Bool {
-        ExplorerDirectoryActions.normalizedFolderName(name) != nil
-    }
-
+struct LibrarySectionHeading: View {
+    let title: String
+    init(_ title: String) { self.title = title }
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("New Folder")
-                .font(.headline)
-                .foregroundStyle(NotoTheme.head)
+        Text(title.uppercased()).font(.system(size: 12, weight: .regular))
+            .kerning(0.5).foregroundStyle(NotoTheme.muted)
+    }
+}
 
-            TextField("Folder name", text: $name)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.words)
-                .submitLabel(.done)
-                .focused($isNameFocused)
-                .onSubmit(createIfPossible)
-                .accessibilityIdentifier("browse_new_folder_name_field")
+struct LibraryListStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .contentMargins(.horizontal, 16, for: .scrollContent)
+            .contentMargins(.top, 0, for: .scrollContent)
+            .listSectionSpacing(12)
+            .environment(\.defaultMinListRowHeight, 52)
+            .listRowSeparatorTint(NotoTheme.hairline)
+            .background(NotoTheme.background.ignoresSafeArea())
+            .tint(NotoTheme.accent)
+    }
+}
 
-            HStack(spacing: 12) {
-                Button("Cancel", role: .cancel) {
-                    dismiss()
+struct LibraryFolderRow: View {
+    let name: String
+    let count: Int
+    var body: some View {
+        HStack(spacing: 12) {
+            LibraryRowIcon(symbol: name == "Daily Notes" ? "calendar" : "folder", circular: true)
+            Text(name).font(.system(size: 16, weight: .semibold)).foregroundStyle(NotoTheme.ink)
+            Spacer(minLength: 8)
+            Text(count.formatted()).font(.system(size: 14)).foregroundStyle(NotoTheme.muted)
+            Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(NotoTheme.faint)
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+struct LibraryRowIcon: View {
+    let symbol: String
+    var pinned = false
+    var circular = false
+    var body: some View {
+        Image(systemName: symbol).font(.system(size: 13, weight: .medium))
+            .foregroundStyle(pinned ? NotoTheme.accentText : NotoTheme.muted)
+            .frame(width: circular ? 30 : 32, height: circular ? 30 : 32)
+            .background {
+                if circular {
+                    Circle().fill(pinned ? NotoTheme.accentSoft : NotoTheme.secondaryFill)
+                } else {
+                    RoundedRectangle(cornerRadius: 11).fill(pinned ? NotoTheme.accentSoft : NotoTheme.secondaryFill)
                 }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("browse_cancel_folder_button")
+            }
+    }
+}
 
-                Spacer()
+struct LibraryNoteRow: View {
+    let entry: LibraryNote
+    var pinned = false
+    var body: some View {
+        HStack(spacing: 12) {
+            LibraryRowIcon(symbol: pinned ? "pin" : (entry.folderPath == "Daily Notes" ? "calendar" : "doc"), pinned: pinned, circular: true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(entry.note.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(NotoTheme.ink).lineLimit(1)
+                Text("\(entry.folderPath.isEmpty ? "Library" : entry.folderPath.replacingOccurrences(of: "/", with: " › ")) · \(NotoRelativeDate.compactString(from: entry.note.modifiedDate))")
+                    .font(.system(size: 13)).foregroundStyle(NotoTheme.muted).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
+    }
+}
 
-                Button("Create") {
-                    createIfPossible()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!canCreate)
-                .accessibilityIdentifier("browse_create_folder_button")
+struct LibraryFolderNoteRow: View {
+    let entry: LibraryNote
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(entry.note.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(NotoTheme.ink).lineLimit(1)
+                Spacer(minLength: 0)
+                Text(entry.note.modifiedDate, format: .dateTime.month(.abbreviated).day())
+                    .font(.system(size: 12)).foregroundStyle(NotoTheme.muted)
+            }
+            if !entry.preview.isEmpty {
+                Text(entry.preview).font(.system(size: 14)).foregroundStyle(NotoTheme.muted).lineLimit(1)
             }
         }
-        .padding(24)
-        .background(NotoTheme.background.ignoresSafeArea())
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+    }
+}
+
+struct LibraryNewFolderSheet: View {
+    @Binding var name: String
+    let onCreate: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var focused: Bool
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Folder name", text: $name).focused($focused)
+                    .accessibilityIdentifier("browse_new_folder_name_field")
+                    .onSubmit(create)
+            }
+            .navigationTitle("New folder").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(role: .close) { dismiss() }
+                        .accessibilityLabel("Cancel").accessibilityIdentifier("browse_cancel_folder_button")
+                }
+            }
+            .modifier(LibrarySheetAction(title: "Create folder", identifier: "browse_create_folder_button", disabled: ExplorerDirectoryActions.normalizedFolderName(name) == nil, action: create))
+        }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
-        .onAppear { isNameFocused = true }
+        .onAppear { focused = true }
     }
-
-    private func createIfPossible() {
-        guard canCreate else { return }
+    private func create() {
+        guard ExplorerDirectoryActions.normalizedFolderName(name) != nil else { return }
         onCreate()
         dismiss()
     }
 }
 
-/// Noto 1's `FolderRow`, verbatim styling: folder glyph, name + contents
-/// summary, own faint chevron.
-private struct BrowseFolderRow: View {
-    let folder: NotoFolder
-
-    private var contentsSummary: String {
-        let total = folder.itemCount + folder.folderCount
-        return total == 0 ? "Empty" : "\(total) \(total == 1 ? "item" : "items")"
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "folder")
-                .font(.system(size: 18, weight: .regular))
-                .foregroundStyle(NotoTheme.muted)
-                .frame(width: 22)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(folder.name)
-                    .font(.system(size: NotoTheme.FontSize.rowTitle, weight: .semibold))
-                    .foregroundStyle(NotoTheme.head)
-                    .lineLimit(1)
-                Text(contentsSummary)
-                    .font(.system(size: NotoTheme.FontSize.subtitle))
-                    .foregroundStyle(NotoTheme.muted)
-                    .lineLimit(1)
+struct LibrarySheetAction: ViewModifier {
+    let title: String
+    let identifier: String
+    var disabled = false
+    let action: () -> Void
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.safeAreaInset(edge: .bottom, spacing: 0) {
+                Button(action: action) { Text(title).frame(maxWidth: .infinity).padding(.vertical, 6) }
+                    .buttonStyle(.glassProminent).tint(NotoTheme.accent).controlSize(.large)
+                    .disabled(disabled).accessibilityIdentifier(identifier).padding(16)
             }
-            Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(NotoTheme.faint)
-        }
-        .padding(.vertical, 9)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("browseFolderRow")
-    }
-}
-
-/// Noto 1's `MarkdownNoteRow`, verbatim styling: doc glyph, title + "Edited …".
-private struct BrowseNoteRow: View {
-    let note: MarkdownNote
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "doc")
-                .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(NotoTheme.muted)
-                .frame(width: 22)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(ExplorerSorting.displayTitle(note))
-                    .font(.system(size: NotoTheme.FontSize.rowTitle, weight: .semibold))
-                    .foregroundStyle(NotoTheme.head)
-                    .lineLimit(1)
-                Text(NotoRelativeDate.editedString(from: note.modifiedDate))
-                    .font(.system(size: NotoTheme.FontSize.subtitle))
-                    .foregroundStyle(NotoTheme.muted)
-                    .lineLimit(1)
+        } else {
+            content.safeAreaInset(edge: .bottom) {
+                Button(action: action) { Text(title).frame(maxWidth: .infinity).padding(.vertical, 6) }
+                    .buttonStyle(.borderedProminent).tint(NotoTheme.accent).controlSize(.large)
+                    .disabled(disabled).accessibilityIdentifier(identifier).padding(16)
             }
         }
-        .padding(.vertical, 9)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("browseNoteRow")
     }
 }

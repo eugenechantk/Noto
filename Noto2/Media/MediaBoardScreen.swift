@@ -1,7 +1,11 @@
+import CryptoKit
+import os.log
 import NotoLinkPreview
 import NotoShareCapture
 import NotoVault
 import SwiftUI
+
+private let mediaLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.noto", category: "MediaBoardScreen")
 
 struct MediaBoardScreen: View {
     let vaultController: VaultController
@@ -68,6 +72,13 @@ struct MediaBoardScreen: View {
         .onDisappear { isVisible = false }
         .task(id: "\(isVisible)|\(refreshRevision)") {
             guard isVisible else { return }
+            if !items.isEmpty {
+                // A refresh: one vault change fans out into several notifications
+                // (file watcher, note sync, link previews); a new revision cancels
+                // this wait, so a burst ends in one scan.
+                try? await Task.sleep(for: .milliseconds(350))
+                guard !Task.isCancelled else { return }
+            }
             await reload()
         }
         .onChange(of: fileWatcher.changeCount) { _, _ in refreshRevision += 1 }
@@ -167,11 +178,26 @@ struct MediaBoardScreen: View {
     private func reload() async {
         isLoading = true
         let previewCache = LinkPreviewSupport.service.cache
-        let library = VaultMediaLibrary(vaultURL: vaultController.vaultURL, linkSearchText: { previewCache.searchText(for: $0) })
+        let library = VaultMediaLibrary(vaultURL: vaultController.vaultURL,
+                                        indexURL: MediaBoardIndex.url(for: vaultController.vaultURL),
+                                        linkSearchText: { previewCache.searchText(for: $0) })
+        if items.isEmpty {
+            // Show the last scan in this very frame (a small JSON read), so the
+            // "Finding your media…" placeholder never flashes; the refresh below
+            // reads only changed notes.
+            let cached = library.cachedSnapshot()
+            if !cached.items.isEmpty {
+                items = cached.items
+                thumbnailRevision += 1
+            }
+            MediaBoardIndex.pruneStale(keeping: MediaBoardIndex.url(for: vaultController.vaultURL))
+        }
+        let started = Date()
         let scan = Task.detached(priority: .utility) { try library.scan() }
         do {
             let snapshot = try await withTaskCancellationHandler { try await scan.value } onCancel: { scan.cancel() }
             try Task.checkCancellation()
+            mediaLogger.info("Media scan: \(snapshot.items.count) items, \(snapshot.unavailableNoteCount) unavailable, \(Int(Date().timeIntervalSince(started) * 1000)) ms")
             items = snapshot.items
             unavailableNoteCount = snapshot.unavailableNoteCount
             loadError = nil
@@ -202,6 +228,41 @@ extension VaultMediaKind {
         case .video: "play.fill"
         case .audio: "waveform"
         case .pdf: "doc.richtext"
+        }
+    }
+}
+
+/// Where the media board remembers its last scan: one index per vault in Caches
+/// (a purge only costs one full scan).
+enum MediaBoardIndex {
+    private static var directory: URL {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return caches.appendingPathComponent("MediaIndex", isDirectory: true)
+    }
+
+    static func url(for vaultURL: URL) -> URL {
+        let name = SHA256.hash(data: Data(stablePath(vaultURL).utf8))
+            .prefix(12).map { String(format: "%02x", $0) }.joined()
+        return directory.appendingPathComponent("\(name).json")
+    }
+
+    /// A path that survives the app's data folder moving (reinstalls change its
+    /// UUID): inside the app's home it is written relative to it. An iCloud
+    /// Drive vault lives outside the home and keeps its absolute path.
+    static func stablePath(_ url: URL) -> String {
+        let path = url.standardizedFileURL.path
+        let home = URL(fileURLWithPath: NSHomeDirectory()).standardizedFileURL.path + "/"
+        return path.hasPrefix(home) ? "~/" + path.dropFirst(home.count) : path
+    }
+
+    /// Drops indexes of vaults not opened for 30 days (a switched or moved vault).
+    static func pruneStale(keeping current: URL) {
+        let cutoff = Date().addingTimeInterval(-30 * 86_400)
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        for file in files where file.standardizedFileURL != current.standardizedFileURL {
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            if modified < cutoff { try? FileManager.default.removeItem(at: file) }
         }
     }
 }

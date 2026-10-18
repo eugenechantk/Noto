@@ -116,10 +116,18 @@ enum DigestThumbnailLoader {
 
     static func image(for item: DigestMediaSplit.Item) async -> UIImage? {
         if let cached = cache.object(forKey: item.url as NSURL) { return cached }
-        guard CoordinatedFileManager.isDownloaded(at: item.url) else {
-            CoordinatedFileManager.startDownloading(at: item.url)
-            return nil
+        // The mirror first: the image, or the video's poster.
+        if let mirrored = MediaSource.mirrorURL(for: item.url, poster: item.isVideo),
+           let data = await MediaSource.remoteData(from: mirrored),
+           var image = UIImage(data: data)?.preparingThumbnail(of: CGSize(width: 480, height: 480)) {
+            if item.isVideo, let cgImage = image.cgImage, let badged = VideoPosterRenderer.withPlayBadge(cgImage) {
+                image = UIImage(cgImage: badged)
+            }
+            cache.setObject(image, forKey: item.url as NSURL)
+            return image
         }
+        // Then the device, if the file is downloaded (never a blocking read).
+        guard MediaSource.localFileIfAvailable(item.url) != nil else { return nil }
         let image: UIImage?
         if item.isVideo {
             image = await withCheckedContinuation { continuation in
@@ -151,6 +159,6 @@ enum DigestCardText {
 
 /// `fullScreenCover(item:)` needs an Identifiable value.
 struct PlayingVideo: Identifiable, Equatable {
-    let url: URL
-    var id: URL { url }
+    let source: MediaSource.VideoSource
+    var id: URL { source.primary }
 }

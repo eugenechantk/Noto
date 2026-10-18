@@ -57,6 +57,15 @@ struct VaultMediaLibraryTests {
         #expect(items.first?.noteRelativePath == "inbox/shared.md")
     }
 
+    @Test func linkDestinationWithSpacesDoesNotHangTheScan() {
+        // The exact line that stalled the Media scan on a real vault (exponential backtracking).
+        let line = "If you liked this post, consider [subscribing](https://buttondown.com/seangoedecke) to email updates about my new posts, or [sharing it on Hacker News](https://news.ycombinator.com/submitlink?u=https://www.seangoedecke.com/ai-research-with-codex/&t=GPT-5-Codex is a better AI researcher than me)."
+        let start = Date()
+        let items = VaultMediaLibrary.items(in: line + "\n![](.attachments/after.png)", noteURL: root.appendingPathComponent("a.md"), vaultURL: root)
+        #expect(Date().timeIntervalSince(start) < 1)
+        #expect(items.map(\.mediaURL.lastPathComponent) == ["after.png"])
+    }
+
     @Test func supportsAngleTargetsTitlesAndParentheses() {
         let text = #"![one](<.attachments/a b.jpg>) ![two](.attachments/a(1).png "Title")"#
         let items = VaultMediaLibrary.items(in: text, noteURL: root.appendingPathComponent("a.md"), vaultURL: root)

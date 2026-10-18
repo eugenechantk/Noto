@@ -4,6 +4,13 @@ import Foundation
 
 @Suite("NotePropertyClassifier")
 struct NotePropertyTests {
+    @Test("Fractional ISO timestamps used by real Markdown files remain readable")
+    func fractionalTimestamp() throws {
+        let date = try #require(NotePropertyClassifier.date(from: "2026-10-17T19:02:28.158825Z"))
+        let whole = try #require(NotePropertyClassifier.date(from: "2026-10-17T19:02:28Z"))
+        #expect(abs(date.timeIntervalSince(whole) - 0.158825) < 0.001)
+    }
+
     @Test("tags by key or list shape")
     func tags() {
         #expect(NotePropertyClassifier.kind(key: "tags", value: "a, b") == .tags)

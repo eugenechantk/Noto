@@ -29,6 +29,8 @@ struct RootTabView: View {
     @State private var vaultController: VaultController?
     @State private var fileWatcher = VaultFileWatcher()
     @State private var selectedTab: Noto2Tab = .capture
+    @State private var todayReselectRevision = 0
+    @State private var inboxBadge = InboxBadgeModel()
     @State private var hasStartedDeferredServices = false
     /// A note another tab asked Browse to open (a just-filed capture).
     @State private var pendingNoteURL: URL?
@@ -53,7 +55,7 @@ struct RootTabView: View {
         if let requestedTab = launchRouter.requestedTab {
             initialTab = requestedTab
         } else if let raw = UserDefaults.standard.string(forKey: "noto2.debug.initialTab"),
-           let tab = Noto2Tab(rawValue: raw) {
+           let tab = Noto2Tab.resolving(raw) {
             initialTab = tab
         } else {
             initialTab = .capture
@@ -65,32 +67,33 @@ struct RootTabView: View {
     }
 
     var body: some View {
+        // System TabView: iOS 26 draws the floating Liquid Glass bar, and the
+        // search-role tab becomes its own circle at the trailing end. Icons
+        // only (Eugene, 2026-10-17); each tab's name is its accessibility label.
         TabView(selection: tabSelection) {
-            Tab("Capture", systemImage: "square.and.pencil", value: Noto2Tab.capture) {
+            Tab(value: Noto2Tab.capture) {
                 CaptureScreen(vaultURL: vaultURL, onOpenFiledNote: openFiledNote)
-            }
-            Tab("Digest", systemImage: "tray.full", value: Noto2Tab.digest) {
+            } label: { tabIcon(.capture) }
+            Tab(value: Noto2Tab.today) {
                 if let vaultController {
-                    DigestScreen(vaultController: vaultController)
+                    TodayScreen(vaultController: vaultController, reselectRevision: todayReselectRevision)
                 } else {
                     deferredTabPlaceholder
                 }
-            }
-            Tab("Search", systemImage: "magnifyingglass", value: Noto2Tab.search) {
+            } label: { tabIcon(.today) }
+            Tab(value: Noto2Tab.digest) {
                 if let vaultController {
-                    SearchScreen(vaultController: vaultController, locationManager: locationManager)
+                    DigestScreen(
+                        vaultController: vaultController,
+                        onOpenFiledNote: openFiledNote,
+                        onCapture: { tabSelection.wrappedValue = .capture }
+                    )
                 } else {
                     deferredTabPlaceholder
                 }
-            }
-            Tab("Media", systemImage: "square.grid.2x2", value: Noto2Tab.media) {
-                if let vaultController {
-                    MediaBoardScreen(vaultController: vaultController)
-                } else {
-                    deferredTabPlaceholder
-                }
-            }
-            Tab("Browse", systemImage: "folder", value: Noto2Tab.browse) {
+            } label: { tabIcon(.digest) }
+            .badge(inboxBadge.count)
+            Tab(value: Noto2Tab.browse) {
                 if let vaultController {
                     BrowseScreen(
                         vaultController: vaultController,
@@ -100,9 +103,16 @@ struct RootTabView: View {
                 } else {
                     deferredTabPlaceholder
                 }
-            }
+            } label: { tabIcon(.browse) }
+            Tab(value: Noto2Tab.search, role: .search) {
+                if let vaultController {
+                    SearchScreen(vaultController: vaultController, locationManager: locationManager)
+                } else {
+                    deferredTabPlaceholder
+                }
+            } label: { tabIcon(.search) }
         }
-        .tint(AppTheme.primaryText)
+        .tint(NotoTheme.accent)
         // Open notes reload when their file changes on disk (iCloud edits from
         // another device, or Hermes adding share-sheet media).
         .environment(fileWatcher)
@@ -112,6 +122,8 @@ struct RootTabView: View {
             // Share-sheet captures staged while the app was closed: file them
             // as soon as the vault is usable, before any vault-wide work.
             await drainSharedCaptures()
+            // A notification tap that launched the app arrives before the vault resolves.
+            openRequestedNoteIfNeeded()
             if Noto2StartupPolicy.requiresWorkspace(selectedTab) {
                 startDeferredServicesIfNeeded()
                 return
@@ -128,12 +140,17 @@ struct RootTabView: View {
             guard phase == .active else { return }
             Task { await drainSharedCaptures() }
             guard hasStartedDeferredServices else { return }
+            refreshInboxBadge()
             if selectedTab == .browse {
                 vaultController?.refreshRootForForegroundActivation()
             }
             startSearchMaintenance()
         }
         .onChange(of: launchRouter.requestRevision) { _, _ in
+            if launchRouter.requestedNotePath != nil {
+                openRequestedNoteIfNeeded()
+                return
+            }
             guard let requestedTab = launchRouter.requestedTab else { return }
             if launchRouter.requestedSharedCaptureID != nil {
                 // The share extension's "Add notes": file the staged capture
@@ -145,6 +162,7 @@ struct RootTabView: View {
         }
         .onChange(of: fileWatcher.changeCount) { _, _ in
             guard let vaultURL else { return }
+            refreshInboxBadge()
             if selectedTab == .browse {
                 vaultController?.refreshRootForForegroundActivation()
             }
@@ -156,6 +174,13 @@ struct RootTabView: View {
                     await Self.refreshSearchIndex(vaultURL: vaultURL)
                 }
             }
+        }
+        .onChange(of: selectedTab) { _, _ in refreshInboxBadge() }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            if hasStartedDeferredServices { refreshInboxBadge() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: SharedCaptureDrain.didFileNotification)) { _ in
+            refreshInboxBadge()
         }
     }
 
@@ -207,6 +232,21 @@ struct RootTabView: View {
         }
     }
 
+    /// A `noto2://note?path=` link (a "Save Quick Capture" notification): open that note, or
+    /// Digest if it is gone. Waits for the vault; `.task(id: vaultURL)` calls this again then.
+    private func openRequestedNoteIfNeeded() {
+        guard let path = launchRouter.requestedNotePath, let vaultURL else { return }
+        launchRouter.clearNoteRequest()
+        let fileURL = vaultURL.appendingPathComponent(path)
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            logger.info("Opening note from link: \(path, privacy: .public)")
+            openFiledNote(fileURL)
+        } else {
+            logger.info("Linked note missing: \(path, privacy: .public); showing Digest")
+            tabSelection.wrappedValue = .digest
+        }
+    }
+
     /// Capture filed a note and the user tapped its status line. Browse owns the
     /// editor, and its workspace may not exist yet on a capture-first launch, so
     /// start it before handing the note over.
@@ -220,12 +260,21 @@ struct RootTabView: View {
         Binding(
             get: { selectedTab },
             set: { newTab in
+                if newTab == .today, selectedTab == .today {
+                    todayReselectRevision += 1
+                }
                 if Noto2StartupPolicy.requiresWorkspace(newTab) {
                     startDeferredServicesIfNeeded()
                 }
                 selectedTab = newTab
             }
         )
+    }
+
+    private func tabIcon(_ tab: Noto2Tab) -> some View {
+        Image(systemName: tab.systemImage)
+            .accessibilityLabel(tab.title)
+            .accessibilityIdentifier("tab_\(tab.rawValue)")
     }
 
     private var deferredTabPlaceholder: some View {
@@ -245,9 +294,14 @@ struct RootTabView: View {
         prepareWorkspaceIfNeeded()
         guard !hasStartedDeferredServices else { return }
         hasStartedDeferredServices = true
+        refreshInboxBadge()
         fileWatcher.watch(directory: vaultURL)
         SemanticSearch.configureAtStartup()
         startSearchMaintenance()
+    }
+
+    private func refreshInboxBadge() {
+        Task { await inboxBadge.refresh(vaultURL: vaultURL) }
     }
 
     private func startSearchMaintenance() {

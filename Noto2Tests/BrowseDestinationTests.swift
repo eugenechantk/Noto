@@ -2,64 +2,12 @@ import Foundation
 import Testing
 @testable import Noto2
 
-/// Test case index
-/// 1. filedStatusCarriesTheFileURL — a filed capture's line knows which note to open (SC1)
-/// 2. filedTextNamesTheRelativePath — the line reads "Filed · inbox/<slug>.md" (SC1)
-/// 3. discardedStatusHasNoFileURL — a discard opens nothing (SC2)
-/// 4. duplicateStatusIsStillOpenable — "Already filed" still points at the existing note (SC3)
-/// 5. openableStatusDwellsLongerThanADiscard — a tappable line outlives the old 1.5s (SC4)
-/// 6. filedNoteURLResolvesToItsDestination — a real filed note resolves to its editor target (SC5)
-/// 7. noteInSubfolderResolvesToItsOwnDirectory — inbox/ notes get the inbox store, not the root (SC5)
-/// 8. urlOutsideTheVaultResolvesToNil — a foreign URL navigates nowhere (SC6)
-/// 9. urlWithNoNoteBehindItResolvesToNil — a vault-shaped path with no file navigates nowhere (SC6)
-struct CaptureStatusTests {
-    private let fileURL = URL(fileURLWithPath: "/tmp/Vault/inbox/2026-09-01-1a2b3c4d.md")
-
-    // MARK: - Unit
-
-    @Test func filedStatusCarriesTheFileURL() {
-        let status = CaptureStatus.filed(
-            relativePath: "inbox/2026-09-01-1a2b3c4d.md", fileURL: fileURL, didCreate: true
-        )
-        #expect(status.fileURL == fileURL)
-        #expect(status.isOpenable)
-        #expect(status.isDiscard == false)
-    }
-
-    @Test func filedTextNamesTheRelativePath() {
-        let status = CaptureStatus.filed(
-            relativePath: "inbox/2026-09-01-1a2b3c4d.md", fileURL: fileURL, didCreate: true
-        )
-        #expect(status.text == "Filed · inbox/2026-09-01-1a2b3c4d.md")
-        #expect(status.glyph == "checkmark")
-    }
-
-    @Test func discardedStatusHasNoFileURL() {
-        let status = CaptureStatus.discarded()
-        #expect(status.fileURL == nil)
-        #expect(status.isOpenable == false)
-        #expect(status.isDiscard)
-    }
-
-    @Test func duplicateStatusIsStillOpenable() {
-        // The capture was not written again, but the note it duplicates exists
-        // and is exactly what the user wants to open.
-        let status = CaptureStatus.filed(
-            relativePath: "inbox/2026-09-01-1a2b3c4d.md", fileURL: fileURL, didCreate: false
-        )
-        #expect(status.isOpenable)
-        #expect(status.text.hasPrefix("Already filed · "))
-        #expect(status.glyph == "doc.on.doc")
-    }
-
-    @Test func openableStatusDwellsLongerThanADiscard() {
-        let openable = CaptureStatus.filed(relativePath: "inbox/a.md", fileURL: fileURL, didCreate: true)
-        let discarded = CaptureStatus.discarded()
-        #expect(openable.dwell == .seconds(6))
-        #expect(discarded.dwell == .seconds(1.5))
-        #expect(openable.dwell > discarded.dwell)
-    }
-
+/// Test case index — where an "Open" from Capture's toast lands in Library.
+/// 1. filedNoteURLResolvesToItsDestination — a real filed note resolves to its editor target
+/// 2. noteInSubfolderResolvesToItsOwnDirectory — inbox/ notes get the inbox store, not the root
+/// 3. urlOutsideTheVaultResolvesToNil — a foreign URL navigates nowhere
+/// 4. urlWithNoNoteBehindItResolvesToNil — a vault-shaped path with no file navigates nowhere
+struct BrowseDestinationTests {
     // MARK: - Integration (real temp vault)
 
     private func makeVault() throws -> URL {

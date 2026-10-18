@@ -15,6 +15,15 @@ struct EditorContentView: View {
     var onOpenDocumentLink: ((String) -> Void)?
     var onOpenDocumentLinkInNewWindow: ((String) -> Void)?
     var onFindNavigate: (EditorFindNavigationDirection) -> Void
+    var showsFindBar = true
+    var focusEditorOnOpen = false
+    var usesFocusLayout = false
+    var dailyNoteDate: Date?
+    var textColumnWidth: CGFloat?
+    var minimumTextInset: CGFloat = 32
+    var showsMetadataProperties = true
+    var documentBreadcrumb: String?
+    var documentTitleSize: CGFloat = 30
     var scrollRestorationID: String?
     var initialContentOffsetY: CGFloat?
     var onContentOffsetYChange: ((CGFloat) -> Void)?
@@ -108,7 +117,7 @@ struct EditorContentView: View {
                     editorView
                 }
 
-                if isFindVisible {
+                if isFindVisible && showsFindBar {
                     EditorFindBar(
                         query: $findQuery,
                         status: findStatus,
@@ -166,7 +175,14 @@ struct EditorContentView: View {
         TextKit2EditorView(
             text: $session.content,
             documentID: session.note.id.uuidString,
-            autoFocus: session.isNew,
+            autoFocus: focusEditorOnOpen || session.isNew,
+            usesFocusLayout: usesFocusLayout,
+            dailyNoteDate: dailyNoteDate,
+            textColumnWidth: textColumnWidth,
+            minimumTextInset: minimumTextInset,
+            showsMetadataProperties: showsMetadataProperties,
+            documentBreadcrumb: documentBreadcrumb,
+            documentTitleSize: documentTitleSize,
             onTextChange: session.handleEditorChange,
             vaultRootURL: session.store.vaultRootURL,
             onImportImageFile: session.importImageAttachment(fileURL:),

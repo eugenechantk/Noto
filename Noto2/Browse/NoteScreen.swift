@@ -9,7 +9,6 @@ struct NoteScreen: View {
     var onNoteDeleted: () -> Void
 
     @State private var session: NoteEditorSession
-    @State private var tagController: TagController
     @State private var isFindVisible = false
     @State private var findQuery = ""
     @State private var findNavigationRequest: EditorFindNavigationRequest?
@@ -21,6 +20,8 @@ struct NoteScreen: View {
     @State private var pendingMoveAfterProperties = false
     @State private var showMoveSheet = false
     @State private var showDeleteConfirmation = false
+    @State private var pinError: String?
+    private let initialFindQuery: String?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -34,43 +35,41 @@ struct NoteScreen: View {
         note: MarkdownNote,
         isNew: Bool = false,
         vaultController: VaultController,
-        onNoteDeleted: @escaping () -> Void = {}
+        onNoteDeleted: @escaping () -> Void = {},
+        initialFindQuery: String? = nil
     ) {
         self.store = store
         self.vaultController = vaultController
         self.onNoteDeleted = onNoteDeleted
+        self.initialFindQuery = initialFindQuery
         _session = State(initialValue: NoteEditorSession(
             store: store,
             note: note,
             isNew: isNew,
             vaultController: vaultController
         ))
-        _tagController = State(initialValue: TagController(vaultURL: vaultController.vaultURL))
     }
 
     var body: some View {
         editorSurface
             .background(NotoTheme.background.ignoresSafeArea())
-            .navigationTitle(session.note.title.isEmpty ? "Untitled" : session.note.title)
+            .navigationTitle("")
+            .navigationBarBackButtonHidden(true)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .tabBar)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NoteEditorActionsMenu(
-                        statusCount: statusCount,
-                        onSearchRequested: showFind,
-                        onShowProperties: presentProperties,
-                        propertyCount: propertyCount,
-                        onCopyPathRequested: copyNotePath,
-                        onMoveRequested: { showMoveSheet = true },
-                        onDeleteRequested: { showDeleteConfirmation = true }
-                    )
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: { Image(systemName: "chevron.left") }
+                        .accessibilityLabel("Back").accessibilityIdentifier("libraryNoteBack")
                 }
+                ToolbarItem(placement: .topBarTrailing) { noteActions }
             }
-            .modifier(NoteEditorNavigationBarBackdropVisibility())
             .task(id: session.note.id) {
-                guard !session.hasLoaded else { return }
-                await session.loadNoteContent()
+                if !session.hasLoaded { await session.loadNoteContent() }
+                if let initialFindQuery, !initialFindQuery.isEmpty {
+                    findQuery = initialFindQuery
+                    isFindVisible = true
+                }
             }
             // Pick up changes made outside this editor — another device via iCloud,
             // or Hermes appending a shared post's media. The session skips the
@@ -90,27 +89,19 @@ struct NoteScreen: View {
                 session.persistFinalSnapshotIfNeeded(isExternallyDeleting: false)
             }
             .sheet(isPresented: $showProperties, onDismiss: openPendingMoveIfNeeded) {
-                PropertiesSheet(
-                    session: session,
-                    onClose: { showProperties = false },
-                    onMoveFolder: {
-                        pendingMoveAfterProperties = true
-                        showProperties = false
-                    }
-                )
-                .presentationDetents([.medium, .large])
+                LibraryNoteInfoSheet(session: session, count: statusCount, onClose: { showProperties = false }, onMoveFolder: {
+                    pendingMoveAfterProperties = true
+                    showProperties = false
+                })
+                .presentationDetents([.fraction(0.8), .large])
                 .presentationDragIndicator(.visible)
-                .environment(tagController)
             }
             .sheet(isPresented: $showMoveSheet) {
-                MoveNoteDestinationPicker(
-                    vaultRootURL: store.vaultRootURL,
-                    currentDirectoryURL: session.note.fileURL.deletingLastPathComponent(),
-                    directoryLoader: store.directoryLoader,
-                    onCancel: { showMoveSheet = false },
-                    onMove: moveCurrentNote
-                )
+                LibraryMoveNoteSheet(vaultController: vaultController, note: session.note, onCancel: { showMoveSheet = false }, onMove: moveCurrentNote)
             }
+            .alert("Could not pin note", isPresented: Binding(get: { pinError != nil }, set: { if !$0 { pinError = nil } })) {
+                Button("OK", role: .cancel) { pinError = nil }
+            } message: { Text(pinError ?? "") }
             .confirmationDialog("Delete this note?", isPresented: $showDeleteConfirmation) {
                 Button("Delete Note", role: .destructive, action: deleteCurrentNote)
                     .accessibilityIdentifier("confirm_delete_note_button")
@@ -118,32 +109,40 @@ struct NoteScreen: View {
             }
     }
 
-    private func copyNotePath() {
-        let path = store.vaultRelativePath(for: session.note.fileURL)
-            ?? session.note.fileURL.standardizedFileURL.path
-        NotePathClipboard.copy(path)
+    private var noteActions: some View {
+        Menu {
+            Button(NotePinning.isPinned(in: session.content) ? "Unpin from Library" : "Pin to Library", systemImage: NotePinning.isPinned(in: session.content) ? "pin.slash" : "pin") { togglePin() }
+                .accessibilityIdentifier("notePinAction")
+            Button("Note info", systemImage: "info.circle", action: presentProperties)
+                .accessibilityIdentifier("properties_menu_item")
+            Button("Move to folder", systemImage: "folder", action: { showMoveSheet = true })
+                .accessibilityIdentifier("move_note_menu_item")
+            Button("Find in note", systemImage: "magnifyingglass", action: showFind)
+                .accessibilityIdentifier("search_in_note_menu_item")
+            Button("Copy note link", systemImage: "link", action: copyNoteLink)
+                .accessibilityIdentifier("copy_note_link_menu_item")
+            ShareLink(item: session.note.fileURL) { Label("Share", systemImage: "square.and.arrow.up") }
+                .accessibilityIdentifier("share_note_menu_item")
+            Divider()
+            Button("Delete note", systemImage: "trash", role: .destructive) { showDeleteConfirmation = true }
+                .accessibilityIdentifier("delete_note_menu_item")
+        } label: { Image(systemName: "ellipsis") }
+        .accessibilityLabel("Note actions")
+        .accessibilityIdentifier("noteMoreMenu")
     }
 
-    /// The editor remains full-screen underneath the navigation chrome. The
-    /// geometry reader itself stays in the navigation-safe region, so its
-    /// global top gives us the exact screen-top-to-bar-bottom distance used by
-    /// the LFG-style glass fade.
-    @ViewBuilder
-    private var editorSurface: some View {
-        if #available(iOS 26.0, *) {
-            GeometryReader { safeAreaProxy in
-                let chromeHeight = max(safeAreaProxy.frame(in: .global).minY, 0)
-
-                editorContent
-                    .overlay(alignment: .top) {
-                        Noto2TopChromeFade(chromeHeight: chromeHeight)
-                            .offset(y: -chromeHeight)
-                    }
-            }
-        } else {
-            editorContent
-        }
+    private func copyNoteLink() {
+        guard let path = store.vaultRelativePath(for: session.note.fileURL),
+              let url = Noto2LaunchRoute.openNoteURL(relativePath: path) else { return }
+        NotePathClipboard.copy(url.absoluteString)
     }
+
+    private func togglePin() {
+        do { try LibraryNotePinAction.toggle(session: session) }
+        catch { pinError = "The note could not be saved. Try again after it finishes downloading." }
+    }
+
+    private var editorSurface: some View { editorContent }
 
     private var editorContent: some View {
         EditorContentView(
@@ -180,8 +179,6 @@ struct NoteScreen: View {
     }
 
     private func presentProperties() {
-        tagController.load()
-        tagController.rebuildMembership()
         withAnimation(.easeInOut(duration: 0.18)) {
             showProperties = true
         }

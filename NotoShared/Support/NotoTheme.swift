@@ -5,8 +5,8 @@ import UIKit
 import AppKit
 #endif
 
-/// Design tokens for the Noto v2 redesign (claude.ai/design "Noto System").
-/// Dark-only. Source of truth: `.claude/ios-redesign/component-breakdown.md` §1.
+/// Shared theme API. Noto 2 uses the C canvas palette; Noto keeps its existing palette.
+/// Noto 2 reference: `.codex/design/noto2-20261018/boards.json`.
 /// Self-contained (own RGB helper) so it doesn't depend on cross-file extensions.
 enum NotoTheme {
     private static func rgb(_ hex: UInt32, _ opacity: Double = 1) -> Color {
@@ -17,24 +17,44 @@ enum NotoTheme {
               opacity: opacity)
     }
 
+    private static let isNoto2 = Bundle.main.bundleIdentifier?.hasPrefix("com.eugenechan.Noto2") == true
+
     // MARK: Surfaces & text
-    static let background = rgb(0x0E1116)
-    static let ink        = rgb(0xECECEE)            // body text
-    static let head       = Color.white             // headings / row titles
-    static let muted      = Color.white.opacity(0.62)
-    static let faint      = rgb(0xECECEE, 0.34)
+    static let background = rgb(isNoto2 ? 0x0F0F10 : 0x0E1116)
+    static let ink        = rgb(isNoto2 ? 0xF2F1EE : 0xECECEE)            // body text
+    static let head       = (isNoto2 ? rgb(0xF2F1EE) : Color.white) // headings / row titles
+    static let muted      = (isNoto2 ? rgb(0xA3A09A) : Color.white.opacity(0.62))
+    static let faint      = (isNoto2 ? rgb(0x8C8983) : rgb(0xECECEE, 0.34))
     static let hairline   = Color.white.opacity(0.10)
     static let accent     = rgb(0xFF6A2E)
 
     // MARK: Grouped list (properties sheet)
-    static let groupedBackground = rgb(0x111419)     // systemGroupedBackground (dark)
-    static let card              = rgb(0x1C2027)     // secondarySystemGroupedBackground
+    static let groupedBackground = rgb(isNoto2 ? 0x0F0F10 : 0x111419)     // systemGroupedBackground (dark)
+    static let card              = rgb(isNoto2 ? 0x1C1C1E : 0x1C2027)     // secondarySystemGroupedBackground
     static let separator         = rgb(0x545458, 0.55)
     static let chipFill          = rgb(0x767680, 0.24)
 
     // MARK: Status / destructive
     static let statusAmber = rgb(0xE6B62A)
-    static let destructive = rgb(0xFF3B30)
+    static let destructive = rgb(isNoto2 ? 0xFF6B5E : 0xFF3B30)
+
+    // MARK: Noto 2 content and Inbox actions
+    static let peek = rgb(0x151517)
+    static let sheet = rgb(0x161618)
+    static let subdued = rgb(0x2A2A2D)
+    static let secondaryFill = rgb(0x2C2C2F)
+    static let accentText = rgb(0xFF8A5C)
+    static let accentSoft = rgb(0x3A2418)
+    static let onAccent = rgb(0x1D0D05)
+    static let inboxAddTo = rgb(0x6EA8FF)
+    static let inboxAddToSoft = rgb(0x16243A)
+    static let inboxNewNote = rgb(0x5CC271)
+    static let inboxNewNoteSoft = rgb(0x15301D)
+    static let inboxLater = rgb(0xE6B62A)
+    static let inboxLaterSoft = rgb(0x3A2F12)
+    static let inboxDiscard = rgb(0xFF6B5E)
+    static let inboxDiscardSoft = rgb(0x3A1B18)
+    static let onAction = rgb(0x0B0B0C)
 
     /// Accent-tinted selection background for the active row.
     static let selectedRowBackground = rgb(0xFF6A2E, 0.12)
@@ -53,10 +73,10 @@ enum NotoTheme {
     }
 
     #if os(iOS)
-    static let uiBackground = UIColor(red: 0x0E / 255.0, green: 0x11 / 255.0, blue: 0x16 / 255.0, alpha: 1)
-    static let uiInk        = UIColor(red: 0xEC / 255.0, green: 0xEC / 255.0, blue: 0xEE / 255.0, alpha: 1)
+    static let uiBackground = UIColor(background)
+    static let uiInk        = UIColor(ink)
     static let uiAccent     = UIColor(red: 0xFF / 255.0, green: 0x6A / 255.0, blue: 0x2E / 255.0, alpha: 1)
-    static let uiCard       = UIColor(red: 0x1C / 255.0, green: 0x20 / 255.0, blue: 0x27 / 255.0, alpha: 1)
+    static let uiCard       = UIColor(card)
     #elseif os(macOS)
     static let nsBackground = NSColor(red: 0x0E / 255.0, green: 0x11 / 255.0, blue: 0x16 / 255.0, alpha: 1)
     static let nsInk        = NSColor(red: 0xEC / 255.0, green: 0xEC / 255.0, blue: 0xEE / 255.0, alpha: 1)

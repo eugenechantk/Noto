@@ -49,13 +49,14 @@ final class ReadwiseSyncController: ObservableObject {
         tokenStore: any ReadwiseTokenStore = KeychainReadwiseTokenStore(),
         bundledTokenProvider: any ReadwiseBundledTokenProviding = BundleReadwiseBundledTokenProvider(),
         runner: any ReadwiseSyncRunning = PackageReadwiseSyncRunner(),
-        refreshIndex: @escaping ReadwiseSyncIndexRefresher = ReadwiseSyncController.defaultIndexRefresher
+        refreshIndex: @escaping ReadwiseSyncIndexRefresher = ReadwiseSyncController.defaultIndexRefresher,
+        refreshOnInit: Bool = true
     ) {
         self.tokenStore = tokenStore
         self.bundledTokenProvider = bundledTokenProvider
         self.runner = runner
         self.refreshIndex = refreshIndex
-        refreshSavedTokenState()
+        if refreshOnInit && !usesPreviewStorage { refreshSavedTokenState() }
     }
 
     var canSaveToken: Bool {
@@ -214,7 +215,12 @@ final class ReadwiseSyncController: ObservableObject {
         }
     }
 
+    private var usesPreviewStorage: Bool {
+        NotoPreviewConfiguration.isEnabled && tokenStore is KeychainReadwiseTokenStore
+    }
+
     private var activeToken: String? {
+        guard !usesPreviewStorage else { return nil }
         if let token = normalizedToken(tokenInput) {
             return token
         }

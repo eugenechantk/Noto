@@ -17,7 +17,7 @@ struct SettingsView: View {
     @State private var isResumingSemanticIndex = false
     @ObservedObject private var indexStatus = SearchIndexStatusModel.shared
     @State private var openRouterKeyInput = ""
-    @State private var openRouterKeySaved = OpenRouterKeyStore.hasKey
+    @State private var openRouterKeySaved = NotoPreviewConfiguration.isEnabled ? false : OpenRouterKeyStore.hasKey
     @State private var openRouterBaseURLInput = OpenRouterBaseURLStore.load() ?? ""
     @State private var editingTag: TagDefinition?
     @Environment(\.dismiss) private var dismiss
