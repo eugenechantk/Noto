@@ -9,6 +9,7 @@ import Testing
 /// 4. everyActionNeedsText — a blank draft disables the whole menu
 /// 5. filingActionsAlsoNeedAVault — Copy and Discard work without a vault; filing does not
 /// 6. menuItemsHaveStableIdentifiers — automation contracts for the simulator audit
+/// 7. captureEditorKeepsTheFloatingToolbar — the live editor shows the glass keyboard toolbar (bug 044)
 struct CaptureActionsTests {
     @Test func fileButtonNeedsTextAVaultAndIdle() {
         #expect(CaptureActions.canFile(draft: "a thought", hasVault: true, isBusy: false))
@@ -48,5 +49,9 @@ struct CaptureActionsTests {
             "captureMenuFile", "captureMenuAddTo", "captureMenuNewNote", "captureMenuCopy", "captureMenuDiscard",
         ])
         #expect(Set(CaptureMenuAction.allCases.map(\.systemImage)).count == CaptureMenuAction.allCases.count)
+    }
+
+    @Test func captureEditorKeepsTheFloatingToolbar() {
+        #expect(CaptureScreen.editorKeyboardToolbarStyle == .floating)
     }
 }

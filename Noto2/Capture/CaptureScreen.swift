@@ -59,6 +59,10 @@ struct CaptureScreen: View {
     /// Drag distance past which a still-moving flick detaches mid-gesture.
     private static let autoCommitDistance: CGFloat = 150
     private static let cardCornerRadius: CGFloat = 28
+    /// The live editor keeps the floating glass toolbar (todo, indent,
+    /// formatting, hide keyboard). The 0.2.0 redesign hid it; Eugene asked
+    /// for it back on 2026-10-18.
+    static let editorKeyboardToolbarStyle: EditorKeyboardToolbarStyle = .floating
 
     private var normalizedDraft: String { CaptureFilingService.normalizedBody(draft) }
     private var canSend: Bool { CaptureActions.canFile(draft: draft, hasVault: vaultURL != nil, isBusy: isSending) }
@@ -147,6 +151,14 @@ struct CaptureScreen: View {
             .padding(.top, 8)
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // A tap on blank space puts the keyboard away. The card sits above
+            // this layer, so taps inside the card never land here.
+            .background {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: dismissKeyboard)
+                    .accessibilityIdentifier("captureBlankArea")
+            }
             // The swipe works from the gaps too — matters when a long note
             // makes the editor consume in-card pans for scrolling.
             .contentShape(Rectangle())
@@ -219,7 +231,7 @@ struct CaptureScreen: View {
                     draft = newText
                 },
                 vaultRootURL: vaultURL,
-                keyboardToolbarStyle: .hidden,
+                keyboardToolbarStyle: Self.editorKeyboardToolbarStyle,
                 backgroundColorOverride: NotoTheme.uiCard,
                 // With bounce off, a swipe over a short draft passes through the
                 // text view to the container's drag gesture.
@@ -690,6 +702,10 @@ struct CaptureScreen: View {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
             cardArriving = false
         }
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private func clearEditor() {
