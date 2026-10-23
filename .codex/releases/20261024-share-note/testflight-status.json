@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-10-23T17:59:55Z",
+  "appId": "6804900143",
+  "bundleId": "com.eugenechan.Noto2",
+  "highestTrain": "0.2.0",
+  "builds": {
+    "202610240125": {
+      "listed": false
+    },
+    "202610240135": {
+      "id": "ea4a6819-f5cf-4878-a4b7-72c224f818cf",
+      "processingState": "VALID",
+      "train": "0.2.0",
+      "internalBuildState": "IN_BETA_TESTING",
+      "expired": false
+    }
+  }
+}

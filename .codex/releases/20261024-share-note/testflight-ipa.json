@@ -1,0 +1,36 @@
+{
+  "ipa": "/Users/eugenechan/dev/personal/Noto-share-release/build/fastlane/Noto2.ipa",
+  "ipaSha256": "66c3f601fbb93061925be28874f8bed3fe34ac478a629cd227bf87d2f4debe30",
+  "ipaBytes": 102211727,
+  "sourceCommit": "3c2409f966e8afecc15975110bbee8210e6fb4a2",
+  "version": "0.2.0",
+  "build": "202610240135",
+  "bundles": [
+    {
+      "bundleId": "com.eugenechan.Noto2",
+      "version": "0.2.0",
+      "build": "202610240135",
+      "signature": "Apple Distribution; strict verification passed",
+      "profile": "match AppStore com.eugenechan.Noto2",
+      "executableSha256": "477ebfb00f8818d5d9bb0c64b4f330cb7433a630cee60d3da53eec712523d79a"
+    },
+    {
+      "bundleId": "com.eugenechan.Noto2.QuickCaptureControl",
+      "version": "0.2.0",
+      "build": "202610240135",
+      "signature": "Apple Distribution; strict verification passed",
+      "profile": "match AppStore com.eugenechan.Noto2.QuickCaptureControl",
+      "executableSha256": "52e4d3c0fb9adb1fe657ca16fec03979a2be7e1dcf9a5a0f2aec511c3e59f4be"
+    },
+    {
+      "bundleId": "com.eugenechan.Noto2.ShareExtension",
+      "version": "0.2.0",
+      "build": "202610240135",
+      "signature": "Apple Distribution; strict verification passed",
+      "profile": "match AppStore com.eugenechan.Noto2.ShareExtension",
+      "executableSha256": "8d1e54a19d57de911cc0ad7a4c27a7342651478a97ac74177efe84cd725d0b44"
+    }
+  ],
+  "modelWeightsMatchVerifiedSource": true,
+  "result": "PASS"
+}

@@ -1,0 +1,19 @@
+{
+  "host": "Eugenes-MacBook-Air.local",
+  "architecture": "arm64",
+  "version": "0.2.0",
+  "build": "202610240135",
+  "bundleId": "com.eugenechan.Noto",
+  "installedPath": "/Applications/Noto.app",
+  "backupPath": "/Users/eugenechan/Library/Application Support/Noto/ReleaseBackups/202610240135/Noto.app",
+  "bundleFilesVerified": 23,
+  "signatureVerified": true,
+  "executableSha256": "227fe1f55e693f2b3c912b536a2c5e10f16ded33efacdd267a1834235933d410",
+  "pids": [
+    85402
+  ],
+  "processPaths": [
+    "/Applications/Noto.app/Contents/MacOS/Noto"
+  ],
+  "launchServicesPath": "/Applications/Noto.app"
+}
