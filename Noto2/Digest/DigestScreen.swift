@@ -1,4 +1,5 @@
 import NotoDigest
+import NotoVault
 import NotoLinkPreview
 import SwiftUI
 import UIKit
@@ -86,6 +87,12 @@ struct DigestScreen: View {
                     .accessibilityIdentifier("inboxTitle")
                 }
                 .sharedBackgroundVisibility(.hidden)
+                if showingDetail && !isCueDragActive, let entry = detailEntry {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NoteMarkdownShareLink(item: shareItem(for: entry))
+                            .accessibilityIdentifier("share_note_button")
+                    }
+                }
                 if !showingDetail && !isCueDragActive {
                     ToolbarItem(placement: .topBarTrailing) {
                         Picker("View", selection: $presentation) {
@@ -147,6 +154,7 @@ struct DigestScreen: View {
         .alert("Couldn't finish this action", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(model.errorMessage ?? "") }
+        .noteSharing()
     }
 
     private var progressLine: some View {
@@ -327,12 +335,22 @@ struct DigestScreen: View {
 
     private func actionMenu(_ entry: DigestEntry) -> some View {
         Group {
+            NoteMarkdownShareLink(item: shareItem(for: entry))
+                .accessibilityIdentifier("share_note_context_item")
             Button("Add to note…", systemImage: "text.append") { choose(.addTo, entry: entry) }.accessibilityIdentifier("inboxMenuAddTo")
             Button("New note…", systemImage: "doc.badge.plus") { choose(.create, entry: entry) }.accessibilityIdentifier("inboxMenuNewNote")
             Button("Later", systemImage: "clock") { choose(.snooze, entry: entry) }.accessibilityIdentifier("inboxMenuLater")
             Button("Discard", systemImage: "trash", role: .destructive) { choose(.discard, entry: entry) }.accessibilityIdentifier("inboxMenuDiscard")
         }
         .disabled(model.isBusy || !entry.isAvailable)
+    }
+
+    private func shareItem(for entry: DigestEntry) -> NoteMarkdownShare? {
+        guard entry.isAvailable else { return nil }
+        if showingDetail && detailEntry?.id == entry.id && detailText != detailOriginal {
+            return NoteMarkdownShare(body: detailText)
+        }
+        return NoteMarkdownShare(fileURL: entry.fileURL)
     }
 
     private var emptyState: some View {

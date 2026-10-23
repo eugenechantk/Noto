@@ -7,6 +7,7 @@ struct EditorNavigationChrome: ViewModifier {
     let vaultRootURL: URL
     let noteFileURL: URL
     let statusCount: WordCounter.Count
+    var shareItem: NoteMarkdownShare? = nil
     var leadingControls: EditorLeadingChromeControls = .none
     var onTapBreadcrumbLevel: ((URL) -> Void)?
     var onOpenTodayNote: (() -> Void)?
@@ -25,9 +26,7 @@ struct EditorNavigationChrome: ViewModifier {
     var onNavigateForward: (() -> Void)?
     var onDismiss: () -> Void
 
-    // iPad design: the detail toolbar trailing group is `search + more` (two buttons).
-    // The iPhone minimal editor is `back · more` only (search lives in the ••• menu),
-    // so the standalone search button is gated to regular width.
+    // Search stays in More on iPhone; Share is directly available at every size.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var showsTrailingSearchButton: Bool {
@@ -89,24 +88,32 @@ struct EditorNavigationChrome: ViewModifier {
                         }
                     }
 
-                    // v2 design: bare TRAILING group. iPad = `search + more` (two
-                    // buttons); iPhone = `more` only (search is in the ••• menu).
-                    // Note-history chevrons are omitted so back always pops to the file view.
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        HStack(spacing: 2) {
-                            if showsTrailingSearchButton {
-                                Button(action: onSearchRequested) {
-                                    Image(systemName: "magnifyingglass")
-                                        .font(.system(size: 18, weight: .regular))
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("editor_search_button")
-                                .accessibilityLabel("Search in Note")
+                    // Separate native items keep Share and More tap targets distinct.
+                    if showsTrailingSearchButton {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button(action: onSearchRequested) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 18, weight: .regular))
                             }
-                            moreMenu
-                                .buttonStyle(.plain)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(NotoTheme.head)
+                            .accessibilityIdentifier("editor_search_button")
+                            .accessibilityLabel("Search in Note")
                         }
-                        .foregroundStyle(NotoTheme.head)
+                        .plainToolbarBackground()
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        NoteMarkdownShareLink(item: shareItem)
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(NotoTheme.head)
+                            .accessibilityIdentifier("share_note_button")
+                    }
+                    .plainToolbarBackground()
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        moreMenu
+                            .buttonStyle(.plain)
+                            .foregroundStyle(NotoTheme.head)
                     }
                     .plainToolbarBackground()
                 }
@@ -131,6 +138,7 @@ struct EditorNavigationChrome: ViewModifier {
     private var moreMenu: some View {
         NoteEditorActionsMenu(
             statusCount: statusCount,
+            shareItem: shareItem,
             onSearchRequested: onSearchRequested,
             onShowProperties: onShowProperties,
             propertyCount: propertyCount,

@@ -17,6 +17,7 @@ enum NotePathClipboard {
 /// shared layer prevents the two apps from drifting as editor actions evolve.
 struct NoteEditorActionsMenu: View {
     let statusCount: WordCounter.Count
+    var shareItem: NoteMarkdownShare? = nil
     let onSearchRequested: () -> Void
     let onShowProperties: (() -> Void)?
     let propertyCount: Int
@@ -51,6 +52,9 @@ struct NoteEditorActionsMenu: View {
                 Label("Copy Path", systemImage: "doc.on.doc")
             }
             .accessibilityIdentifier("copy_note_path_menu_item")
+
+            NoteMarkdownShareLink(item: shareItem)
+                .accessibilityIdentifier("share_note_menu_item")
 
             Divider()
 

@@ -145,6 +145,7 @@ struct NoteEditorScreen: View {
             vaultRootURL: store.vaultRootURL,
             noteFileURL: session.note.fileURL,
             statusCount: statusCount,
+            shareItem: session.markdownShare,
             leadingControls: leadingChromeControls,
             onTapBreadcrumbLevel: onTapBreadcrumbLevel,
             onOpenTodayNote: onOpenTodayNote,
@@ -219,6 +220,7 @@ struct NoteEditorScreen: View {
             vaultRootURL: store.vaultRootURL,
             noteFileURL: session.note.fileURL,
             statusCount: statusCount,
+            shareItem: session.markdownShare,
             leadingControls: leadingChromeControls,
             canNavigateBack: canNavigateBack,
             canNavigateForward: canNavigateForward,
@@ -313,6 +315,7 @@ struct NoteEditorScreen: View {
                 }
             )
         }
+        .noteSharing()
     }
 
     private func deleteCurrentNote() {

@@ -56,6 +56,15 @@ final class MacDesktopModel {
     var document = ""
     var documentReady = false
     var activeEditorID: UUID?
+    var selectedNoteShare: NoteMarkdownShare? {
+        guard selectedNote != nil, documentReady else { return nil }
+        return NoteMarkdownShare(markdown: document)
+    }
+
+    func markdownShare(for note: VaultLibraryNote) -> NoteMarkdownShare {
+        if selectedNote?.id == note.id, let selectedNoteShare { return selectedNoteShare }
+        return NoteMarkdownShare(fileURL: note.fileURL)
+    }
     var isLoading = false
     var error: String?
     var palette: MacPalettePurpose?

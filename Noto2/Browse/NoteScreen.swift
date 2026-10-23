@@ -62,6 +62,10 @@ struct NoteScreen: View {
                     Button { dismiss() } label: { Image(systemName: "chevron.left") }
                         .accessibilityLabel("Back").accessibilityIdentifier("libraryNoteBack")
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    NoteMarkdownShareLink(item: session.markdownShare)
+                        .accessibilityIdentifier("share_note_button")
+                }
                 ToolbarItem(placement: .topBarTrailing) { noteActions }
             }
             .task(id: session.note.id) {
@@ -107,6 +111,7 @@ struct NoteScreen: View {
                     .accessibilityIdentifier("confirm_delete_note_button")
                 Button("Cancel", role: .cancel) {}
             }
+            .noteSharing()
     }
 
     private var noteActions: some View {
@@ -121,7 +126,7 @@ struct NoteScreen: View {
                 .accessibilityIdentifier("search_in_note_menu_item")
             Button("Copy note link", systemImage: "link", action: copyNoteLink)
                 .accessibilityIdentifier("copy_note_link_menu_item")
-            ShareLink(item: session.note.fileURL) { Label("Share", systemImage: "square.and.arrow.up") }
+            NoteMarkdownShareLink(item: session.markdownShare)
                 .accessibilityIdentifier("share_note_menu_item")
             Divider()
             Button("Delete note", systemImage: "trash", role: .destructive) { showDeleteConfirmation = true }

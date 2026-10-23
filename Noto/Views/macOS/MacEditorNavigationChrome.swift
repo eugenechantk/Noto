@@ -9,6 +9,7 @@ struct EditorNavigationChrome: ViewModifier {
     let vaultRootURL: URL
     let noteFileURL: URL
     let statusCount: WordCounter.Count
+    var shareItem: NoteMarkdownShare? = nil
     var leadingControls: EditorLeadingChromeControls = .none
     var canNavigateBack = false
     var canNavigateForward = false
@@ -92,6 +93,11 @@ struct EditorNavigationChrome: ViewModifier {
 
                 inContentButton("magnifyingglass", id: "editor_search_button", label: "Search in Note",
                                 shortcut: ("f", [.command]), action: onSearchRequested)
+                NoteMarkdownShareLink(item: shareItem)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.plain)
+                    .frame(width: 30, height: 30)
+                    .accessibilityIdentifier("share_note_button")
                 inContentMoreMenu
             }
         }
@@ -194,6 +200,9 @@ struct EditorNavigationChrome: ViewModifier {
                         .help("Search in Note")
                         .keyboardShortcut("f", modifiers: [.command])
 
+                        NoteMarkdownShareLink(item: shareItem)
+                            .labelStyle(.iconOnly)
+                            .accessibilityIdentifier("share_note_button")
                         moreMenu
                     }
                 }
@@ -205,6 +214,8 @@ struct EditorNavigationChrome: ViewModifier {
 
     @ViewBuilder
     private var moreMenuItems: some View {
+            NoteMarkdownShareLink(item: shareItem)
+                .accessibilityIdentifier("share_note_menu_item")
             if let onShowProperties {
                 Button(action: onShowProperties) {
                     Text("Properties")

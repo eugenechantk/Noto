@@ -187,6 +187,9 @@ struct MacDesktopWorkspace: View {
                 Spacer()
                 Text(model.selectedNote?.title ?? "").font(.system(size: 13)).foregroundStyle(MacDesktopStyle.secondary)
                 Spacer()
+                NoteMarkdownShareLink(item: model.selectedNoteShare)
+                    .labelStyle(.iconOnly).buttonStyle(.plain)
+                    .accessibilityIdentifier("share_note_button")
                 Button { focusMode = false } label: {
                     HStack(spacing: 6) { Text("Focus").fontWeight(.semibold); Text("⇧⌘F") }
                         .font(.system(size: 12)).foregroundStyle(MacDesktopStyle.icon).padding(.horizontal, 10).frame(height: 32)
@@ -250,16 +253,19 @@ struct MacDesktopWorkspace: View {
                     Button { model.palette = .search } label: { Image(systemName: "magnifyingglass").font(.system(size: 15)).frame(width: 32, height: 26) }
                         .buttonStyle(.plain).accessibilityLabel("Search your notes").accessibilityIdentifier("macSearch")
                     if inspectorActions {
-                        ShareLink(item: model.selectedNote?.fileURL ?? model.vaultURL) { Image(systemName: "square.and.arrow.up").font(.system(size: 16)).frame(width: 32, height: 26) }
+                        NoteMarkdownShareLink(item: model.selectedNoteShare).labelStyle(.iconOnly).font(.system(size: 16)).frame(width: 32, height: 26).accessibilityIdentifier("share_note_button")
                             .buttonStyle(.plain).accessibilityLabel("Share")
                         Button { setInspector(false) } label: { Image(systemName: "sidebar.right").font(.system(size: 15)).frame(width: 32, height: 26) }
                             .buttonStyle(.plain).accessibilityLabel("Hide inspector").accessibilityIdentifier("macToggleInspector")
                     } else {
+                        NoteMarkdownShareLink(item: model.selectedNoteShare)
+                            .labelStyle(.iconOnly).buttonStyle(.plain).frame(width: 32, height: 26)
+                            .accessibilityIdentifier("share_note_button")
                         Menu {
                             Toggle("Show Inspector", isOn: Binding(get: { inspectorVisible }, set: setInspector))
                             Toggle("Focus Mode", isOn: $focusMode)
                             Divider()
-                            ShareLink(item: model.selectedNote?.fileURL ?? model.vaultURL) { Text("Share…") }
+                            NoteMarkdownShareLink(item: model.selectedNoteShare, title: "Share…").accessibilityIdentifier("share_note_menu_item")
                         } label: { Image(systemName: "ellipsis").font(.system(size: 16)).frame(width: 32, height: 26) }
                             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().frame(width: 32, height: 26)
                             .accessibilityLabel("More").accessibilityIdentifier("macMore")
@@ -273,10 +279,14 @@ struct MacDesktopWorkspace: View {
                     .accessibilityIdentifier("macFileCapture")
             } else if !single {
                 HStack(spacing: 2) {
-                    if model.destination != .inbox { ShareLink(item: model.selectedNote?.fileURL ?? model.vaultURL) { Image(systemName: "square.and.arrow.up") }.buttonStyle(.plain).frame(width: 30, height: 28) }
+                    NoteMarkdownShareLink(item: model.selectedNoteShare).labelStyle(.iconOnly).accessibilityIdentifier("share_note_button").buttonStyle(.plain).frame(width: 30, height: 28)
                     MacDesktopIconButton(symbol: "sidebar.right", label: "Show inspector", id: "macToggleInspector") { setInspector(!inspectorVisible) }
                 }.padding(.horizontal, 3).frame(height: 32).background(.white.opacity(0.07), in: Capsule())
                     .overlay(Capsule().strokeBorder(.white.opacity(0.08)))
+            } else {
+                NoteMarkdownShareLink(item: model.selectedNoteShare)
+                    .labelStyle(.iconOnly).buttonStyle(.plain)
+                    .accessibilityIdentifier("share_note_button")
             }
             Button { model.palette = .search } label: {
                 let full = wide && contentWidth >= 800

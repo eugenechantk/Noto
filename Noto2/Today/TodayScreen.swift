@@ -28,6 +28,10 @@ struct TodayScreen: View {
                 .toolbar(focusedEditorID != nil && focusedEditorID == model.session?.editorSessionID ? .hidden : .visible, for: .tabBar)
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
+                        if let session = model.session {
+                            NoteMarkdownShareLink(item: session.markdownShare)
+                                .accessibilityIdentifier("share_note_button")
+                        }
                         Button {
                             Task { await model.previousDay() }
                         } label: {
@@ -95,6 +99,7 @@ struct TodayScreen: View {
             .task { await model.refreshWrittenDays(inMonthContaining: model.selectedDate) }
             .presentationDragIndicator(.visible)
         }
+        .noteSharing()
     }
 
     private var content: some View {

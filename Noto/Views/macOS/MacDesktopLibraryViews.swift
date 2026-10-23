@@ -242,7 +242,8 @@ struct MacDesktopNoteList: View {
             Button("Duplicate") { model.duplicate(note) }.keyboardShortcut("d")
             Button("Rename…") { model.open(note); onRename(note) }
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([note.fileURL]) }.keyboardShortcut("r", modifiers: [.command, .shift])
-            ShareLink(item: note.fileURL) { Text("Share") }
+            NoteMarkdownShareLink(item: model.markdownShare(for: note))
+                .accessibilityIdentifier("share_note_context_item")
             Divider()
             Button("Move to Trash", role: .destructive) { onTrash(note) }.keyboardShortcut(.delete, modifiers: .command)
         }

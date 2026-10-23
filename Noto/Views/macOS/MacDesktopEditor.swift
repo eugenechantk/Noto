@@ -89,7 +89,7 @@ struct MacDesktopEditor: View {
         .onChange(of: session.hasLoaded, initial: true) { _, loaded in model.documentReady = loaded; if loaded { applyPendingMove(); applyPendingDuplicate() } }
         .onChange(of: model.pendingMove) { _, _ in applyPendingMove() }
         .onChange(of: model.pendingDuplicate) { _, _ in applyPendingDuplicate() }
-        .onChange(of: session.content, initial: true) { _, content in
+        .onChange(of: session.latestEditorText, initial: true) { _, content in
             model.document = content
             countTask?.cancel()
             countTask = Task {

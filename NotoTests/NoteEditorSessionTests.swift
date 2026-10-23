@@ -20,7 +20,13 @@ struct NoteEditorSessionTests {
         #expect(session.note.title == "First Sentence")
         #expect(session.note.fileURL.lastPathComponent == note.fileURL.lastPathComponent)
 
-        try? await Task.sleep(for: .milliseconds(900))
+        // Wait for the outcome, allowing the debounce task to start while other
+        // main-actor tests run. A fixed 900 ms sleep races the 800 ms timer.
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(3))
+        while session.note.fileURL == note.fileURL, clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(25))
+        }
 
         #expect(session.note.fileURL.lastPathComponent == "First Sentence.md")
         #expect(FileManager.default.fileExists(atPath: session.note.fileURL.path))
